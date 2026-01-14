@@ -3,6 +3,10 @@ import axios from 'axios';
 
 // --- UI Components ---
 
+const formatCurrency = (value) => {
+    return "SAR " + Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
 const Card = ({ title, value, subtext, color = "blue" }) => (
     <div className={`bg-slate-800 p-6 rounded-xl shadow-lg border-l-4 border-${color}-500`}>
         <h3 className="text-gray-400 text-sm font-medium uppercase">{title}</h3>
@@ -57,16 +61,16 @@ const AllocationCard = ({ analysis }) => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                 <div className="bg-slate-800 p-3 rounded shadow-sm border border-slate-700">
                     <p className="text-xs text-gray-400 uppercase">Liquid Cash</p>
-                    <p className="text-lg font-bold text-white">AED {analysis.liquid_cash.toFixed(2)}</p>
+                    <p className="text-lg font-bold text-white">{formatCurrency(analysis.liquid_cash)}</p>
                 </div>
                 <div className="bg-slate-800 p-3 rounded shadow-sm border border-slate-700">
                     <p className="text-xs text-gray-400 uppercase">Upcoming Bills</p>
-                    <p className="text-lg font-bold text-white">AED {analysis.unpaid_obligations_this_month.toFixed(2)}</p>
+                    <p className="text-lg font-bold text-white">{formatCurrency(analysis.unpaid_obligations_this_month)}</p>
                 </div>
                 <div className="bg-slate-800 p-3 rounded shadow-sm border border-slate-700">
                     <p className="text-xs text-gray-400 uppercase">Safe to Spend</p>
                     <p className={`text-lg font-bold ${analysis.freedom_cash < 0 ? 'text-red-400' : 'text-green-400'}`}>
-                        AED {analysis.freedom_cash.toFixed(2)}
+                        {formatCurrency(analysis.freedom_cash)}
                     </p>
                 </div>
             </div>
@@ -243,8 +247,8 @@ function App() {
                 <AllocationCard analysis={analysis} />
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <Card title="Total Balance" value={`AED ${totalBalance.toFixed(2)}`} color="green" />
-                    <Card title="Total Loans" value={`AED ${totalLoans.toFixed(2)}`} color="red" />
+                    <Card title="Total Balance" value={formatCurrency(totalBalance)} color="green" />
+                    <Card title="Total Loans" value={formatCurrency(totalLoans)} color="red" />
                     <Card title="Monthly Obligations" value={`${obligations.length} Items`} color="indigo" />
                 </div>
 
@@ -284,7 +288,7 @@ function App() {
                     <Modal title={editingId ? "Edit Obligation" : "Add Obligation"} onClose={() => setShowObligationModal(false)}>
                         <form onSubmit={handleSaveObligation} className="space-y-4">
                             <input type="text" placeholder="Name (e.g. Rent)" required className={inputClass} value={obligationForm.name} onChange={e => setObligationForm({ ...obligationForm, name: e.target.value })} />
-                            <input type="number" placeholder="Amount (AED)" required className={inputClass} value={obligationForm.amount} onChange={e => setObligationForm({ ...obligationForm, amount: e.target.value })} />
+                            <input type="number" placeholder="Amount (SAR)" required className={inputClass} value={obligationForm.amount} onChange={e => setObligationForm({ ...obligationForm, amount: e.target.value })} />
                             <input type="number" placeholder="Due Day (1-31)" required min="1" max="31" className={inputClass} value={obligationForm.due_day} onChange={e => setObligationForm({ ...obligationForm, due_day: e.target.value })} />
                             <input type="text" placeholder="Category (e.g. Housing)" className={inputClass} value={obligationForm.category} onChange={e => setObligationForm({ ...obligationForm, category: e.target.value })} />
                             <button type="submit" className="w-full bg-indigo-600 text-white p-2 rounded hover:bg-indigo-700 font-medium">Save Obligation</button>
@@ -306,7 +310,7 @@ function App() {
                                 <span className="text-xs bg-slate-600 text-gray-200 px-2 py-1 rounded">*{acc.last_4_digits}</span>
                             </div>
                             <p className={`text-xl font-bold mt-2 ${acc.current_balance < 0 ? 'text-red-400' : 'text-green-400'}`}>
-                                AED {acc.current_balance.toFixed(2)}
+                                {formatCurrency(acc.current_balance)}
                             </p>
                             <p className="text-xs text-gray-500 uppercase mt-1">{acc.account_type}</p>
                         </div>
@@ -325,8 +329,8 @@ function App() {
                                 <span className="text-sm bg-red-900/40 text-red-300 px-2 py-1 rounded">-{loan.interest_rate}%</span>
                             </div>
                             <div className="mt-3 flex justify-between text-sm">
-                                <span className="text-gray-400">Principal: {loan.principal_amount}</span>
-                                <span className="font-bold text-red-400">Remaining: {loan.remaining_balance.toFixed(2)}</span>
+                                <span className="text-gray-400">Principal: {formatCurrency(loan.principal_amount)}</span>
+                                <span className="font-bold text-red-400">Remaining: {formatCurrency(loan.remaining_balance)}</span>
                             </div>
                             <div className="w-full bg-slate-700 h-2 rounded-full mt-2">
                                 {/* Prevent division by zero if principal is 0 */}
@@ -354,7 +358,7 @@ function App() {
                                 <tr key={obl.id}>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">{obl.name} <span className="text-gray-500 font-normal">({obl.category})</span></td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{obl.due_day}th</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-white">AED {obl.amount.toFixed(2)}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-white">{formatCurrency(obl.amount)}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <button onClick={() => openObligationModal(obl)} className="text-indigo-400 hover:text-indigo-300">Edit</button>
                                     </td>
@@ -383,7 +387,7 @@ function App() {
                                 <tr key={tx.id}>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-white">{tx.merchant}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{new Date(tx.timestamp).toLocaleDateString()}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-red-400">- AED {tx.amount.toFixed(2)}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-red-400">- {formatCurrency(tx.amount)}</td>
                                 </tr>
                             ))}
                             {transactions.length === 0 && (
