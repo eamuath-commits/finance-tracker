@@ -71,19 +71,25 @@ const Obligations = () => {
         const payment = payments.find(p => isMatch(p, targetMonth, targetYear));
 
         // Smart Amount Logic:
-        // If paid, use actual payment amount.
-        // If unpaid, check previous month. If previous month was paid, use THAT amount.
-        // Fallback to obligation default amount.
+        // Use actual payment if exists.
+        // Else, find the MOST RECENT payment that occurred BEFORE this target month.
         let displayAmount = obl.amount;
 
         if (payment) {
             displayAmount = payment.amount;
         } else {
-            // Look back at previous month
-            const prevDate = new Date(targetYear, targetMonth - 1, 1);
-            const prevPayment = payments.find(p => isMatch(p, prevDate.getMonth(), prevDate.getFullYear()));
-            if (prevPayment) {
-                displayAmount = prevPayment.amount; // Inherit from previous month
+            // Filter for payments strictly before this target month
+            const pastPayments = payments.filter(p => {
+                let d = new Date(p.billing_month || p.payment_date);
+                // We want strictly earlier than targetDate (which is 1st of month)
+                // Actually, comparing YYYY-MM strings is safer or just getTime
+                return d < targetDate;
+            });
+
+            if (pastPayments.length > 0) {
+                // Sort descending
+                pastPayments.sort((a, b) => new Date(b.billing_month || b.payment_date) - new Date(a.billing_month || a.payment_date));
+                displayAmount = pastPayments[0].amount;
             }
         }
 
@@ -309,11 +315,12 @@ const Obligations = () => {
                                     ) : (
                                         <div className="text-gray-600 flex flex-col items-center w-full relative">
                                             <XCircle size={20} className="mb-1" />
-                                            <span className="text-sm mb-1">Unpaid</span>
+                                            <span className="font-bold text-lg mb-1">{formatCurrency(monthMinus2.amount)}</span>
+                                            <span className="text-xs mb-1">Unpaid</span>
                                             {/* Pay Button */}
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, monthMinus2.billingDateStr, monthMinus2.amount); }}
-                                                className="text-[10px] bg-blue-900/50 hover:bg-blue-800 text-blue-200 px-2 py-0.5 rounded border border-blue-900/50 opacity-0 group-hover/m2:opacity-100 transition cursor-pointer z-50 mt-1"
+                                                className="text-[10px] bg-blue-900/50 hover:bg-blue-800 text-blue-200 px-2 py-0.5 rounded border border-blue-900/50 opacity-0 group-hover/m2:opacity-100 transition cursor-pointer z-50"
                                             >
                                                 Mark Paid
                                             </button>
@@ -341,6 +348,7 @@ const Obligations = () => {
                                     ) : (
                                         <div className="text-gray-500 flex flex-col items-center w-full relative">
                                             <XCircle size={20} className="mb-1" />
+                                            <span className="font-bold text-lg mb-1">{formatCurrency(prevMonth.amount)}</span>
                                             <span className="text-sm mb-1">Unpaid</span>
                                             {/* Pay Button for Previous Month */}
                                             <button
