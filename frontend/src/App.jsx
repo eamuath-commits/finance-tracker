@@ -114,6 +114,8 @@ function App() {
     const [accountForm, setAccountForm] = useState({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '' });
     const [loanForm, setLoanForm] = useState({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '' });
     const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_day: '', category: '' });
+    const [transactionForm, setTransactionForm] = useState({ category: '' });
+    const [showTransactionModal, setShowTransactionModal] = useState(false);
 
     // Allow overriding API URL via environment variable for remote development
     const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
@@ -190,6 +192,16 @@ function App() {
         } catch (err) { alert('Error saving obligation'); }
     };
 
+    const handleSaveTransaction = async (e) => {
+        e.preventDefault();
+        try {
+            await axios.put(`${API_URL}/transactions/${editingId}`, transactionForm);
+            setShowTransactionModal(false);
+            setEditingId(null);
+            fetchData();
+        } catch (err) { alert('Error updating transaction'); }
+    };
+
     // --- Edit Triggers ---
 
     const openAccountModal = (acc = null) => {
@@ -230,6 +242,12 @@ function App() {
             setObligationForm({ name: '', amount: '', due_day: '', category: '' });
         }
         setShowObligationModal(true);
+    };
+
+    const openTransactionModal = (tx) => {
+        setEditingId(tx.id);
+        setTransactionForm({ category: tx.category || '' });
+        setShowTransactionModal(true);
     };
 
     if (loading) return <div className="p-10 text-center text-white bg-slate-900 min-h-screen">Loading Dashboard...</div>;
@@ -295,6 +313,23 @@ function App() {
                             <input type="number" placeholder="Due Day (1-31)" required min="1" max="31" className={inputClass} value={obligationForm.due_day} onChange={e => setObligationForm({ ...obligationForm, due_day: e.target.value })} />
                             <input type="text" placeholder="Category (e.g. Housing)" className={inputClass} value={obligationForm.category} onChange={e => setObligationForm({ ...obligationForm, category: e.target.value })} />
                             <button type="submit" className="w-full bg-indigo-600 text-white p-2 rounded hover:bg-indigo-700 font-medium">Save Obligation</button>
+                        </form>
+                    </Modal>
+                )}
+
+                {showTransactionModal && (
+                    <Modal title="Edit Transaction" onClose={() => setShowTransactionModal(false)}>
+                        <form onSubmit={handleSaveTransaction} className="space-y-4">
+                            <p className="text-gray-400 text-sm mb-2">Assign a category to this transaction.</p>
+                            <input type="text" placeholder="Category (e.g. Food, Transport)" className={inputClass} value={transactionForm.category} onChange={e => setTransactionForm({ ...transactionForm, category: e.target.value })} />
+                            <div className="flex gap-2 flex-wrap">
+                                {['Food', 'Transport', 'Utilities', 'Entertainment', 'Shopping'].map(cat => (
+                                    <button key={cat} type="button" onClick={() => setTransactionForm({ ...transactionForm, category: cat })} className="bg-slate-700 text-xs px-2 py-1 rounded text-gray-300 hover:bg-slate-600 border border-slate-600">
+                                        {cat}
+                                    </button>
+                                ))}
+                            </div>
+                            <button type="submit" className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 font-medium">Save Changes</button>
                         </form>
                     </Modal>
                 )}
@@ -383,18 +418,25 @@ function App() {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Merchant</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
                                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Amount</th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Edit</th>
                             </tr>
                         </thead>
                         <tbody className="bg-slate-800 divide-y divide-slate-700">
                             {transactions.map(tx => (
                                 <tr key={tx.id}>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-white">{tx.merchant}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                                        {tx.merchant}
+                                        {tx.category && <span className="ml-2 px-2 py-0.5 rounded text-xs bg-slate-700 text-blue-300 border border-slate-600">{tx.category}</span>}
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{new Date(tx.timestamp).toLocaleDateString()}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-red-400">- {formatCurrency(tx.amount)}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <button onClick={() => openTransactionModal(tx)} className="text-blue-400 hover:text-blue-300">Edit</button>
+                                    </td>
                                 </tr>
                             ))}
                             {transactions.length === 0 && (
-                                <tr><td colSpan="3" className="px-6 py-4 text-center text-gray-500">No transactions recorded yet.</td></tr>
+                                <tr><td colSpan="4" className="px-6 py-4 text-center text-gray-500">No transactions recorded yet.</td></tr>
                             )}
                         </tbody>
                     </table>

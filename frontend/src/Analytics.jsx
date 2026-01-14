@@ -27,12 +27,12 @@ const processTransactionData = (transactions) => {
     }));
 };
 
-// --- Helper: Group Obligations by Category ---
-const processObligationData = (obligations) => {
+// --- Helper: Group Transactions by Category ---
+const processTransactionCategoryData = (transactions) => {
     const categories = {};
-    obligations.forEach(obl => {
-        const cat = obl.category || "Uncategorized";
-        categories[cat] = (categories[cat] || 0) + obl.amount;
+    transactions.forEach(tx => {
+        const cat = tx.category || "Uncategorized";
+        categories[cat] = (categories[cat] || 0) + tx.amount;
     });
 
     return Object.keys(categories).map(cat => ({
@@ -45,7 +45,7 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'
 
 const Analytics = ({ transactions, obligations }) => {
     const barData = processTransactionData(transactions);
-    const pieData = processObligationData(obligations);
+    const pieData = processTransactionCategoryData(transactions);
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -71,7 +71,7 @@ const Analytics = ({ transactions, obligations }) => {
 
             {/* Obligation Breakdown */}
             <div className="bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700">
-                <h3 className="text-gray-400 text-sm font-medium uppercase mb-4">Monthly Obligations by Category</h3>
+                <h3 className="text-gray-400 text-sm font-medium uppercase mb-4">Spending by Category</h3>
                 <div className="h-64 flex items-center justify-center">
                     {pieData.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">

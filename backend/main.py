@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import text, inspect
 from typing import List
 
 import models
@@ -11,7 +12,23 @@ from sms_parser import parser
 import analysis
 import analysis_schema
 
-# Create tables
+# --- Migration Logic ---
+def run_migrations(engine):
+    try:
+        inspector = inspect(engine)
+        columns = [col['name'] for col in inspector.get_columns('transactions')]
+        if 'category' not in columns:
+            print("Migrating: Adding category column to transactions table")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE transactions ADD COLUMN category VARCHAR"))
+                conn.commit()
+    except Exception as e:
+        print(f"Migration failed: {e}")
+
+# Run migrations
+run_migrations(engine)
+
+# Create tables (if they don't exist)
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Personal Finance Manager")
@@ -82,6 +99,13 @@ def update_obligation(obligation_id: str, obligation_update: schemas.ObligationU
 @app.get("/transactions/", response_model=List[schemas.Transaction])
 def read_transactions(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return crud.get_transactions(db, skip=skip, limit=limit)
+
+@app.put("/transactions/{transaction_id}", response_model=schemas.Transaction)
+def update_transaction(transaction_id: str, transaction_update: schemas.TransactionUpdate, db: Session = Depends(get_db)):
+    updated_tx = crud.update_transaction(db, transaction_id, transaction_update)
+    if not updated_tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    return updated_tx
 
 # --- Analysis Endpoints ---
 @app.get("/analysis/allocation", response_model=analysis_schema.AllocationResponse)

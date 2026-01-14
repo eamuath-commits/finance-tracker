@@ -31,6 +31,7 @@ class Transaction(Base):
     amount = Column(Float, nullable=False)
     merchant = Column(String)
     timestamp = Column(DateTime, default=datetime.utcnow)
+    category = Column(String, nullable=True)
     raw_sms_content = Column(Text, nullable=True)
     
     account = relationship("Account", back_populates="transactions")

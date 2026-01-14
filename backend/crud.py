@@ -124,3 +124,17 @@ def update_obligation(db: Session, obligation_id: str, obligation_update: schema
 
 def get_transactions(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Transaction).order_by(models.Transaction.timestamp.desc()).offset(skip).limit(limit).all()
+
+def update_transaction(db: Session, transaction_id: str, transaction_update: schemas.TransactionUpdate):
+    db_tx = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
+    if not db_tx:
+        return None
+    
+    update_data = transaction_update.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_tx, key, value)
+        
+    db.add(db_tx)
+    db.commit()
+    db.refresh(db_tx)
+    return db_tx

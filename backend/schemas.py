@@ -26,11 +26,20 @@ class Account(AccountBase):
 class TransactionBase(BaseModel):
     amount: float
     merchant: str
+    category: Optional[str] = None
     raw_sms_content: Optional[str] = None
 
 class TransactionCreate(TransactionBase):
     account_id: str # Needs to be linked manually if not via SMS
     # For SMS parsing, we might not have account_id immediately
+
+class TransactionUpdate(BaseModel):
+    account_id: Optional[str] = None
+    amount: Optional[float] = None
+    merchant: Optional[str] = None
+    category: Optional[str] = None
+    timestamp: Optional[datetime] = None
+
 
 class Transaction(TransactionBase):
     id: str
