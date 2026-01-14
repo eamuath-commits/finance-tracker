@@ -65,7 +65,8 @@ const Obligations = () => {
             monthIndex: targetMonth, // For comparison
             isPaid: !!payment,
             amount: payment ? payment.amount : null,
-            date: payment ? payment.payment_date : null
+            date: payment ? payment.payment_date : null,
+            paymentId: payment ? payment.id : null // Captured ID for deletion
         };
     };
 
@@ -153,7 +154,7 @@ const Obligations = () => {
                 note: paymentForm.note
             });
             setShowPaymentModal(false);
-            fetchObligations();
+            fetchObligations(); // Refreshes everything
         } catch (err) { alert("Error processing payment"); }
     };
 
@@ -174,9 +175,10 @@ const Obligations = () => {
                 billing_month: bMonth.toISOString(),
                 note: formData.get('note') || "Manual History Log"
             });
+            // Refresh local history view + global
             const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/history`);
             setSelectedHistory(hRes.data);
-            setHistory(prev => ({ ...prev, [viewingHistoryId]: hRes.data }));
+            fetchObligations();
             e.target.reset();
         } catch (err) { alert("Error adding record"); }
     };
@@ -185,14 +187,14 @@ const Obligations = () => {
         if (!confirm("Are you sure you want to delete this payment record?")) return;
         try {
             await axios.delete(`${API_URL}/obligations/history/${historyId}`);
-            // Refresh
-            const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/history`);
-            setSelectedHistory(hRes.data);
-            setHistory(prev => ({ ...prev, [viewingHistoryId]: hRes.data }));
 
-            // Also refresh main list to update statuses immediately
-            const res = await axios.get(`${API_URL}/obligations/`);
-            setObligations(res.data);
+            // Refresh modal if open
+            if (viewingHistoryId) {
+                const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/history`);
+                setSelectedHistory(hRes.data);
+            }
+            // Refresh global state (Important for dashboard cards)
+            fetchObligations();
         } catch (err) { alert("Error deleting history"); }
     };
 
@@ -285,10 +287,10 @@ const Obligations = () => {
                                 </div>
 
                                 {/* Current Month */}
-                                <div className="p-4 flex flex-col items-center text-center bg-slate-700/20 relative">
+                                <div className="p-4 flex flex-col items-center text-center bg-slate-700/20 relative group/current">
                                     <span className="text-xs uppercase font-bold text-blue-300 mb-2">{currMonth.shortLabel}</span>
                                     {currMonth.isPaid ? (
-                                        <div className="text-green-400 flex flex-col items-center animate-in fade-in zoom-in duration-300">
+                                        <div className="text-green-400 flex flex-col items-center animate-in fade-in zoom-in duration-300 relative">
                                             <CheckCircle size={28} className="mb-2" />
                                             <span className="font-bold text-2xl">{formatCurrency(currMonth.amount)}</span>
                                             <span className="text-xs bg-green-900/30 px-2 py-0.5 rounded text-green-300 mt-1">Paid</span>
