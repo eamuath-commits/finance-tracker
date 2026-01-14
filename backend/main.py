@@ -36,6 +36,13 @@ def read_accounts(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
     accounts = crud.get_accounts(db, skip=skip, limit=limit)
     return accounts
 
+@app.put("/accounts/{account_id}", response_model=schemas.Account)
+def update_account(account_id: str, account_update: schemas.AccountUpdate, db: Session = Depends(get_db)):
+    updated_account = crud.update_account(db, account_id, account_update)
+    if not updated_account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return updated_account
+
 # --- Loan Endpoints ---
 @app.post("/loans/", response_model=schemas.Loan)
 def create_loan(loan: schemas.LoanCreate, db: Session = Depends(get_db)):
@@ -46,6 +53,13 @@ def read_loans(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     loans = crud.get_loans(db, skip=skip, limit=limit)
     return loans
 
+@app.put("/loans/{loan_id}", response_model=schemas.Loan)
+def update_loan(loan_id: str, loan_update: schemas.LoanUpdate, db: Session = Depends(get_db)):
+    updated_loan = crud.update_loan(db, loan_id, loan_update)
+    if not updated_loan:
+        raise HTTPException(status_code=404, detail="Loan not found")
+    return updated_loan
+
 # --- Obligation Endpoints ---
 @app.post("/obligations/", response_model=schemas.Obligation)
 def create_obligation(obligation: schemas.ObligationCreate, db: Session = Depends(get_db)):
@@ -54,6 +68,13 @@ def create_obligation(obligation: schemas.ObligationCreate, db: Session = Depend
 @app.get("/obligations/", response_model=List[schemas.Obligation])
 def read_obligations(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return crud.get_obligations(db, skip=skip, limit=limit)
+
+@app.put("/obligations/{obligation_id}", response_model=schemas.Obligation)
+def update_obligation(obligation_id: str, obligation_update: schemas.ObligationUpdate, db: Session = Depends(get_db)):
+    updated_obj = crud.update_obligation(db, obligation_id, obligation_update)
+    if not updated_obj:
+        raise HTTPException(status_code=404, detail="Obligation not found")
+    return updated_obj
 
 # --- Transaction Endpoints ---
 @app.get("/transactions/", response_model=List[schemas.Transaction])

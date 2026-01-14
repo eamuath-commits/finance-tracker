@@ -27,11 +27,19 @@ const Modal = ({ title, children, onClose }) => (
         <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold">{title}</h3>
-                <button onClick={onClose} className="text-gray-500 hover:text-gray-700">&times;</button>
+                <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
             </div>
             {children}
         </div>
     </div>
+);
+
+const EditIcon = ({ onClick }) => (
+    <button onClick={onClick} className="text-gray-400 hover:text-blue-600 ml-2">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+        </svg>
+    </button>
 );
 
 function App() {
@@ -41,13 +49,18 @@ function App() {
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // Modal States
+    // Modal Visibility
+    const [showAccountModal, setShowAccountModal] = useState(false);
     const [showLoanModal, setShowLoanModal] = useState(false);
     const [showObligationModal, setShowObligationModal] = useState(false);
 
-    // Form States
-    const [newLoan, setNewLoan] = useState({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '' });
-    const [newObligation, setNewObligation] = useState({ name: '', amount: '', due_day: '', category: '' });
+    // Editing State (If null, we are creating. If set, we are editing)
+    const [editingId, setEditingId] = useState(null);
+
+    // Form Data
+    const [accountForm, setAccountForm] = useState({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '' });
+    const [loanForm, setLoanForm] = useState({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '' });
+    const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_day: '', category: '' });
 
     const API_URL = "http://" + window.location.hostname + ":8000";
 
@@ -72,30 +85,95 @@ function App() {
 
     useEffect(() => {
         fetchData();
-    }, [API_URL]);
+    }, []);
 
-    const handleCreateLoan = async (e) => {
+    // --- Handlers ---
+
+    const handleSaveAccount = async (e) => {
         e.preventDefault();
         try {
-            await axios.post(`${API_URL}/loans/`, newLoan);
-            setShowLoanModal(false);
-            setNewLoan({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '' });
-            fetchData(); // Refresh list
-        } catch (err) {
-            alert('Error creating loan');
-        }
+            if (editingId) {
+                await axios.put(`${API_URL}/accounts/${editingId}`, accountForm);
+            } else {
+                await axios.post(`${API_URL}/accounts/`, accountForm);
+            }
+            setShowAccountModal(false);
+            setEditingId(null);
+            setAccountForm({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '' });
+            fetchData();
+        } catch (err) { alert('Error saving account'); }
     };
 
-    const handleCreateObligation = async (e) => {
+    const handleSaveLoan = async (e) => {
         e.preventDefault();
         try {
-            await axios.post(`${API_URL}/obligations/`, newObligation);
+            if (editingId) {
+                await axios.put(`${API_URL}/loans/${editingId}`, loanForm);
+            } else {
+                await axios.post(`${API_URL}/loans/`, loanForm);
+            }
+            setShowLoanModal(false);
+            setEditingId(null);
+            setLoanForm({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '' });
+            fetchData();
+        } catch (err) { alert('Error saving loan'); }
+    };
+
+    const handleSaveObligation = async (e) => {
+        e.preventDefault();
+        try {
+            if (editingId) {
+                await axios.put(`${API_URL}/obligations/${editingId}`, obligationForm);
+            } else {
+                await axios.post(`${API_URL}/obligations/`, obligationForm);
+            }
             setShowObligationModal(false);
-            setNewObligation({ name: '', amount: '', due_day: '', category: '' });
-            fetchData(); // Refresh list
-        } catch (err) {
-            alert('Error creating obligation');
+            setEditingId(null);
+            setObligationForm({ name: '', amount: '', due_day: '', category: '' });
+            fetchData();
+        } catch (err) { alert('Error saving obligation'); }
+    };
+
+    // --- Edit Triggers ---
+
+    const openAccountModal = (acc = null) => {
+        if (acc) {
+            setEditingId(acc.id);
+            setAccountForm({ name: acc.name, account_type: acc.account_type, last_4_digits: acc.last_4_digits, current_balance: acc.current_balance });
+        } else {
+            setEditingId(null);
+            setAccountForm({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '' });
         }
+        setShowAccountModal(true);
+    };
+
+    const openLoanModal = (loan = null) => {
+        if (loan) {
+            setEditingId(loan.id);
+            setLoanForm({
+                name: loan.name,
+                principal_amount: loan.principal_amount,
+                interest_rate: loan.interest_rate,
+                // Format date to YYYY-MM-DD for input
+                start_date: loan.start_date ? new Date(loan.start_date).toISOString().split('T')[0] : '',
+                term_months: loan.term_months
+            });
+        } else {
+            setEditingId(null);
+            setLoanForm({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '' });
+        }
+        setShowLoanModal(true);
+    };
+
+    const openObligationModal = (obl = null) => {
+        if (obl) {
+            setEditingId(obl.id);
+            setObligationForm({ name: obl.name, amount: obl.amount, due_day: obl.due_day, category: obl.category });
+        } else {
+            setEditingId(null);
+            setObligationForm({ name: '', amount: '', due_day: '', category: '' });
+        }
+        setShowObligationModal(true);
     };
 
     if (loading) return <div className="p-10 text-center">Loading Dashboard...</div>;
@@ -117,39 +195,59 @@ function App() {
                     <Card title="Monthly Obligations" value={`${obligations.length} Items`} color="indigo" />
                 </div>
 
-                {/* --- MANUAL ENTRY MODALS --- */}
+                {/* --- MODALS --- */}
+
+                {showAccountModal && (
+                    <Modal title={editingId ? "Edit Account" : "Add New Account"} onClose={() => setShowAccountModal(false)}>
+                        <form onSubmit={handleSaveAccount} className="space-y-4">
+                            <input type="text" placeholder="Account Name (e.g. Chase)" required className="w-full p-2 border rounded" value={accountForm.name} onChange={e => setAccountForm({ ...accountForm, name: e.target.value })} />
+                            <select className="w-full p-2 border rounded" value={accountForm.account_type} onChange={e => setAccountForm({ ...accountForm, account_type: e.target.value })}>
+                                <option value="Checking">Checking</option>
+                                <option value="Savings">Savings</option>
+                                <option value="Credit Card">Credit Card</option>
+                            </select>
+                            <input type="text" placeholder="Last 4 Digits" required className="w-full p-2 border rounded" value={accountForm.last_4_digits} onChange={e => setAccountForm({ ...accountForm, last_4_digits: e.target.value })} />
+                            <input type="number" step="0.01" placeholder="Current Balance" required className="w-full p-2 border rounded" value={accountForm.current_balance} onChange={e => setAccountForm({ ...accountForm, current_balance: e.target.value })} />
+                            <button type="submit" className="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700">Save Account</button>
+                        </form>
+                    </Modal>
+                )}
+
                 {showLoanModal && (
-                    <Modal title="Add New Loan" onClose={() => setShowLoanModal(false)}>
-                        <form onSubmit={handleCreateLoan} className="space-y-4">
-                            <input type="text" placeholder="Loan Name (e.g. Car Loan)" required className="w-full p-2 border rounded" value={newLoan.name} onChange={e => setNewLoan({ ...newLoan, name: e.target.value })} />
-                            <input type="number" placeholder="Principal Amount" required className="w-full p-2 border rounded" value={newLoan.principal_amount} onChange={e => setNewLoan({ ...newLoan, principal_amount: e.target.value })} />
-                            <input type="number" placeholder="Interest Rate %" required step="0.1" className="w-full p-2 border rounded" value={newLoan.interest_rate} onChange={e => setNewLoan({ ...newLoan, interest_rate: e.target.value })} />
-                            <input type="number" placeholder="Term (Months)" required className="w-full p-2 border rounded" value={newLoan.term_months} onChange={e => setNewLoan({ ...newLoan, term_months: e.target.value })} />
+                    <Modal title={editingId ? "Edit Loan" : "Add New Loan"} onClose={() => setShowLoanModal(false)}>
+                        <form onSubmit={handleSaveLoan} className="space-y-4">
+                            <input type="text" placeholder="Loan Name" required className="w-full p-2 border rounded" value={loanForm.name} onChange={e => setLoanForm({ ...loanForm, name: e.target.value })} />
+                            <input type="number" placeholder="Principal Amount" required className="w-full p-2 border rounded" value={loanForm.principal_amount} onChange={e => setLoanForm({ ...loanForm, principal_amount: e.target.value })} />
+                            <input type="number" placeholder="Interest Rate %" required step="0.1" className="w-full p-2 border rounded" value={loanForm.interest_rate} onChange={e => setLoanForm({ ...loanForm, interest_rate: e.target.value })} />
+                            <input type="number" placeholder="Term (Months)" required className="w-full p-2 border rounded" value={loanForm.term_months} onChange={e => setLoanForm({ ...loanForm, term_months: e.target.value })} />
                             <p className="text-xs text-gray-500">Start Date:</p>
-                            <input type="date" required className="w-full p-2 border rounded" value={newLoan.start_date} onChange={e => setNewLoan({ ...newLoan, start_date: e.target.value })} />
+                            <input type="date" required className="w-full p-2 border rounded" value={loanForm.start_date} onChange={e => setLoanForm({ ...loanForm, start_date: e.target.value })} />
                             <button type="submit" className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Save Loan</button>
                         </form>
                     </Modal>
                 )}
 
                 {showObligationModal && (
-                    <Modal title="Add Monthly Obligation" onClose={() => setShowObligationModal(false)}>
-                        <form onSubmit={handleCreateObligation} className="space-y-4">
-                            <input type="text" placeholder="Name (e.g. Rent)" required className="w-full p-2 border rounded" value={newObligation.name} onChange={e => setNewObligation({ ...newObligation, name: e.target.value })} />
-                            <input type="number" placeholder="Amount (AED)" required className="w-full p-2 border rounded" value={newObligation.amount} onChange={e => setNewObligation({ ...newObligation, amount: e.target.value })} />
-                            <input type="number" placeholder="Due Day (1-31)" required min="1" max="31" className="w-full p-2 border rounded" value={newObligation.due_day} onChange={e => setNewObligation({ ...newObligation, due_day: e.target.value })} />
-                            <input type="text" placeholder="Category (e.g. Housing)" className="w-full p-2 border rounded" value={newObligation.category} onChange={e => setNewObligation({ ...newObligation, category: e.target.value })} />
+                    <Modal title={editingId ? "Edit Obligation" : "Add Obligation"} onClose={() => setShowObligationModal(false)}>
+                        <form onSubmit={handleSaveObligation} className="space-y-4">
+                            <input type="text" placeholder="Name (e.g. Rent)" required className="w-full p-2 border rounded" value={obligationForm.name} onChange={e => setObligationForm({ ...obligationForm, name: e.target.value })} />
+                            <input type="number" placeholder="Amount (AED)" required className="w-full p-2 border rounded" value={obligationForm.amount} onChange={e => setObligationForm({ ...obligationForm, amount: e.target.value })} />
+                            <input type="number" placeholder="Due Day (1-31)" required min="1" max="31" className="w-full p-2 border rounded" value={obligationForm.due_day} onChange={e => setObligationForm({ ...obligationForm, due_day: e.target.value })} />
+                            <input type="text" placeholder="Category (e.g. Housing)" className="w-full p-2 border rounded" value={obligationForm.category} onChange={e => setObligationForm({ ...obligationForm, category: e.target.value })} />
                             <button type="submit" className="w-full bg-indigo-600 text-white p-2 rounded hover:bg-indigo-700">Save Obligation</button>
                         </form>
                     </Modal>
                 )}
 
-                {/* --- DATA SECTIONS --- */}
+                {/* --- LISTS --- */}
 
-                <SectionHeader title="Your Accounts" />
+                <SectionHeader title="Your Accounts" onAdd={() => openAccountModal(null)} />
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {accounts.map(acc => (
-                        <div key={acc.id} className="bg-white p-4 rounded-lg shadow border border-gray-100">
+                        <div key={acc.id} className="bg-white p-4 rounded-lg shadow border border-gray-100 group relative">
+                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition">
+                                <EditIcon onClick={() => openAccountModal(acc)} />
+                            </div>
                             <div className="flex justify-between items-center">
                                 <span className="font-semibold">{acc.name}</span>
                                 <span className="text-xs bg-gray-200 px-2 py-1 rounded">*{acc.last_4_digits}</span>
@@ -162,47 +260,51 @@ function App() {
                     ))}
                 </div>
 
-                {/* LOANS SECTION */}
-                <SectionHeader title="Active Loans" onAdd={() => setShowLoanModal(true)} />
+                <SectionHeader title="Active Loans" onAdd={() => openLoanModal(null)} />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {loans.map(loan => (
-                        <div key={loan.id} className="bg-white p-4 rounded-lg shadow border border-red-100">
+                        <div key={loan.id} className="bg-white p-4 rounded-lg shadow border border-red-100 group relative">
+                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition">
+                                <EditIcon onClick={() => openLoanModal(loan)} />
+                            </div>
                             <div className="flex justify-between items-center">
                                 <span className="font-bold text-gray-800">{loan.name}</span>
                                 <span className="text-sm bg-red-100 text-red-600 px-2 py-1 rounded">-{loan.interest_rate}%</span>
                             </div>
                             <div className="mt-3 flex justify-between text-sm">
                                 <span className="text-gray-500">Principal: {loan.principal_amount}</span>
-                                <span className="font-bold text-red-600">Testing Bal: {loan.remaining_balance.toFixed(2)}</span>
+                                <span className="font-bold text-red-600">Remaining: {loan.remaining_balance.toFixed(2)}</span>
                             </div>
                             <div className="w-full bg-gray-200 h-2 rounded-full mt-2">
-                                <div className="bg-red-500 h-2 rounded-full" style={{ width: `${(loan.remaining_balance / loan.principal_amount) * 100}%` }}></div>
+                                {/* Prevent division by zero if principal is 0 */}
+                                <div className="bg-red-500 h-2 rounded-full" style={{ width: `${loan.principal_amount ? (loan.remaining_balance / loan.principal_amount) * 100 : 0}%` }}></div>
                             </div>
                             <p className="text-xs text-gray-400 mt-1 text-right">{loan.term_months} months term</p>
                         </div>
                     ))}
-                    {loans.length === 0 && <p className="text-gray-400 italic">No loans active. Click Add New to start tracking.</p>}
+                    {loans.length === 0 && <p className="text-gray-400 italic">No loans active.</p>}
                 </div>
 
-
-                <SectionHeader title="Monthly Obligations" onAdd={() => setShowObligationModal(true)} />
+                <SectionHeader title="Monthly Obligations" onAdd={() => openObligationModal(null)} />
                 <div className="bg-white rounded-xl shadow overflow-hidden">
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Day</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due</th>
                                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Edit</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {obligations.map(obl => (
                                 <tr key={obl.id}>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{obl.name}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{obl.category}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{obl.name} <span className="text-gray-400 font-normal">({obl.category})</span></td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{obl.due_day}th</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold">AED {obl.amount.toFixed(2)}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <button onClick={() => openObligationModal(obl)} className="text-indigo-600 hover:text-indigo-900">Edit</button>
+                                    </td>
                                 </tr>
                             ))}
                             {obligations.length === 0 && (
@@ -214,6 +316,7 @@ function App() {
 
                 <SectionHeader title="Recent Transactions (SMS Log)" />
                 <div className="bg-white rounded-xl shadow overflow-hidden">
+                    {/* Transactions are usually immutable from UI, so no Edit button here for now */}
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>

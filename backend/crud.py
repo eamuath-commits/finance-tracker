@@ -22,6 +22,20 @@ def create_account(db: Session, account: schemas.AccountCreate):
 def get_accounts(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Account).offset(skip).limit(limit).all()
 
+def update_account(db: Session, account_id: str, account_update: schemas.AccountUpdate):
+    db_account = db.query(models.Account).filter(models.Account.id == account_id).first()
+    if not db_account:
+        return None
+    
+    update_data = account_update.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_account, key, value)
+    
+    db.add(db_account)
+    db.commit()
+    db.refresh(db_account)
+    return db_account
+
 def create_transaction(db: Session, transaction: schemas.TransactionCreate):
     db_transaction = models.Transaction(
         account_id=transaction.account_id,
@@ -65,6 +79,20 @@ def create_loan(db: Session, loan: schemas.LoanCreate):
 def get_loans(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Loan).offset(skip).limit(limit).all()
 
+def update_loan(db: Session, loan_id: str, loan_update: schemas.LoanUpdate):
+    db_loan = db.query(models.Loan).filter(models.Loan.id == loan_id).first()
+    if not db_loan:
+        return None
+    
+    update_data = loan_update.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_loan, key, value)
+        
+    db.add(db_loan)
+    db.commit()
+    db.refresh(db_loan)
+    return db_loan
+
 def create_obligation(db: Session, obligation: schemas.ObligationCreate):
     db_obj = models.MonthlyObligation(
         name=obligation.name,
@@ -79,6 +107,20 @@ def create_obligation(db: Session, obligation: schemas.ObligationCreate):
 
 def get_obligations(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.MonthlyObligation).offset(skip).limit(limit).all()
+
+def update_obligation(db: Session, obligation_id: str, obligation_update: schemas.ObligationUpdate):
+    db_obj = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
+    if not db_obj:
+        return None
+        
+    update_data = obligation_update.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_obj, key, value)
+        
+    db.add(db_obj)
+    db.commit()
+    db.refresh(db_obj)
+    return db_obj
 
 def get_transactions(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Transaction).order_by(models.Transaction.timestamp.desc()).offset(skip).limit(limit).all()

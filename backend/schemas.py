@@ -12,6 +12,12 @@ class AccountBase(BaseModel):
 class AccountCreate(AccountBase):
     pass
 
+class AccountUpdate(BaseModel):
+    name: Optional[str] = None
+    account_type: Optional[AccountType] = None
+    last_4_digits: Optional[str] = None
+    current_balance: Optional[float] = None
+
 class Account(AccountBase):
     id: str
     class Config:
@@ -43,6 +49,14 @@ class LoanBase(BaseModel):
 class LoanCreate(LoanBase):
     pass
 
+class LoanUpdate(BaseModel):
+    name: Optional[str] = None
+    principal_amount: Optional[float] = None
+    interest_rate: Optional[float] = None
+    start_date: Optional[datetime] = None
+    term_months: Optional[int] = None
+    remaining_balance: Optional[float] = None
+
 class Loan(LoanBase):
     id: str
     remaining_balance: float
@@ -57,6 +71,12 @@ class ObligationBase(BaseModel):
 
 class ObligationCreate(ObligationBase):
     pass
+
+class ObligationUpdate(BaseModel):
+    name: Optional[str] = None
+    amount: Optional[float] = None
+    due_day: Optional[int] = None
+    category: Optional[str] = None
 
 class Obligation(ObligationBase):
     id: str
