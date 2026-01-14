@@ -89,7 +89,7 @@ const Obligations = () => {
 
         const payload = {
             name: obligationForm.name,
-            amount: obligationForm.amount,
+            amount: parseFloat(obligationForm.amount || 0), // Allow 0/Empty
             category: obligationForm.category,
             due_day: due_day_val
         };
@@ -122,12 +122,12 @@ const Obligations = () => {
     const openPaymentModal = (obl) => {
         const now = new Date();
         // Default billing month: Current month
-        // Or if due_day is < 10, assume user might want previous month? 
+        // Or if due_day is < 10, assume user might want previous month?
         // Let's just default to current month YYYY-MM-01
 
         let initialMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-        // Smart Logic: If Due Day is early (e.g. 4th) and Today is early (e.g. 5th), 
+        // Smart Logic: If Due Day is early (e.g. 4th) and Today is early (e.g. 5th),
         // user MIGHT mean "Last Month's Bill". But safer to let user switch manually.
 
         const monthStr = `${initialMonth.getFullYear()}-${(initialMonth.getMonth() + 1).toString().padStart(2, '0')}-01`;
@@ -149,7 +149,7 @@ const Obligations = () => {
         try {
             await axios.post(`${API_URL}/obligations/${paymentForm.id}/pay`, {
                 payment_date: new Date().toISOString(),
-                amount: parseFloat(paymentForm.amount),
+                amount: parseFloat(paymentForm.amount || 0), // Allow empty -> 0
                 billing_month: new Date(paymentForm.billing_month).toISOString(), // Send YYYY-MM-01
                 note: paymentForm.note
             });
@@ -171,7 +171,7 @@ const Obligations = () => {
         try {
             await axios.post(`${API_URL}/obligations/${viewingHistoryId}/pay`, {
                 payment_date: pDate.toISOString(),
-                amount: parseFloat(formData.get('amount')),
+                amount: parseFloat(formData.get('amount') || 0), // Allow empty
                 billing_month: bMonth.toISOString(),
                 note: formData.get('note') || "Manual History Log"
             });
@@ -294,6 +294,15 @@ const Obligations = () => {
                                             <CheckCircle size={28} className="mb-2" />
                                             <span className="font-bold text-2xl">{formatCurrency(currMonth.amount)}</span>
                                             <span className="text-xs bg-green-900/30 px-2 py-0.5 rounded text-green-300 mt-1">Paid</span>
+
+                                            {/* Unpay / Delete Button - Shows on Hover */}
+                                            <button
+                                                onClick={() => handleDeleteHistory(currMonth.paymentId)}
+                                                className="absolute -top-1 -right-8 opacity-0 group-hover/current:opacity-100 transition text-red-400 bg-slate-900/80 p-1.5 rounded-full hover:bg-slate-900 border border-slate-700 shadow-xl"
+                                                title="Delete this payment"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
                                         </div>
                                     ) : (
                                         <div className="flex flex-col items-center w-full">
@@ -343,7 +352,8 @@ const Obligations = () => {
 
                         <div>
                             <label className="text-gray-400 text-xs uppercase mb-1 block">Amount</label>
-                            <input type="number" step="0.01" required className={inputClass} value={paymentForm.amount} onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
+                            <input type="number" step="0.01" className={inputClass} value={paymentForm.amount} onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
+                            <p className="text-xs text-gray-500 mt-1">Optional. Leave empty for 0.</p>
                         </div>
 
                         <div>
@@ -368,7 +378,7 @@ const Obligations = () => {
                         </div>
                         <div>
                             <label className="text-gray-400 text-xs uppercase mb-1 block">Amount</label>
-                            <input type="number" placeholder="SAR" required step="0.01" className={inputClass} value={obligationForm.amount} onChange={e => setObligationForm({ ...obligationForm, amount: e.target.value })} />
+                            <input type="number" placeholder="SAR" step="0.01" className={inputClass} value={obligationForm.amount} onChange={e => setObligationForm({ ...obligationForm, amount: e.target.value })} />
                         </div>
                         <div>
                             <label className="text-gray-400 text-xs uppercase mb-1 block">Due Date</label>
@@ -416,7 +426,7 @@ const Obligations = () => {
                             </div>
 
                             <div className="col-span-2 grid grid-cols-2 gap-3">
-                                <div><input type="number" name="amount" defaultValue={currentHistoryObligation.amount} placeholder="Amount" step="0.01" required className={`${inputClass} text-sm`} /></div>
+                                <div><input type="number" name="amount" defaultValue={currentHistoryObligation.amount} placeholder="Amount" step="0.01" className={`${inputClass} text-sm`} /></div>
                                 <div><input type="text" name="note" placeholder="Note (Optional)" className={`${inputClass} text-sm`} /></div>
                             </div>
 
