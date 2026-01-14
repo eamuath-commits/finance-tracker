@@ -53,10 +53,12 @@ const Obligations = () => {
         const targetMonth = targetDate.getMonth();
         const targetYear = targetDate.getFullYear();
 
+        // Format YYYY-MM-01 for predictable API usage
+        const billingDateStr = `${targetYear}-${(targetMonth + 1).toString().padStart(2, '0')}-01`;
+
         const payments = history[oblId] || [];
         const payment = payments.find(p => {
             if (p.billing_month) {
-                // Parse "YYYY-MM-DD" string directly to avoid timezone shifts
                 const [y, m, d] = p.billing_month.split('-').map(Number);
                 return (m - 1) === targetMonth && y === targetYear;
             }
@@ -69,6 +71,7 @@ const Obligations = () => {
             label: targetDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
             shortLabel: targetDate.toLocaleDateString('en-US', { month: 'short' }),
             monthIndex: targetMonth,
+            billingDateStr: billingDateStr, // New field for opening modal
             isPaid: !!payment,
             amount: payment ? payment.amount : null,
             date: payment ? payment.payment_date : null,
@@ -119,16 +122,18 @@ const Obligations = () => {
     };
 
     // Open Custom Payment Modal
-    const openPaymentModal = (obl) => {
+    // Updated to accept a specific target month (default to current if not provided)
+    const openPaymentModal = (obl, targetMonthStr = null) => {
         const now = new Date();
-        const monthStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-01`;
+        // Default to current month YYYY-MM-01 if not provided
+        const defaultMonthStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-01`;
 
         setPaymentForm({
             id: obl.id,
             name: obl.name,
             amount: obl.amount,
             note: "Manual Payment",
-            billing_month: monthStr
+            billing_month: targetMonthStr || defaultMonthStr
         });
         setShowPaymentModal(true);
     };
@@ -266,17 +271,33 @@ const Obligations = () => {
                             {/* 3-Month View Grid */}
                             <div className="grid grid-cols-3 divide-x divide-slate-700">
                                 {/* Previous Month */}
-                                <div className="p-4 flex flex-col items-center text-center opacity-70 hover:opacity-100 transition">
+                                <div className="p-4 flex flex-col items-center text-center opacity-70 hover:opacity-100 transition group/prev relative">
                                     <span className="text-xs uppercase font-bold text-gray-500 mb-2">{prevMonth.shortLabel}</span>
                                     {prevMonth.isPaid ? (
-                                        <div className="text-green-400 flex flex-col items-center">
+                                        <div className="text-green-400 flex flex-col items-center relative">
                                             <CheckCircle size={20} className="mb-1" />
                                             <span className="font-bold text-lg">{formatCurrency(prevMonth.amount)}</span>
+
+                                            {/* Delete Button for Previous Month */}
+                                            <button
+                                                onClick={() => handleDeleteHistory(prevMonth.paymentId)}
+                                                className="absolute -top-1 -right-6 opacity-0 group-hover/prev:opacity-100 transition text-red-400 bg-slate-900/80 p-1 rounded-full hover:bg-slate-900 border border-slate-700 shadow-xl"
+                                                title="Delete this payment"
+                                            >
+                                                <Trash2 size={12} />
+                                            </button>
                                         </div>
                                     ) : (
-                                        <div className="text-gray-500 flex flex-col items-center">
+                                        <div className="text-gray-500 flex flex-col items-center w-full">
                                             <XCircle size={20} className="mb-1" />
-                                            <span className="text-sm">Unpaid</span>
+                                            <span className="text-sm mb-1">Unpaid</span>
+                                            {/* Pay Button for Previous Month */}
+                                            <button
+                                                onClick={() => openPaymentModal(obl, prevMonth.billingDateStr)}
+                                                className="text-[10px] bg-blue-900/50 hover:bg-blue-800 text-blue-200 px-2 py-0.5 rounded border border-blue-900/50 opacity-0 group-hover/prev:opacity-100 transition"
+                                            >
+                                                Mark Paid
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -303,7 +324,7 @@ const Obligations = () => {
                                         <div className="flex flex-col items-center w-full">
                                             <span className="text-2xl font-bold text-white mb-1">{formatCurrency(obl.amount)}</span>
                                             <p className="text-xs text-red-300 mb-3 font-medium">Due: {getNextDueDate(obl.due_day)}</p>
-                                            <button onClick={() => openPaymentModal(obl)} className="w-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold py-2 px-4 rounded shadow-lg flex justify-center items-center gap-2 transition transform hover:scale-105">
+                                            <button onClick={() => openPaymentModal(obl, currMonth.billingDateStr)} className="w-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold py-2 px-4 rounded shadow-lg flex justify-center items-center gap-2 transition transform hover:scale-105">
                                                 <CheckCircle size={16} /> Pay Now
                                             </button>
                                         </div>
