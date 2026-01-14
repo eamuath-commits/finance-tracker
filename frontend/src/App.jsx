@@ -106,7 +106,8 @@ function App() {
     const [loanForm, setLoanForm] = useState({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '' });
     const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_day: '', category: '' });
 
-    const API_URL = "http://" + window.location.hostname + ":8000";
+    // Allow overriding API URL via environment variable for remote development
+    const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
     const fetchData = async () => {
         try {
