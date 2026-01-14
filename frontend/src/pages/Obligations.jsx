@@ -73,7 +73,10 @@ const Obligations = () => {
         // Smart Amount Logic:
         // Use actual payment if exists.
         // Else, find the MOST RECENT payment that occurred BEFORE this target month.
-        let displayAmount = obl.amount;
+        // Smart Amount Logic:
+        // Use actual payment if exists.
+        // Else, find the MOST RECENT payment that occurred BEFORE this target month.
+        let displayAmount = null;
 
         if (payment) {
             displayAmount = payment.amount;
@@ -82,7 +85,6 @@ const Obligations = () => {
             const pastPayments = payments.filter(p => {
                 let d = new Date(p.billing_month || p.payment_date);
                 // We want strictly earlier than targetDate (which is 1st of month)
-                // Actually, comparing YYYY-MM strings is safer or just getTime
                 return d < targetDate;
             });
 
@@ -91,6 +93,12 @@ const Obligations = () => {
                 pastPayments.sort((a, b) => new Date(b.billing_month || b.payment_date) - new Date(a.billing_month || a.payment_date));
                 displayAmount = pastPayments[0].amount;
             }
+        }
+
+        // If no history found, and it's current or future month, default to obligation amount.
+        // If it's a PAST month and no history found, leave as null (so UI implies "No Data" or just "Unpaid" without assuming amount).
+        if (displayAmount === null && offset >= 0) {
+            displayAmount = obl.amount;
         }
 
         return {
