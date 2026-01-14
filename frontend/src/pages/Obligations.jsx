@@ -181,6 +181,21 @@ const Obligations = () => {
         } catch (err) { alert("Error adding record"); }
     };
 
+    const handleDeleteHistory = async (historyId) => {
+        if (!confirm("Are you sure you want to delete this payment record?")) return;
+        try {
+            await axios.delete(`${API_URL}/obligations/history/${historyId}`);
+            // Refresh
+            const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/history`);
+            setSelectedHistory(hRes.data);
+            setHistory(prev => ({ ...prev, [viewingHistoryId]: hRes.data }));
+
+            // Also refresh main list to update statuses immediately
+            const res = await axios.get(`${API_URL}/obligations/`);
+            setObligations(res.data);
+        } catch (err) { alert("Error deleting history"); }
+    };
+
     const openObligationModal = (obl = null) => {
         if (obl) {
             setEditingId(obl.id);
@@ -354,8 +369,9 @@ const Obligations = () => {
                             <input type="number" placeholder="SAR" required step="0.01" className={inputClass} value={obligationForm.amount} onChange={e => setObligationForm({ ...obligationForm, amount: e.target.value })} />
                         </div>
                         <div>
-                            <label className="text-gray-400 text-xs uppercase mb-1 block">Due Day</label>
+                            <label className="text-gray-400 text-xs uppercase mb-1 block">Due Date</label>
                             <input type="date" required className={inputClass} value={obligationForm.due_date} onChange={e => setObligationForm({ ...obligationForm, due_date: e.target.value })} />
+                            <p className="text-xs text-gray-500 mt-1">We repeat this obligation monthly on this <strong>Day</strong>.</p>
                         </div>
                         <div>
                             <label className="text-gray-400 text-xs uppercase mb-1 block">Category</label>
@@ -412,8 +428,13 @@ const Obligations = () => {
                                     <p className="text-white font-medium text-sm">{new Date(h.payment_date).toLocaleDateString()}</p>
                                     <p className="text-[10px] text-gray-400">Month: {h.billing_month ? new Date(h.billing_month).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Auto'}</p>
                                 </div>
-                                <div className="text-right">
-                                    <p className="text-green-400 font-bold text-sm">{formatCurrency(h.amount)}</p>
+                                <div className="text-right flex flex-col items-end">
+                                    <div className="flex items-center gap-3">
+                                        <p className="text-green-400 font-bold text-sm">{formatCurrency(h.amount)}</p>
+                                        <button onClick={() => handleDeleteHistory(h.id)} className="text-slate-500 hover:text-red-400 transition" title="Delete Record">
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
                                     {h.note && <p className="text-xs text-gray-500">{h.note}</p>}
                                 </div>
                             </div>

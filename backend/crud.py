@@ -167,5 +167,12 @@ def create_obligation_payment(db: Session, obligation_id: str, payment: schemas.
     db.refresh(db_payment)
     return db_payment
 
+def delete_obligation_history_entry(db: Session, history_id: int):
+    entry = db.query(models.ObligationHistory).filter(models.ObligationHistory.id == history_id).first()
+    if entry:
+        db.delete(entry)
+        db.commit()
+    return entry
+
 def get_obligation_history(db: Session, obligation_id: str):
     return db.query(models.ObligationHistory).filter(models.ObligationHistory.obligation_id == obligation_id).order_by(models.ObligationHistory.payment_date.desc()).all()

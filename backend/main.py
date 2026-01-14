@@ -123,8 +123,15 @@ def pay_obligation(obligation_id: str, payment: schemas.ObligationHistoryCreate,
     return crud.create_obligation_payment(db=db, obligation_id=obligation_id, payment=payment)
 
 @app.get("/obligations/{obligation_id}/history", response_model=List[schemas.ObligationHistory])
-def get_obligation_history(obligation_id: str, db: Session = Depends(get_db)):
-    return crud.get_obligation_history(db=db, obligation_id=obligation_id)
+def read_obligation_history(obligation_id: str, db: Session = Depends(get_db)):
+    return crud.get_obligation_history(db, obligation_id)
+
+@app.delete("/obligations/history/{history_id}")
+def delete_obligation_history(history_id: int, db: Session = Depends(get_db)):
+    deleted = crud.delete_obligation_history_entry(db, history_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="History entry not found")
+    return {"message": "History entry deleted"}
 
 # --- Transaction Endpoints ---
 @app.get("/transactions/", response_model=List[schemas.Transaction])
