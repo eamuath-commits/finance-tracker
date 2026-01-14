@@ -19,7 +19,7 @@ const Obligations = () => {
 
     // Forms
     // Default billing_month to today YYYY-MM-DD for safety, though we override it
-    const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_date: '', category: '' });
+    const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_day: '', category: '' });
     const [paymentForm, setPaymentForm] = useState({ id: null, amount: '', note: '', billing_month: new Date().toISOString().split('T')[0] });
 
     const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
@@ -87,17 +87,11 @@ const Obligations = () => {
     const handleSaveObligation = async (e) => {
         e.preventDefault();
 
-        let due_day_val = 1;
-        if (obligationForm.due_date) {
-            const parts = obligationForm.due_date.split('-');
-            if (parts.length === 3) due_day_val = parseInt(parts[2]);
-        }
-
         const payload = {
             name: obligationForm.name,
             amount: parseFloat(obligationForm.amount || 0),
             category: obligationForm.category,
-            due_day: due_day_val
+            due_day: parseInt(obligationForm.due_day || 1)
         };
 
         try {
@@ -199,18 +193,15 @@ const Obligations = () => {
     const openObligationModal = (obl = null) => {
         if (obl) {
             setEditingId(obl.id);
-            const now = new Date();
-            const dayStr = obl.due_day.toString().padStart(2, '0');
-            const monthStr = (now.getMonth() + 1).toString().padStart(2, '0');
             setObligationForm({
                 name: obl.name,
                 amount: obl.amount,
-                due_date: `${now.getFullYear()}-${monthStr}-${dayStr}`,
+                due_day: obl.due_day,
                 category: obl.category
             });
         } else {
             setEditingId(null);
-            setObligationForm({ name: '', amount: '', due_date: '', category: '' });
+            setObligationForm({ name: '', amount: '', due_day: '', category: '' });
         }
         setShowObligationModal(true);
     };
@@ -403,9 +394,18 @@ const Obligations = () => {
                             <input type="number" placeholder="SAR" step="0.01" className={inputClass} value={obligationForm.amount} onChange={e => setObligationForm({ ...obligationForm, amount: e.target.value })} />
                         </div>
                         <div>
-                            <label className="text-gray-400 text-xs uppercase mb-1 block">Due Date</label>
-                            <input type="date" required className={inputClass} value={obligationForm.due_date} onChange={e => setObligationForm({ ...obligationForm, due_date: e.target.value })} />
-                            <p className="text-xs text-gray-500 mt-1">We repeat this obligation monthly on this <strong>Day</strong>.</p>
+                            <label className="text-gray-400 text-xs uppercase mb-1 block">Due Day</label>
+                            <input
+                                type="number"
+                                min="1"
+                                max="31"
+                                placeholder="1-31"
+                                required
+                                className={inputClass}
+                                value={obligationForm.due_day}
+                                onChange={e => setObligationForm({ ...obligationForm, due_day: e.target.value })}
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Day of the month (1-31) for this bill.</p>
                         </div>
                         <div>
                             <label className="text-gray-400 text-xs uppercase mb-1 block">Category</label>
