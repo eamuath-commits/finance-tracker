@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Card, SectionHeader, Modal, EditIcon, formatCurrency, inputClass, selectClass } from '../components/UI';
-import { CheckCircle, XCircle, History, Calendar, Trash2, ArrowRight } from 'lucide-react';
+import { CheckCircle, XCircle, History, Calendar, Trash2, ArrowRight, Pencil } from 'lucide-react';
 
 const Obligations = () => {
     const [obligations, setObligations] = useState([]);
