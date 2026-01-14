@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Card, SectionHeader, Modal, EditIcon, formatCurrency, inputClass } from '../components/UI';
+import { Card, SectionHeader, Modal, EditIcon, formatCurrency, inputClass, selectClass } from '../components/UI';
 import { CheckCircle, XCircle, History, Calendar } from 'lucide-react';
 
 const Obligations = () => {
@@ -224,7 +224,17 @@ const Obligations = () => {
                         </div>
                         <div>
                             <label className="text-gray-400 text-xs uppercase mb-1 block">Category</label>
-                            <input type="text" placeholder="e.g. Housing, Utilities" className={inputClass} value={obligationForm.category} onChange={e => setObligationForm({ ...obligationForm, category: e.target.value })} />
+                            <select className={selectClass} value={obligationForm.category} onChange={e => setObligationForm({ ...obligationForm, category: e.target.value })}>
+                                <option value="">Select Category...</option>
+                                <option value="Housing">Housing</option>
+                                <option value="Utilities">Utilities</option>
+                                <option value="Food">Food & Groceries</option>
+                                <option value="Transport">Transport</option>
+                                <option value="Insurance">Insurance</option>
+                                <option value="Tech">Tech & Subscriptions</option>
+                                <option value="Loan">Loan Repayment</option>
+                                <option value="Other">Other</option>
+                            </select>
                         </div>
                         <button type="submit" className="w-full bg-blue-600 text-white p-3 rounded hover:bg-blue-500 font-bold mt-4 shadow-lg">
                             {editingId ? "Save Changes" : "Create Obligation"}
