@@ -45,3 +45,12 @@ class Loan(Base):
     start_date = Column(Date, nullable=False)
     term_months = Column(Integer, nullable=False)
     remaining_balance = Column(Float, nullable=False)
+
+class MonthlyObligation(Base):
+    __tablename__ = "obligations"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False)
+    amount = Column(Float, nullable=False)
+    due_day = Column(Integer, nullable=False) # e.g. 1 for 1st of month
+    category = Column(String, nullable=True)

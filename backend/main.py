@@ -37,6 +37,20 @@ def read_loans(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     loans = crud.get_loans(db, skip=skip, limit=limit)
     return loans
 
+# --- Obligation Endpoints ---
+@app.post("/obligations/", response_model=schemas.Obligation)
+def create_obligation(obligation: schemas.ObligationCreate, db: Session = Depends(get_db)):
+    return crud.create_obligation(db=db, obligation=obligation)
+
+@app.get("/obligations/", response_model=List[schemas.Obligation])
+def read_obligations(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return crud.get_obligations(db, skip=skip, limit=limit)
+
+# --- Transaction Endpoints ---
+@app.get("/transactions/", response_model=List[schemas.Transaction])
+def read_transactions(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return crud.get_transactions(db, skip=skip, limit=limit)
+
 # --- Webhook Endpoint ---
 @app.post("/webhook/sms")
 def receive_sms(payload: schemas.SMSPayload, db: Session = Depends(get_db)):

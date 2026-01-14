@@ -49,6 +49,20 @@ class Loan(LoanBase):
     class Config:
         orm_mode = True
 
+class ObligationBase(BaseModel):
+    name: str
+    amount: float
+    due_day: int
+    category: Optional[str] = None
+
+class ObligationCreate(ObligationBase):
+    pass
+
+class Obligation(ObligationBase):
+    id: str
+    class Config:
+        orm_mode = True
+
 class SMSPayload(BaseModel):
     body: str
     sender: str

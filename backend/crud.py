@@ -64,3 +64,21 @@ def create_loan(db: Session, loan: schemas.LoanCreate):
 
 def get_loans(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Loan).offset(skip).limit(limit).all()
+
+def create_obligation(db: Session, obligation: schemas.ObligationCreate):
+    db_obj = models.MonthlyObligation(
+        name=obligation.name,
+        amount=obligation.amount,
+        due_day=obligation.due_day,
+        category=obligation.category
+    )
+    db.add(db_obj)
+    db.commit()
+    db.refresh(db_obj)
+    return db_obj
+
+def get_obligations(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.MonthlyObligation).offset(skip).limit(limit).all()
+
+def get_transactions(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Transaction).order_by(models.Transaction.timestamp.desc()).offset(skip).limit(limit).all()
