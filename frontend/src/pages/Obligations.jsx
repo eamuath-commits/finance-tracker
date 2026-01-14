@@ -344,15 +344,36 @@ const Obligations = () => {
 
                         <div>
                             <label className="text-gray-400 text-xs uppercase mb-1 block">For Month</label>
-                            {/* Input type="month" is cleaner but "date" works if we just force day=1 */}
-                            <input
-                                type="date"
-                                required
-                                className={inputClass}
-                                value={paymentForm.billing_month}
-                                onChange={e => setPaymentForm({ ...paymentForm, billing_month: e.target.value })}
-                            />
-                            <p className="text-xs text-gray-500 mt-1">If paying in Jan for Dec bill, select a date in December.</p>
+                            <div className="flex gap-1">
+                                <select
+                                    className={`${selectClass} text-sm flex-1`}
+                                    value={new Date(paymentForm.billing_month).getMonth()}
+                                    onChange={e => {
+                                        const d = new Date(paymentForm.billing_month);
+                                        d.setMonth(parseInt(e.target.value));
+                                        // Keep day as 1 just to be safe
+                                        d.setDate(1);
+                                        setPaymentForm({ ...paymentForm, billing_month: d.toISOString().split('T')[0] });
+                                    }}
+                                >
+                                    {months.map((m, idx) => (
+                                        <option key={idx} value={idx}>{m}</option>
+                                    ))}
+                                </select>
+                                <select
+                                    className={`${selectClass} text-sm w-24`}
+                                    value={new Date(paymentForm.billing_month).getFullYear()}
+                                    onChange={e => {
+                                        const d = new Date(paymentForm.billing_month);
+                                        d.setFullYear(parseInt(e.target.value));
+                                        setPaymentForm({ ...paymentForm, billing_month: d.toISOString().split('T')[0] });
+                                    }}
+                                >
+                                    {years.map(y => (
+                                        <option key={y} value={y}>{y}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
 
                         <div>
@@ -418,7 +439,7 @@ const Obligations = () => {
                     <div className="bg-slate-700/50 p-4 rounded-lg mb-6 border border-slate-600">
                         <div className="flex items-center gap-2 mb-3 text-blue-300">
                             <Calendar size={16} />
-                            <h4 className="text-sm font-bold uppercase tracking-wide">Log Past Payment</h4>
+                            <h4 className="text-sm font-bold uppercase tracking-wide">Log Payment Record</h4>
                         </div>
                         <form onSubmit={handleAddPastPayment} className="grid grid-cols-2 gap-3">
                             <div>
