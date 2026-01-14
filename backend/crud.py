@@ -155,6 +155,13 @@ def create_obligation_payment(db: Session, obligation_id: str, payment: schemas.
         note=payment.note
     )
     db.add(db_payment)
+    
+    # Auto-update the expected amount for next month based on this payment
+    obligation = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
+    if obligation:
+        obligation.amount = payment.amount
+        db.add(obligation)
+
     db.commit()
     db.refresh(db_payment)
     return db_payment
