@@ -4,7 +4,7 @@ from sqlalchemy.dialects.postgresql import UUID
 import uuid
 import enum
 from datetime import datetime
-from .database import Base
+from database import Base
 
 class AccountType(enum.Enum):
     CHECKING = "Checking"

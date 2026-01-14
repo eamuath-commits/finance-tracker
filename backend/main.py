@@ -2,9 +2,11 @@ from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List
 
-from . import models, schemas, crud
-from .database import engine, get_db
-from .sms_parser import parser
+import models
+import schemas
+import crud
+from database import engine, get_db
+from sms_parser import parser
 
 # Create tables
 models.Base.metadata.create_all(bind=engine)

@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
-from .models import AccountType
+from models import AccountType
 
 class AccountBase(BaseModel):
     name: str
