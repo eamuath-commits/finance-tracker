@@ -55,7 +55,13 @@ const Obligations = () => {
 
         const payments = history[oblId] || [];
         const payment = payments.find(p => {
-            let cycleDate = p.billing_month ? new Date(p.billing_month) : new Date(p.payment_date);
+            if (p.billing_month) {
+                // Parse "YYYY-MM-DD" string directly to avoid timezone shifts
+                const [y, m, d] = p.billing_month.split('-').map(Number);
+                return (m - 1) === targetMonth && y === targetYear;
+            }
+            // Fallback for old data without billing_month
+            let cycleDate = new Date(p.payment_date);
             return cycleDate.getMonth() === targetMonth && cycleDate.getFullYear() === targetYear;
         });
 
@@ -141,7 +147,7 @@ const Obligations = () => {
             await axios.post(`${API_URL}/obligations/${paymentForm.id}/pay`, {
                 payment_date: new Date().toISOString(),
                 amount: parseFloat(paymentForm.amount || 0),
-                billing_month: new Date(paymentForm.billing_month).toISOString(),
+                billing_month: paymentForm.billing_month, // Already YYYY-MM-DD str
                 note: paymentForm.note
             });
             setShowPaymentModal(false);
@@ -157,18 +163,16 @@ const Obligations = () => {
         const rawDate = formData.get('date');
         const pDate = rawDate ? new Date(rawDate) : new Date();
 
-        // Construct Billing Month from Selects
-        const bYear = parseInt(formData.get('billing_year'));
-        const bMonthIndex = parseInt(formData.get('billing_month_idx'));
-
-        // Ensure valid date construction
-        const bMonth = new Date(bYear, bMonthIndex, 1);
+        // Construct Billing Month String directly (YYYY-MM-01) to avoid Timezone Shifts
+        const bYear = formData.get('billing_year');
+        const bMonthIndex = parseInt(formData.get('billing_month_idx')) + 1; // 1-12
+        const bMonthStr = `${bYear}-${bMonthIndex.toString().padStart(2, '0')}-01`;
 
         try {
             await axios.post(`${API_URL}/obligations/${viewingHistoryId}/pay`, {
                 payment_date: pDate.toISOString(),
                 amount: parseFloat(formData.get('amount') || 0),
-                billing_month: bMonth.toISOString(),
+                billing_month: bMonthStr,
                 note: formData.get('note') || "Manual History Log"
             });
 
@@ -342,12 +346,11 @@ const Obligations = () => {
                             <div className="grid grid-cols-2 gap-3">
                                 <select
                                     className={`${selectClass} text-sm w-full`}
-                                    value={new Date(paymentForm.billing_month).getMonth()}
+                                    value={parseInt(paymentForm.billing_month.split('-')[1]) - 1}
                                     onChange={e => {
-                                        const d = new Date(paymentForm.billing_month);
-                                        d.setMonth(parseInt(e.target.value));
-                                        d.setDate(1);
-                                        setPaymentForm({ ...paymentForm, billing_month: d.toISOString().split('T')[0] });
+                                        const parts = paymentForm.billing_month.split('-');
+                                        const newMonth = (parseInt(e.target.value) + 1).toString().padStart(2, '0');
+                                        setPaymentForm({ ...paymentForm, billing_month: `${parts[0]}-${newMonth}-01` });
                                     }}
                                 >
                                     {months.map((m, idx) => (
@@ -356,11 +359,10 @@ const Obligations = () => {
                                 </select>
                                 <select
                                     className={`${selectClass} text-sm w-full`}
-                                    value={new Date(paymentForm.billing_month).getFullYear()}
+                                    value={parseInt(paymentForm.billing_month.split('-')[0])}
                                     onChange={e => {
-                                        const d = new Date(paymentForm.billing_month);
-                                        d.setFullYear(parseInt(e.target.value));
-                                        setPaymentForm({ ...paymentForm, billing_month: d.toISOString().split('T')[0] });
+                                        const parts = paymentForm.billing_month.split('-');
+                                        setPaymentForm({ ...paymentForm, billing_month: `${e.target.value}-${parts[1]}-01` });
                                     }}
                                 >
                                     {years.map(y => (
