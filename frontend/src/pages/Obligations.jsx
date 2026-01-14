@@ -153,7 +153,9 @@ const Obligations = () => {
         e.preventDefault();
         const formData = new FormData(e.target);
 
-        const pDate = new Date(formData.get('date'));
+        // Date Handling: Use input value or default to Today
+        const rawDate = formData.get('date');
+        const pDate = rawDate ? new Date(rawDate) : new Date();
 
         // Construct Billing Month from Selects
         const bYear = parseInt(formData.get('billing_year'));
@@ -337,9 +339,9 @@ const Obligations = () => {
 
                         <div>
                             <label className="text-gray-400 text-xs uppercase mb-1 block">For Month</label>
-                            <div className="flex gap-1">
+                            <div className="grid grid-cols-2 gap-3">
                                 <select
-                                    className={`${selectClass} text-sm flex-1`}
+                                    className={`${selectClass} text-sm w-full`}
                                     value={new Date(paymentForm.billing_month).getMonth()}
                                     onChange={e => {
                                         const d = new Date(paymentForm.billing_month);
@@ -353,7 +355,7 @@ const Obligations = () => {
                                     ))}
                                 </select>
                                 <select
-                                    className={`${selectClass} text-sm w-24`}
+                                    className={`${selectClass} text-sm w-full`}
                                     value={new Date(paymentForm.billing_month).getFullYear()}
                                     onChange={e => {
                                         const d = new Date(paymentForm.billing_month);
@@ -436,17 +438,18 @@ const Obligations = () => {
                         <form onSubmit={handleAddPastPayment} className="grid grid-cols-2 gap-3">
                             <div>
                                 <label className="text-[10px] uppercase text-gray-400 block mb-1">Payment Date</label>
-                                <input type="date" name="date" required className={`${inputClass} text-sm`} />
+                                <input type="date" name="date" className={`${inputClass} text-sm`} />
+                                <p className="text-[9px] text-gray-500 mt-0.5">Empty = Today</p>
                             </div>
                             <div>
                                 <label className="text-[10px] uppercase text-gray-400 block mb-1">For Month</label>
-                                <div className="flex gap-1">
-                                    <select name="billing_month_idx" className={`${selectClass} text-sm flex-1`} defaultValue={today.getMonth()}>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <select name="billing_month_idx" className={`${selectClass} text-sm w-full`} defaultValue={today.getMonth()}>
                                         {months.map((m, idx) => (
                                             <option key={idx} value={idx}>{m}</option>
                                         ))}
                                     </select>
-                                    <select name="billing_year" className={`${selectClass} text-sm w-20`} defaultValue={currentYear}>
+                                    <select name="billing_year" className={`${selectClass} text-sm w-full`} defaultValue={currentYear}>
                                         {years.map(y => (
                                             <option key={y} value={y}>{y}</option>
                                         ))}
