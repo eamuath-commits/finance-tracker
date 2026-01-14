@@ -47,7 +47,7 @@ const Obligations = () => {
     }, []);
 
     // --- Helpers ---
-    const getMonthStatus = (oblId, offset) => {
+    const getMonthStatus = (obl, offset) => {
         const today = new Date();
         const targetDate = new Date(today.getFullYear(), today.getMonth() + offset, 1);
         const targetMonth = targetDate.getMonth();
@@ -56,24 +56,44 @@ const Obligations = () => {
         // Format YYYY-MM-01 for predictable API usage
         const billingDateStr = `${targetYear}-${(targetMonth + 1).toString().padStart(2, '0')}-01`;
 
-        const payments = history[oblId] || [];
-        const payment = payments.find(p => {
+        const payments = history[obl.id] || [];
+
+        // Helper to check if a payment matches a specific month/year
+        const isMatch = (p, m, y) => {
             if (p.billing_month) {
-                const [y, m, d] = p.billing_month.split('-').map(Number);
-                return (m - 1) === targetMonth && y === targetYear;
+                const [py, pm] = p.billing_month.split('-').map(Number);
+                return (pm - 1) === m && py === y;
             }
-            // Fallback for old data without billing_month
-            let cycleDate = new Date(p.payment_date);
-            return cycleDate.getMonth() === targetMonth && cycleDate.getFullYear() === targetYear;
-        });
+            let d = new Date(p.payment_date);
+            return d.getMonth() === m && d.getFullYear() === y;
+        };
+
+        const payment = payments.find(p => isMatch(p, targetMonth, targetYear));
+
+        // Smart Amount Logic:
+        // If paid, use actual payment amount.
+        // If unpaid, check previous month. If previous month was paid, use THAT amount.
+        // Fallback to obligation default amount.
+        let displayAmount = obl.amount;
+
+        if (payment) {
+            displayAmount = payment.amount;
+        } else {
+            // Look back at previous month
+            const prevDate = new Date(targetYear, targetMonth - 1, 1);
+            const prevPayment = payments.find(p => isMatch(p, prevDate.getMonth(), prevDate.getFullYear()));
+            if (prevPayment) {
+                displayAmount = prevPayment.amount; // Inherit from previous month
+            }
+        }
 
         return {
             label: targetDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
             shortLabel: targetDate.toLocaleDateString('en-US', { month: 'short' }),
             monthIndex: targetMonth,
-            billingDateStr: billingDateStr, // New field for opening modal
+            billingDateStr: billingDateStr,
             isPaid: !!payment,
-            amount: payment ? payment.amount : null,
+            amount: displayAmount, // Now returns Smart Amount
             date: payment ? payment.payment_date : null,
             paymentId: payment ? payment.id : null
         };
@@ -105,7 +125,7 @@ const Obligations = () => {
             }
             setShowObligationModal(false);
             setEditingId(null);
-            setObligationForm({ name: '', amount: '', due_date: '', category: '' });
+            setObligationForm({ name: '', amount: '', due_day: '', category: '' });
             fetchObligations();
         } catch (err) { alert('Error saving obligation'); }
     };
@@ -122,16 +142,15 @@ const Obligations = () => {
     };
 
     // Open Custom Payment Modal
-    // Updated to accept a specific target month (default to current if not provided)
-    const openPaymentModal = (obl, targetMonthStr = null) => {
+    // Updated to accept amount override
+    const openPaymentModal = (obl, targetMonthStr = null, defaultAmount = null) => {
         const now = new Date();
-        // Default to current month YYYY-MM-01 if not provided
         const defaultMonthStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-01`;
 
         setPaymentForm({
             id: obl.id,
             name: obl.name,
-            amount: obl.amount,
+            amount: defaultAmount !== null ? defaultAmount : obl.amount, // Use smart amount if provided
             note: "Manual Payment",
             billing_month: targetMonthStr || defaultMonthStr
         });
@@ -244,9 +263,9 @@ const Obligations = () => {
 
             <div className="grid grid-cols-1 gap-6">
                 {obligations.map(obl => {
-                    const prevMonth = getMonthStatus(obl.id, -1);
-                    const currMonth = getMonthStatus(obl.id, 0);
-                    const nextMonth = getMonthStatus(obl.id, 1);
+                    const prevMonth = getMonthStatus(obl, -1);
+                    const currMonth = getMonthStatus(obl, 0);
+                    const nextMonth = getMonthStatus(obl, 1);
 
                     return (
                         <div key={obl.id} className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-lg group relative">
@@ -292,7 +311,7 @@ const Obligations = () => {
                                             <span className="text-sm mb-1">Unpaid</span>
                                             {/* Pay Button for Previous Month */}
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, prevMonth.billingDateStr); }}
+                                                onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, prevMonth.billingDateStr, prevMonth.amount); }}
                                                 className="text-[10px] bg-blue-900/50 hover:bg-blue-800 text-blue-200 px-2 py-0.5 rounded border border-blue-900/50 opacity-0 group-hover/prev:opacity-100 transition cursor-pointer z-50 mt-1"
                                             >
                                                 Mark Paid
@@ -321,9 +340,9 @@ const Obligations = () => {
                                         </div>
                                     ) : (
                                         <div className="flex flex-col items-center w-full">
-                                            <span className="text-2xl font-bold text-white mb-1">{formatCurrency(obl.amount)}</span>
+                                            <span className="text-2xl font-bold text-white mb-1">{formatCurrency(currMonth.amount)}</span>
                                             <p className="text-xs text-red-300 mb-3 font-medium">Due: {getNextDueDate(obl.due_day)}</p>
-                                            <button onClick={() => openPaymentModal(obl, currMonth.billingDateStr)} className="w-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold py-2 px-4 rounded shadow-lg flex justify-center items-center gap-2 transition transform hover:scale-105">
+                                            <button onClick={() => openPaymentModal(obl, currMonth.billingDateStr, currMonth.amount)} className="w-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold py-2 px-4 rounded shadow-lg flex justify-center items-center gap-2 transition transform hover:scale-105">
                                                 <CheckCircle size={16} /> Pay Now
                                             </button>
                                         </div>
@@ -335,7 +354,7 @@ const Obligations = () => {
                                     <span className="text-xs uppercase font-bold text-gray-500 mb-2">{nextMonth.shortLabel}</span>
                                     <div className="flex flex-col items-center text-gray-400">
                                         <ArrowRight size={20} className="mb-1 text-slate-600" />
-                                        <span className="font-bold text-lg text-gray-300">{formatCurrency(obl.amount)}</span>
+                                        <span className="font-bold text-lg text-gray-300">{formatCurrency(nextMonth.amount)}</span>
                                     </div>
                                 </div>
                             </div>
