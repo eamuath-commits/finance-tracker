@@ -263,6 +263,7 @@ const Obligations = () => {
 
             <div className="grid grid-cols-1 gap-6">
                 {obligations.map(obl => {
+                    const monthMinus2 = getMonthStatus(obl, -2);
                     const prevMonth = getMonthStatus(obl, -1);
                     const currMonth = getMonthStatus(obl, 0);
                     const nextMonth = getMonthStatus(obl, 1);
@@ -286,8 +287,40 @@ const Obligations = () => {
                                 </div>
                             </div>
 
-                            {/* 3-Month View Grid */}
-                            <div className="grid grid-cols-3 divide-x divide-slate-700">
+                            {/* 4-Month View Grid */}
+                            <div className="grid grid-cols-4 divide-x divide-slate-700">
+                                {/* Month -2 */}
+                                <div className="p-4 flex flex-col items-center text-center opacity-70 hover:opacity-100 transition group/m2 relative z-0 hover:z-10 bg-slate-900/20">
+                                    <span className="text-xs uppercase font-bold text-gray-600 mb-2">{monthMinus2.shortLabel}</span>
+                                    {monthMinus2.isPaid ? (
+                                        <div className="text-green-400 flex flex-col items-center relative">
+                                            <CheckCircle size={20} className="mb-1" />
+                                            <span className="font-bold text-lg">{formatCurrency(monthMinus2.amount)}</span>
+
+                                            {/* Delete Button */}
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteHistory(monthMinus2.paymentId); }}
+                                                className="absolute -top-1 -right-6 opacity-0 group-hover/m2:opacity-100 transition text-red-400 bg-slate-900/80 p-1.5 rounded-full hover:bg-slate-900 border border-slate-700 shadow-xl cursor-pointer z-50"
+                                                title="Delete this payment"
+                                            >
+                                                <Trash2 size={12} />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="text-gray-600 flex flex-col items-center w-full relative">
+                                            <XCircle size={20} className="mb-1" />
+                                            <span className="text-sm mb-1">Unpaid</span>
+                                            {/* Pay Button */}
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, monthMinus2.billingDateStr, monthMinus2.amount); }}
+                                                className="text-[10px] bg-blue-900/50 hover:bg-blue-800 text-blue-200 px-2 py-0.5 rounded border border-blue-900/50 opacity-0 group-hover/m2:opacity-100 transition cursor-pointer z-50 mt-1"
+                                            >
+                                                Mark Paid
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
                                 {/* Previous Month */}
                                 <div className="p-4 flex flex-col items-center text-center opacity-70 hover:opacity-100 transition group/prev relative z-0 hover:z-10">
                                     <span className="text-xs uppercase font-bold text-gray-500 mb-2">{prevMonth.shortLabel}</span>
@@ -296,7 +329,7 @@ const Obligations = () => {
                                             <CheckCircle size={20} className="mb-1" />
                                             <span className="font-bold text-lg">{formatCurrency(prevMonth.amount)}</span>
 
-                                            {/* Delete Button for Previous Month */}
+                                            {/* Delete Button */}
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); handleDeleteHistory(prevMonth.paymentId); }}
                                                 className="absolute -top-1 -right-6 opacity-0 group-hover/prev:opacity-100 transition text-red-400 bg-slate-900/80 p-1.5 rounded-full hover:bg-slate-900 border border-slate-700 shadow-xl cursor-pointer z-50"
@@ -354,7 +387,7 @@ const Obligations = () => {
                                     <span className="text-xs uppercase font-bold text-gray-500 mb-2">{nextMonth.shortLabel}</span>
                                     <div className="flex flex-col items-center text-gray-400">
                                         <ArrowRight size={20} className="mb-1 text-slate-600" />
-                                        <span className="font-bold text-lg text-gray-300">{formatCurrency(nextMonth.amount)}</span>
+                                        <span className="font-bold text-lg text-gray-300">{formatCurrency(obl.amount)}</span>
                                     </div>
                                 </div>
                             </div>
