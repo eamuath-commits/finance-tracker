@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Card, SectionHeader, Modal, EditIcon, formatCurrency, inputClass } from '../components/UI';
-import { CheckCircle, XCircle, History } from 'lucide-react';
+import { CheckCircle, XCircle, History, Calendar } from 'lucide-react';
 
 const Obligations = () => {
     const [obligations, setObligations] = useState([]);
@@ -13,6 +13,7 @@ const Obligations = () => {
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [selectedHistory, setSelectedHistory] = useState([]);
+    const [viewingHistoryId, setViewingHistoryId] = useState(null); // Track which obligation's history we are viewing
 
     // Forms
     const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_day: '', category: '' });
@@ -59,11 +60,7 @@ const Obligations = () => {
         const now = new Date();
         const currentYear = now.getFullYear();
         const currentMonth = now.getMonth();
-
-        // We fundamentally assume this is THIS month's due date
-        // Logic: Create a date object for this year/month and the specific day
         const date = new Date(currentYear, currentMonth, day);
-
         return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
     };
 
@@ -89,10 +86,35 @@ const Obligations = () => {
             await axios.post(`${API_URL}/obligations/${obl.id}/pay`, {
                 payment_date: new Date().toISOString(),
                 amount: obl.amount,
-                note: "Manual entry"
+                note: "Manual entry - Paid Button"
             });
             fetchObligations();
         } catch (err) { alert("Error marking as paid"); }
+    };
+
+    const handleAddPastPayment = async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+
+        try {
+            await axios.post(`${API_URL}/obligations/${viewingHistoryId}/pay`, {
+                payment_date: new Date(formData.get('date')).toISOString(),
+                amount: parseFloat(formData.get('amount')),
+                note: formData.get('note') || "Manual Manual History Log"
+            });
+
+            // Refresh history view
+            const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/history`);
+            setSelectedHistory(hRes.data);
+
+            // Update main state
+            setHistory(prev => ({ ...prev, [viewingHistoryId]: hRes.data }));
+
+            // Reset form
+            e.target.reset();
+        } catch (err) {
+            alert("Error adding historical record");
+        }
     };
 
     const openObligationModal = (obl = null) => {
@@ -107,11 +129,14 @@ const Obligations = () => {
     };
 
     const openHistory = (oblId) => {
+        setViewingHistoryId(oblId);
         setSelectedHistory(history[oblId] || []);
         setShowHistoryModal(true);
     };
 
     if (loading) return <div className="p-10 text-white">Loading...</div>;
+
+    const currentHistoryObligation = obligations.find(o => o.id === viewingHistoryId) || {};
 
     return (
         <div>
@@ -135,7 +160,7 @@ const Obligations = () => {
                     return (
                         <div key={obl.id} className={`relative group p-6 rounded-xl border ${paid ? 'bg-green-900/10 border-green-800' : 'bg-slate-800 border-slate-700'} shadow-lg flex justify-between items-center`}>
 
-                            {/* Edit Icon (Hidden until hover) */}
+                            {/* Edit Icon */}
                             <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition cursor-pointer bg-slate-900/50 p-1 rounded">
                                 <EditIcon onClick={() => openObligationModal(obl)} />
                             </div>
@@ -165,8 +190,8 @@ const Obligations = () => {
                                     </button>
                                 )}
 
-                                <button onClick={() => openHistory(obl.id)} className="text-gray-400 hover:text-white text-sm flex items-center gap-1">
-                                    <History size={16} /> History
+                                <button onClick={() => openHistory(obl.id)} className="text-gray-400 hover:text-white text-sm flex items-center gap-1 group-hover:text-blue-300 transition">
+                                    <History size={16} /> View History
                                 </button>
                             </div>
                         </div>
@@ -210,18 +235,42 @@ const Obligations = () => {
 
             {/* --- HISTORY MODAL --- */}
             {showHistoryModal && (
-                <Modal title="Payment History" onClose={() => setShowHistoryModal(false)}>
-                    <div className="max-h-96 overflow-y-auto space-y-3">
+                <Modal title={`History: ${currentHistoryObligation.name}`} onClose={() => setShowHistoryModal(false)}>
+
+                    {/* Add Past Record Form */}
+                    <div className="bg-slate-700/50 p-4 rounded-lg mb-6 border border-slate-600">
+                        <div className="flex items-center gap-2 mb-3 text-blue-300">
+                            <Calendar size={16} />
+                            <h4 className="text-sm font-bold uppercase tracking-wide">Log Past Payment</h4>
+                        </div>
+                        <form onSubmit={handleAddPastPayment} className="grid grid-cols-2 gap-3">
+                            <div className="col-span-2">
+                                <input type="date" name="date" required className={`${inputClass} text-sm`} />
+                            </div>
+                            <div>
+                                <input type="number" name="amount" defaultValue={currentHistoryObligation.amount} placeholder="Amount" step="0.01" required className={`${inputClass} text-sm`} />
+                            </div>
+                            <div>
+                                <input type="text" name="note" placeholder="Note (Optional)" className={`${inputClass} text-sm`} />
+                            </div>
+                            <button type="submit" className="col-span-2 bg-slate-600 hover:bg-slate-500 text-white text-xs font-bold py-2 rounded uppercase tracking-wider transition">
+                                + Add Record
+                            </button>
+                        </form>
+                    </div>
+
+                    <div className="max-h-60 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                        <h4 className="text-gray-400 text-xs uppercase font-bold mb-2 sticky top-0 bg-slate-800 py-1">Recorded Payments</h4>
                         {selectedHistory.map(h => (
-                            <div key={h.id} className="bg-slate-700/50 p-3 rounded flex justify-between items-center border border-slate-600">
+                            <div key={h.id} className="bg-slate-800 p-3 rounded flex justify-between items-center border border-slate-700 hover:border-slate-500 transition">
                                 <div>
-                                    <p className="text-white font-medium">{new Date(h.payment_date).toLocaleDateString()}</p>
-                                    {h.note && <p className="text-xs text-gray-400">{h.note}</p>}
+                                    <p className="text-white font-medium text-sm">{new Date(h.payment_date).toLocaleDateString()}</p>
+                                    <p className="text-xs text-gray-500">{h.note || 'No note'}</p>
                                 </div>
-                                <p className="text-green-400 font-bold">{formatCurrency(h.amount)}</p>
+                                <p className="text-green-400 font-bold text-sm">{formatCurrency(h.amount)}</p>
                             </div>
                         ))}
-                        {selectedHistory.length === 0 && <p className="text-gray-500 text-center py-4">No history recorded.</p>}
+                        {selectedHistory.length === 0 && <p className="text-gray-500 text-center py-4 text-sm italic">No history recorded yet.</p>}
                     </div>
                 </Modal>
             )}
