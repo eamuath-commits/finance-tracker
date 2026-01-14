@@ -158,9 +158,8 @@ const Obligations = () => {
         e.preventDefault();
         const formData = new FormData(e.target);
 
-        // Date Handling: Use input value or default to Today
-        const rawDate = formData.get('date');
-        const pDate = rawDate ? new Date(rawDate) : new Date();
+        // Always assume "Today" for payment_date when manually adding history
+        const pDate = new Date();
 
         // Construct Billing Month String directly (YYYY-MM-01) to avoid Timezone Shifts
         const bYear = formData.get('billing_year');
@@ -271,7 +270,7 @@ const Obligations = () => {
                             {/* 3-Month View Grid */}
                             <div className="grid grid-cols-3 divide-x divide-slate-700">
                                 {/* Previous Month */}
-                                <div className="p-4 flex flex-col items-center text-center opacity-70 hover:opacity-100 transition group/prev relative">
+                                <div className="p-4 flex flex-col items-center text-center opacity-70 hover:opacity-100 transition group/prev relative z-0 hover:z-10">
                                     <span className="text-xs uppercase font-bold text-gray-500 mb-2">{prevMonth.shortLabel}</span>
                                     {prevMonth.isPaid ? (
                                         <div className="text-green-400 flex flex-col items-center relative">
@@ -280,21 +279,21 @@ const Obligations = () => {
 
                                             {/* Delete Button for Previous Month */}
                                             <button
-                                                onClick={() => handleDeleteHistory(prevMonth.paymentId)}
-                                                className="absolute -top-1 -right-6 opacity-0 group-hover/prev:opacity-100 transition text-red-400 bg-slate-900/80 p-1 rounded-full hover:bg-slate-900 border border-slate-700 shadow-xl"
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteHistory(prevMonth.paymentId); }}
+                                                className="absolute -top-1 -right-6 opacity-0 group-hover/prev:opacity-100 transition text-red-400 bg-slate-900/80 p-1.5 rounded-full hover:bg-slate-900 border border-slate-700 shadow-xl cursor-pointer z-50"
                                                 title="Delete this payment"
                                             >
                                                 <Trash2 size={12} />
                                             </button>
                                         </div>
                                     ) : (
-                                        <div className="text-gray-500 flex flex-col items-center w-full">
+                                        <div className="text-gray-500 flex flex-col items-center w-full relative">
                                             <XCircle size={20} className="mb-1" />
                                             <span className="text-sm mb-1">Unpaid</span>
                                             {/* Pay Button for Previous Month */}
                                             <button
-                                                onClick={() => openPaymentModal(obl, prevMonth.billingDateStr)}
-                                                className="text-[10px] bg-blue-900/50 hover:bg-blue-800 text-blue-200 px-2 py-0.5 rounded border border-blue-900/50 opacity-0 group-hover/prev:opacity-100 transition"
+                                                onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, prevMonth.billingDateStr); }}
+                                                className="text-[10px] bg-blue-900/50 hover:bg-blue-800 text-blue-200 px-2 py-0.5 rounded border border-blue-900/50 opacity-0 group-hover/prev:opacity-100 transition cursor-pointer z-50 mt-1"
                                             >
                                                 Mark Paid
                                             </button>
@@ -303,7 +302,7 @@ const Obligations = () => {
                                 </div>
 
                                 {/* Current Month */}
-                                <div className="p-4 flex flex-col items-center text-center bg-slate-700/20 relative group/current">
+                                <div className="p-4 flex flex-col items-center text-center bg-slate-700/20 relative group/current z-0 hover:z-10">
                                     <span className="text-xs uppercase font-bold text-blue-300 mb-2">{currMonth.shortLabel}</span>
                                     {currMonth.isPaid ? (
                                         <div className="text-green-400 flex flex-col items-center animate-in fade-in zoom-in duration-300 relative">
@@ -313,8 +312,8 @@ const Obligations = () => {
 
                                             {/* Unpay / Delete Button - Shows on Hover */}
                                             <button
-                                                onClick={() => handleDeleteHistory(currMonth.paymentId)}
-                                                className="absolute -top-1 -right-8 opacity-0 group-hover/current:opacity-100 transition text-red-400 bg-slate-900/80 p-1.5 rounded-full hover:bg-slate-900 border border-slate-700 shadow-xl"
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteHistory(currMonth.paymentId); }}
+                                                className="absolute -top-1 -right-8 opacity-0 group-hover/current:opacity-100 transition text-red-400 bg-slate-900/80 p-1.5 rounded-full hover:bg-slate-900 border border-slate-700 shadow-xl cursor-pointer z-50"
                                                 title="Delete this payment"
                                             >
                                                 <Trash2 size={14} />
@@ -459,12 +458,7 @@ const Obligations = () => {
                             <h4 className="text-sm font-bold uppercase tracking-wide">Log Payment Record</h4>
                         </div>
                         <form onSubmit={handleAddPastPayment} className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="text-[10px] uppercase text-gray-400 block mb-1">Payment Date</label>
-                                <input type="date" name="date" className={`${inputClass} text-sm`} />
-                                <p className="text-[9px] text-gray-500 mt-0.5">Empty = Today</p>
-                            </div>
-                            <div>
+                            <div className="col-span-2">
                                 <label className="text-[10px] uppercase text-gray-400 block mb-1">For Month</label>
                                 <div className="grid grid-cols-2 gap-2">
                                     <select name="billing_month_idx" className={`${selectClass} text-sm w-full`} defaultValue={today.getMonth()}>
