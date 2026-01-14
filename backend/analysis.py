@@ -1,6 +1,5 @@
-from sqlalchemy.orm import Session
-from datetime import datetime
-from models import Account, MonthlyObligation, AccountType, ObligationHistory, extract
+from sqlalchemy import extract
+from models import Account, MonthlyObligation, AccountType, ObligationHistory
 from analysis_schema import AllocationResponse, Recommendation
 
 def calculate_allocation(db: Session) -> AllocationResponse:
