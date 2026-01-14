@@ -162,16 +162,17 @@ const Obligations = () => {
         e.preventDefault();
         const formData = new FormData(e.target);
 
-        // When adding history manually, assume Billing Month = Payment Date's Month
-        // Unless user specifies differently
         const pDate = new Date(formData.get('date'));
-        const bMonthDate = new Date(formData.get('billing_month'));
-        const bMonth = new Date(bMonthDate.getFullYear(), bMonthDate.getMonth(), 1);
+
+        // Construct Billing Month from Selects
+        const bYear = parseInt(formData.get('billing_year'));
+        const bMonthIndex = parseInt(formData.get('billing_month_idx'));
+        const bMonth = new Date(bYear, bMonthIndex, 1);
 
         try {
             await axios.post(`${API_URL}/obligations/${viewingHistoryId}/pay`, {
                 payment_date: pDate.toISOString(),
-                amount: parseFloat(formData.get('amount') || 0), // Allow empty
+                amount: parseFloat(formData.get('amount') || 0),
                 billing_month: bMonth.toISOString(),
                 note: formData.get('note') || "Manual History Log"
             });
@@ -226,6 +227,10 @@ const Obligations = () => {
     if (loading) return <div className="p-10 text-white">Loading...</div>;
 
     const currentHistoryObligation = obligations.find(o => o.id === viewingHistoryId) || {};
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const years = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
 
     return (
         <div>
@@ -422,7 +427,18 @@ const Obligations = () => {
                             </div>
                             <div>
                                 <label className="text-[10px] uppercase text-gray-400 block mb-1">For Month</label>
-                                <input type="date" name="billing_month" required className={`${inputClass} text-sm`} />
+                                <div className="flex gap-1">
+                                    <select name="billing_month_idx" className={`${selectClass} text-sm flex-1`} defaultValue={today.getMonth()}>
+                                        {months.map((m, idx) => (
+                                            <option key={idx} value={idx}>{m}</option>
+                                        ))}
+                                    </select>
+                                    <select name="billing_year" className={`${selectClass} text-sm w-20`} defaultValue={currentYear}>
+                                        {years.map(y => (
+                                            <option key={y} value={y}>{y}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
 
                             <div className="col-span-2 grid grid-cols-2 gap-3">
