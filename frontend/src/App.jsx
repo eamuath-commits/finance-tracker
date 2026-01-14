@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import Analytics from './Analytics';
 
 // --- UI Components ---
 
@@ -245,6 +246,8 @@ function App() {
                 </header>
 
                 <AllocationCard analysis={analysis} />
+
+                <Analytics transactions={transactions} obligations={obligations} />
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <Card title="Total Balance" value={formatCurrency(totalBalance)} color="green" />
