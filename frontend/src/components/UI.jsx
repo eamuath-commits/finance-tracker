@@ -1,7 +1,7 @@
 import React from 'react';
 
 export const formatCurrency = (value) => {
-    return "SAR " + Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return "﷼ " + Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
 export const Card = ({ title, value, subtext, color = "blue" }) => (
