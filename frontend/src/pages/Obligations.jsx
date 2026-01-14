@@ -487,7 +487,11 @@ const Obligations = () => {
                             <div key={h.id} className="bg-slate-800 p-3 rounded flex justify-between items-center border border-slate-700">
                                 <div>
                                     <p className="text-white font-medium text-sm">{new Date(h.payment_date).toLocaleDateString()}</p>
-                                    <p className="text-[10px] text-gray-400">Month: {h.billing_month ? new Date(h.billing_month).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Auto'}</p>
+                                    <p className="text-[10px] text-gray-400">Month: {h.billing_month ? (() => {
+                                        const [y, m] = h.billing_month.split('-').map(Number);
+                                        const date = new Date(y, m - 1, 1);
+                                        return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                                    })() : 'Auto'}</p>
                                 </div>
                                 <div className="text-right flex flex-col items-end">
                                     <div className="flex items-center gap-3">
