@@ -99,6 +99,7 @@ class SMSPayload(BaseModel):
 
 class ObligationHistoryBase(BaseModel):
     payment_date: datetime
+    billing_month: Optional[datetime] = None
     amount: float
     note: Optional[str] = None
 

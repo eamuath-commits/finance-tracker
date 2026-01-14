@@ -152,6 +152,7 @@ def create_obligation_payment(db: Session, obligation_id: str, payment: schemas.
         obligation_id=obligation_id,
         amount=payment.amount,
         payment_date=payment.payment_date,
+        billing_month=payment.billing_month,
         note=payment.note
     )
     db.add(db_payment)

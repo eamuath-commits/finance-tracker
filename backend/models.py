@@ -62,6 +62,7 @@ class ObligationHistory(Base):
     id = Column(Integer, primary_key=True, index=True)
     obligation_id = Column(String, ForeignKey("obligations.id"), nullable=False)
     payment_date = Column(DateTime, default=datetime.utcnow)
+    billing_month = Column(Date, nullable=True) # First day of the cycle month
     amount = Column(Float, nullable=False)
     note = Column(String, nullable=True)
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Card, SectionHeader, Modal, EditIcon, formatCurrency, inputClass, selectClass } from '../components/UI';
-import { CheckCircle, XCircle, History, Calendar, Trash2, AlertCircle, ArrowRight } from 'lucide-react';
+import { CheckCircle, XCircle, History, Calendar, Trash2, ArrowRight } from 'lucide-react';
 
 const Obligations = () => {
     const [obligations, setObligations] = useState([]);
@@ -11,12 +11,15 @@ const Obligations = () => {
     // Modal State
     const [showObligationModal, setShowObligationModal] = useState(false);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
+    const [showPaymentModal, setShowPaymentModal] = useState(false); // NEW: Custom Payment Modal
+
     const [editingId, setEditingId] = useState(null);
     const [selectedHistory, setSelectedHistory] = useState([]);
+    const [viewingHistoryId, setViewingHistoryId] = useState(null);
 
     // Forms
     const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_date: '', category: '' });
-    const [viewingHistoryId, setViewingHistoryId] = useState(null);
+    const [paymentForm, setPaymentForm] = useState({ id: null, amount: '', note: '', billing_month: '' });
 
     const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
@@ -45,20 +48,21 @@ const Obligations = () => {
     // --- Helpers ---
     const getMonthStatus = (oblId, offset) => {
         const today = new Date();
-        // Calculate target month
         const targetDate = new Date(today.getFullYear(), today.getMonth() + offset, 1);
         const targetMonth = targetDate.getMonth();
         const targetYear = targetDate.getFullYear();
 
         const payments = history[oblId] || [];
         const payment = payments.find(p => {
-            const d = new Date(p.payment_date);
-            return d.getMonth() === targetMonth && d.getFullYear() === targetYear;
+            // Check billing_month if available, else fallback to payment_date
+            let cycleDate = p.billing_month ? new Date(p.billing_month) : new Date(p.payment_date);
+            return cycleDate.getMonth() === targetMonth && cycleDate.getFullYear() === targetYear;
         });
 
         return {
             label: targetDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
             shortLabel: targetDate.toLocaleDateString('en-US', { month: 'short' }),
+            monthIndex: targetMonth, // For comparison
             isPaid: !!payment,
             amount: payment ? payment.amount : null,
             date: payment ? payment.payment_date : null
@@ -68,7 +72,6 @@ const Obligations = () => {
     const getNextDueDate = (day) => {
         if (!day) return "Not set";
         const now = new Date();
-        // We want the Due Date for THIS month
         const date = new Date(now.getFullYear(), now.getMonth(), day);
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
@@ -114,32 +117,60 @@ const Obligations = () => {
         } catch (err) { alert('Error deleting'); }
     };
 
-    const handleMarkPaid = async (obl) => {
-        // Default to the current obligation amount
-        // We can prompt user to confirm the amount
-        const amountStr = prompt(`Confirm payment amount for ${obl.name}:`, obl.amount);
-        if (amountStr === null) return; // Cancelled
+    // Open Custom Payment Modal
+    const openPaymentModal = (obl) => {
+        const now = new Date();
+        // Default billing month: Current month
+        // Or if due_day is < 10, assume user might want previous month? 
+        // Let's just default to current month YYYY-MM-01
 
-        const amount = parseFloat(amountStr);
-        if (isNaN(amount)) { alert("Invalid amount"); return; }
+        let initialMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        // Smart Logic: If Due Day is early (e.g. 4th) and Today is early (e.g. 5th), 
+        // user MIGHT mean "Last Month's Bill". But safer to let user switch manually.
+
+        const monthStr = `${initialMonth.getFullYear()}-${(initialMonth.getMonth() + 1).toString().padStart(2, '0')}-01`;
+
+        setPaymentForm({
+            id: obl.id,
+            name: obl.name,
+            amount: obl.amount,
+            note: "Manual Payment",
+            billing_month: monthStr // YYYY-MM-01 format for date input
+        });
+        setShowPaymentModal(true);
+    };
+
+    const submitPayment = async (e) => {
+        e.preventDefault();
+        if (!paymentForm.id) return;
 
         try {
-            await axios.post(`${API_URL}/obligations/${obl.id}/pay`, {
+            await axios.post(`${API_URL}/obligations/${paymentForm.id}/pay`, {
                 payment_date: new Date().toISOString(),
-                amount: amount,
-                note: "Paid via Dashboard"
+                amount: parseFloat(paymentForm.amount),
+                billing_month: new Date(paymentForm.billing_month).toISOString(), // Send YYYY-MM-01
+                note: paymentForm.note
             });
+            setShowPaymentModal(false);
             fetchObligations();
-        } catch (err) { alert("Error marking as paid"); }
+        } catch (err) { alert("Error processing payment"); }
     };
 
     const handleAddPastPayment = async (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
+
+        // When adding history manually, assume Billing Month = Payment Date's Month
+        // Unless user specifies differently? For simplicity, lock them together here.
+        const pDate = new Date(formData.get('date'));
+        const bMonth = new Date(pDate.getFullYear(), pDate.getMonth(), 1);
+
         try {
             await axios.post(`${API_URL}/obligations/${viewingHistoryId}/pay`, {
-                payment_date: new Date(formData.get('date')).toISOString(),
+                payment_date: pDate.toISOString(),
                 amount: parseFloat(formData.get('amount')),
+                billing_month: bMonth.toISOString(),
                 note: formData.get('note') || "Manual History Log"
             });
             const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/history`);
@@ -184,7 +215,7 @@ const Obligations = () => {
             <div className="flex justify-between items-center mb-8">
                 <div>
                     <h1 className="text-3xl font-bold text-white">Obligation Manager</h1>
-                    <p className="text-gray-400">Track recurring bills: Past, Present, and Future.</p>
+                    <p className="text-gray-400">Track bills via Billing Cycles.</p>
                 </div>
                 <button
                     onClick={() => openObligationModal(null)}
@@ -198,18 +229,18 @@ const Obligations = () => {
                 {obligations.map(obl => {
                     const prevMonth = getMonthStatus(obl.id, -1);
                     const currMonth = getMonthStatus(obl.id, 0);
-                    const nextMonth = getMonthStatus(obl.id, 1); // Not really checking status, just for label
+                    const nextMonth = getMonthStatus(obl.id, 1);
 
                     return (
                         <div key={obl.id} className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-lg group relative">
-                            {/* Card Header & Edit Button */}
+                            {/* Card Header */}
                             <div className="bg-slate-900/50 p-4 border-b border-slate-700 flex justify-between items-start">
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <h3 className="text-xl font-bold text-white">{obl.name}</h3>
                                         <span className="text-xs px-2 py-0.5 rounded bg-slate-700 text-gray-400">{obl.category}</span>
                                     </div>
-                                    <p className="text-sm text-gray-400 mt-1">Recurrence: <span className="text-gray-300">Day {obl.due_day}</span></p>
+                                    <p className="text-sm text-gray-400 mt-1">Due Day: <span className="text-gray-300">{obl.due_day}th</span></p>
                                 </div>
                                 <div className="flex gap-3">
                                     <button onClick={() => openHistory(obl.id)} className="text-xs font-medium text-gray-400 hover:text-white flex items-center gap-1">
@@ -221,67 +252,95 @@ const Obligations = () => {
 
                             {/* 3-Month View Grid */}
                             <div className="grid grid-cols-3 divide-x divide-slate-700">
-
                                 {/* Previous Month */}
                                 <div className="p-4 flex flex-col items-center text-center opacity-70 hover:opacity-100 transition">
-                                    <span className="text-xs uppercase font-bold text-gray-500 mb-2">{prevMonth.shortLabel} (Prev)</span>
+                                    <span className="text-xs uppercase font-bold text-gray-500 mb-2">{prevMonth.shortLabel} Cycle</span>
                                     {prevMonth.isPaid ? (
                                         <div className="text-green-400 flex flex-col items-center">
                                             <CheckCircle size={20} className="mb-1" />
                                             <span className="font-bold text-lg">{formatCurrency(prevMonth.amount)}</span>
-                                            <span className="text-xs text-green-500/70">Paid</span>
                                         </div>
                                     ) : (
                                         <div className="text-gray-500 flex flex-col items-center">
                                             <XCircle size={20} className="mb-1" />
-                                            <span className="text-sm">Not Recorded</span>
+                                            <span className="text-sm">Unpaid</span>
                                         </div>
                                     )}
                                 </div>
 
-                                {/* Current Month (Main Focus) */}
+                                {/* Current Month */}
                                 <div className="p-4 flex flex-col items-center text-center bg-slate-700/20 relative">
-                                    <span className="text-xs uppercase font-bold text-blue-300 mb-2">{currMonth.shortLabel} (Current)</span>
-
+                                    <span className="text-xs uppercase font-bold text-blue-300 mb-2">{currMonth.shortLabel} Cycle</span>
                                     {currMonth.isPaid ? (
                                         <div className="text-green-400 flex flex-col items-center animate-in fade-in zoom-in duration-300">
                                             <CheckCircle size={28} className="mb-2" />
                                             <span className="font-bold text-2xl">{formatCurrency(currMonth.amount)}</span>
-                                            <span className="text-xs bg-green-900/30 px-2 py-0.5 rounded text-green-300 mt-1">Paid on {new Date(currMonth.date).getDate()}th</span>
+                                            <span className="text-xs bg-green-900/30 px-2 py-0.5 rounded text-green-300 mt-1">Paid</span>
                                         </div>
                                     ) : (
                                         <div className="flex flex-col items-center w-full">
                                             <span className="text-2xl font-bold text-white mb-1">{formatCurrency(obl.amount)}</span>
                                             <p className="text-xs text-red-300 mb-3 font-medium">Due: {getNextDueDate(obl.due_day)}</p>
-
-                                            <button
-                                                onClick={() => handleMarkPaid(obl)}
-                                                className="w-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold py-2 px-4 rounded shadow-lg flex justify-center items-center gap-2 transition transform hover:scale-105"
-                                            >
+                                            <button onClick={() => openPaymentModal(obl)} className="w-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold py-2 px-4 rounded shadow-lg flex justify-center items-center gap-2 transition transform hover:scale-105">
                                                 <CheckCircle size={16} /> Pay Now
                                             </button>
                                         </div>
                                     )}
                                 </div>
 
-                                {/* Next Month (Forecast) */}
+                                {/* Next Month */}
                                 <div className="p-4 flex flex-col items-center text-center opacity-70 hover:opacity-100 transition">
-                                    <span className="text-xs uppercase font-bold text-gray-500 mb-2">{nextMonth.shortLabel} (Expected)</span>
+                                    <span className="text-xs uppercase font-bold text-gray-500 mb-2">{nextMonth.shortLabel} Cycle</span>
                                     <div className="flex flex-col items-center text-gray-400">
                                         <ArrowRight size={20} className="mb-1 text-slate-600" />
                                         <span className="font-bold text-lg text-gray-300">{formatCurrency(obl.amount)}</span>
-                                        <span className="text-xs text-gray-500">Auto-calculated</span>
                                     </div>
                                 </div>
-
                             </div>
                         </div>
                     );
                 })}
             </div>
 
-            {/* Modals remain mostly unchanged */}
-            {/* Obligation Modal */}
+            {/* --- PAYMENT MODAL --- */}
+            {showPaymentModal && (
+                <Modal title={`Pay Bill: ${paymentForm.name}`} onClose={() => setShowPaymentModal(false)}>
+                    <form onSubmit={submitPayment} className="space-y-4">
+                        <div className="bg-blue-900/20 p-3 rounded border border-blue-900/50 mb-4">
+                            <p className="text-sm text-blue-200">Select which <strong>Billing Cycle</strong> you are paying for.</p>
+                        </div>
+
+                        <div>
+                            <label className="text-gray-400 text-xs uppercase mb-1 block">Billing Cycle Month</label>
+                            {/* Input type="month" is cleaner but "date" works if we just force day=1 */}
+                            <input
+                                type="date"
+                                required
+                                className={inputClass}
+                                value={paymentForm.billing_month}
+                                onChange={e => setPaymentForm({ ...paymentForm, billing_month: e.target.value })}
+                            />
+                            <p className="text-xs text-gray-500 mt-1">If paying in Jan for Dec bill, select a date in December.</p>
+                        </div>
+
+                        <div>
+                            <label className="text-gray-400 text-xs uppercase mb-1 block">Amount</label>
+                            <input type="number" step="0.01" required className={inputClass} value={paymentForm.amount} onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
+                        </div>
+
+                        <div>
+                            <label className="text-gray-400 text-xs uppercase mb-1 block">Note</label>
+                            <input type="text" className={inputClass} value={paymentForm.note} onChange={e => setPaymentForm({ ...paymentForm, note: e.target.value })} />
+                        </div>
+
+                        <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white p-3 rounded font-bold shadow-lg mt-4">
+                            Confirm Payment
+                        </button>
+                    </form>
+                </Modal>
+            )}
+
+            {/* Obligation Modal (Edit/Add) */}
             {showObligationModal && (
                 <Modal title={editingId ? "Edit Obligation" : "Add Obligation"} onClose={() => setShowObligationModal(false)}>
                     <form onSubmit={handleSaveObligation} className="space-y-4">
@@ -296,7 +355,6 @@ const Obligations = () => {
                         <div>
                             <label className="text-gray-400 text-xs uppercase mb-1 block">Due Day</label>
                             <input type="date" required className={inputClass} value={obligationForm.due_date} onChange={e => setObligationForm({ ...obligationForm, due_date: e.target.value })} />
-                            <p className="text-xs text-gray-500 mt-1">Recurrence set to the {obligationForm.due_date ? new Date(obligationForm.due_date).getDate() : 'X'}th of every month.</p>
                         </div>
                         <div>
                             <label className="text-gray-400 text-xs uppercase mb-1 block">Category</label>

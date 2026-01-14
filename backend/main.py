@@ -22,6 +22,17 @@ def run_migrations(engine):
             with engine.connect() as conn:
                 conn.execute(text("ALTER TABLE transactions ADD COLUMN category VARCHAR"))
                 conn.commit()
+
+        # Check obligation_history for billing_month
+        history_columns = [col['name'] for col in inspector.get_columns('obligation_history')]
+        if 'billing_month' not in history_columns:
+            print("Migrating: Adding billing_month to obligation_history")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE obligation_history ADD COLUMN billing_month DATE"))
+                # Backfill: Set billing_month = start of month of payment_date
+                conn.execute(text("UPDATE obligation_history SET billing_month = DATE_TRUNC('month', payment_date)"))
+                conn.commit()
+
     except Exception as e:
         print(f"Migration failed: {e}")
 
