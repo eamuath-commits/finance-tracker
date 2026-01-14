@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Card, SectionHeader, Modal, EditIcon, formatCurrency, inputClass, selectClass } from '../components/UI';
-import { CheckCircle, XCircle, History, Calendar } from 'lucide-react';
+import { CheckCircle, XCircle, History, Calendar, Trash2 } from 'lucide-react';
 
 const Obligations = () => {
     const [obligations, setObligations] = useState([]);
@@ -13,10 +13,11 @@ const Obligations = () => {
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [selectedHistory, setSelectedHistory] = useState([]);
-    const [viewingHistoryId, setViewingHistoryId] = useState(null); // Track which obligation's history we are viewing
 
     // Forms
-    const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_day: '', category: '' });
+    // Using string for due_date input to handle date picker "YYYY-MM-DD"
+    const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_date: '', category: '' });
+    const [viewingHistoryId, setViewingHistoryId] = useState(null);
 
     const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
@@ -57,6 +58,7 @@ const Obligations = () => {
     };
 
     const getNextDueDate = (day) => {
+        if (!day) return "Not set";
         const now = new Date();
         const currentYear = now.getFullYear();
         const currentMonth = now.getMonth();
@@ -67,17 +69,47 @@ const Obligations = () => {
     // --- Handlers ---
     const handleSaveObligation = async (e) => {
         e.preventDefault();
+
+        // Extract day from YYYY-MM-DD
+        let due_day_val = 1;
+        if (obligationForm.due_date) {
+            // "2024-05-15" -> 15
+            const parts = obligationForm.due_date.split('-');
+            if (parts.length === 3) {
+                due_day_val = parseInt(parts[2]);
+            }
+        }
+
+        const payload = {
+            name: obligationForm.name,
+            amount: obligationForm.amount,
+            category: obligationForm.category,
+            due_day: due_day_val
+        };
+
         try {
             if (editingId) {
-                await axios.put(`${API_URL}/obligations/${editingId}`, obligationForm);
+                await axios.put(`${API_URL}/obligations/${editingId}`, payload);
             } else {
-                await axios.post(`${API_URL}/obligations/`, obligationForm);
+                await axios.post(`${API_URL}/obligations/`, payload);
             }
             setShowObligationModal(false);
             setEditingId(null);
-            setObligationForm({ name: '', amount: '', due_day: '', category: '' });
+            setObligationForm({ name: '', amount: '', due_date: '', category: '' });
             fetchObligations();
         } catch (err) { alert('Error saving obligation'); }
+    };
+
+    const handleDeleteObligation = async () => {
+        if (!editingId) return;
+        if (!confirm("Are you sure you want to delete this obligation? This cannot be undone.")) return;
+
+        try {
+            await axios.delete(`${API_URL}/obligations/${editingId}`);
+            setShowObligationModal(false);
+            setEditingId(null);
+            fetchObligations();
+        } catch (err) { alert('Error deleting obligation'); }
     };
 
     const handleMarkPaid = async (obl) => {
@@ -103,27 +135,32 @@ const Obligations = () => {
                 note: formData.get('note') || "Manual Manual History Log"
             });
 
-            // Refresh history view
             const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/history`);
             setSelectedHistory(hRes.data);
-
-            // Update main state
             setHistory(prev => ({ ...prev, [viewingHistoryId]: hRes.data }));
-
-            // Reset form
             e.target.reset();
-        } catch (err) {
-            alert("Error adding historical record");
-        }
+        } catch (err) { alert("Error adding historical record"); }
     };
 
     const openObligationModal = (obl = null) => {
         if (obl) {
             setEditingId(obl.id);
-            setObligationForm({ name: obl.name, amount: obl.amount, due_day: obl.due_day, category: obl.category });
+            // Reconstruct a dummy YYYY-MM-DD for the value input based on today's month/year + saved day
+            // Only strictly needed if we want to show the correct "day" in the picker.
+            const now = new Date();
+            const dayStr = obl.due_day.toString().padStart(2, '0');
+            const monthStr = (now.getMonth() + 1).toString().padStart(2, '0');
+            const dateStr = `${now.getFullYear()}-${monthStr}-${dayStr}`;
+
+            setObligationForm({
+                name: obl.name,
+                amount: obl.amount,
+                due_date: dateStr,
+                category: obl.category
+            });
         } else {
             setEditingId(null);
-            setObligationForm({ name: '', amount: '', due_day: '', category: '' });
+            setObligationForm({ name: '', amount: '', due_date: '', category: '' });
         }
         setShowObligationModal(true);
     };
@@ -219,8 +256,9 @@ const Obligations = () => {
                             <input type="number" placeholder="SAR" required step="0.01" className={inputClass} value={obligationForm.amount} onChange={e => setObligationForm({ ...obligationForm, amount: e.target.value })} />
                         </div>
                         <div>
-                            <label className="text-gray-400 text-xs uppercase mb-1 block">Due Day of Month</label>
-                            <input type="number" placeholder="Day (1-31)" required min="1" max="31" className={inputClass} value={obligationForm.due_day} onChange={e => setObligationForm({ ...obligationForm, due_day: e.target.value })} />
+                            <label className="text-gray-400 text-xs uppercase mb-1 block">Due Date</label>
+                            <input type="date" required className={inputClass} value={obligationForm.due_date} onChange={e => setObligationForm({ ...obligationForm, due_date: e.target.value })} />
+                            <p className="text-xs text-gray-500 mt-1">We will use the <strong>Day</strong> from this date for the monthly recurrence.</p>
                         </div>
                         <div>
                             <label className="text-gray-400 text-xs uppercase mb-1 block">Category</label>
@@ -236,9 +274,17 @@ const Obligations = () => {
                                 <option value="Other">Other</option>
                             </select>
                         </div>
-                        <button type="submit" className="w-full bg-blue-600 text-white p-3 rounded hover:bg-blue-500 font-bold mt-4 shadow-lg">
-                            {editingId ? "Save Changes" : "Create Obligation"}
-                        </button>
+
+                        <div className="flex gap-2 mt-6">
+                            <button type="submit" className="flex-1 bg-blue-600 text-white p-3 rounded hover:bg-blue-500 font-bold shadow-lg">
+                                {editingId ? "Save Changes" : "Create Obligation"}
+                            </button>
+                            {editingId && (
+                                <button type="button" onClick={handleDeleteObligation} className="bg-red-900/80 text-red-200 p-3 rounded hover:bg-red-800 font-bold border border-red-800">
+                                    <Trash2 size={20} />
+                                </button>
+                            )}
+                        </div>
                     </form>
                 </Modal>
             )}

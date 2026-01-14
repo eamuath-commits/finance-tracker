@@ -95,6 +95,13 @@ def update_obligation(obligation_id: str, obligation_update: schemas.ObligationU
         raise HTTPException(status_code=404, detail="Obligation not found")
     return updated_obj
 
+@app.delete("/obligations/{obligation_id}", response_model=schemas.Obligation)
+def delete_obligation(obligation_id: str, db: Session = Depends(get_db)):
+    deleted_obj = crud.delete_obligation(db, obligation_id)
+    if not deleted_obj:
+        raise HTTPException(status_code=404, detail="Obligation not found")
+    return deleted_obj
+
 @app.post("/obligations/{obligation_id}/pay", response_model=schemas.ObligationHistory)
 def pay_obligation(obligation_id: str, payment: schemas.ObligationHistoryCreate, db: Session = Depends(get_db)):
     # Verify obligation exists

@@ -122,6 +122,13 @@ def update_obligation(db: Session, obligation_id: str, obligation_update: schema
     db.refresh(db_obj)
     return db_obj
 
+def delete_obligation(db: Session, obligation_id: str):
+    db_obj = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
+    if db_obj:
+        db.delete(db_obj)
+        db.commit()
+    return db_obj
+
 def get_transactions(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Transaction).order_by(models.Transaction.timestamp.desc()).offset(skip).limit(limit).all()
 
