@@ -162,9 +162,10 @@ const Obligations = () => {
         const formData = new FormData(e.target);
 
         // When adding history manually, assume Billing Month = Payment Date's Month
-        // Unless user specifies differently? For simplicity, lock them together here.
+        // Unless user specifies differently
         const pDate = new Date(formData.get('date'));
-        const bMonth = new Date(pDate.getFullYear(), pDate.getMonth(), 1);
+        const bMonthDate = new Date(formData.get('billing_month'));
+        const bMonth = new Date(bMonthDate.getFullYear(), bMonthDate.getMonth(), 1);
 
         try {
             await axios.post(`${API_URL}/obligations/${viewingHistoryId}/pay`, {
@@ -254,7 +255,7 @@ const Obligations = () => {
                             <div className="grid grid-cols-3 divide-x divide-slate-700">
                                 {/* Previous Month */}
                                 <div className="p-4 flex flex-col items-center text-center opacity-70 hover:opacity-100 transition">
-                                    <span className="text-xs uppercase font-bold text-gray-500 mb-2">{prevMonth.shortLabel} Cycle</span>
+                                    <span className="text-xs uppercase font-bold text-gray-500 mb-2">{prevMonth.shortLabel}</span>
                                     {prevMonth.isPaid ? (
                                         <div className="text-green-400 flex flex-col items-center">
                                             <CheckCircle size={20} className="mb-1" />
@@ -270,7 +271,7 @@ const Obligations = () => {
 
                                 {/* Current Month */}
                                 <div className="p-4 flex flex-col items-center text-center bg-slate-700/20 relative">
-                                    <span className="text-xs uppercase font-bold text-blue-300 mb-2">{currMonth.shortLabel} Cycle</span>
+                                    <span className="text-xs uppercase font-bold text-blue-300 mb-2">{currMonth.shortLabel}</span>
                                     {currMonth.isPaid ? (
                                         <div className="text-green-400 flex flex-col items-center animate-in fade-in zoom-in duration-300">
                                             <CheckCircle size={28} className="mb-2" />
@@ -290,7 +291,7 @@ const Obligations = () => {
 
                                 {/* Next Month */}
                                 <div className="p-4 flex flex-col items-center text-center opacity-70 hover:opacity-100 transition">
-                                    <span className="text-xs uppercase font-bold text-gray-500 mb-2">{nextMonth.shortLabel} Cycle</span>
+                                    <span className="text-xs uppercase font-bold text-gray-500 mb-2">{nextMonth.shortLabel}</span>
                                     <div className="flex flex-col items-center text-gray-400">
                                         <ArrowRight size={20} className="mb-1 text-slate-600" />
                                         <span className="font-bold text-lg text-gray-300">{formatCurrency(obl.amount)}</span>
@@ -307,11 +308,11 @@ const Obligations = () => {
                 <Modal title={`Pay Bill: ${paymentForm.name}`} onClose={() => setShowPaymentModal(false)}>
                     <form onSubmit={submitPayment} className="space-y-4">
                         <div className="bg-blue-900/20 p-3 rounded border border-blue-900/50 mb-4">
-                            <p className="text-sm text-blue-200">Select which <strong>Billing Cycle</strong> you are paying for.</p>
+                            <p className="text-sm text-blue-200">Select which <strong>Month</strong> you are paying for.</p>
                         </div>
 
                         <div>
-                            <label className="text-gray-400 text-xs uppercase mb-1 block">Billing Cycle Month</label>
+                            <label className="text-gray-400 text-xs uppercase mb-1 block">For Month</label>
                             {/* Input type="month" is cleaner but "date" works if we just force day=1 */}
                             <input
                                 type="date"
@@ -387,17 +388,34 @@ const Obligations = () => {
                             <h4 className="text-sm font-bold uppercase tracking-wide">Log Past Payment</h4>
                         </div>
                         <form onSubmit={handleAddPastPayment} className="grid grid-cols-2 gap-3">
-                            <div className="col-span-2"><input type="date" name="date" required className={`${inputClass} text-sm`} /></div>
-                            <div><input type="number" name="amount" defaultValue={currentHistoryObligation.amount} placeholder="Amount" step="0.01" required className={`${inputClass} text-sm`} /></div>
-                            <div><input type="text" name="note" placeholder="Note (Optional)" className={`${inputClass} text-sm`} /></div>
+                            <div>
+                                <label className="text-[10px] uppercase text-gray-400 block mb-1">Payment Date</label>
+                                <input type="date" name="date" required className={`${inputClass} text-sm`} />
+                            </div>
+                            <div>
+                                <label className="text-[10px] uppercase text-gray-400 block mb-1">For Month</label>
+                                <input type="date" name="billing_month" required className={`${inputClass} text-sm`} />
+                            </div>
+
+                            <div className="col-span-2 grid grid-cols-2 gap-3">
+                                <div><input type="number" name="amount" defaultValue={currentHistoryObligation.amount} placeholder="Amount" step="0.01" required className={`${inputClass} text-sm`} /></div>
+                                <div><input type="text" name="note" placeholder="Note (Optional)" className={`${inputClass} text-sm`} /></div>
+                            </div>
+
                             <button type="submit" className="col-span-2 bg-slate-600 hover:bg-slate-500 text-white text-xs font-bold py-2 rounded uppercase tracking-wider transition">+ Add Record</button>
                         </form>
                     </div>
                     <div className="max-h-60 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
                         {selectedHistory.map(h => (
                             <div key={h.id} className="bg-slate-800 p-3 rounded flex justify-between items-center border border-slate-700">
-                                <div><p className="text-white font-medium text-sm">{new Date(h.payment_date).toLocaleDateString()}</p><p className="text-xs text-gray-500">{h.note || 'No note'}</p></div>
-                                <p className="text-green-400 font-bold text-sm">{formatCurrency(h.amount)}</p>
+                                <div>
+                                    <p className="text-white font-medium text-sm">{new Date(h.payment_date).toLocaleDateString()}</p>
+                                    <p className="text-[10px] text-gray-400">Month: {h.billing_month ? new Date(h.billing_month).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Auto'}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-green-400 font-bold text-sm">{formatCurrency(h.amount)}</p>
+                                    {h.note && <p className="text-xs text-gray-500">{h.note}</p>}
+                                </div>
                             </div>
                         ))}
                     </div>
