@@ -8,6 +8,8 @@ import schemas
 import crud
 from database import engine, get_db
 from sms_parser import parser
+import analysis
+import analysis_schema
 
 # Create tables
 models.Base.metadata.create_all(bind=engine)
@@ -80,6 +82,11 @@ def update_obligation(obligation_id: str, obligation_update: schemas.ObligationU
 @app.get("/transactions/", response_model=List[schemas.Transaction])
 def read_transactions(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return crud.get_transactions(db, skip=skip, limit=limit)
+
+# --- Analysis Endpoints ---
+@app.get("/analysis/allocation", response_model=analysis_schema.AllocationResponse)
+def get_allocation_analysis(db: Session = Depends(get_db)):
+    return analysis.calculate_allocation(db)
 
 # --- Webhook Endpoint ---
 @app.post("/webhook/sms")

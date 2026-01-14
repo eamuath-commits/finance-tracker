@@ -42,11 +42,55 @@ const EditIcon = ({ onClick }) => (
     </button>
 );
 
+const AllocationCard = ({ analysis }) => {
+    if (!analysis) return null;
+
+    const isDanger = analysis.freedom_cash < 0;
+    const colorClass = isDanger ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200";
+    const textClass = isDanger ? "text-red-800" : "text-green-800";
+
+    return (
+        <div className={`p-6 rounded-xl border ${colorClass} mb-8`}>
+            <h2 className={`text-xl font-bold ${textClass} mb-2`}>Smart Analysis</h2>
+            <p className="text-gray-700 font-medium text-lg">{analysis.message}</p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                <div className="bg-white p-3 rounded shadow-sm">
+                    <p className="text-xs text-gray-500 uppercase">Liquid Cash</p>
+                    <p className="text-lg font-bold">AED {analysis.liquid_cash.toFixed(2)}</p>
+                </div>
+                <div className="bg-white p-3 rounded shadow-sm">
+                    <p className="text-xs text-gray-500 uppercase">Upcoming Bills</p>
+                    <p className="text-lg font-bold">AED {analysis.unpaid_obligations_this_month.toFixed(2)}</p>
+                </div>
+                <div className="bg-white p-3 rounded shadow-sm">
+                    <p className="text-xs text-gray-500 uppercase">Safe to Spend</p>
+                    <p className={`text-lg font-bold ${analysis.freedom_cash < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        AED {analysis.freedom_cash.toFixed(2)}
+                    </p>
+                </div>
+            </div>
+
+            <div className="mt-4 space-y-2">
+                {analysis.recommendations.map((rec, idx) => (
+                    <div key={idx} className="flex items-start">
+                        <span className="mr-2 text-lg">
+                            {rec.type === 'bill' ? '🧾' : rec.type === 'save' ? '💰' : '⚠️'}
+                        </span>
+                        <p className="text-sm text-gray-700">{rec.text}</p>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 function App() {
     const [accounts, setAccounts] = useState([]);
     const [loans, setLoans] = useState([]);
     const [obligations, setObligations] = useState([]);
     const [transactions, setTransactions] = useState([]);
+    const [analysis, setAnalysis] = useState(null);
     const [loading, setLoading] = useState(true);
 
     // Modal Visibility
@@ -66,16 +110,18 @@ function App() {
 
     const fetchData = async () => {
         try {
-            const [accRes, loanRes, oblRes, txRes] = await Promise.all([
+            const [accRes, loanRes, oblRes, txRes, analysisRes] = await Promise.all([
                 axios.get(`${API_URL}/accounts/`),
                 axios.get(`${API_URL}/loans/`),
                 axios.get(`${API_URL}/obligations/`),
-                axios.get(`${API_URL}/transactions/`)
+                axios.get(`${API_URL}/transactions/`),
+                axios.get(`${API_URL}/analysis/allocation`)
             ]);
             setAccounts(accRes.data);
             setLoans(loanRes.data);
             setObligations(oblRes.data);
             setTransactions(txRes.data);
+            setAnalysis(analysisRes.data);
         } catch (error) {
             console.error("Error fetching data", error);
         } finally {
@@ -188,6 +234,8 @@ function App() {
                     <h1 className="text-3xl font-bold text-gray-900">Finance Overview</h1>
                     <p className="text-gray-500">Welcome back, Muath</p>
                 </header>
+
+                <AllocationCard analysis={analysis} />
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <Card title="Total Balance" value={`AED ${totalBalance.toFixed(2)}`} color="green" />
