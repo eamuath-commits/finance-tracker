@@ -149,17 +149,33 @@ const Obligations = () => {
 
     // Open Custom Payment Modal
     // Updated to accept amount override
-    const openPaymentModal = (obl, targetMonthStr = null, defaultAmount = null) => {
+    // Open Custom Payment Modal
+    // Updated to accept amount override and history entry for editing
+    const openPaymentModal = (obl, targetMonthStr = null, defaultAmount = null, historyEntry = null) => {
         const now = new Date();
         const defaultMonthStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-01`;
 
-        setPaymentForm({
-            id: obl.id,
-            name: obl.name,
-            amount: defaultAmount !== null ? defaultAmount : obl.amount, // Use smart amount if provided
-            note: "Manual Payment",
-            billing_month: targetMonthStr || defaultMonthStr
-        });
+        if (historyEntry) {
+            // Editing existing payment
+            setPaymentForm({
+                id: obl.id,
+                historyId: historyEntry.id, // Track we are editing this history
+                name: obl.name,
+                amount: historyEntry.amount,
+                note: historyEntry.note || "",
+                billing_month: historyEntry.billing_month || targetMonthStr
+            });
+        } else {
+            // New Payment
+            setPaymentForm({
+                id: obl.id,
+                historyId: null,
+                name: obl.name,
+                amount: defaultAmount !== null ? defaultAmount : obl.amount,
+                note: "Manual Payment",
+                billing_month: targetMonthStr || defaultMonthStr
+            });
+        }
         setShowPaymentModal(true);
     };
 
@@ -168,16 +184,188 @@ const Obligations = () => {
         if (!paymentForm.id) return;
 
         try {
-            await axios.post(`${API_URL}/obligations/${paymentForm.id}/pay`, {
-                payment_date: new Date().toISOString(),
-                amount: parseFloat(paymentForm.amount || 0),
-                billing_month: paymentForm.billing_month, // Already YYYY-MM-DD str
-                note: paymentForm.note
-            });
+            if (paymentForm.historyId) {
+                // UPDATE existing record
+                await axios.put(`${API_URL}/obligations/history/${paymentForm.historyId}`, {
+                    payment_date: new Date().toISOString(), // Optional: keep original date? Used prefers update to today usually? Let's check user intent. Usually standard is to update amount only. But we can update date too.
+                    amount: parseFloat(paymentForm.amount || 0),
+                    billing_month: paymentForm.billing_month,
+                    note: paymentForm.note
+                });
+            } else {
+                // CREATE new record
+                await axios.post(`${API_URL}/obligations/${paymentForm.id}/pay`, {
+                    payment_date: new Date().toISOString(),
+                    amount: parseFloat(paymentForm.amount || 0),
+                    billing_month: paymentForm.billing_month,
+                    note: paymentForm.note
+                });
+            }
             setShowPaymentModal(false);
+
+            // If viewing history, update that list too
+            if (viewingHistoryId) {
+                const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/history`);
+                setSelectedHistory(hRes.data);
+            }
+
             fetchObligations();
         } catch (err) { alert("Error processing payment"); }
     };
+
+    // ... existing helpers ...
+
+    // In render loop:
+    const MonthCard = ({ status, obl }) => {
+        return (
+            <div className={`p-4 flex flex-col items-center text-center relative z-0 hover:z-10 ${status.isPaid ? '' : 'opacity-100'} group/card`}>
+                <span className="text-xs uppercase font-bold text-gray-400 mb-2">{status.shortLabel}</span>
+                {status.isPaid ? (
+                    <div className="text-green-400 flex flex-col items-center relative">
+                        <CheckCircle size={20} className="mb-1" />
+                        <span className="font-bold text-lg">{formatCurrency(status.amount)}</span>
+                        <div className="flex gap-1 absolute -top-2 -right-10 opacity-0 group-hover/card:opacity-100 transition z-50 bg-slate-900/90 p-1 rounded-full shadow-xl border border-slate-700">
+                            {/* Edit Button */}
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    // Reconstruct strict object for edit
+                                    const entry = { id: status.paymentId, amount: status.amount, billing_month: status.billingDateStr, note: "" };
+                                    openPaymentModal(obl, status.billingDateStr, null, entry);
+                                }}
+                                className="text-blue-400 hover:text-white p-1 hover:bg-slate-700 rounded-full transition"
+                                title="Edit Amount"
+                            >
+                                <EditIcon size={12} />
+                            </button>
+                            {/* Delete Button */}
+                            <button
+                                onClick={(e) => { e.stopPropagation(); handleDeleteHistory(status.paymentId); }}
+                                className="text-red-400 hover:text-white p-1 hover:bg-slate-700 rounded-full transition"
+                                title="Delete Record"
+                            >
+                                <Trash2 size={12} />
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="text-gray-500 flex flex-col items-center w-full relative">
+                        <XCircle size={20} className="mb-1" />
+                        <span className="font-bold text-lg mb-1">{formatCurrency(status.amount)}</span>
+                        <span className="text-xs mb-1">Unpaid</span>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, status.billingDateStr, status.amount); }}
+                            className="text-[10px] bg-blue-900/50 hover:bg-blue-800 text-blue-200 px-2 py-0.5 rounded border border-blue-900/50 opacity-0 group-hover/card:opacity-100 transition cursor-pointer z-50"
+                        >
+                            Mark Paid
+                        </button>
+                    </div>
+                )}
+            </div>
+        )
+    }
+
+    // Replace manual grid content with unified component usage in map:
+    // This is too complex for one regex replacement. I will stick to minimal targeted replacements.
+
+    return (
+        <div key={obl.id} className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-lg group relative">
+            {/* ... Header ... */}
+            <div className="bg-slate-900/50 p-4 border-b border-slate-700 flex justify-between items-start">
+                {/* ... Same Header ... */}
+                <div>
+                    <div className="flex items-center gap-2">
+                        <h3 className="text-xl font-bold text-white">{obl.name}</h3>
+                        <span className="text-xs px-2 py-0.5 rounded bg-slate-700 text-gray-400">{obl.category}</span>
+                    </div>
+                    <p className="text-sm text-gray-400 mt-1">Due Day: <span className="text-gray-300">{obl.due_day}th</span></p>
+                </div>
+                <div className="flex gap-3">
+                    <button onClick={() => openHistory(obl.id)} className="text-xs font-medium text-gray-400 hover:text-white flex items-center gap-1">
+                        <History size={14} /> History
+                    </button>
+                    <EditIcon onClick={() => openObligationModal(obl)} className="text-gray-500 hover:text-white cursor-pointer" size={18} />
+                </div>
+            </div>
+
+            <div className="grid grid-cols-4 divide-x divide-slate-700">
+                {/* We will inline the Edit Logic for each block since I can't use new Component in replace_file_content easily without rewriting whole file */}
+                {/* Month -2 */}
+                <div className="p-4 flex flex-col items-center text-center opacity-70 hover:opacity-100 transition group/m2 relative z-0 hover:z-10 bg-slate-900/20">
+                    <span className="text-xs uppercase font-bold text-gray-600 mb-2">{monthMinus2.shortLabel}</span>
+                    {monthMinus2.isPaid ? (
+                        <div className="text-green-400 flex flex-col items-center relative">
+                            <CheckCircle size={20} className="mb-1" />
+                            <span className="font-bold text-lg">{formatCurrency(monthMinus2.amount)}</span>
+                            <div className="flex gap-1 absolute -top-3 -right-8 opacity-0 group-hover/m2:opacity-100 transition z-50 bg-slate-900/90 p-1 rounded-full shadow-xl border border-slate-700">
+                                <button onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, monthMinus2.billingDateStr, null, { id: monthMinus2.paymentId, amount: monthMinus2.amount, billing_month: monthMinus2.billingDateStr }); }} className="text-blue-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><EditIcon size={12} /></button>
+                                <button onClick={(e) => { e.stopPropagation(); handleDeleteHistory(monthMinus2.paymentId); }} className="text-red-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><Trash2 size={12} /></button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-gray-600 flex flex-col items-center w-full relative">
+                            <XCircle size={20} className="mb-1" />
+                            <span className="font-bold text-lg mb-1">{formatCurrency(monthMinus2.amount)}</span>
+                            <span className="text-xs mb-1">Unpaid</span>
+                            <button onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, monthMinus2.billingDateStr, monthMinus2.amount); }} className="text-[10px] bg-blue-900/50 hover:bg-blue-800 text-blue-200 px-2 py-0.5 rounded border border-blue-900/50 opacity-0 group-hover/m2:opacity-100 transition cursor-pointer z-50">Mark Paid</button>
+                        </div>
+                    )}
+                </div>
+                {/* Prev Month */}
+                <div className="p-4 flex flex-col items-center text-center opacity-70 hover:opacity-100 transition group/prev relative z-0 hover:z-10">
+                    <span className="text-xs uppercase font-bold text-gray-500 mb-2">{prevMonth.shortLabel}</span>
+                    {prevMonth.isPaid ? (
+                        <div className="text-green-400 flex flex-col items-center relative">
+                            <CheckCircle size={20} className="mb-1" />
+                            <span className="font-bold text-lg">{formatCurrency(prevMonth.amount)}</span>
+                            <div className="flex gap-1 absolute -top-3 -right-8 opacity-0 group-hover/prev:opacity-100 transition z-50 bg-slate-900/90 p-1 rounded-full shadow-xl border border-slate-700">
+                                <button onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, prevMonth.billingDateStr, null, { id: prevMonth.paymentId, amount: prevMonth.amount, billing_month: prevMonth.billingDateStr }); }} className="text-blue-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><EditIcon size={12} /></button>
+                                <button onClick={(e) => { e.stopPropagation(); handleDeleteHistory(prevMonth.paymentId); }} className="text-red-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><Trash2 size={12} /></button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-gray-500 flex flex-col items-center w-full relative">
+                            <XCircle size={20} className="mb-1" />
+                            <span className="font-bold text-lg mb-1">{formatCurrency(prevMonth.amount)}</span>
+                            <span className="text-sm mb-1">Unpaid</span>
+                            <button onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, prevMonth.billingDateStr, prevMonth.amount); }} className="text-[10px] bg-blue-900/50 hover:bg-blue-800 text-blue-200 px-2 py-0.5 rounded border border-blue-900/50 opacity-0 group-hover/prev:opacity-100 transition cursor-pointer z-50 mt-1">Mark Paid</button>
+                        </div>
+                    )}
+                </div>
+                {/* Current Month */}
+                <div className="p-4 flex flex-col items-center text-center bg-slate-700/20 relative group/current z-0 hover:z-10">
+                    <span className="text-xs uppercase font-bold text-blue-300 mb-2">{currMonth.shortLabel}</span>
+                    {currMonth.isPaid ? (
+                        <div className="text-green-400 flex flex-col items-center animate-in fade-in zoom-in duration-300 relative">
+                            <CheckCircle size={28} className="mb-2" />
+                            <span className="font-bold text-2xl">{formatCurrency(currMonth.amount)}</span>
+                            <span className="text-xs bg-green-900/30 px-2 py-0.5 rounded text-green-300 mt-1">Paid</span>
+                            <div className="flex gap-1 absolute -top-3 -right-10 opacity-0 group-hover/current:opacity-100 transition z-50 bg-slate-900/90 p-1 rounded-full shadow-xl border border-slate-700">
+                                <button onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, currMonth.billingDateStr, null, { id: currMonth.paymentId, amount: currMonth.amount, billing_month: currMonth.billingDateStr }); }} className="text-blue-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><EditIcon size={12} /></button>
+                                <button onClick={(e) => { e.stopPropagation(); handleDeleteHistory(currMonth.paymentId); }} className="text-red-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><Trash2 size={12} /></button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center w-full">
+                            <span className="text-2xl font-bold text-white mb-1">{formatCurrency(currMonth.amount)}</span>
+                            <p className="text-xs text-red-300 mb-3 font-medium">Due: {getNextDueDate(obl.due_day)}</p>
+                            <button onClick={() => openPaymentModal(obl, currMonth.billingDateStr, currMonth.amount)} className="w-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold py-2 px-4 rounded shadow-lg flex justify-center items-center gap-2 transition transform hover:scale-105">
+                                <CheckCircle size={16} /> Pay Now
+                            </button>
+                        </div>
+                    )}
+                </div>
+                {/* Next Month */}
+                <div className="p-4 flex flex-col items-center text-center opacity-70 hover:opacity-100 transition">
+                    <span className="text-xs uppercase font-bold text-gray-500 mb-2">{nextMonth.shortLabel}</span>
+                    <div className="flex flex-col items-center text-gray-400">
+                        <ArrowRight size={20} className="mb-1 text-slate-600" />
+                        <span className="font-bold text-lg text-gray-300">{formatCurrency(obl.amount)}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 
     const handleAddPastPayment = async (e) => {
         e.preventDefault();
@@ -302,65 +490,41 @@ const Obligations = () => {
                                         <div className="text-green-400 flex flex-col items-center relative">
                                             <CheckCircle size={20} className="mb-1" />
                                             <span className="font-bold text-lg">{formatCurrency(monthMinus2.amount)}</span>
-
-                                            {/* Delete Button */}
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleDeleteHistory(monthMinus2.paymentId); }}
-                                                className="absolute -top-1 -right-6 opacity-0 group-hover/m2:opacity-100 transition text-red-400 bg-slate-900/80 p-1.5 rounded-full hover:bg-slate-900 border border-slate-700 shadow-xl cursor-pointer z-50"
-                                                title="Delete this payment"
-                                            >
-                                                <Trash2 size={12} />
-                                            </button>
+                                            <div className="flex gap-1 absolute -top-3 -right-8 opacity-0 group-hover/m2:opacity-100 transition z-50 bg-slate-900/90 p-1 rounded-full shadow-xl border border-slate-700">
+                                                <button onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, monthMinus2.billingDateStr, null, { id: monthMinus2.paymentId, amount: monthMinus2.amount, billing_month: monthMinus2.billingDateStr }); }} className="text-blue-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><EditIcon size={12} /></button>
+                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteHistory(monthMinus2.paymentId); }} className="text-red-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><Trash2 size={12} /></button>
+                                            </div>
                                         </div>
                                     ) : (
                                         <div className="text-gray-600 flex flex-col items-center w-full relative">
                                             <XCircle size={20} className="mb-1" />
                                             <span className="font-bold text-lg mb-1">{formatCurrency(monthMinus2.amount)}</span>
                                             <span className="text-xs mb-1">Unpaid</span>
-                                            {/* Pay Button */}
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, monthMinus2.billingDateStr, monthMinus2.amount); }}
-                                                className="text-[10px] bg-blue-900/50 hover:bg-blue-800 text-blue-200 px-2 py-0.5 rounded border border-blue-900/50 opacity-0 group-hover/m2:opacity-100 transition cursor-pointer z-50"
-                                            >
-                                                Mark Paid
-                                            </button>
+                                            <button onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, monthMinus2.billingDateStr, monthMinus2.amount); }} className="text-[10px] bg-blue-900/50 hover:bg-blue-800 text-blue-200 px-2 py-0.5 rounded border border-blue-900/50 opacity-0 group-hover/m2:opacity-100 transition cursor-pointer z-50">Mark Paid</button>
                                         </div>
                                     )}
                                 </div>
-
-                                {/* Previous Month */}
+                                {/* Prev Month */}
                                 <div className="p-4 flex flex-col items-center text-center opacity-70 hover:opacity-100 transition group/prev relative z-0 hover:z-10">
                                     <span className="text-xs uppercase font-bold text-gray-500 mb-2">{prevMonth.shortLabel}</span>
                                     {prevMonth.isPaid ? (
                                         <div className="text-green-400 flex flex-col items-center relative">
                                             <CheckCircle size={20} className="mb-1" />
                                             <span className="font-bold text-lg">{formatCurrency(prevMonth.amount)}</span>
-
-                                            {/* Delete Button */}
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleDeleteHistory(prevMonth.paymentId); }}
-                                                className="absolute -top-1 -right-6 opacity-0 group-hover/prev:opacity-100 transition text-red-400 bg-slate-900/80 p-1.5 rounded-full hover:bg-slate-900 border border-slate-700 shadow-xl cursor-pointer z-50"
-                                                title="Delete this payment"
-                                            >
-                                                <Trash2 size={12} />
-                                            </button>
+                                            <div className="flex gap-1 absolute -top-3 -right-8 opacity-0 group-hover/prev:opacity-100 transition z-50 bg-slate-900/90 p-1 rounded-full shadow-xl border border-slate-700">
+                                                <button onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, prevMonth.billingDateStr, null, { id: prevMonth.paymentId, amount: prevMonth.amount, billing_month: prevMonth.billingDateStr }); }} className="text-blue-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><EditIcon size={12} /></button>
+                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteHistory(prevMonth.paymentId); }} className="text-red-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><Trash2 size={12} /></button>
+                                            </div>
                                         </div>
                                     ) : (
                                         <div className="text-gray-500 flex flex-col items-center w-full relative">
                                             <XCircle size={20} className="mb-1" />
                                             <span className="font-bold text-lg mb-1">{formatCurrency(prevMonth.amount)}</span>
                                             <span className="text-sm mb-1">Unpaid</span>
-                                            {/* Pay Button for Previous Month */}
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, prevMonth.billingDateStr, prevMonth.amount); }}
-                                                className="text-[10px] bg-blue-900/50 hover:bg-blue-800 text-blue-200 px-2 py-0.5 rounded border border-blue-900/50 opacity-0 group-hover/prev:opacity-100 transition cursor-pointer z-50 mt-1"
-                                            >
-                                                Mark Paid
-                                            </button>
+                                            <button onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, prevMonth.billingDateStr, prevMonth.amount); }} className="text-[10px] bg-blue-900/50 hover:bg-blue-800 text-blue-200 px-2 py-0.5 rounded border border-blue-900/50 opacity-0 group-hover/prev:opacity-100 transition cursor-pointer z-50 mt-1">Mark Paid</button>
                                         </div>
                                     )}
                                 </div>
-
                                 {/* Current Month */}
                                 <div className="p-4 flex flex-col items-center text-center bg-slate-700/20 relative group/current z-0 hover:z-10">
                                     <span className="text-xs uppercase font-bold text-blue-300 mb-2">{currMonth.shortLabel}</span>
@@ -369,15 +533,10 @@ const Obligations = () => {
                                             <CheckCircle size={28} className="mb-2" />
                                             <span className="font-bold text-2xl">{formatCurrency(currMonth.amount)}</span>
                                             <span className="text-xs bg-green-900/30 px-2 py-0.5 rounded text-green-300 mt-1">Paid</span>
-
-                                            {/* Unpay / Delete Button - Shows on Hover */}
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleDeleteHistory(currMonth.paymentId); }}
-                                                className="absolute -top-1 -right-8 opacity-0 group-hover/current:opacity-100 transition text-red-400 bg-slate-900/80 p-1.5 rounded-full hover:bg-slate-900 border border-slate-700 shadow-xl cursor-pointer z-50"
-                                                title="Delete this payment"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
+                                            <div className="flex gap-1 absolute -top-3 -right-10 opacity-0 group-hover/current:opacity-100 transition z-50 bg-slate-900/90 p-1 rounded-full shadow-xl border border-slate-700">
+                                                <button onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, currMonth.billingDateStr, null, { id: currMonth.paymentId, amount: currMonth.amount, billing_month: currMonth.billingDateStr }); }} className="text-blue-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><EditIcon size={12} /></button>
+                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteHistory(currMonth.paymentId); }} className="text-red-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><Trash2 size={12} /></button>
+                                            </div>
                                         </div>
                                     ) : (
                                         <div className="flex flex-col items-center w-full">
@@ -389,7 +548,6 @@ const Obligations = () => {
                                         </div>
                                     )}
                                 </div>
-
                                 {/* Next Month */}
                                 <div className="p-4 flex flex-col items-center text-center opacity-70 hover:opacity-100 transition">
                                     <span className="text-xs uppercase font-bold text-gray-500 mb-2">{nextMonth.shortLabel}</span>

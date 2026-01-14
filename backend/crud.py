@@ -168,11 +168,29 @@ def create_obligation_payment(db: Session, obligation_id: str, payment: schemas.
     return db_payment
 
 def delete_obligation_history_entry(db: Session, history_id: int):
-    entry = db.query(models.ObligationHistory).filter(models.ObligationHistory.id == history_id).first()
-    if entry:
-        db.delete(entry)
+    db_history = db.query(models.ObligationHistory).filter(models.ObligationHistory.id == history_id).first()
+    if db_history:
+        db.delete(db_history)
         db.commit()
-    return entry
+    return db_history
+
+def update_obligation_history_entry(db: Session, history_id: int, update_data: schemas.ObligationHistoryUpdate):
+    db_history = db.query(models.ObligationHistory).filter(models.ObligationHistory.id == history_id).first()
+    if not db_history:
+        return None
+    
+    if update_data.payment_date:
+        db_history.payment_date = update_data.payment_date
+    if update_data.billing_month:
+        db_history.billing_month = update_data.billing_month
+    if update_data.amount is not None:
+        db_history.amount = update_data.amount
+    if update_data.note is not None:
+        db_history.note = update_data.note
+        
+    db.commit()
+    db.refresh(db_history)
+    return db_history
 
 def get_obligation_history(db: Session, obligation_id: str):
     return db.query(models.ObligationHistory).filter(models.ObligationHistory.obligation_id == obligation_id).order_by(models.ObligationHistory.payment_date.desc()).all()

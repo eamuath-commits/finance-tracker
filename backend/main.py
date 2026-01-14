@@ -128,10 +128,17 @@ def read_obligation_history(obligation_id: str, db: Session = Depends(get_db)):
 
 @app.delete("/obligations/history/{history_id}")
 def delete_obligation_history(history_id: int, db: Session = Depends(get_db)):
-    deleted = crud.delete_obligation_history_entry(db, history_id)
-    if not deleted:
+    killed = crud.delete_obligation_history_entry(db, history_id)
+    if not killed:
         raise HTTPException(status_code=404, detail="History entry not found")
     return {"message": "History entry deleted"}
+
+@app.put("/obligations/history/{history_id}", response_model=schemas.ObligationHistory)
+def update_obligation_history(history_id: int, history_update: schemas.ObligationHistoryUpdate, db: Session = Depends(get_db)):
+    updated = crud.update_obligation_history_entry(db, history_id, history_update)
+    if not updated:
+        raise HTTPException(status_code=404, detail="History entry not found")
+    return updated
 
 # --- Transaction Endpoints ---
 @app.get("/transactions/", response_model=List[schemas.Transaction])

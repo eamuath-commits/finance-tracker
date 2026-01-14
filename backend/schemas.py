@@ -106,6 +106,12 @@ class ObligationHistoryBase(BaseModel):
 class ObligationHistoryCreate(ObligationHistoryBase):
     pass
 
+class ObligationHistoryUpdate(BaseModel):
+    payment_date: Optional[datetime] = None
+    billing_month: Optional[datetime] = None
+    amount: Optional[float] = None
+    note: Optional[str] = None
+
 class ObligationHistory(ObligationHistoryBase):
     id: int
     obligation_id: str
