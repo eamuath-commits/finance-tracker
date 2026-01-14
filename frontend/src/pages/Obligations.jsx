@@ -11,15 +11,16 @@ const Obligations = () => {
     // Modal State
     const [showObligationModal, setShowObligationModal] = useState(false);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
-    const [showPaymentModal, setShowPaymentModal] = useState(false); // NEW: Custom Payment Modal
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
 
     const [editingId, setEditingId] = useState(null);
     const [selectedHistory, setSelectedHistory] = useState([]);
     const [viewingHistoryId, setViewingHistoryId] = useState(null);
 
     // Forms
+    // Default billing_month to today YYYY-MM-DD for safety, though we override it
     const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_date: '', category: '' });
-    const [paymentForm, setPaymentForm] = useState({ id: null, amount: '', note: '', billing_month: '' });
+    const [paymentForm, setPaymentForm] = useState({ id: null, amount: '', note: '', billing_month: new Date().toISOString().split('T')[0] });
 
     const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
@@ -54,7 +55,6 @@ const Obligations = () => {
 
         const payments = history[oblId] || [];
         const payment = payments.find(p => {
-            // Check billing_month if available, else fallback to payment_date
             let cycleDate = p.billing_month ? new Date(p.billing_month) : new Date(p.payment_date);
             return cycleDate.getMonth() === targetMonth && cycleDate.getFullYear() === targetYear;
         });
@@ -62,11 +62,11 @@ const Obligations = () => {
         return {
             label: targetDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
             shortLabel: targetDate.toLocaleDateString('en-US', { month: 'short' }),
-            monthIndex: targetMonth, // For comparison
+            monthIndex: targetMonth,
             isPaid: !!payment,
             amount: payment ? payment.amount : null,
             date: payment ? payment.payment_date : null,
-            paymentId: payment ? payment.id : null // Captured ID for deletion
+            paymentId: payment ? payment.id : null
         };
     };
 
@@ -89,7 +89,7 @@ const Obligations = () => {
 
         const payload = {
             name: obligationForm.name,
-            amount: parseFloat(obligationForm.amount || 0), // Allow 0/Empty
+            amount: parseFloat(obligationForm.amount || 0),
             category: obligationForm.category,
             due_day: due_day_val
         };
@@ -121,23 +121,14 @@ const Obligations = () => {
     // Open Custom Payment Modal
     const openPaymentModal = (obl) => {
         const now = new Date();
-        // Default billing month: Current month
-        // Or if due_day is < 10, assume user might want previous month?
-        // Let's just default to current month YYYY-MM-01
-
-        let initialMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-        // Smart Logic: If Due Day is early (e.g. 4th) and Today is early (e.g. 5th),
-        // user MIGHT mean "Last Month's Bill". But safer to let user switch manually.
-
-        const monthStr = `${initialMonth.getFullYear()}-${(initialMonth.getMonth() + 1).toString().padStart(2, '0')}-01`;
+        const monthStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-01`;
 
         setPaymentForm({
             id: obl.id,
             name: obl.name,
             amount: obl.amount,
             note: "Manual Payment",
-            billing_month: monthStr // YYYY-MM-01 format for date input
+            billing_month: monthStr
         });
         setShowPaymentModal(true);
     };
@@ -149,12 +140,12 @@ const Obligations = () => {
         try {
             await axios.post(`${API_URL}/obligations/${paymentForm.id}/pay`, {
                 payment_date: new Date().toISOString(),
-                amount: parseFloat(paymentForm.amount || 0), // Allow empty -> 0
-                billing_month: new Date(paymentForm.billing_month).toISOString(), // Send YYYY-MM-01
+                amount: parseFloat(paymentForm.amount || 0),
+                billing_month: new Date(paymentForm.billing_month).toISOString(),
                 note: paymentForm.note
             });
             setShowPaymentModal(false);
-            fetchObligations(); // Refreshes everything
+            fetchObligations();
         } catch (err) { alert("Error processing payment"); }
     };
 
@@ -167,6 +158,8 @@ const Obligations = () => {
         // Construct Billing Month from Selects
         const bYear = parseInt(formData.get('billing_year'));
         const bMonthIndex = parseInt(formData.get('billing_month_idx'));
+
+        // Ensure valid date construction
         const bMonth = new Date(bYear, bMonthIndex, 1);
 
         try {
@@ -176,7 +169,7 @@ const Obligations = () => {
                 billing_month: bMonth.toISOString(),
                 note: formData.get('note') || "Manual History Log"
             });
-            // Refresh local history view + global
+
             const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/history`);
             setSelectedHistory(hRes.data);
             fetchObligations();
@@ -189,12 +182,10 @@ const Obligations = () => {
         try {
             await axios.delete(`${API_URL}/obligations/history/${historyId}`);
 
-            // Refresh modal if open
             if (viewingHistoryId) {
                 const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/history`);
                 setSelectedHistory(hRes.data);
             }
-            // Refresh global state (Important for dashboard cards)
             fetchObligations();
         } catch (err) { alert("Error deleting history"); }
     };
@@ -227,6 +218,8 @@ const Obligations = () => {
     if (loading) return <div className="p-10 text-white">Loading...</div>;
 
     const currentHistoryObligation = obligations.find(o => o.id === viewingHistoryId) || {};
+
+    // UI Constants for Dropdowns
     const today = new Date();
     const currentYear = today.getFullYear();
     const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -351,7 +344,6 @@ const Obligations = () => {
                                     onChange={e => {
                                         const d = new Date(paymentForm.billing_month);
                                         d.setMonth(parseInt(e.target.value));
-                                        // Keep day as 1 just to be safe
                                         d.setDate(1);
                                         setPaymentForm({ ...paymentForm, billing_month: d.toISOString().split('T')[0] });
                                     }}
