@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Card, SectionHeader, Modal, EditIcon, formatCurrency, inputClass, selectClass } from '../components/UI';
-import { CheckCircle, XCircle, History, Calendar, Trash2 } from 'lucide-react';
+import { CheckCircle, XCircle, History, Calendar, Trash2, AlertCircle, ArrowRight } from 'lucide-react';
 
 const Obligations = () => {
     const [obligations, setObligations] = useState([]);
@@ -15,7 +15,6 @@ const Obligations = () => {
     const [selectedHistory, setSelectedHistory] = useState([]);
 
     // Forms
-    // Using string for due_date input to handle date picker "YYYY-MM-DD"
     const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_date: '', category: '' });
     const [viewingHistoryId, setViewingHistoryId] = useState(null);
 
@@ -26,7 +25,6 @@ const Obligations = () => {
             const res = await axios.get(`${API_URL}/obligations/`);
             setObligations(res.data);
 
-            // Check history
             const historyData = {};
             await Promise.all(res.data.map(async (obl) => {
                 const hRes = await axios.get(`${API_URL}/obligations/${obl.id}/history`);
@@ -45,39 +43,44 @@ const Obligations = () => {
     }, []);
 
     // --- Helpers ---
-    const isPaidThisMonth = (oblId) => {
-        const payments = history[oblId] || [];
-        const now = new Date();
-        const currentMonth = now.getMonth();
-        const currentYear = now.getFullYear();
+    const getMonthStatus = (oblId, offset) => {
+        const today = new Date();
+        // Calculate target month
+        const targetDate = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+        const targetMonth = targetDate.getMonth();
+        const targetYear = targetDate.getFullYear();
 
-        return payments.some(p => {
+        const payments = history[oblId] || [];
+        const payment = payments.find(p => {
             const d = new Date(p.payment_date);
-            return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+            return d.getMonth() === targetMonth && d.getFullYear() === targetYear;
         });
+
+        return {
+            label: targetDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+            shortLabel: targetDate.toLocaleDateString('en-US', { month: 'short' }),
+            isPaid: !!payment,
+            amount: payment ? payment.amount : null,
+            date: payment ? payment.payment_date : null
+        };
     };
 
     const getNextDueDate = (day) => {
         if (!day) return "Not set";
         const now = new Date();
-        const currentYear = now.getFullYear();
-        const currentMonth = now.getMonth();
-        const date = new Date(currentYear, currentMonth, day);
-        return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+        // We want the Due Date for THIS month
+        const date = new Date(now.getFullYear(), now.getMonth(), day);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
 
     // --- Handlers ---
     const handleSaveObligation = async (e) => {
         e.preventDefault();
 
-        // Extract day from YYYY-MM-DD
         let due_day_val = 1;
         if (obligationForm.due_date) {
-            // "2024-05-15" -> 15
             const parts = obligationForm.due_date.split('-');
-            if (parts.length === 3) {
-                due_day_val = parseInt(parts[2]);
-            }
+            if (parts.length === 3) due_day_val = parseInt(parts[2]);
         }
 
         const payload = {
@@ -102,23 +105,29 @@ const Obligations = () => {
 
     const handleDeleteObligation = async () => {
         if (!editingId) return;
-        if (!confirm("Are you sure you want to delete this obligation? This cannot be undone.")) return;
-
+        if (!confirm("Are you sure?")) return;
         try {
             await axios.delete(`${API_URL}/obligations/${editingId}`);
             setShowObligationModal(false);
             setEditingId(null);
             fetchObligations();
-        } catch (err) { alert('Error deleting obligation'); }
+        } catch (err) { alert('Error deleting'); }
     };
 
     const handleMarkPaid = async (obl) => {
-        if (!confirm(`Mark ${obl.name} as paid for this month?`)) return;
+        // Default to the current obligation amount
+        // We can prompt user to confirm the amount
+        const amountStr = prompt(`Confirm payment amount for ${obl.name}:`, obl.amount);
+        if (amountStr === null) return; // Cancelled
+
+        const amount = parseFloat(amountStr);
+        if (isNaN(amount)) { alert("Invalid amount"); return; }
+
         try {
             await axios.post(`${API_URL}/obligations/${obl.id}/pay`, {
                 payment_date: new Date().toISOString(),
-                amount: obl.amount,
-                note: "Manual entry - Paid Button"
+                amount: amount,
+                note: "Paid via Dashboard"
             });
             fetchObligations();
         } catch (err) { alert("Error marking as paid"); }
@@ -127,35 +136,29 @@ const Obligations = () => {
     const handleAddPastPayment = async (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
-
         try {
             await axios.post(`${API_URL}/obligations/${viewingHistoryId}/pay`, {
                 payment_date: new Date(formData.get('date')).toISOString(),
                 amount: parseFloat(formData.get('amount')),
-                note: formData.get('note') || "Manual Manual History Log"
+                note: formData.get('note') || "Manual History Log"
             });
-
             const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/history`);
             setSelectedHistory(hRes.data);
             setHistory(prev => ({ ...prev, [viewingHistoryId]: hRes.data }));
             e.target.reset();
-        } catch (err) { alert("Error adding historical record"); }
+        } catch (err) { alert("Error adding record"); }
     };
 
     const openObligationModal = (obl = null) => {
         if (obl) {
             setEditingId(obl.id);
-            // Reconstruct a dummy YYYY-MM-DD for the value input based on today's month/year + saved day
-            // Only strictly needed if we want to show the correct "day" in the picker.
             const now = new Date();
             const dayStr = obl.due_day.toString().padStart(2, '0');
             const monthStr = (now.getMonth() + 1).toString().padStart(2, '0');
-            const dateStr = `${now.getFullYear()}-${monthStr}-${dayStr}`;
-
             setObligationForm({
                 name: obl.name,
                 amount: obl.amount,
-                due_date: dateStr,
+                due_date: `${now.getFullYear()}-${monthStr}-${dayStr}`,
                 category: obl.category
             });
         } else {
@@ -177,11 +180,11 @@ const Obligations = () => {
 
     return (
         <div>
-            {/* Header + Add Button */}
+            {/* Header */}
             <div className="flex justify-between items-center mb-8">
                 <div>
                     <h1 className="text-3xl font-bold text-white">Obligation Manager</h1>
-                    <p className="text-gray-400">Track your recurring bills and payments.</p>
+                    <p className="text-gray-400">Track recurring bills: Past, Present, and Future.</p>
                 </div>
                 <button
                     onClick={() => openObligationModal(null)}
@@ -193,72 +196,107 @@ const Obligations = () => {
 
             <div className="grid grid-cols-1 gap-6">
                 {obligations.map(obl => {
-                    const paid = isPaidThisMonth(obl.id);
+                    const prevMonth = getMonthStatus(obl.id, -1);
+                    const currMonth = getMonthStatus(obl.id, 0);
+                    const nextMonth = getMonthStatus(obl.id, 1); // Not really checking status, just for label
+
                     return (
-                        <div key={obl.id} className={`relative group p-6 rounded-xl border ${paid ? 'bg-green-900/10 border-green-800' : 'bg-slate-800 border-slate-700'} shadow-lg flex justify-between items-center`}>
-
-                            {/* Edit Icon */}
-                            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition cursor-pointer bg-slate-900/50 p-1 rounded">
-                                <EditIcon onClick={() => openObligationModal(obl)} />
-                            </div>
-
-                            <div>
-                                <div className="flex items-center gap-3">
-                                    <h3 className="text-xl font-bold text-white">{obl.name}</h3>
-                                    <span className="text-xs px-2 py-1 rounded bg-slate-700 text-gray-300">{obl.category || 'Uncategorized'}</span>
-                                </div>
-                                <p className="text-gray-400 mt-1">Due: <span className="text-white font-medium">{getNextDueDate(obl.due_day)}</span></p>
-                                <p className="text-2xl font-bold text-white mt-2">{formatCurrency(obl.amount)}</p>
-                            </div>
-
-                            <div className="flex flex-col items-end gap-3 mt-4 mr-8">
-                                {paid ? (
-                                    <div className="flex items-center gap-2 text-green-400 bg-green-900/30 px-4 py-2 rounded-lg border border-green-900/50">
-                                        <CheckCircle size={20} />
-                                        <span className="font-bold">Paid</span>
+                        <div key={obl.id} className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-lg group relative">
+                            {/* Card Header & Edit Button */}
+                            <div className="bg-slate-900/50 p-4 border-b border-slate-700 flex justify-between items-start">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-xl font-bold text-white">{obl.name}</h3>
+                                        <span className="text-xs px-2 py-0.5 rounded bg-slate-700 text-gray-400">{obl.category}</span>
                                     </div>
-                                ) : (
-                                    <button
-                                        onClick={() => handleMarkPaid(obl)}
-                                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition shadow"
-                                    >
-                                        <CheckCircle size={18} />
-                                        Mark as Paid
+                                    <p className="text-sm text-gray-400 mt-1">Recurrence: <span className="text-gray-300">Day {obl.due_day}</span></p>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button onClick={() => openHistory(obl.id)} className="text-xs font-medium text-gray-400 hover:text-white flex items-center gap-1">
+                                        <History size={14} /> History
                                     </button>
-                                )}
+                                    <EditIcon onClick={() => openObligationModal(obl)} className="text-gray-500 hover:text-white cursor-pointer" size={18} />
+                                </div>
+                            </div>
 
-                                <button onClick={() => openHistory(obl.id)} className="text-gray-400 hover:text-white text-sm flex items-center gap-1 group-hover:text-blue-300 transition">
-                                    <History size={16} /> View History
-                                </button>
+                            {/* 3-Month View Grid */}
+                            <div className="grid grid-cols-3 divide-x divide-slate-700">
+
+                                {/* Previous Month */}
+                                <div className="p-4 flex flex-col items-center text-center opacity-70 hover:opacity-100 transition">
+                                    <span className="text-xs uppercase font-bold text-gray-500 mb-2">{prevMonth.shortLabel} (Prev)</span>
+                                    {prevMonth.isPaid ? (
+                                        <div className="text-green-400 flex flex-col items-center">
+                                            <CheckCircle size={20} className="mb-1" />
+                                            <span className="font-bold text-lg">{formatCurrency(prevMonth.amount)}</span>
+                                            <span className="text-xs text-green-500/70">Paid</span>
+                                        </div>
+                                    ) : (
+                                        <div className="text-gray-500 flex flex-col items-center">
+                                            <XCircle size={20} className="mb-1" />
+                                            <span className="text-sm">Not Recorded</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Current Month (Main Focus) */}
+                                <div className="p-4 flex flex-col items-center text-center bg-slate-700/20 relative">
+                                    <span className="text-xs uppercase font-bold text-blue-300 mb-2">{currMonth.shortLabel} (Current)</span>
+
+                                    {currMonth.isPaid ? (
+                                        <div className="text-green-400 flex flex-col items-center animate-in fade-in zoom-in duration-300">
+                                            <CheckCircle size={28} className="mb-2" />
+                                            <span className="font-bold text-2xl">{formatCurrency(currMonth.amount)}</span>
+                                            <span className="text-xs bg-green-900/30 px-2 py-0.5 rounded text-green-300 mt-1">Paid on {new Date(currMonth.date).getDate()}th</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col items-center w-full">
+                                            <span className="text-2xl font-bold text-white mb-1">{formatCurrency(obl.amount)}</span>
+                                            <p className="text-xs text-red-300 mb-3 font-medium">Due: {getNextDueDate(obl.due_day)}</p>
+
+                                            <button
+                                                onClick={() => handleMarkPaid(obl)}
+                                                className="w-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold py-2 px-4 rounded shadow-lg flex justify-center items-center gap-2 transition transform hover:scale-105"
+                                            >
+                                                <CheckCircle size={16} /> Pay Now
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Next Month (Forecast) */}
+                                <div className="p-4 flex flex-col items-center text-center opacity-70 hover:opacity-100 transition">
+                                    <span className="text-xs uppercase font-bold text-gray-500 mb-2">{nextMonth.shortLabel} (Expected)</span>
+                                    <div className="flex flex-col items-center text-gray-400">
+                                        <ArrowRight size={20} className="mb-1 text-slate-600" />
+                                        <span className="font-bold text-lg text-gray-300">{formatCurrency(obl.amount)}</span>
+                                        <span className="text-xs text-gray-500">Auto-calculated</span>
+                                    </div>
+                                </div>
+
                             </div>
                         </div>
                     );
                 })}
-
-                {obligations.length === 0 && (
-                    <div className="text-center p-12 bg-slate-800/50 rounded-xl border border-dashed border-slate-700">
-                        <p className="text-gray-400 mb-4">You haven't added any obligations yet.</p>
-                        <button onClick={() => openObligationModal(null)} className="text-blue-400 hover:text-blue-300 underline">Add your first bill</button>
-                    </div>
-                )}
             </div>
 
-            {/* --- ADD/EDIT MODAL --- */}
+            {/* Modals remain mostly unchanged */}
+            {/* Obligation Modal */}
             {showObligationModal && (
                 <Modal title={editingId ? "Edit Obligation" : "Add Obligation"} onClose={() => setShowObligationModal(false)}>
                     <form onSubmit={handleSaveObligation} className="space-y-4">
                         <div>
                             <label className="text-gray-400 text-xs uppercase mb-1 block">Name</label>
-                            <input type="text" placeholder="e.g. Rent, Netflix" required className={inputClass} value={obligationForm.name} onChange={e => setObligationForm({ ...obligationForm, name: e.target.value })} />
+                            <input type="text" placeholder="e.g. Rent" required className={inputClass} value={obligationForm.name} onChange={e => setObligationForm({ ...obligationForm, name: e.target.value })} />
                         </div>
                         <div>
                             <label className="text-gray-400 text-xs uppercase mb-1 block">Amount</label>
                             <input type="number" placeholder="SAR" required step="0.01" className={inputClass} value={obligationForm.amount} onChange={e => setObligationForm({ ...obligationForm, amount: e.target.value })} />
                         </div>
                         <div>
-                            <label className="text-gray-400 text-xs uppercase mb-1 block">Due Date</label>
+                            <label className="text-gray-400 text-xs uppercase mb-1 block">Due Day</label>
                             <input type="date" required className={inputClass} value={obligationForm.due_date} onChange={e => setObligationForm({ ...obligationForm, due_date: e.target.value })} />
-                            <p className="text-xs text-gray-500 mt-1">We will use the <strong>Day</strong> from this date for the monthly recurrence.</p>
+                            <p className="text-xs text-gray-500 mt-1">Recurrence set to the {obligationForm.due_date ? new Date(obligationForm.due_date).getDate() : 'X'}th of every month.</p>
                         </div>
                         <div>
                             <label className="text-gray-400 text-xs uppercase mb-1 block">Category</label>
@@ -274,59 +312,36 @@ const Obligations = () => {
                                 <option value="Other">Other</option>
                             </select>
                         </div>
-
                         <div className="flex gap-2 mt-6">
-                            <button type="submit" className="flex-1 bg-blue-600 text-white p-3 rounded hover:bg-blue-500 font-bold shadow-lg">
-                                {editingId ? "Save Changes" : "Create Obligation"}
-                            </button>
-                            {editingId && (
-                                <button type="button" onClick={handleDeleteObligation} className="bg-red-900/80 text-red-200 p-3 rounded hover:bg-red-800 font-bold border border-red-800">
-                                    <Trash2 size={20} />
-                                </button>
-                            )}
+                            <button type="submit" className="flex-1 bg-blue-600 text-white p-3 rounded hover:bg-blue-500 font-bold shadow-lg">{editingId ? "Save Changes" : "Create"}</button>
+                            {editingId && <button type="button" onClick={handleDeleteObligation} className="bg-red-900/80 text-red-200 p-3 rounded hover:bg-red-800 font-bold"><Trash2 size={20} /></button>}
                         </div>
                     </form>
                 </Modal>
             )}
 
-            {/* --- HISTORY MODAL --- */}
+            {/* History Modal */}
             {showHistoryModal && (
                 <Modal title={`History: ${currentHistoryObligation.name}`} onClose={() => setShowHistoryModal(false)}>
-
-                    {/* Add Past Record Form */}
                     <div className="bg-slate-700/50 p-4 rounded-lg mb-6 border border-slate-600">
                         <div className="flex items-center gap-2 mb-3 text-blue-300">
                             <Calendar size={16} />
                             <h4 className="text-sm font-bold uppercase tracking-wide">Log Past Payment</h4>
                         </div>
                         <form onSubmit={handleAddPastPayment} className="grid grid-cols-2 gap-3">
-                            <div className="col-span-2">
-                                <input type="date" name="date" required className={`${inputClass} text-sm`} />
-                            </div>
-                            <div>
-                                <input type="number" name="amount" defaultValue={currentHistoryObligation.amount} placeholder="Amount" step="0.01" required className={`${inputClass} text-sm`} />
-                            </div>
-                            <div>
-                                <input type="text" name="note" placeholder="Note (Optional)" className={`${inputClass} text-sm`} />
-                            </div>
-                            <button type="submit" className="col-span-2 bg-slate-600 hover:bg-slate-500 text-white text-xs font-bold py-2 rounded uppercase tracking-wider transition">
-                                + Add Record
-                            </button>
+                            <div className="col-span-2"><input type="date" name="date" required className={`${inputClass} text-sm`} /></div>
+                            <div><input type="number" name="amount" defaultValue={currentHistoryObligation.amount} placeholder="Amount" step="0.01" required className={`${inputClass} text-sm`} /></div>
+                            <div><input type="text" name="note" placeholder="Note (Optional)" className={`${inputClass} text-sm`} /></div>
+                            <button type="submit" className="col-span-2 bg-slate-600 hover:bg-slate-500 text-white text-xs font-bold py-2 rounded uppercase tracking-wider transition">+ Add Record</button>
                         </form>
                     </div>
-
                     <div className="max-h-60 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                        <h4 className="text-gray-400 text-xs uppercase font-bold mb-2 sticky top-0 bg-slate-800 py-1">Recorded Payments</h4>
                         {selectedHistory.map(h => (
-                            <div key={h.id} className="bg-slate-800 p-3 rounded flex justify-between items-center border border-slate-700 hover:border-slate-500 transition">
-                                <div>
-                                    <p className="text-white font-medium text-sm">{new Date(h.payment_date).toLocaleDateString()}</p>
-                                    <p className="text-xs text-gray-500">{h.note || 'No note'}</p>
-                                </div>
+                            <div key={h.id} className="bg-slate-800 p-3 rounded flex justify-between items-center border border-slate-700">
+                                <div><p className="text-white font-medium text-sm">{new Date(h.payment_date).toLocaleDateString()}</p><p className="text-xs text-gray-500">{h.note || 'No note'}</p></div>
                                 <p className="text-green-400 font-bold text-sm">{formatCurrency(h.amount)}</p>
                             </div>
                         ))}
-                        {selectedHistory.length === 0 && <p className="text-gray-500 text-center py-4 text-sm italic">No history recorded yet.</p>}
                     </div>
                 </Modal>
             )}
