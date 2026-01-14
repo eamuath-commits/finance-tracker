@@ -55,3 +55,14 @@ class MonthlyObligation(Base):
     amount = Column(Float, nullable=False)
     due_day = Column(Integer, nullable=False) # e.g. 1 for 1st of month
     category = Column(String, nullable=True)
+
+class ObligationHistory(Base):
+    __tablename__ = "obligation_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    obligation_id = Column(String, ForeignKey("obligations.id"), nullable=False)
+    payment_date = Column(DateTime, default=datetime.utcnow)
+    amount = Column(Float, nullable=False)
+    note = Column(String, nullable=True)
+
+    obligation = relationship("MonthlyObligation")

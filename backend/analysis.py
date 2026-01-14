@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from datetime import datetime
-from models import Account, MonthlyObligation, AccountType
+from models import Account, MonthlyObligation, AccountType, ObligationHistory, extract
 from analysis_schema import AllocationResponse, Recommendation
 
 def calculate_allocation(db: Session) -> AllocationResponse:
@@ -13,17 +13,25 @@ def calculate_allocation(db: Session) -> AllocationResponse:
     
     # 2. Get Today's Date
     today = datetime.now()
-    current_day = today.day
+    current_month = today.month
+    current_year = today.year
     
     # 3. Calculate Unpaid Obligations (Rest of Month)
-    # logic: if due_day > current_day, we assume it's still due this month
     obligations = db.query(MonthlyObligation).all()
     
     unpaid_amount = 0.0
     upcoming_bills = []
     
     for obl in obligations:
-        if obl.due_day > current_day:
+        # Check if paid this month
+        payment = db.query(ObligationHistory).filter(
+            ObligationHistory.obligation_id == obl.id,
+            extract('month', ObligationHistory.payment_date) == current_month,
+            extract('year', ObligationHistory.payment_date) == current_year
+        ).first()
+        
+        if not payment:
+            # It is unpaid. Proceed to reserve.
             unpaid_amount += obl.amount
             upcoming_bills.append(obl)
             
@@ -38,12 +46,12 @@ def calculate_allocation(db: Session) -> AllocationResponse:
         bill_names = ", ".join([b.name for b in upcoming_bills])
         recommendations.append(Recommendation(
             type="bill",
-            text=f"Reserve ${unpaid_amount:.2f} for upcoming bills: {bill_names}"
+            text=f"Reserve ${unpaid_amount:.2f} for unpaid bills: {bill_names}"
         ))
     else:
         recommendations.append(Recommendation(
             type="info",
-            text="No more billing cycles detected this month."
+            text="All bills for this month are confirmed paid! 🎉"
         ))
 
     if freedom_cash < 0:
@@ -51,7 +59,7 @@ def calculate_allocation(db: Session) -> AllocationResponse:
         message = f"Warning: You are short ${shortfall:.2f} for this month."
         recommendations.append(Recommendation(
             type="warning",
-            text=f"You need ${shortfall:.2f} more to cover upcoming bills."
+            text=f"You need ${shortfall:.2f} more to cover remaining bills."
         ))
     else:
         message = "You are in a safe financial position."

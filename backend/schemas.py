@@ -96,3 +96,17 @@ class SMSPayload(BaseModel):
     body: str
     sender: str
     timestamp: Optional[datetime] = None
+
+class ObligationHistoryBase(BaseModel):
+    payment_date: datetime
+    amount: float
+    note: Optional[str] = None
+
+class ObligationHistoryCreate(ObligationHistoryBase):
+    pass
+
+class ObligationHistory(ObligationHistoryBase):
+    id: int
+    obligation_id: str
+    class Config:
+        orm_mode = True

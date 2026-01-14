@@ -137,4 +137,20 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
     db.add(db_tx)
     db.commit()
     db.refresh(db_tx)
+    db.refresh(db_tx)
     return db_tx
+
+def create_obligation_payment(db: Session, obligation_id: str, payment: schemas.ObligationHistoryCreate):
+    db_payment = models.ObligationHistory(
+        obligation_id=obligation_id,
+        amount=payment.amount,
+        payment_date=payment.payment_date,
+        note=payment.note
+    )
+    db.add(db_payment)
+    db.commit()
+    db.refresh(db_payment)
+    return db_payment
+
+def get_obligation_history(db: Session, obligation_id: str):
+    return db.query(models.ObligationHistory).filter(models.ObligationHistory.obligation_id == obligation_id).order_by(models.ObligationHistory.payment_date.desc()).all()

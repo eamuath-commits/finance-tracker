@@ -95,6 +95,19 @@ def update_obligation(obligation_id: str, obligation_update: schemas.ObligationU
         raise HTTPException(status_code=404, detail="Obligation not found")
     return updated_obj
 
+@app.post("/obligations/{obligation_id}/pay", response_model=schemas.ObligationHistory)
+def pay_obligation(obligation_id: str, payment: schemas.ObligationHistoryCreate, db: Session = Depends(get_db)):
+    # Verify obligation exists
+    obligation = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
+    if not obligation:
+        raise HTTPException(status_code=404, detail="Obligation not found")
+    
+    return crud.create_obligation_payment(db=db, obligation_id=obligation_id, payment=payment)
+
+@app.get("/obligations/{obligation_id}/history", response_model=List[schemas.ObligationHistory])
+def get_obligation_history(obligation_id: str, db: Session = Depends(get_db)):
+    return crud.get_obligation_history(db=db, obligation_id=obligation_id)
+
 # --- Transaction Endpoints ---
 @app.get("/transactions/", response_model=List[schemas.Transaction])
 def read_transactions(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
