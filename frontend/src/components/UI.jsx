@@ -1,7 +1,17 @@
 import React from 'react';
 
 export const formatCurrency = (value) => {
-    return "\u20C1 " + Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return (
+        <span className="flex items-center gap-1 inline-flex">
+            <img
+                src="/riyal-symbol.png"
+                alt="SAR"
+                className="h-3 w-auto opacity-90 invert brightness-0"
+                style={{ filter: 'brightness(0) invert(1)' }}
+            />
+            <span>{Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        </span>
+    );
 };
 
 export const Card = ({ title, value, subtext, color = "blue" }) => (

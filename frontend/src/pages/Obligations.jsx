@@ -463,7 +463,7 @@ const Obligations = () => {
                         </div>
                         <div>
                             <label className="text-gray-400 text-xs uppercase mb-1 block">Amount</label>
-                            <input type="number" placeholder="﷼" step="0.01" className={inputClass} value={obligationForm.amount} onChange={e => setObligationForm({ ...obligationForm, amount: e.target.value })} />
+                            <input type="number" placeholder="SAR" step="0.01" className={inputClass} value={obligationForm.amount} onChange={e => setObligationForm({ ...obligationForm, amount: e.target.value })} />
                         </div>
                         <div>
                             <label className="text-gray-400 text-xs uppercase mb-1 block">Due Day</label>
