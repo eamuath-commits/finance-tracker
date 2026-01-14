@@ -215,55 +215,7 @@ const Obligations = () => {
 
     // ... existing helpers ...
 
-    // In render loop:
-    const MonthCard = ({ status, obl }) => {
-        return (
-            <div className={`p-4 flex flex-col items-center text-center relative z-0 hover:z-10 ${status.isPaid ? '' : 'opacity-100'} group/card`}>
-                <span className="text-xs uppercase font-bold text-gray-400 mb-2">{status.shortLabel}</span>
-                {status.isPaid ? (
-                    <div className="text-green-400 flex flex-col items-center relative">
-                        <CheckCircle size={20} className="mb-1" />
-                        <span className="font-bold text-lg">{formatCurrency(status.amount)}</span>
-                        <div className="flex gap-1 absolute -top-2 -right-10 opacity-0 group-hover/card:opacity-100 transition z-50 bg-slate-900/90 p-1 rounded-full shadow-xl border border-slate-700">
-                            {/* Edit Button */}
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    // Reconstruct strict object for edit
-                                    const entry = { id: status.paymentId, amount: status.amount, billing_month: status.billingDateStr, note: "" };
-                                    openPaymentModal(obl, status.billingDateStr, null, entry);
-                                }}
-                                className="text-blue-400 hover:text-white p-1 hover:bg-slate-700 rounded-full transition"
-                                title="Edit Amount"
-                            >
-                                <EditIcon size={12} />
-                            </button>
-                            {/* Delete Button */}
-                            <button
-                                onClick={(e) => { e.stopPropagation(); handleDeleteHistory(status.paymentId); }}
-                                className="text-red-400 hover:text-white p-1 hover:bg-slate-700 rounded-full transition"
-                                title="Delete Record"
-                            >
-                                <Trash2 size={12} />
-                            </button>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="text-gray-500 flex flex-col items-center w-full relative">
-                        <XCircle size={20} className="mb-1" />
-                        <span className="font-bold text-lg mb-1">{formatCurrency(status.amount)}</span>
-                        <span className="text-xs mb-1">Unpaid</span>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, status.billingDateStr, status.amount); }}
-                            className="text-[10px] bg-blue-900/50 hover:bg-blue-800 text-blue-200 px-2 py-0.5 rounded border border-blue-900/50 opacity-0 group-hover/card:opacity-100 transition cursor-pointer z-50"
-                        >
-                            Mark Paid
-                        </button>
-                    </div>
-                )}
-            </div>
-        )
-    }
+
 
     // Replace manual grid content with unified component usage in map:
     // This is too complex for one regex replacement. I will stick to minimal targeted replacements.
@@ -491,7 +443,7 @@ const Obligations = () => {
                                             <CheckCircle size={20} className="mb-1" />
                                             <span className="font-bold text-lg">{formatCurrency(monthMinus2.amount)}</span>
                                             <div className="flex gap-1 absolute -top-3 -right-8 opacity-0 group-hover/m2:opacity-100 transition z-50 bg-slate-900/90 p-1 rounded-full shadow-xl border border-slate-700">
-                                                <button onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, monthMinus2.billingDateStr, null, { id: monthMinus2.paymentId, amount: monthMinus2.amount, billing_month: monthMinus2.billingDateStr }); }} className="text-blue-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><EditIcon size={12} /></button>
+                                                <button onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, monthMinus2.billingDateStr, null, { id: monthMinus2.paymentId, amount: monthMinus2.amount, billing_month: monthMinus2.billingDateStr }); }} className="text-blue-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><Pencil size={12} /></button>
                                                 <button onClick={(e) => { e.stopPropagation(); handleDeleteHistory(monthMinus2.paymentId); }} className="text-red-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><Trash2 size={12} /></button>
                                             </div>
                                         </div>
