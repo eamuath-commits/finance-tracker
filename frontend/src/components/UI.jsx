@@ -3,11 +3,19 @@ import React from 'react';
 export const formatCurrency = (value) => {
     return (
         <span className="flex items-center gap-1 inline-flex">
-            <img
-                src="/riyal-symbol.png"
-                alt="SAR"
-                className="h-3 w-auto opacity-90 invert brightness-0"
-                style={{ filter: 'brightness(0) invert(1)' }}
+            <span
+                className="h-3 w-3 inline-block"
+                style={{
+                    backgroundColor: 'currentColor',
+                    maskImage: 'url(/riyal-symbol.png)',
+                    WebkitMaskImage: 'url(/riyal-symbol.png)',
+                    maskSize: 'contain',
+                    WebkitMaskSize: 'contain',
+                    maskRepeat: 'no-repeat',
+                    WebkitMaskRepeat: 'no-repeat',
+                    maskPosition: 'center',
+                    WebkitMaskPosition: 'center'
+                }}
             />
             <span>{Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </span>
