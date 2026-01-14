@@ -504,14 +504,19 @@ const Obligations = () => {
                             <label className="text-gray-400 text-xs uppercase mb-1 block">Category</label>
                             <select className={selectClass} value={obligationForm.category} onChange={e => setObligationForm({ ...obligationForm, category: e.target.value })}>
                                 <option value="">Select Category...</option>
-                                <option value="Housing">Housing</option>
+                                <option value="Salary">Salary</option>
+                                <option value="House">House</option>
                                 <option value="Utilities">Utilities</option>
                                 <option value="Food">Food & Groceries</option>
                                 <option value="Transport">Transport</option>
                                 <option value="Insurance">Insurance</option>
                                 <option value="Tech">Tech & Subscriptions</option>
-                                <option value="Loan">Loan Repayment</option>
+                                <option value="Loan">Loan</option>
+                                <option value="Credit Card">Credit Card</option>
+                                <option value="Pay Later">Pay Later</option>
                                 <option value="Other">Other</option>
+
+
                             </select>
                         </div>
                         <div className="flex gap-2 mt-6">
