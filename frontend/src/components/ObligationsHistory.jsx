@@ -6,6 +6,16 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: 'billing_month', direction: 'desc' });
 
+    const formatMonthDisplay = (dateStr) => {
+        if (!dateStr) return '-';
+        const parts = dateStr.split('-');
+        if (parts.length < 2) return dateStr;
+        const year = parts[0].substring(2);
+        const monthNum = parseInt(parts[1], 10);
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        return `${monthNames[monthNum - 1]}-${year}`;
+    };
+
     // Filters - Default to Current Year and Month to show "Unpaid" immediately
     const currentDate = new Date();
     const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear().toString());
@@ -255,7 +265,7 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                             {sorted.length > 0 ? sorted.map((item, idx) => (
                                 <tr key={`${item.id}-${idx}`} className="hover:bg-slate-700/30 transition text-slate-300">
                                     <td className="px-6 py-3 text-blue-300 font-mono text-xs">
-                                        {item.billing_month ? item.billing_month.substring(0, 7) : '-'}
+                                        {formatMonthDisplay(item.billing_month)}
                                     </td>
                                     <td className="px-6 py-3 font-semibold text-white">{item.oblName}</td>
 
