@@ -8,7 +8,7 @@ import ObligationsHistory from '../components/ObligationsHistory';
 
 const Obligations = () => {
     const [obligations, setObligations] = useState([]);
-    const [history, setHistory] = useState({});
+    const [payments, setPayments] = useState({}); // Renamed from history
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewModeState] = useState(localStorage.getItem('obligationsViewMode') || 'overview');
 
@@ -38,21 +38,22 @@ const Obligations = () => {
             console.log(`✅ Fetched ${res.data.length} obligations.`);
             setObligations(res.data);
 
-            const historyData = {};
-            // console.log("⏳ Fetching history for each obligation...");
+            const paymentsData = {};
+            // console.log("⏳ Fetching payments for each obligation...");
 
             await Promise.all(res.data.map(async (obl) => {
                 try {
-                    const hRes = await axios.get(`${API_URL}/obligations/${obl.id}/history`);
-                    historyData[obl.id] = hRes.data;
+                    // Use new /payments endpoint
+                    const hRes = await axios.get(`${API_URL}/obligations/${obl.id}/payments`);
+                    paymentsData[obl.id] = hRes.data;
                 } catch (hErr) {
-                    console.error(`❌ Failed to fetch history for ${obl.name} (${obl.id}):`, hErr);
-                    historyData[obl.id] = [];
+                    console.error(`❌ Failed to fetch payments for ${obl.name} (${obl.id}):`, hErr);
+                    paymentsData[obl.id] = [];
                 }
             }));
 
-            // console.log("✅ History fetch complete.", historyData);
-            setHistory(historyData);
+            // console.log("✅ Payments fetch complete.", paymentsData);
+            setPayments(paymentsData);
         } catch (error) {
             console.error("❌ CRITICAL ERROR fetching obligations:", error);
         } finally {
@@ -82,7 +83,7 @@ const Obligations = () => {
         const targetYear = targetDate.getFullYear();
         const billingDateStr = `${targetYear}-${(targetMonth + 1).toString().padStart(2, '0')}-01`;
 
-        const payments = history[obl.id] || [];
+        const oblPayments = payments[obl.id] || [];
         const isMatch = (p, m, y) => {
             if (p.billing_month) {
                 const [py, pm] = p.billing_month.split('-').map(Number);
@@ -92,35 +93,28 @@ const Obligations = () => {
             return d.getMonth() === m && d.getFullYear() === y;
         };
 
-        const payment = payments.find(p => isMatch(p, targetMonth, targetYear));
+        const payment = oblPayments.find(p => isMatch(p, targetMonth, targetYear));
         let displayAmount = null;
 
         if (payment) {
             displayAmount = payment.amount;
-        } else if (offset < 0) {
-            // Find most recent past payment
-            const pastPayments = payments.filter(p => {
-                let d = new Date(p.billing_month || p.payment_date);
-                return d < targetDate;
-            });
-            if (pastPayments.length > 0) {
-                pastPayments.sort((a, b) => new Date(b.billing_month || b.payment_date) - new Date(a.billing_month || a.payment_date));
-                displayAmount = pastPayments[0].amount;
-            }
         }
 
-        if (displayAmount === null && offset >= 0) {
-            displayAmount = obl.amount;
-        }
+        // Strict "Delete means Gone" logic:
+        // If there is NO payment record, we return NO status (not Paid, not Unpaid).
+        // It's just... empty/available.
+        // Unless we want to show "Unpaid" ONLY if it's strictly due?
+        // User said: "delete the history without making the history come back".
+        // So: No Payment = No Status.
 
         return {
             label: targetDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
             shortLabel: targetDate.toLocaleDateString('en-US', { month: 'short' }),
             billingDateStr,
             isPaid: payment && payment.status === 'PAID',
-            amount: displayAmount,
+            amount: displayAmount, // Can be null
             paymentId: payment ? payment.id : null,
-            status: payment ? payment.status : null
+            status: payment ? payment.status : null // null status = "Nothing logged"
         };
     };
 
@@ -128,7 +122,7 @@ const Obligations = () => {
         e.preventDefault();
         const payload = {
             name: obligationForm.name,
-            amount: parseFloat(obligationForm.amount || 0),
+            amount: obligationForm.amount ? parseFloat(obligationForm.amount) : null, // Send null if empty
             category: obligationForm.category,
             due_day: parseInt(obligationForm.due_day || 1)
         };
@@ -162,24 +156,24 @@ const Obligations = () => {
         const defaultMonthStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-01`;
 
         if (historyEntry) {
-            // Check if this is a "virtual" (Unpaid) entry
-            const isVirtual = historyEntry.id && historyEntry.id.toString().startsWith('virtual-');
-
             setPaymentForm({
                 id: obl.id,
-                historyId: isVirtual ? null : historyEntry.id, // If virtual, we are creating NEW payment (POST), not updating (PUT)
+                historyId: historyEntry.id,
                 name: obl.name,
                 amount: historyEntry.amount,
-                note: historyEntry.note === 'Pending' ? '' : (historyEntry.note || ""),
+                note: historyEntry.note || "",
                 billing_month: historyEntry.billing_month || targetMonthStr,
                 status: historyEntry.status || "PAID"
             });
         } else {
+            // New Payment
+            // If obl.amount is null, defaultAmount might be null. 
+            // We leave amount empty so user must type it.
             setPaymentForm({
                 id: obl.id,
                 historyId: null,
                 name: obl.name,
-                amount: defaultAmount !== null ? defaultAmount : obl.amount,
+                amount: defaultAmount !== null ? defaultAmount : (obl.amount || ''), // Use empty string if no amount
                 note: "Manual Payment",
                 billing_month: targetMonthStr || defaultMonthStr,
                 status: "PAID"
@@ -201,13 +195,15 @@ const Obligations = () => {
             };
 
             if (paymentForm.historyId) {
+                // Using legacy endpoint to route correctly in backend (or update logic to use /payments)
+                // Backend still has the PUT /history route hooked up to update_payment
                 await axios.put(`${API_URL}/obligations/history/${paymentForm.historyId}`, payload);
             } else {
                 await axios.post(`${API_URL}/obligations/${paymentForm.id}/pay`, payload);
             }
             setShowPaymentModal(false);
             if (viewingHistoryId) {
-                const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/history`);
+                const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/payments`);
                 setSelectedHistory(hRes.data);
             }
             fetchObligations();
@@ -226,9 +222,9 @@ const Obligations = () => {
                 payment_date: new Date().toISOString(),
                 amount: parseFloat(formData.get('amount') || 0),
                 billing_month: bMonthStr,
-                note: formData.get('note') || "Manual History Log"
+                note: formData.get('note') || "Manual Payment Log"
             });
-            const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/history`);
+            const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/payments`);
             setSelectedHistory(hRes.data);
             fetchObligations();
             e.target.reset();
@@ -236,39 +232,17 @@ const Obligations = () => {
     };
 
     const handleDeleteHistory = async (historyId) => {
-        if (historyId && historyId.toString().startsWith('virtual-')) {
-            // ID Format: virtual-{oblId}-{year}-{month}
-            const parts = historyId.toString().split('-');
-            if (parts.length >= 2) {
-                const oblId = parts[1];
-                const obl = obligations.find(o => o.id === oblId);
-                const oblName = obl ? obl.name : "this item";
-
-                const choice = confirm(
-                    `"${oblName}" is a recurring obligation.\n\n` +
-                    `• To skip THIS month only: Mark as Paid $0.00.\n` +
-                    `• To delete it FOREVER: Click OK to delete the main obligation.`
-                );
-
-                if (choice) {
-                    try {
-                        await axios.delete(`${API_URL}/obligations/${oblId}`);
-                        fetchObligations(); // Refresh list
-                    } catch (err) { alert("Error deleting obligation"); }
-                }
-            }
-            return;
-        }
-
-        if (!confirm("Delete this record?")) return;
+        // No more "Virtual" items. Since we only show real payments, we only delete real IDs.
+        if (!confirm("Delete this payment record?")) return;
         try {
+            // Using legacy endpoint
             await axios.delete(`${API_URL}/obligations/history/${historyId}`);
             if (viewingHistoryId) {
-                const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/history`);
+                const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/payments`);
                 setSelectedHistory(hRes.data);
             }
             fetchObligations();
-        } catch (err) { alert("Error deleting history"); }
+        } catch (err) { alert("Error deleting payment"); }
     };
 
     const openObligationModal = (obl = null) => {
@@ -276,7 +250,7 @@ const Obligations = () => {
             setEditingId(obl.id);
             setObligationForm({
                 name: obl.name,
-                amount: obl.amount,
+                amount: obl.amount || '', // Handle null amount
                 due_day: obl.due_day,
                 category: obl.category
             });
@@ -289,7 +263,7 @@ const Obligations = () => {
 
     const openHistory = (oblId) => {
         setViewingHistoryId(oblId);
-        setSelectedHistory(history[oblId] || []);
+        setSelectedHistory(payments[oblId] || []);
         setShowHistoryModal(true);
     };
 
@@ -307,7 +281,7 @@ const Obligations = () => {
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h1 className="text-3xl font-bold text-white">Obligations</h1>
-                    <p className="text-gray-400 text-sm">Track monthly bills & subscriptions</p>
+                    <p className="text-gray-400 text-sm">Track monthly payments</p>
                 </div>
                 <div className="flex bg-slate-800 p-1 rounded-lg">
                     <button
@@ -326,7 +300,7 @@ const Obligations = () => {
                         onClick={() => setViewMode('history')}
                         className={`px-4 py-2 rounded-md text-sm font-bold transition ${viewMode === 'history' ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
                     >
-                        History
+                        Payments
                     </button>
                 </div>
             </div>
@@ -363,7 +337,7 @@ const Obligations = () => {
             {viewMode === 'history' && (
                 <ObligationsHistory
                     obligations={obligations}
-                    history={history}
+                    history={payments} // Passing payments as history prop
                     onEdit={(item) => {
                         const obl = obligations.find(o => o.id === item.obligation_id);
                         if (obl) openPaymentModal(obl, null, null, item);
@@ -433,7 +407,7 @@ const Obligations = () => {
                 <Modal title={editingId ? "Edit Obligation" : "Add Obligation"} onClose={() => setShowObligationModal(false)}>
                     <form onSubmit={handleSaveObligation} className="space-y-4">
                         <input type="text" placeholder="Name" required className={inputClass} value={obligationForm.name} onChange={e => setObligationForm({ ...obligationForm, name: e.target.value })} />
-                        <input type="number" placeholder="Amount" step="0.01" className={inputClass} value={obligationForm.amount} onChange={e => setObligationForm({ ...obligationForm, amount: e.target.value })} />
+                        <input type="number" placeholder="Default Amount (Optional)" step="0.01" className={inputClass} value={obligationForm.amount} onChange={e => setObligationForm({ ...obligationForm, amount: e.target.value })} />
                         <input type="number" placeholder="Due Day (1-31)" min="1" max="31" required className={inputClass} value={obligationForm.due_day} onChange={e => setObligationForm({ ...obligationForm, due_day: e.target.value })} />
                         <select className={selectClass} value={obligationForm.category} onChange={e => setObligationForm({ ...obligationForm, category: e.target.value })}>
                             <option value="">Select Category...</option>
@@ -461,7 +435,7 @@ const Obligations = () => {
 
             {/* History Modal */}
             {showHistoryModal && (
-                <Modal title={`History: ${currentHistoryObligation.name}`} onClose={() => setShowHistoryModal(false)}>
+                <Modal title={`Payment History: ${currentHistoryObligation.name}`} onClose={() => setShowHistoryModal(false)}>
                     <div className="bg-slate-700/50 p-4 rounded-lg mb-6 border border-slate-600">
                         <h4 className="text-sm font-bold uppercase tracking-wide text-blue-300 mb-2">Log Payment</h4>
                         <form onSubmit={handleAddPastPayment} className="grid grid-cols-2 gap-3">
@@ -473,7 +447,7 @@ const Obligations = () => {
                                     {years.map(y => <option key={y} value={y}>{y}</option>)}
                                 </select>
                             </div>
-                            <input type="number" name="amount" defaultValue={currentHistoryObligation.amount} placeholder="Amount" step="0.01" className={`${inputClass} text-sm`} />
+                            <input type="number" name="amount" defaultValue={currentHistoryObligation.amount || ''} placeholder="Amount" step="0.01" className={`${inputClass} text-sm`} />
                             <input type="text" name="note" placeholder="Note" className={`${inputClass} text-sm`} />
                             <button type="submit" className="col-span-2 bg-slate-600 hover:bg-slate-500 text-white text-xs font-bold py-2 rounded uppercase transition">+ Add Record</button>
                         </form>
@@ -488,6 +462,7 @@ const Obligations = () => {
                                             return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
                                         })() : 'Auto Log'}
                                     </p>
+                                    <p className={`text-xs font-bold ${h.status === 'PAID' ? 'text-green-400' : 'text-red-400'}`}>{h.status}</p>
                                 </div>
                                 <div className="text-right flex flex-col items-end">
                                     <div className="flex items-center gap-3">

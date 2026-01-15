@@ -74,7 +74,7 @@ class Loan(LoanBase):
 
 class ObligationBase(BaseModel):
     name: str
-    amount: float
+    amount: Optional[float] = None
     due_day: int
     category: Optional[str] = None
 
@@ -97,24 +97,24 @@ class SMSPayload(BaseModel):
     sender: str
     timestamp: Optional[datetime] = None
 
-class ObligationHistoryBase(BaseModel):
+class PaymentBase(BaseModel):
     payment_date: datetime
     billing_month: Optional[datetime] = None
     amount: float
     note: Optional[str] = None
     status: str = "PAID" # "PAID" or "PENDING"
 
-class ObligationHistoryCreate(ObligationHistoryBase):
+class PaymentCreate(PaymentBase):
     pass
 
-class ObligationHistoryUpdate(BaseModel):
+class PaymentUpdate(BaseModel):
     payment_date: Optional[datetime] = None
     billing_month: Optional[datetime] = None
     amount: Optional[float] = None
     note: Optional[str] = None
     status: Optional[str] = None
 
-class ObligationHistory(ObligationHistoryBase):
+class Payment(PaymentBase):
     id: int
     obligation_id: str
     class Config:

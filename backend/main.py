@@ -23,23 +23,39 @@ def run_migrations(engine):
                 conn.execute(text("ALTER TABLE transactions ADD COLUMN category VARCHAR"))
                 conn.commit()
 
-        # Check obligation_history for billing_month
-        history_columns = [col['name'] for col in inspector.get_columns('obligation_history')]
-        if 'billing_month' not in history_columns:
-            print("Migrating: Adding billing_month to obligation_history")
+        # Check for table rename (obligation_history -> payments)
+        table_names = inspector.get_table_names()
+        if 'obligation_history' in table_names and 'payments' not in table_names:
+            print("Migrating: Renaming obligation_history to payments")
             with engine.connect() as conn:
-                conn.execute(text("ALTER TABLE obligation_history ADD COLUMN billing_month DATE"))
-                # Backfill: Set billing_month = start of month of payment_date
-                conn.execute(text("UPDATE obligation_history SET billing_month = DATE_TRUNC('month', payment_date)"))
+                conn.execute(text("ALTER TABLE obligation_history RENAME TO payments"))
                 conn.commit()
+        
+        # Check for amount optionality
+        # (This is harder to check via inspector easily without iterating constraint, allow it to run if needed or just try/except)
+        # We can just try to alter it.
+        try:
+             with engine.connect() as conn:
+                # Postgres syntax
+                conn.execute(text("ALTER TABLE obligations ALTER COLUMN amount DROP NOT NULL"))
+                conn.commit()
+        except Exception:
+            pass # Already nullable or other error
 
-        # Check obligation_history for status
-        if 'status' not in history_columns:
-            print("Migrating: Adding status to obligation_history")
-            with engine.connect() as conn:
-                # Add column
-                conn.execute(text("ALTER TABLE obligation_history ADD COLUMN status VARCHAR DEFAULT 'PAID'"))
-                conn.commit()
+        # Check payments for billing_month (if renaming didn't happen or previously migrated)
+        # Note: If we renamed, the columns are there.
+        # But if we are starting fresh, create_all does it.
+        
+        # Check payments table for status column
+        # We need to refresh inspector if we renamed
+        inspector = inspect(engine)
+        if 'payments' in inspector.get_table_names():
+            p_columns = [col['name'] for col in inspector.get_columns('payments')]
+            if 'status' not in p_columns:
+                print("Migrating: Adding status to payments")
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE payments ADD COLUMN status VARCHAR DEFAULT 'PAID'"))
+                    conn.commit()
 
     except Exception as e:
         print(f"Migration failed: {e}")
@@ -121,34 +137,38 @@ def delete_obligation(obligation_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Obligation not found")
     return deleted_obj
 
-@app.post("/obligations/{obligation_id}/pay", response_model=schemas.ObligationHistory)
-def pay_obligation(obligation_id: str, payment: schemas.ObligationHistoryCreate, db: Session = Depends(get_db)):
+@app.post("/obligations/{obligation_id}/pay", response_model=schemas.Payment)
+def pay_obligation(obligation_id: str, payment: schemas.PaymentCreate, db: Session = Depends(get_db)):
     # Verify obligation exists
     obligation = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
     if not obligation:
         raise HTTPException(status_code=404, detail="Obligation not found")
     
     try:
-        return crud.create_obligation_payment(db=db, obligation_id=obligation_id, payment=payment)
+        return crud.create_payment(db=db, obligation_id=obligation_id, payment=payment)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.get("/obligations/{obligation_id}/history", response_model=List[schemas.ObligationHistory])
-def read_obligation_history(obligation_id: str, db: Session = Depends(get_db)):
-    return crud.get_obligation_history(db, obligation_id)
+@app.get("/obligations/{obligation_id}/payments", response_model=List[schemas.Payment])
+def read_obligation_payments(obligation_id: str, db: Session = Depends(get_db)):
+    return crud.get_payments(db, obligation_id)
 
-@app.delete("/obligations/history/{history_id}")
-def delete_obligation_history(history_id: int, db: Session = Depends(get_db)):
-    killed = crud.delete_obligation_history_entry(db, history_id)
+@app.get("/obligations/{obligation_id}/history", response_model=List[schemas.Payment]) # Keep deprecated endpoint for safety temporarily?
+def read_obligation_history_legacy(obligation_id: str, db: Session = Depends(get_db)):
+    return crud.get_payments(db, obligation_id)
+
+@app.delete("/obligations/history/{payment_id}") # Backward compat URL for frontend
+def delete_payment(payment_id: int, db: Session = Depends(get_db)):
+    killed = crud.delete_payment(db, payment_id)
     if not killed:
-        raise HTTPException(status_code=404, detail="History entry not found")
-    return {"message": "History entry deleted"}
+        raise HTTPException(status_code=404, detail="Payment entry not found")
+    return {"message": "Payment deleted"}
 
-@app.put("/obligations/history/{history_id}", response_model=schemas.ObligationHistory)
-def update_obligation_history(history_id: int, history_update: schemas.ObligationHistoryUpdate, db: Session = Depends(get_db)):
-    updated = crud.update_obligation_history_entry(db, history_id, history_update)
+@app.put("/obligations/history/{payment_id}", response_model=schemas.Payment) # Backward compat URL
+def update_payment(payment_id: int, payment_update: schemas.PaymentUpdate, db: Session = Depends(get_db)):
+    updated = crud.update_payment(db, payment_id, payment_update)
     if not updated:
-        raise HTTPException(status_code=404, detail="History entry not found")
+        raise HTTPException(status_code=404, detail="Payment entry not found")
     return updated
 
 # --- Transaction Endpoints ---

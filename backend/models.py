@@ -52,7 +52,7 @@ class MonthlyObligation(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, nullable=False)
-    amount = Column(Float, nullable=False)
+    amount = Column(Float, nullable=True) # User requested optional amount
     due_day = Column(Integer, nullable=False) # e.g. 1 for 1st of month
     category = Column(String, nullable=True)
 
@@ -61,8 +61,8 @@ class PaymentStatus(enum.Enum):
     PENDING = "PENDING"
     # Status Enum Definition
 
-class ObligationHistory(Base):
-    __tablename__ = "obligation_history"
+class Payment(Base):
+    __tablename__ = "payments"
 
     id = Column(Integer, primary_key=True, index=True)
     obligation_id = Column(String, ForeignKey("obligations.id"), nullable=False)

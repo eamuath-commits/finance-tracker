@@ -123,8 +123,8 @@ def update_obligation(db: Session, obligation_id: str, obligation_update: schema
     return db_obj
 
 def delete_obligation(db: Session, obligation_id: str):
-    # Delete associated history first to prevent Foreign Key errors
-    db.query(models.ObligationHistory).filter(models.ObligationHistory.obligation_id == obligation_id).delete()
+    # Delete associated payments first to prevent Foreign Key errors
+    db.query(models.Payment).filter(models.Payment.obligation_id == obligation_id).delete()
     
     db_obj = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
     if db_obj:
@@ -150,12 +150,12 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
     db.refresh(db_tx)
     return db_tx
 
-def create_obligation_payment(db: Session, obligation_id: str, payment: schemas.ObligationHistoryCreate):
+def create_payment(db: Session, obligation_id: str, payment: schemas.PaymentCreate):
     # Check for duplicate billing_month
     if payment.billing_month:
-        existing = db.query(models.ObligationHistory).filter(
-            models.ObligationHistory.obligation_id == obligation_id,
-            models.ObligationHistory.billing_month == payment.billing_month
+        existing = db.query(models.Payment).filter(
+            models.Payment.obligation_id == obligation_id,
+            models.Payment.billing_month == payment.billing_month
         ).first()
         if existing:
             # If the existing payment is PENDING, we should treat this "New Payment" as an update/confirmation
@@ -173,9 +173,12 @@ def create_obligation_payment(db: Session, obligation_id: str, payment: schemas.
                 existing.note = payment.note
                 existing.status = status_enum
                 
-                # Auto-update expected amount if PAID
+                # Auto-update expected amount if PAID (and if obligation has an amount set)
                 if status_enum == models.PaymentStatus.PAID:
                     obligation = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
+                    # Only update obligation preference if it HAS a preference? Or always update?
+                    # If obligation amount is None, and we pay X, maybe we set it to X?
+                    # User said "obligation not require amount".
                     if obligation:
                         obligation.amount = payment.amount
                         db.add(obligation)
@@ -194,7 +197,7 @@ def create_obligation_payment(db: Session, obligation_id: str, payment: schemas.
         except ValueError:
             pass # Default to PAID
 
-    db_payment = models.ObligationHistory(
+    db_payment = models.Payment(
         obligation_id=obligation_id,
         amount=payment.amount,
         payment_date=payment.payment_date,
@@ -205,10 +208,11 @@ def create_obligation_payment(db: Session, obligation_id: str, payment: schemas.
     db.add(db_payment)
     
     # Auto-update the expected amount for next month based on this payment, 
-    # BUT only if it is actually PAID. If Pending, maybe don't update expectation?
+    # BUT only if it is actually PAID.
     if status_enum == models.PaymentStatus.PAID:
         obligation = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
         if obligation:
+            # If obligation has no amount, or we want to update it to latest payment
             obligation.amount = payment.amount
             db.add(obligation)
 
@@ -216,35 +220,35 @@ def create_obligation_payment(db: Session, obligation_id: str, payment: schemas.
     db.refresh(db_payment)
     return db_payment
 
-def delete_obligation_history_entry(db: Session, history_id: int):
-    db_history = db.query(models.ObligationHistory).filter(models.ObligationHistory.id == history_id).first()
-    if db_history:
-        db.delete(db_history)
+def delete_payment(db: Session, payment_id: int):
+    db_payment = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
+    if db_payment:
+        db.delete(db_payment)
         db.commit()
-    return db_history
+    return db_payment
 
-def update_obligation_history_entry(db: Session, history_id: int, update_data: schemas.ObligationHistoryUpdate):
-    db_history = db.query(models.ObligationHistory).filter(models.ObligationHistory.id == history_id).first()
-    if not db_history:
+def update_payment(db: Session, payment_id: int, update_data: schemas.PaymentUpdate):
+    db_payment = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
+    if not db_payment:
         return None
     
     if update_data.payment_date:
-        db_history.payment_date = update_data.payment_date
+        db_payment.payment_date = update_data.payment_date
     if update_data.billing_month:
-        db_history.billing_month = update_data.billing_month
+        db_payment.billing_month = update_data.billing_month
     if update_data.amount is not None:
-        db_history.amount = update_data.amount
+        db_payment.amount = update_data.amount
     if update_data.note is not None:
-        db_history.note = update_data.note
+        db_payment.note = update_data.note
     if update_data.status:
         try:
-            db_history.status = models.PaymentStatus(update_data.status)
+            db_payment.status = models.PaymentStatus(update_data.status)
         except ValueError:
             pass
         
     db.commit()
-    db.refresh(db_history)
-    return db_history
+    db.refresh(db_payment)
+    return db_payment
 
-def get_obligation_history(db: Session, obligation_id: str):
-    return db.query(models.ObligationHistory).filter(models.ObligationHistory.obligation_id == obligation_id).order_by(models.ObligationHistory.payment_date.desc()).all()
+def get_payments(db: Session, obligation_id: str):
+    return db.query(models.Payment).filter(models.Payment.obligation_id == obligation_id).order_by(models.Payment.payment_date.desc()).all()
