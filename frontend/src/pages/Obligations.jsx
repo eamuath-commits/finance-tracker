@@ -415,6 +415,7 @@ const Obligations = () => {
                         getMonthStatus={getMonthStatus}
                         openObligationModal={openObligationModal}
                         openPaymentModal={openPaymentModal}
+                        handleQuickPay={handleQuickPay}
                         openHistory={openHistory}
                         handleDeleteHistory={handleDeleteHistory}
                         monthOffset={monthOffset}
