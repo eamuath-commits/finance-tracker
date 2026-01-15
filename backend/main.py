@@ -219,8 +219,9 @@ def receive_sms(payload: schemas.SMSPayload, db: Session = Depends(get_db)):
     Receives an SMS body, parses it, finds the matching account, 
     and logs the transaction.
     """
+    print(f"Received SMS Webhook Payload: {payload.dict()}") # Debug log
     sms_text = payload.body
-    print(f"Received SMS: {sms_text}") # Debug log
+    print(f"Extract SMS Body: {sms_text}")
 
     parsed_data = parser.parse(sms_text)
     
