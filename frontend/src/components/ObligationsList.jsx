@@ -40,7 +40,8 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
                 finalAmount = initialAmount;
             }
 
-            handleQuickPay(obl.id, finalAmount, currMonth.billingDateStr);
+            // Pass "PENDING" to save as draft (not paid)
+            handleQuickPay(obl.id, finalAmount, currMonth.billingDateStr, "PENDING");
         }
     };
 
