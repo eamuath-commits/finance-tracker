@@ -2,6 +2,111 @@ import React from 'react';
 import { CheckCircle, History, Pencil, Trash2, Banknote, Home, Zap, Utensils, Car, Shield, Smartphone, Landmark, CreditCard, Clock, Box } from 'lucide-react';
 import { formatCurrency, EditIcon } from '../components/UI';
 
+const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObligationModal, openPaymentModal, handleDeleteHistory, CATEGORY_ICONS }) => {
+    const prevMonth = getMonthStatus(obl, monthOffset - 1);
+    const currMonth = getMonthStatus(obl, monthOffset);
+
+    // Initial value for input: Prioritize Prev Month Amount -> Obligation Default -> Empty
+    const initialAmount = prevMonth.amount !== null ? prevMonth.amount : (obl.amount || "");
+    const [payAmount, setPayAmount] = React.useState(initialAmount);
+
+    // Update local state if the underlying data changes significantly (e.g. month navigation)
+    React.useEffect(() => {
+        const newVal = prevMonth.amount !== null ? prevMonth.amount : (obl.amount || "");
+        setPayAmount(newVal);
+    }, [prevMonth.amount, obl.amount, monthOffset]);
+
+    const handlePay = (e) => {
+        e.stopPropagation();
+        // If input is empty, fallback to the initial default we calculated
+        const finalAmount = payAmount !== "" ? parseFloat(payAmount) : (initialAmount || 0);
+        openPaymentModal(obl, currMonth.billingDateStr, finalAmount);
+    };
+
+    return (
+        <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition group relative">
+            <div className="bg-slate-900/40 px-3 py-2 border-b border-slate-700 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                    {/* Icon next to name */}
+                    <div className="text-slate-400 opacity-70 scale-75">
+                        {CATEGORY_ICONS[obl.category] || <Box size={20} />}
+                    </div>
+                    <h3 className="text-sm font-bold text-white truncate max-w-[150px]">{obl.name}</h3>
+                    <span className="text-[10px] text-gray-500">Day: {obl.due_day}</span>
+                </div>
+                <div className="flex gap-2 opacity-50 group-hover:opacity-100 transition">
+                    <button onClick={() => openHistory(obl.id)}><History size={14} className="text-gray-400 hover:text-white" /></button>
+                    <button onClick={() => openObligationModal(obl)}><EditIcon size={14} className="text-gray-400 hover:text-white" /></button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-2 divide-x divide-slate-700 text-xs">
+                {/* Previous Month Column */}
+                <div className="p-2 flex flex-col items-center justify-center relative hover:bg-slate-700/30 transition group/cell">
+                    <span className="text-[9px] uppercase font-bold text-gray-600 mb-0.5">{prevMonth.shortLabel}</span>
+                    {prevMonth.isPaid ? (
+                        <div className="text-center group-hover/cell:opacity-20 transition">
+                            <CheckCircle size={14} className="text-green-500/50 mx-auto" />
+                            <span className="font-mono text-gray-400">{formatCurrency(prevMonth.amount)}</span>
+                        </div>
+                    ) : (
+                        <div className="text-center">
+                            <span className="font-mono text-gray-500 block mb-1">{prevMonth.amount !== null ? formatCurrency(prevMonth.amount) : "-"}</span>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, prevMonth.billingDateStr, prevMonth.amount || obl.amount); }}
+                                className="text-[9px] bg-blue-900/40 text-blue-300 px-1.5 py-0.5 rounded hover:bg-blue-800 transition"
+                            >
+                                Pay
+                            </button>
+                        </div>
+                    )}
+                    {prevMonth.isPaid && (
+                        <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 group-hover/cell:opacity-100 bg-slate-800/90 transition z-10">
+                            <button onClick={() => openPaymentModal(obl, prevMonth.billingDateStr, null, { id: prevMonth.paymentId, amount: prevMonth.amount, billing_month: prevMonth.billingDateStr })} className="p-1 hover:text-blue-400"><Pencil size={12} /></button>
+                            <button onClick={() => handleDeleteHistory(prevMonth.paymentId)} className="p-1 hover:text-red-400"><Trash2 size={12} /></button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Current Month Column */}
+                <div className="p-2 flex flex-col items-center justify-center bg-slate-700/10 relative group/curr">
+                    <span className="text-[9px] uppercase font-bold text-blue-400 mb-0.5">{currMonth.shortLabel}</span>
+                    {currMonth.isPaid ? (
+                        <div className="text-center relative">
+                            <CheckCircle size={16} className="text-green-400 mx-auto mb-0.5" />
+                            <span className="font-bold font-mono text-white block">{formatCurrency(currMonth.amount)}</span>
+                            <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 group-hover/curr:opacity-100 bg-slate-800/90 transition z-10">
+                                <button onClick={() => openPaymentModal(obl, currMonth.billingDateStr, null, { id: currMonth.paymentId, amount: currMonth.amount, billing_month: currMonth.billingDateStr })} className="p-1 hover:text-blue-400"><Pencil size={12} /></button>
+                                <button onClick={() => handleDeleteHistory(currMonth.paymentId)} className="p-1 hover:text-red-400"><Trash2 size={12} /></button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-center w-full relative">
+                            <div className="flex items-center justify-center gap-1 mb-1 relative">
+                                <input
+                                    type="number"
+                                    className="bg-slate-900 border border-slate-600 rounded text-center text-white text-xs py-0.5 w-20 font-mono focus:border-blue-500 outline-none transition"
+                                    placeholder={initialAmount}
+                                    value={payAmount}
+                                    onChange={(e) => setPayAmount(e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                                <button onClick={() => openObligationModal(obl)} className="text-gray-600 hover:text-white"><Pencil size={10} /></button>
+                            </div>
+                            <button
+                                onClick={handlePay}
+                                className="w-full bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold py-0.5 px-2 rounded flex items-center justify-center gap-1 mt-1"
+                            >
+                                Pay
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const ObligationsList = ({
     obligations,
     getMonthStatus,
@@ -48,10 +153,7 @@ const ObligationsList = ({
                 // Budget is based on Prev Month's actuals
                 currentBudget += prev.amount;
             } else if (obl.amount) {
-                // Fallback for budget if no prev history? 
-                // Let's stick to consistent logic: Budget = Prev Month Paid usually. 
-                // But generally users want to see "What I need to pay".
-                // If we strictly follow "Budget = Prev Month", zero history means zero budget.
+                // Fallback for budget
             }
 
             if (curr.isPaid && curr.amount) currentPaid += curr.amount;
@@ -167,102 +269,19 @@ const ObligationsList = ({
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-4">
-                            {items.map(obl => {
-                                const monthMinus3 = getMonthStatus(obl, monthOffset - 3);
-                                const monthMinus2 = getMonthStatus(obl, monthOffset - 2);
-                                const prevMonth = getMonthStatus(obl, monthOffset - 1);
-                                const currMonth = getMonthStatus(obl, monthOffset);
-
-                                return (
-                                    <div key={obl.id} className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition group relative">
-                                        <div className="bg-slate-900/40 px-3 py-2 border-b border-slate-700 flex justify-between items-center">
-                                            <div className="flex items-center gap-2">
-                                                {/* Icon next to name */}
-                                                <div className="text-slate-400 opacity-70 scale-75">
-                                                    {CATEGORY_ICONS[obl.category] || <Box size={20} />}
-                                                </div>
-                                                <h3 className="text-sm font-bold text-white truncate max-w-[150px]">{obl.name}</h3>
-                                                <span className="text-[10px] text-gray-500">Day: {obl.due_day}</span>
-                                            </div>
-                                            <div className="flex gap-2 opacity-50 group-hover:opacity-100 transition">
-                                                <button onClick={() => openHistory(obl.id)}><History size={14} className="text-gray-400 hover:text-white" /></button>
-                                                <button onClick={() => openObligationModal(obl)}><EditIcon size={14} className="text-gray-400 hover:text-white" /></button>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 divide-x divide-slate-700 text-xs">
-                                            {[prevMonth].map((m, idx) => (
-                                                <div key={idx} className="p-2 flex flex-col items-center justify-center relative hover:bg-slate-700/30 transition group/cell">
-                                                    <span className="text-[9px] uppercase font-bold text-gray-600 mb-0.5">{m.shortLabel}</span>
-                                                    {m.isPaid ? (
-                                                        <div className="text-center group-hover/cell:opacity-20 transition">
-                                                            <CheckCircle size={14} className="text-green-500/50 mx-auto" />
-                                                            <span className="font-mono text-gray-400">{formatCurrency(m.amount)}</span>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="text-center">
-                                                            <span className="font-mono text-gray-500 block mb-1">{m.amount !== null ? formatCurrency(m.amount) : "-"}</span>
-                                                            {/* No need for inline pay on Prev month usually, but keeping button just in case */}
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, m.billingDateStr, m.amount || obl.amount); }}
-                                                                className="text-[9px] bg-blue-900/40 text-blue-300 px-1.5 py-0.5 rounded hover:bg-blue-800 transition"
-                                                            >
-                                                                Pay
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                    {m.isPaid && (
-                                                        <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 group-hover/cell:opacity-100 bg-slate-800/90 transition z-10">
-                                                            <button onClick={() => openPaymentModal(obl, m.billingDateStr, null, { id: m.paymentId, amount: m.amount, billing_month: m.billingDateStr })} className="p-1 hover:text-blue-400"><Pencil size={12} /></button>
-                                                            <button onClick={() => handleDeleteHistory(m.paymentId)} className="p-1 hover:text-red-400"><Trash2 size={12} /></button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
-
-                                            <div className="p-2 flex flex-col items-center justify-center bg-slate-700/10 relative group/curr">
-                                                <span className="text-[9px] uppercase font-bold text-blue-400 mb-0.5">{currMonth.shortLabel}</span>
-                                                {currMonth.isPaid ? (
-                                                    <div className="text-center relative">
-                                                        <CheckCircle size={16} className="text-green-400 mx-auto mb-0.5" />
-                                                        <span className="font-bold font-mono text-white block">{formatCurrency(currMonth.amount)}</span>
-                                                        <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 group-hover/curr:opacity-100 bg-slate-800/90 transition z-10">
-                                                            <button onClick={() => openPaymentModal(obl, currMonth.billingDateStr, null, { id: currMonth.paymentId, amount: currMonth.amount, billing_month: currMonth.billingDateStr })} className="p-1 hover:text-blue-400"><Pencil size={12} /></button>
-                                                            <button onClick={() => handleDeleteHistory(currMonth.paymentId)} className="p-1 hover:text-red-400"><Trash2 size={12} /></button>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <div className="text-center w-full relative">
-                                                        <div className="flex items-center justify-center gap-1 mb-1 relative">
-                                                            {/* Smart Default: Use Prev Month amount if available, else Obligation default */}
-                                                            <input
-                                                                type="number"
-                                                                className="bg-slate-900 border border-slate-600 rounded text-center text-white text-xs py-0.5 w-20 font-mono focus:border-blue-500 outline-none transition"
-                                                                placeholder={prevMonth.amount ? prevMonth.amount : (obl.amount || "0.00")}
-                                                                defaultValue={prevMonth.amount ? prevMonth.amount : (obl.amount || "")}
-                                                                id={`pay-input-${obl.id}`}
-                                                                onClick={(e) => e.stopPropagation()}
-                                                            />
-                                                            <button onClick={() => openObligationModal(obl)} className="text-gray-600 hover:text-white"><Pencil size={10} /></button>
-                                                        </div>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                const inputVal = document.getElementById(`pay-input-${obl.id}`).value;
-                                                                const finalAmount = inputVal ? parseFloat(inputVal) : (prevMonth.amount || obl.amount);
-                                                                openPaymentModal(obl, currMonth.billingDateStr, finalAmount);
-                                                            }}
-                                                            className="w-full bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold py-0.5 px-2 rounded flex items-center justify-center gap-1 mt-1"
-                                                        >
-                                                            Pay
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                            {items.map(obl => (
+                                <ObligationCard
+                                    key={obl.id}
+                                    obl={obl}
+                                    getMonthStatus={getMonthStatus}
+                                    monthOffset={monthOffset}
+                                    openHistory={openHistory}
+                                    openObligationModal={openObligationModal}
+                                    openPaymentModal={openPaymentModal}
+                                    handleDeleteHistory={handleDeleteHistory}
+                                    CATEGORY_ICONS={CATEGORY_ICONS}
+                                />
+                            ))}
                         </div>
                     </div>
                 );
