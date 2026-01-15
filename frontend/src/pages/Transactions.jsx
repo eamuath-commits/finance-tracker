@@ -127,7 +127,7 @@ const Transactions = () => {
     });
 
     const sortedTransactions = sortData(filteredTransactions);
-    const Categories = ['Food', 'Transport', 'Utilities', 'Entertainment', 'Shopping', 'Housing', 'Health', 'Income', 'Transfer', 'Subscription'];
+    const Categories = ['Food', 'Transport', 'Utilities', 'Entertainment', 'Shopping', 'Housing', 'Health', 'Income', 'Transfer', 'Subscription', 'Obligation', 'Credit Card Payment'];
 
     if (loading) return <div className="p-10 text-center text-white">Loading Transactions...</div>;
 
