@@ -1,7 +1,7 @@
 from sqlalchemy import extract
 from sqlalchemy.orm import Session
 from datetime import datetime
-from models import Account, MonthlyObligation, AccountType, ObligationHistory
+from models import Account, MonthlyObligation, AccountType, Payment
 from analysis_schema import AllocationResponse, Recommendation
 
 def calculate_allocation(db: Session) -> AllocationResponse:
@@ -25,10 +25,10 @@ def calculate_allocation(db: Session) -> AllocationResponse:
     
     for obl in obligations:
         # Check if paid this month
-        payment = db.query(ObligationHistory).filter(
-            ObligationHistory.obligation_id == obl.id,
-            extract('month', ObligationHistory.payment_date) == current_month,
-            extract('year', ObligationHistory.payment_date) == current_year
+        payment = db.query(Payment).filter(
+            Payment.obligation_id == obl.id,
+            extract('month', Payment.payment_date) == current_month,
+            extract('year', Payment.payment_date) == current_year
         ).first()
         
         if not payment:
