@@ -177,6 +177,10 @@ const ObligationsList = ({
                                     <div key={obl.id} className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition group relative">
                                         <div className="bg-slate-900/40 px-3 py-2 border-b border-slate-700 flex justify-between items-center">
                                             <div className="flex items-center gap-2">
+                                                {/* Icon next to name */}
+                                                <div className="text-slate-400 opacity-70 scale-75">
+                                                    {CATEGORY_ICONS[obl.category] || <Box size={20} />}
+                                                </div>
                                                 <h3 className="text-sm font-bold text-white truncate max-w-[150px]">{obl.name}</h3>
                                                 <span className="text-[10px] text-gray-500">Day: {obl.due_day}</span>
                                             </div>
@@ -198,9 +202,10 @@ const ObligationsList = ({
                                                     ) : (
                                                         <div className="text-center">
                                                             <span className="font-mono text-gray-500 block mb-1">{m.amount !== null ? formatCurrency(m.amount) : "-"}</span>
+                                                            {/* No need for inline pay on Prev month usually, but keeping button just in case */}
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, m.billingDateStr, m.amount || obl.amount); }}
-                                                                className="text-[9px] bg-blue-900/40 text-blue-300 px-1.5 rounded hover:bg-blue-800 transition"
+                                                                className="text-[9px] bg-blue-900/40 text-blue-300 px-1.5 py-0.5 rounded hover:bg-blue-800 transition"
                                                             >
                                                                 Pay
                                                             </button>
@@ -229,12 +234,25 @@ const ObligationsList = ({
                                                 ) : (
                                                     <div className="text-center w-full relative">
                                                         <div className="flex items-center justify-center gap-1 mb-1 relative">
-                                                            <span className="font-bold font-mono text-white text-sm">{formatCurrency(currMonth.amount)}</span>
+                                                            {/* Smart Default: Use Prev Month amount if available, else Obligation default */}
+                                                            <input
+                                                                type="number"
+                                                                className="bg-slate-900 border border-slate-600 rounded text-center text-white text-xs py-0.5 w-20 font-mono focus:border-blue-500 outline-none transition"
+                                                                placeholder={prevMonth.amount ? prevMonth.amount : (obl.amount || "0.00")}
+                                                                defaultValue={prevMonth.amount ? prevMonth.amount : (obl.amount || "")}
+                                                                id={`pay-input-${obl.id}`}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            />
                                                             <button onClick={() => openObligationModal(obl)} className="text-gray-600 hover:text-white"><Pencil size={10} /></button>
                                                         </div>
                                                         <button
-                                                            onClick={() => openPaymentModal(obl, currMonth.billingDateStr, currMonth.amount)}
-                                                            className="w-full bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold py-1 px-2 rounded flex items-center justify-center gap-1"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const inputVal = document.getElementById(`pay-input-${obl.id}`).value;
+                                                                const finalAmount = inputVal ? parseFloat(inputVal) : (prevMonth.amount || obl.amount);
+                                                                openPaymentModal(obl, currMonth.billingDateStr, finalAmount);
+                                                            }}
+                                                            className="w-full bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold py-0.5 px-2 rounded flex items-center justify-center gap-1 mt-1"
                                                         >
                                                             Pay
                                                         </button>
