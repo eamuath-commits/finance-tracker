@@ -262,12 +262,14 @@ const Transactions = () => {
                             value={form.amount}
                             onChange={e => setForm({ ...form, amount: e.target.value })}
                         />
-                        <input
-                            type="text" placeholder="Category (Optional)"
-                            className={inputClass}
+                        <select
+                            className={selectClass}
                             value={form.category}
                             onChange={e => setForm({ ...form, category: e.target.value })}
-                        />
+                        >
+                            <option value="">Select Category (Optional)</option>
+                            {Categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        </select>
                         <p className="text-xs text-gray-400">Note: This will deduct the amount from the selected account balance.</p>
                         <button type="submit" className="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700 font-medium">Add Transaction</button>
                     </form>
@@ -295,8 +297,8 @@ const Transactions = () => {
                                         key={cat} type="button"
                                         onClick={() => setForm({ ...form, category: cat })}
                                         className={`px-2 py-1 text-xs rounded border transition ${form.category === cat
-                                                ? 'bg-blue-600 border-blue-500 text-white'
-                                                : 'bg-slate-700 border-slate-600 text-gray-300 hover:bg-slate-600'
+                                            ? 'bg-blue-600 border-blue-500 text-white'
+                                            : 'bg-slate-700 border-slate-600 text-gray-300 hover:bg-slate-600'
                                             }`}
                                     >
                                         {cat}
