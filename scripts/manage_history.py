@@ -121,17 +121,38 @@ def delete_all_for_month(target_month_str):
             continue
 
         for h in history:
-            b_month = h.get('billing_month', '')
+            # Match frontend logic: use billing_month, fallback to payment_date
+            raw_billing = h.get('billing_month')
+            raw_payment = h.get('payment_date', '')
+            
+            b_month = raw_billing
+            if not b_month and raw_payment:
+                b_month = raw_payment.split('T')[0]
+            
+            # Ensure we have a string to compare
+            if not b_month:
+                continue
+
+            # Check for match (YYYY-MM)
             if b_month.startswith(target_month_str):
                 # Delete this specific history item
                 hid = h['id']
-                print(f"   Running delete for {obl['name']} - {b_month} (ID: {hid})...")
+                print(f"   Running delete for {obl['name']} (ID: {hid}) - Month: {b_month}...")
                 res = make_request(f"{API_URL}/obligations/history/{hid}", method='DELETE')
-                if res and res.get('status') == 200:
+                
+                # Check 200 or 204 (some APIs return 200 for delete)
+                if res and (res.get('status') == 200 or res.get('status') == 204 or res.get('status') is None): 
+                    # Note: make_request returns dict for json, or {'status': code} for DELETE if I updated it right.
+                    # My make_request DELETE logic returns response.status.
+                    # If response.status is 200-299, it's success.
                     count_deleted += 1
                     print(f"     ✅ Deleted.")
                 else:
-                    print(f"     ❌ Failed to delete.")
+                    print(f"     ❌ Failed to delete. Response: {res}")
+            else:
+                 # Debug: Show what we skipped to help user understand mismatch
+                 pass
+                 # print(f"     [Skip] {obl['name']} - Found: {b_month}, Target: {target_month_str}")
 
     print(f"\n✅ Finished Bulk Delete.")
     print(f"   Deleted {count_deleted} records.")
