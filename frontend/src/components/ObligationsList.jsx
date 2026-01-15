@@ -21,27 +21,32 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
         e.preventDefault();
         e.stopPropagation();
 
-        // Logic: Empty or 0 -> Revert to Initial Default (Prev Month or Obligation Default)
-        let finalAmount = payAmount !== "" ? parseFloat(payAmount) : (initialAmount || 0);
-        if (finalAmount === 0 && initialAmount > 0) {
-            finalAmount = initialAmount;
+        // Smart Default Logic:
+        // 1. If user typed "0" or cleared it -> Use PREVIOUS month's amount (if available)
+        // 2. Else -> Use what they typed.
+        let val = parseFloat(payAmount);
+        if (isNaN(val) || val === 0) {
+            if (prevMonth.amount !== null && prevMonth.amount > 0) val = prevMonth.amount;
+            else if (obl.amount) val = obl.amount;
         }
 
-        openPaymentModal(obl, currMonth.billingDateStr, finalAmount);
+        openPaymentModal(obl, currMonth.billingDateStr, val);
     };
 
     const handleKeyDown = (e) => {
         if (e.key === 'Enter') {
+            console.log("👉 Enter Key Pressed!", { payAmount });
             e.preventDefault();
             e.stopPropagation();
 
-            let finalAmount = payAmount !== "" ? parseFloat(payAmount) : (initialAmount || 0);
-            if (finalAmount === 0 && initialAmount > 0) {
-                finalAmount = initialAmount;
+            let val = parseFloat(payAmount);
+            if (isNaN(val) || val === 0) {
+                if (prevMonth.amount !== null && prevMonth.amount > 0) val = prevMonth.amount;
+                else if (obl.amount) val = obl.amount;
             }
 
             // Pass "PENDING" to save as draft (not paid)
-            handleQuickPay(obl.id, finalAmount, currMonth.billingDateStr, "PENDING");
+            handleQuickPay(obl.id, val, currMonth.billingDateStr, "PENDING");
         }
     };
 
