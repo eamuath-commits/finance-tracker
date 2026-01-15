@@ -140,11 +140,23 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
     if (selectedStatus === 'Paid') {
         totalLabel = "Total Paid";
         totalDisplay = visiblePaid;
-        totalSubtext = `${sorted.length} records`;
+        totalSubtext = <span className="text-white font-semibold">{sorted.length} Records</span>;
     } else if (selectedStatus === 'Unpaid') {
         totalLabel = "Total Pending";
         totalDisplay = visibleUnpaid;
-        totalSubtext = `${sorted.length} records`;
+        totalSubtext = <span className="text-white font-semibold">{sorted.length} Records</span>;
+    } else {
+        // Fallback for All Status to show count + breakdown
+        totalSubtext = (
+            <div className="flex flex-col gap-0.5 mt-1">
+                <span className="text-white font-semibold">{sorted.length} Records</span>
+                <span className="flex items-center gap-1 text-[10px] opacity-80">
+                    <span>{formatCurrency(visiblePaid)} Paid</span>
+                    <span>·</span>
+                    <span>{formatCurrency(visibleUnpaid)} Pending</span>
+                </span>
+            </div>
+        );
     }
 
     return (
