@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Card, SectionHeader, Modal, EditIcon, formatCurrency, inputClass, selectClass } from '../components/UI';
-import { CheckCircle, XCircle, History, Calendar, Trash2, ArrowRight, Pencil } from 'lucide-react';
+import { CheckCircle, XCircle, History, Calendar, Trash2, ArrowRight, Pencil, Banknote, Home, Zap, Utensils, Car, Shield, Smartphone, Landmark, CreditCard, Clock, Box } from 'lucide-react';
 
 const Obligations = () => {
     const [obligations, setObligations] = useState([]);
@@ -318,132 +318,173 @@ const Obligations = () => {
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-6">
-                {obligations.map(obl => {
-                    const monthMinus3 = getMonthStatus(obl, -3);
-                    const monthMinus2 = getMonthStatus(obl, -2);
-                    const prevMonth = getMonthStatus(obl, -1);
-                    const currMonth = getMonthStatus(obl, 0);
+            {/* CATEGORY ICON MAPPING */}
+            {(() => {
+                const CATEGORY_ICONS = {
+                    "Salary": <Banknote size={20} className="text-emerald-400" />,
+                    "House": <Home size={20} className="text-blue-400" />,
+                    "Utilities": <Zap size={20} className="text-yellow-400" />,
+                    "Food & Groceries": <Utensils size={20} className="text-orange-400" />,
+                    "Transport": <Car size={20} className="text-red-400" />,
+                    "Insurance": <Shield size={20} className="text-purple-400" />,
+                    "Tech & Subscriptions": <Smartphone size={20} className="text-cyan-400" />,
+                    "Loan": <Landmark size={20} className="text-rose-400" />,
+                    "Credit Card": <CreditCard size={20} className="text-pink-400" />,
+                    "Pay Later": <Clock size={20} className="text-amber-400" />,
+                    "Other": <Box size={20} className="text-gray-400" />
+                };
+
+                // Group Obligations
+                const grouped = obligations.reduce((acc, obl) => {
+                    const cat = obl.category || "Other";
+                    if (!acc[cat]) acc[cat] = [];
+                    acc[cat].push(obl);
+                    return acc;
+                }, {});
+
+                // Calculate Category Stats
+                const getCategoryStats = (items) => {
+                    let prevPaid = 0;
+                    let currentBudget = 0;
+                    let currentPaid = 0;
+
+                    items.forEach(obl => {
+                        const prev = getMonthStatus(obl, -1);
+                        const curr = getMonthStatus(obl, 0);
+
+                        // Prev month paid tally (assuming we only care about what was actually paid?)
+                        // User said "sum of previouse month". Assuming total bill amount of previous month.
+                        if (prev.amount) prevPaid += prev.amount;
+
+                        // Current Budget = Expected bills
+                        if (curr.amount) currentBudget += curr.amount;
+
+                        // Paid so far
+                        if (curr.isPaid && curr.amount) currentPaid += curr.amount;
+                    });
+
+                    return { prevPaid, currentBudget, currentPaid };
+                };
+
+                return Object.entries(grouped).map(([category, items]) => {
+                    const stats = getCategoryStats(items);
 
                     return (
-                        <div key={obl.id} className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-lg group relative">
-                            {/* Card Header */}
-                            <div className="bg-slate-900/50 p-4 border-b border-slate-700 flex justify-between items-start">
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="text-xl font-bold text-white">{obl.name}</h3>
-                                        <span className="text-xs px-2 py-0.5 rounded bg-slate-700 text-gray-400">{obl.category}</span>
-                                    </div>
-                                    <p className="text-sm text-gray-400 mt-1">Due Day: <span className="text-gray-300">{obl.due_day}th</span></p>
+                        <div key={category} className="mb-8">
+                            {/* Section Header */}
+                            <div className="flex items-center justify-between mb-4 border-b border-slate-700 pb-2">
+                                <div className="flex items-center gap-2">
+                                    {CATEGORY_ICONS[category] || <Box size={20} className="text-gray-400" />}
+                                    <h2 className="text-xl font-bold text-slate-200">{category}</h2>
+                                    <span className="bg-slate-800 text-slate-400 text-xs px-2 py-0.5 rounded-full border border-slate-700">{items.length}</span>
                                 </div>
-                                <div className="flex gap-3">
-                                    <button onClick={() => openHistory(obl.id)} className="text-xs font-medium text-gray-400 hover:text-white flex items-center gap-1">
-                                        <History size={14} /> History
-                                    </button>
-                                    <EditIcon onClick={() => openObligationModal(obl)} className="text-gray-500 hover:text-white cursor-pointer" size={18} />
+
+                                {/* Budget Badges */}
+                                <div className="flex gap-4 text-xs">
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-gray-500 uppercase font-semibold">Prev Total</span>
+                                        <span className="text-gray-300 font-mono">{formatCurrency(stats.prevPaid)}</span>
+                                    </div>
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-blue-400 uppercase font-semibold">Budget</span>
+                                        <span className="text-blue-200 font-mono">{formatCurrency(stats.currentBudget)}</span>
+                                    </div>
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-green-400 uppercase font-semibold">Paid</span>
+                                        <span className="text-green-200 font-mono">{formatCurrency(stats.currentPaid)}</span>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* 4-Month View Grid */}
-                            <div className="grid grid-cols-4 divide-x divide-slate-700">
-                                {/* Month -3 */}
-                                <div className="p-4 flex flex-col items-center text-center opacity-70 hover:opacity-100 transition group/m3 relative z-0 hover:z-10 bg-slate-900/20">
-                                    <span className="text-xs uppercase font-bold text-gray-600 mb-2">{monthMinus3.shortLabel}</span>
-                                    {monthMinus3.isPaid ? (
-                                        <div className="text-green-400 flex flex-col items-center relative">
-                                            <CheckCircle size={20} className="mb-1" />
-                                            <span className="font-bold text-lg">{formatCurrency(monthMinus3.amount)}</span>
-                                            <div className="flex gap-1 absolute -top-3 -right-8 opacity-0 group-hover/m3:opacity-100 transition z-50 bg-slate-900/90 p-1 rounded-full shadow-xl border border-slate-700">
-                                                <button onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, monthMinus3.billingDateStr, null, { id: monthMinus3.paymentId, amount: monthMinus3.amount, billing_month: monthMinus3.billingDateStr }); }} className="text-blue-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><Pencil size={12} /></button>
-                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteHistory(monthMinus3.paymentId); }} className="text-red-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><Trash2 size={12} /></button>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-4">
+                                {items.map(obl => {
+                                    const monthMinus3 = getMonthStatus(obl, -3);
+                                    const monthMinus2 = getMonthStatus(obl, -2);
+                                    const prevMonth = getMonthStatus(obl, -1);
+                                    const currMonth = getMonthStatus(obl, 0);
+
+                                    return (
+                                        <div key={obl.id} className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition group relative">
+                                            {/* Compact Card Header */}
+                                            <div className="bg-slate-900/40 px-3 py-2 border-b border-slate-700 flex justify-between items-center">
+                                                <div className="flex items-center gap-2">
+                                                    <h3 className="text-sm font-bold text-white truncate max-w-[150px]">{obl.name}</h3>
+                                                    <span className="text-[10px] text-gray-500">Day: {obl.due_day}</span>
+                                                </div>
+                                                <div className="flex gap-2 opacity-50 group-hover:opacity-100 transition">
+                                                    <button onClick={() => openHistory(obl.id)}><History size={14} className="text-gray-400 hover:text-white" /></button>
+                                                    <button onClick={() => openObligationModal(obl)}><EditIcon size={14} className="text-gray-400 hover:text-white" /></button>
+                                                </div>
+                                            </div>
+
+                                            {/* Compact 4-Month Grid */}
+                                            <div className="grid grid-cols-4 divide-x divide-slate-700 text-xs">
+                                                {/* Helper Render Function */}
+                                                {[monthMinus3, monthMinus2, prevMonth].map((m, idx) => (
+                                                    <div key={idx} className="p-2 flex flex-col items-center justify-center relative hover:bg-slate-700/30 transition group/cell">
+                                                        <span className="text-[9px] uppercase font-bold text-gray-600 mb-0.5">{m.shortLabel}</span>
+                                                        {m.isPaid ? (
+                                                            <div className="text-center group-hover/cell:opacity-20 transition">
+                                                                <CheckCircle size={14} className="text-green-500/50 mx-auto" />
+                                                                <span className="font-mono text-gray-400">{formatCurrency(m.amount)}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="text-center">
+                                                                <span className="font-mono text-gray-500 block mb-1">{m.amount !== null ? formatCurrency(m.amount) : "-"}</span>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, m.billingDateStr, m.amount || obl.amount); }}
+                                                                    className="text-[9px] bg-blue-900/40 text-blue-300 px-1.5 rounded hover:bg-blue-800 transition"
+                                                                >
+                                                                    Pay
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                        {/* History Edit Overlay for Paid Items */}
+                                                        {m.isPaid && (
+                                                            <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 group-hover/cell:opacity-100 bg-slate-800/90 transition z-10">
+                                                                <button onClick={() => openPaymentModal(obl, m.billingDateStr, null, { id: m.paymentId, amount: m.amount, billing_month: m.billingDateStr })} className="p-1 hover:text-blue-400"><Pencil size={12} /></button>
+                                                                <button onClick={() => handleDeleteHistory(m.paymentId)} className="p-1 hover:text-red-400"><Trash2 size={12} /></button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+
+                                                {/* Current Month (Highlighted) */}
+                                                <div className="p-2 flex flex-col items-center justify-center bg-slate-700/10 relative group/curr">
+                                                    <span className="text-[9px] uppercase font-bold text-blue-400 mb-0.5">{currMonth.shortLabel}</span>
+                                                    {currMonth.isPaid ? (
+                                                        <div className="text-center relative">
+                                                            <CheckCircle size={16} className="text-green-400 mx-auto mb-0.5" />
+                                                            <span className="font-bold font-mono text-white block">{formatCurrency(currMonth.amount)}</span>
+                                                            <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 group-hover/curr:opacity-100 bg-slate-800/90 transition z-10">
+                                                                <button onClick={() => openPaymentModal(obl, currMonth.billingDateStr, null, { id: currMonth.paymentId, amount: currMonth.amount, billing_month: currMonth.billingDateStr })} className="p-1 hover:text-blue-400"><Pencil size={12} /></button>
+                                                                <button onClick={() => handleDeleteHistory(currMonth.paymentId)} className="p-1 hover:text-red-400"><Trash2 size={12} /></button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-center w-full relative">
+                                                            <div className="flex items-center justify-center gap-1 mb-1 relative">
+                                                                <span className="font-bold font-mono text-white text-sm">{formatCurrency(currMonth.amount)}</span>
+                                                                <button onClick={() => openObligationModal(obl)} className="text-gray-600 hover:text-white"><Pencil size={10} /></button>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => openPaymentModal(obl, currMonth.billingDateStr, currMonth.amount)}
+                                                                className="w-full bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold py-1 px-2 rounded flex items-center justify-center gap-1"
+                                                            >
+                                                                Pay
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
-                                    ) : (
-                                        <div className="text-gray-600 flex flex-col items-center w-full relative">
-                                            <XCircle size={20} className="mb-1" />
-                                            <span className="font-bold text-lg mb-1">{monthMinus3.amount !== null ? formatCurrency(monthMinus3.amount) : <span className="text-gray-700 text-2xl">-</span>}</span>
-                                            <span className="text-xs mb-1">Unpaid</span>
-                                            <button onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, monthMinus3.billingDateStr, monthMinus3.amount || obl.amount); }} className="text-[10px] bg-blue-900/50 hover:bg-blue-800 text-blue-200 px-2 py-0.5 rounded border border-blue-900/50 opacity-0 group-hover/m3:opacity-100 transition cursor-pointer z-50">Mark Paid</button>
-                                        </div>
-                                    )}
-                                </div>
-                                {/* Month -2 */}
-                                <div className="p-4 flex flex-col items-center text-center opacity-70 hover:opacity-100 transition group/m2 relative z-0 hover:z-10 bg-slate-900/20">
-                                    <span className="text-xs uppercase font-bold text-gray-600 mb-2">{monthMinus2.shortLabel}</span>
-                                    {monthMinus2.isPaid ? (
-                                        <div className="text-green-400 flex flex-col items-center relative">
-                                            <CheckCircle size={20} className="mb-1" />
-                                            <span className="font-bold text-lg">{formatCurrency(monthMinus2.amount)}</span>
-                                            <div className="flex gap-1 absolute -top-3 -right-8 opacity-0 group-hover/m2:opacity-100 transition z-50 bg-slate-900/90 p-1 rounded-full shadow-xl border border-slate-700">
-                                                <button onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, monthMinus2.billingDateStr, null, { id: monthMinus2.paymentId, amount: monthMinus2.amount, billing_month: monthMinus2.billingDateStr }); }} className="text-blue-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><Pencil size={12} /></button>
-                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteHistory(monthMinus2.paymentId); }} className="text-red-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><Trash2 size={12} /></button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="text-gray-600 flex flex-col items-center w-full relative">
-                                            <XCircle size={20} className="mb-1" />
-                                            <span className="font-bold text-lg mb-1">{monthMinus2.amount !== null ? formatCurrency(monthMinus2.amount) : <span className="text-gray-700 text-2xl">-</span>}</span>
-                                            <span className="text-xs mb-1">Unpaid</span>
-                                            <button onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, monthMinus2.billingDateStr, monthMinus2.amount || obl.amount); }} className="text-[10px] bg-blue-900/50 hover:bg-blue-800 text-blue-200 px-2 py-0.5 rounded border border-blue-900/50 opacity-0 group-hover/m2:opacity-100 transition cursor-pointer z-50">Mark Paid</button>
-                                        </div>
-                                    )}
-                                </div>
-                                {/* Prev Month */}
-                                <div className="p-4 flex flex-col items-center text-center opacity-70 hover:opacity-100 transition group/prev relative z-0 hover:z-10">
-                                    <span className="text-xs uppercase font-bold text-gray-500 mb-2">{prevMonth.shortLabel}</span>
-                                    {prevMonth.isPaid ? (
-                                        <div className="text-green-400 flex flex-col items-center relative">
-                                            <CheckCircle size={20} className="mb-1" />
-                                            <span className="font-bold text-lg">{formatCurrency(prevMonth.amount)}</span>
-                                            <div className="flex gap-1 absolute -top-3 -right-8 opacity-0 group-hover/prev:opacity-100 transition z-50 bg-slate-900/90 p-1 rounded-full shadow-xl border border-slate-700">
-                                                <button onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, prevMonth.billingDateStr, null, { id: prevMonth.paymentId, amount: prevMonth.amount, billing_month: prevMonth.billingDateStr }); }} className="text-blue-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><Pencil size={12} /></button>
-                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteHistory(prevMonth.paymentId); }} className="text-red-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><Trash2 size={12} /></button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="text-gray-500 flex flex-col items-center w-full relative">
-                                            <XCircle size={20} className="mb-1" />
-                                            <span className="font-bold text-lg mb-1">{prevMonth.amount !== null ? formatCurrency(prevMonth.amount) : <span className="text-gray-700 text-2xl">-</span>}</span>
-                                            <span className="text-sm mb-1">Unpaid</span>
-                                            <button onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, prevMonth.billingDateStr, prevMonth.amount || obl.amount); }} className="text-[10px] bg-blue-900/50 hover:bg-blue-800 text-blue-200 px-2 py-0.5 rounded border border-blue-900/50 opacity-0 group-hover/prev:opacity-100 transition cursor-pointer z-50 mt-1">Mark Paid</button>
-                                        </div>
-                                    )}
-                                </div>
-                                {/* Current Month */}
-                                <div className="p-4 flex flex-col items-center text-center bg-slate-700/20 relative group/current z-0 hover:z-10">
-                                    <span className="text-xs uppercase font-bold text-blue-300 mb-2">{currMonth.shortLabel}</span>
-                                    {currMonth.isPaid ? (
-                                        <div className="text-green-400 flex flex-col items-center animate-in fade-in zoom-in duration-300 relative">
-                                            <CheckCircle size={28} className="mb-2" />
-                                            <span className="font-bold text-2xl">{formatCurrency(currMonth.amount)}</span>
-                                            <span className="text-xs bg-green-900/30 px-2 py-0.5 rounded text-green-300 mt-1">Paid</span>
-                                            <div className="flex gap-1 absolute -top-3 -right-10 opacity-0 group-hover/current:opacity-100 transition z-50 bg-slate-900/90 p-1 rounded-full shadow-xl border border-slate-700">
-                                                <button onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, currMonth.billingDateStr, null, { id: currMonth.paymentId, amount: currMonth.amount, billing_month: currMonth.billingDateStr }); }} className="text-blue-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><Pencil size={12} /></button>
-                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteHistory(currMonth.paymentId); }} className="text-red-400 hover:text-white p-1 hover:bg-slate-700 rounded-full"><Trash2 size={12} /></button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col items-center w-full relative">
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); openObligationModal(obl); }}
-                                                className="absolute top-0 right-2 p-1 text-slate-500 hover:text-white hover:bg-slate-700 rounded-full transition"
-                                                title="Edit Amount"
-                                            >
-                                                <Pencil size={12} />
-                                            </button>
-                                            <span className="text-2xl font-bold text-white mb-1">{formatCurrency(currMonth.amount)}</span>
-                                            <p className="text-xs text-red-300 mb-3 font-medium">Due: {getNextDueDate(obl.due_day)}</p>
-                                            <button onClick={() => openPaymentModal(obl, currMonth.billingDateStr, currMonth.amount)} className="w-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold py-2 px-4 rounded shadow-lg flex justify-center items-center gap-2 transition transform hover:scale-105">
-                                                <CheckCircle size={16} /> Pay Now
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     );
-                })}
-            </div>
+                });
+            })()}
 
             {/* --- PAYMENT MODAL --- */}
             {showPaymentModal && (
