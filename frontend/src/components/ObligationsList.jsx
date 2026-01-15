@@ -47,15 +47,86 @@ const ObligationsList = ({
                 prevPaid += prev.amount;
                 // Budget is based on Prev Month's actuals
                 currentBudget += prev.amount;
+            } else if (obl.amount) {
+                // Fallback for budget if no prev history? 
+                // Let's stick to consistent logic: Budget = Prev Month Paid usually. 
+                // But generally users want to see "What I need to pay".
+                // If we strictly follow "Budget = Prev Month", zero history means zero budget.
             }
+
             if (curr.isPaid && curr.amount) currentPaid += curr.amount;
         });
 
         return { prevPaid, currentBudget, currentPaid };
     };
 
+    // Calculate Global Stats
+    const globalStats = obligations.reduce((acc, obl) => {
+        const prev = getMonthStatus(obl, monthOffset - 1);
+        const curr = getMonthStatus(obl, monthOffset);
+
+        let budget = 0;
+        if (prev.amount) budget = prev.amount;
+
+        let paid = 0;
+        if (curr.isPaid && curr.amount) paid = curr.amount;
+
+        acc.budget += budget;
+        acc.paid += paid;
+        return acc;
+    }, { budget: 0, paid: 0 });
+
     return (
         <div className="animate-fade-in-up">
+            {/* Global Summary Card */}
+            <div className="bg-gradient-to-r from-slate-800 to-slate-900 border border-slate-700 rounded-lg p-4 mb-8 shadow-lg flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-3">
+                    <div className="bg-blue-900/40 p-2 rounded-full text-blue-400">
+                        <Landmark size={24} />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-bold text-white">Monthly Overview</h2>
+                        <div className="flex items-center gap-2 text-xs">
+                            <span className="text-slate-400">{obligations.length} Active Obligations</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex gap-8 text-sm">
+                    <div className="flex flex-col items-end">
+                        <span className="text-blue-400 uppercase font-bold text-[10px] tracking-wider">Total Budget</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-2xl font-mono text-white font-bold">{formatCurrency(globalStats.budget)}</span>
+                        </div>
+                    </div>
+
+                    <div className="w-px bg-slate-700 h-10 hidden md:block"></div>
+
+                    <div className="flex flex-col items-end">
+                        <span className="text-green-400 uppercase font-bold text-[10px] tracking-wider">Total Paid</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-2xl font-mono text-green-400 font-bold">{formatCurrency(globalStats.paid)}</span>
+                        </div>
+                    </div>
+
+                    <div className="w-px bg-slate-700 h-10 hidden md:block"></div>
+
+                    <div className="flex flex-col items-end">
+                        <span className={`uppercase font-bold text-[10px] tracking-wider ${globalStats.paid > globalStats.budget ? 'text-red-400' : 'text-slate-400'}`}>
+                            {globalStats.paid > globalStats.budget ? 'Over Budget' : 'Remaining'}
+                        </span>
+                        <div className="flex items-center gap-2">
+                            <span className={`text-2xl font-mono font-bold ${globalStats.paid > globalStats.budget ? 'text-red-400' : 'text-slate-500'}`}>
+                                {globalStats.paid > globalStats.budget ?
+                                    `+${formatCurrency(globalStats.paid - globalStats.budget)}` :
+                                    formatCurrency(globalStats.budget - globalStats.paid)
+                                }
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {Object.entries(grouped).map(([category, items]) => {
                 const stats = getCategoryStats(items);
 
