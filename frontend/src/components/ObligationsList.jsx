@@ -100,8 +100,8 @@ const ObligationsList = ({
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-4 divide-x divide-slate-700 text-xs">
-                                            {[monthMinus3, monthMinus2, prevMonth].map((m, idx) => (
+                                        <div className="grid grid-cols-2 divide-x divide-slate-700 text-xs">
+                                            {[prevMonth].map((m, idx) => (
                                                 <div key={idx} className="p-2 flex flex-col items-center justify-center relative hover:bg-slate-700/30 transition group/cell">
                                                     <span className="text-[9px] uppercase font-bold text-gray-600 mb-0.5">{m.shortLabel}</span>
                                                     {m.isPaid ? (
