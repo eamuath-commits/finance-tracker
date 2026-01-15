@@ -17,6 +17,9 @@ const Obligations = () => {
     const [selectedHistory, setSelectedHistory] = useState([]);
     const [viewingHistoryId, setViewingHistoryId] = useState(null);
 
+    // View Mode: 'dashboard' or 'details'
+    const [viewMode, setViewMode] = useState('dashboard');
+
     // Forms
     // Default billing_month to today YYYY-MM-DD for safety, though we override it
     const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_day: '', category: '' });
@@ -319,259 +322,308 @@ const Obligations = () => {
                     <h1 className="text-3xl font-bold text-white">Obligation Manager</h1>
                     <p className="text-gray-400">Track bills via Billing Cycles.</p>
                 </div>
-                <button
-                    onClick={() => openObligationModal(null)}
-                    className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-lg shadow-lg flex items-center gap-2 transition"
-                >
-                    <span className="text-xl">+</span> Add New
-                </button>
+                <div className="flex gap-3">
+                    {viewMode === 'details' && (
+                        <button
+                            onClick={() => setViewMode('dashboard')}
+                            className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg shadow transition flex items-center gap-2"
+                        >
+                            <ArrowRight className="rotate-180" size={20} /> Dashboard
+                        </button>
+                    )}
+                    <button
+                        onClick={() => openObligationModal(null)}
+                        className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-lg shadow-lg flex items-center gap-2 transition"
+                    >
+                        <span className="text-xl">+</span> Add New
+                    </button>
+                </div>
             </div>
 
-            {/* Global Stats Summaries */}
-            {(() => {
-                const getStats = (items) => {
-                    let prevPaid = 0;
-                    let currentBudget = 0;
-                    let currentPaid = 0;
+            {/* DASHBOARD VIEW */}
+            {viewMode === 'dashboard' && (
+                <div className="animate-fade-in">
+                    {/* Summary Cards */}
+                    {(() => {
+                        const getStats = (items) => {
+                            let prevPaid = 0;
+                            let currentBudget = 0;
+                            let currentPaid = 0;
 
-                    items.forEach(obl => {
-                        const prev = getMonthStatus(obl, -1);
-                        const curr = getMonthStatus(obl, 0);
-                        if (prev.amount) prevPaid += prev.amount;
-                        if (curr.amount) currentBudget += curr.amount;
-                        if (curr.isPaid && curr.amount) currentPaid += curr.amount;
-                    });
+                            items.forEach(obl => {
+                                const prev = getMonthStatus(obl, -1);
+                                const curr = getMonthStatus(obl, 0);
+                                if (prev.amount) prevPaid += prev.amount;
+                                if (curr.amount) currentBudget += curr.amount;
+                                if (curr.isPaid && curr.amount) currentPaid += curr.amount;
+                            });
 
-                    return { prevPaid, currentBudget, currentPaid };
-                };
+                            return { prevPaid, currentBudget, currentPaid };
+                        };
 
-                // Filter Logic
-                const creditCards = obligations.filter(o => o.category === 'Credit Card');
-                const loans = obligations.filter(o => ['Loan', 'Auto Loan'].includes(o.category));
-                // Liabilities = Everything else (excluding Loans and Credit Cards)
-                const liabilities = obligations.filter(o => !['Loan', 'Auto Loan', 'Credit Card'].includes(o.category));
+                        // Filter Logic
+                        const creditCards = obligations.filter(o => o.category === 'Credit Card');
+                        const loans = obligations.filter(o => ['Loan', 'Auto Loan'].includes(o.category));
+                        // Liabilities = Everything else (excluding Loans and Credit Cards)
+                        const liabilities = obligations.filter(o => !['Loan', 'Auto Loan', 'Credit Card'].includes(o.category));
 
-                const globalStats = getStats(obligations);
-                const liabilityStats = getStats(liabilities);
-                const loanStats = getStats(loans);
-                const creditCardStats = getStats(creditCards);
+                        const globalStats = getStats(obligations);
+                        const liabilityStats = getStats(liabilities);
+                        const loanStats = getStats(loans);
+                        const creditCardStats = getStats(creditCards);
 
-                // Compact Summary Card Renderer
-                const renderSummaryCard = (title, stats, accentColor, Icon) => {
-                    const progress = stats.currentBudget > 0 ? (stats.currentPaid / stats.currentBudget) * 100 : 0;
+                        // Compact Summary Card Renderer
+                        const renderSummaryCard = (title, stats, accentColor, Icon) => {
+                            const progress = stats.currentBudget > 0 ? (stats.currentPaid / stats.currentBudget) * 100 : 0;
 
-                    return (
-                        <div className={`bg-slate-800 border border-slate-700 rounded-lg p-4 shadow-lg relative overflow-hidden group hover:border-[${accentColor}]/50 transition flex flex-col justify-between h-32`}>
-                            {/* subtle bg tint */}
-                            <div className="absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none opacity-10" style={{ backgroundColor: accentColor }}></div>
+                            return (
+                                <div className={`bg-slate-800 border border-slate-700 rounded-lg p-4 shadow-lg relative overflow-hidden group hover:border-[${accentColor}]/50 transition flex flex-col justify-between h-32`}>
+                                    {/* subtle bg tint */}
+                                    <div className="absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none opacity-10" style={{ backgroundColor: accentColor }}></div>
 
+                                    <div className="relative z-10">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                                                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accentColor }}></span>
+                                                {title}
+                                            </h2>
+                                            {Icon && <Icon size={14} className="text-gray-600" />}
+                                        </div>
+
+                                        <div className="flex items-baseline gap-1.5">
+                                            <span className="text-xl font-bold text-white">{formatCurrency(stats.currentPaid)}</span>
+                                            <span className="text-gray-600 text-[10px]">/ {formatCurrency(stats.currentBudget)}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="relative z-10 mt-auto">
+                                        <div className="w-full bg-slate-700 h-1 rounded-full mb-2 overflow-hidden">
+                                            <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${progress}%`, backgroundColor: accentColor }}></div>
+                                        </div>
+
+                                        <div className="flex justify-between items-center text-[10px]">
+                                            <span className="text-gray-500">Prev: {formatCurrency(stats.prevPaid)}</span>
+                                            <span style={{ color: accentColor }}>{progress.toFixed(0)}%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        };
+
+                        return (
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                                {renderSummaryCard("Total Overview", globalStats, "#3b82f6", Landmark)}
+                                {renderSummaryCard("Liabilities", liabilityStats, "#f97316", Zap)}
+                                {renderSummaryCard("Loans", loanStats, "#a855f7", Car)}
+                                {renderSummaryCard("Credit Cards", creditCardStats, "#ec4899", CreditCard)}
+                            </div>
+                        );
+                    })()}
+
+                    {/* Navigation to Details */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+                        <button
+                            onClick={() => setViewMode('details')}
+                            className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 hover:border-blue-500/50 p-8 rounded-2xl group text-left transition-all hover:shadow-2xl relative overflow-hidden"
+                        >
+                            <div className="absolute top-0 right-0 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none group-hover:bg-blue-500/20 transition"></div>
                             <div className="relative z-10">
-                                <div className="flex justify-between items-start mb-2">
-                                    <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accentColor }}></span>
-                                        {title}
-                                    </h2>
-                                    {Icon && <Icon size={14} className="text-gray-600" />}
+                                <div className="bg-blue-500/20 w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition">
+                                    <Box className="text-blue-400" size={24} />
                                 </div>
-
-                                <div className="flex items-baseline gap-1.5">
-                                    <span className="text-xl font-bold text-white">{formatCurrency(stats.currentPaid)}</span>
-                                    <span className="text-gray-600 text-[10px]">/ {formatCurrency(stats.currentBudget)}</span>
+                                <h2 className="text-2xl font-bold text-white mb-2">View Obligations List</h2>
+                                <p className="text-gray-400">Manage monthly bills, view history, and track payments in detail.</p>
+                                <div className="mt-6 flex items-center gap-2 text-blue-400 font-bold">
+                                    Open List <ArrowRight size={18} className="group-hover:translate-x-1 transition" />
                                 </div>
                             </div>
+                        </button>
 
-                            <div className="relative z-10 mt-auto">
-                                <div className="w-full bg-slate-700 h-1 rounded-full mb-2 overflow-hidden">
-                                    <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${progress}%`, backgroundColor: accentColor }}></div>
-                                </div>
-
-                                <div className="flex justify-between items-center text-[10px]">
-                                    <span className="text-gray-500">Prev: {formatCurrency(stats.prevPaid)}</span>
-                                    <span style={{ color: accentColor }}>{progress.toFixed(0)}%</span>
-                                </div>
+                        {/* Placeholder for future Analysis/Graphs */}
+                        <div className="bg-slate-800/50 border border-slate-700/50 p-8 rounded-2xl flex flex-col justify-center items-center text-center opacity-75 hover:opacity-100 transition">
+                            <div className="bg-purple-500/20 w-12 h-12 rounded-lg flex items-center justify-center mb-4">
+                                <Banknote className="text-purple-400" size={24} />
                             </div>
+                            <h2 className="text-xl font-bold text-gray-300 mb-2">Spending Analysis</h2>
+                            <p className="text-gray-500 text-sm">Detailed charts and trends coming soon.</p>
                         </div>
-                    );
-                };
-
-                return (
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                        {renderSummaryCard("Total Overview", globalStats, "#3b82f6", Landmark)}
-                        {renderSummaryCard("Liabilities", liabilityStats, "#f97316", Zap)}
-                        {renderSummaryCard("Loans", loanStats, "#a855f7", Car)}
-                        {renderSummaryCard("Credit Cards", creditCardStats, "#ec4899", CreditCard)}
                     </div>
-                );
-            })()}
+                </div>
+            )}
 
-            {/* CATEGORY ICON MAPPING */}
-            {(() => {
-                const CATEGORY_ICONS = {
-                    "Salary": <Banknote size={20} className="text-emerald-400" />,
-                    "House": <Home size={20} className="text-blue-400" />,
-                    "Utilities": <Zap size={20} className="text-yellow-400" />,
-                    "Auto Loan": <Car size={20} className="text-red-400" />,
-                    "Food & Groceries": <Utensils size={20} className="text-orange-400" />,
-                    "Transport": <Car size={20} className="text-red-400" />,
-                    "Insurance": <Shield size={20} className="text-purple-400" />,
-                    "Tech & Subscriptions": <Smartphone size={20} className="text-cyan-400" />,
-                    "Loan": <Landmark size={20} className="text-rose-400" />,
-                    "Credit Card": <CreditCard size={20} className="text-pink-400" />,
-                    "Pay Later": <Clock size={20} className="text-amber-400" />,
-                    "Other": <Box size={20} className="text-gray-400" />
-                };
+            {/* DETAILS VIEW */}
+            {viewMode === 'details' && (
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-                // Group Obligations
-                const grouped = obligations.reduce((acc, obl) => {
-                    const cat = obl.category || "Other";
-                    if (!acc[cat]) acc[cat] = [];
-                    acc[cat].push(obl);
-                    return acc;
-                }, {});
+                    {/* CATEGORY ICON MAPPING */}
+                    {(() => {
+                        const CATEGORY_ICONS = {
+                            "Salary": <Banknote size={20} className="text-emerald-400" />,
+                            "House": <Home size={20} className="text-blue-400" />,
+                            "Utilities": <Zap size={20} className="text-yellow-400" />,
+                            "Auto Loan": <Car size={20} className="text-red-400" />,
+                            "Food & Groceries": <Utensils size={20} className="text-orange-400" />,
+                            "Transport": <Car size={20} className="text-red-400" />,
+                            "Insurance": <Shield size={20} className="text-purple-400" />,
+                            "Tech & Subscriptions": <Smartphone size={20} className="text-cyan-400" />,
+                            "Loan": <Landmark size={20} className="text-rose-400" />,
+                            "Credit Card": <CreditCard size={20} className="text-pink-400" />,
+                            "Pay Later": <Clock size={20} className="text-amber-400" />,
+                            "Other": <Box size={20} className="text-gray-400" />
+                        };
 
-                // Calculate Category Stats
-                const getCategoryStats = (items) => {
-                    let prevPaid = 0;
-                    let currentBudget = 0;
-                    let currentPaid = 0;
+                        // Group Obligations
+                        const grouped = obligations.reduce((acc, obl) => {
+                            const cat = obl.category || "Other";
+                            if (!acc[cat]) acc[cat] = [];
+                            acc[cat].push(obl);
+                            return acc;
+                        }, {});
 
-                    items.forEach(obl => {
-                        const prev = getMonthStatus(obl, -1);
-                        const curr = getMonthStatus(obl, 0);
+                        // Calculate Category Stats
+                        const getCategoryStats = (items) => {
+                            let prevPaid = 0;
+                            let currentBudget = 0;
+                            let currentPaid = 0;
 
-                        // Prev month paid tally (assuming we only care about what was actually paid?)
-                        // User said "sum of previouse month". Assuming total bill amount of previous month.
-                        if (prev.amount) prevPaid += prev.amount;
+                            items.forEach(obl => {
+                                const prev = getMonthStatus(obl, -1);
+                                const curr = getMonthStatus(obl, 0);
 
-                        // Current Budget = Expected bills
-                        if (curr.amount) currentBudget += curr.amount;
+                                // Prev month paid tally (assuming we only care about what was actually paid?)
+                                // User said "sum of previouse month". Assuming total bill amount of previous month.
+                                if (prev.amount) prevPaid += prev.amount;
 
-                        // Paid so far
-                        if (curr.isPaid && curr.amount) currentPaid += curr.amount;
-                    });
+                                // Current Budget = Expected bills
+                                if (curr.amount) currentBudget += curr.amount;
 
-                    return { prevPaid, currentBudget, currentPaid };
-                };
+                                // Paid so far
+                                if (curr.isPaid && curr.amount) currentPaid += curr.amount;
+                            });
 
-                return Object.entries(grouped).map(([category, items]) => {
-                    const stats = getCategoryStats(items);
+                            return { prevPaid, currentBudget, currentPaid };
+                        };
 
-                    return (
-                        <div key={category} className="mb-8">
-                            {/* Section Header */}
-                            <div className="flex items-center justify-between mb-4 border-b border-slate-700 pb-2">
-                                <div className="flex items-center gap-2">
-                                    {CATEGORY_ICONS[category] || <Box size={20} className="text-gray-400" />}
-                                    <h2 className="text-xl font-bold text-slate-200">{category}</h2>
-                                    <span className="bg-slate-800 text-slate-400 text-xs px-2 py-0.5 rounded-full border border-slate-700">{items.length}</span>
-                                </div>
+                        return Object.entries(grouped).map(([category, items]) => {
+                            const stats = getCategoryStats(items);
 
-                                {/* Budget Badges */}
-                                <div className="flex gap-4 text-xs">
-                                    <div className="flex flex-col items-end">
-                                        <span className="text-gray-500 uppercase font-semibold">Prev Total</span>
-                                        <span className="text-gray-300 font-mono">{formatCurrency(stats.prevPaid)}</span>
-                                    </div>
-                                    <div className="flex flex-col items-end">
-                                        <span className="text-blue-400 uppercase font-semibold">Budget</span>
-                                        <span className="text-blue-200 font-mono">{formatCurrency(stats.currentBudget)}</span>
-                                    </div>
-                                    <div className="flex flex-col items-end">
-                                        <span className="text-green-400 uppercase font-semibold">Paid</span>
-                                        <span className="text-green-200 font-mono">{formatCurrency(stats.currentPaid)}</span>
-                                    </div>
-                                </div>
-                            </div>
+                            return (
+                                <div key={category} className="mb-8">
+                                    {/* Section Header */}
+                                    <div className="flex items-center justify-between mb-4 border-b border-slate-700 pb-2">
+                                        <div className="flex items-center gap-2">
+                                            {CATEGORY_ICONS[category] || <Box size={20} className="text-gray-400" />}
+                                            <h2 className="text-xl font-bold text-slate-200">{category}</h2>
+                                            <span className="bg-slate-800 text-slate-400 text-xs px-2 py-0.5 rounded-full border border-slate-700">{items.length}</span>
+                                        </div>
 
-                            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-4">
-                                {items.map(obl => {
-                                    const monthMinus3 = getMonthStatus(obl, -3);
-                                    const monthMinus2 = getMonthStatus(obl, -2);
-                                    const prevMonth = getMonthStatus(obl, -1);
-                                    const currMonth = getMonthStatus(obl, 0);
-
-                                    return (
-                                        <div key={obl.id} className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition group relative">
-                                            {/* Compact Card Header */}
-                                            <div className="bg-slate-900/40 px-3 py-2 border-b border-slate-700 flex justify-between items-center">
-                                                <div className="flex items-center gap-2">
-                                                    <h3 className="text-sm font-bold text-white truncate max-w-[150px]">{obl.name}</h3>
-                                                    <span className="text-[10px] text-gray-500">Day: {obl.due_day}</span>
-                                                </div>
-                                                <div className="flex gap-2 opacity-50 group-hover:opacity-100 transition">
-                                                    <button onClick={() => openHistory(obl.id)}><History size={14} className="text-gray-400 hover:text-white" /></button>
-                                                    <button onClick={() => openObligationModal(obl)}><EditIcon size={14} className="text-gray-400 hover:text-white" /></button>
-                                                </div>
+                                        {/* Budget Badges */}
+                                        <div className="flex gap-4 text-xs">
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-gray-500 uppercase font-semibold">Prev Total</span>
+                                                <span className="text-gray-300 font-mono">{formatCurrency(stats.prevPaid)}</span>
                                             </div>
-
-                                            {/* Compact 4-Month Grid */}
-                                            <div className="grid grid-cols-4 divide-x divide-slate-700 text-xs">
-                                                {/* Helper Render Function */}
-                                                {[monthMinus3, monthMinus2, prevMonth].map((m, idx) => (
-                                                    <div key={idx} className="p-2 flex flex-col items-center justify-center relative hover:bg-slate-700/30 transition group/cell">
-                                                        <span className="text-[9px] uppercase font-bold text-gray-600 mb-0.5">{m.shortLabel}</span>
-                                                        {m.isPaid ? (
-                                                            <div className="text-center group-hover/cell:opacity-20 transition">
-                                                                <CheckCircle size={14} className="text-green-500/50 mx-auto" />
-                                                                <span className="font-mono text-gray-400">{formatCurrency(m.amount)}</span>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="text-center">
-                                                                <span className="font-mono text-gray-500 block mb-1">{m.amount !== null ? formatCurrency(m.amount) : "-"}</span>
-                                                                <button
-                                                                    onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, m.billingDateStr, m.amount || obl.amount); }}
-                                                                    className="text-[9px] bg-blue-900/40 text-blue-300 px-1.5 rounded hover:bg-blue-800 transition"
-                                                                >
-                                                                    Pay
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                        {/* History Edit Overlay for Paid Items */}
-                                                        {m.isPaid && (
-                                                            <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 group-hover/cell:opacity-100 bg-slate-800/90 transition z-10">
-                                                                <button onClick={() => openPaymentModal(obl, m.billingDateStr, null, { id: m.paymentId, amount: m.amount, billing_month: m.billingDateStr })} className="p-1 hover:text-blue-400"><Pencil size={12} /></button>
-                                                                <button onClick={() => handleDeleteHistory(m.paymentId)} className="p-1 hover:text-red-400"><Trash2 size={12} /></button>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                ))}
-
-                                                {/* Current Month (Highlighted) */}
-                                                <div className="p-2 flex flex-col items-center justify-center bg-slate-700/10 relative group/curr">
-                                                    <span className="text-[9px] uppercase font-bold text-blue-400 mb-0.5">{currMonth.shortLabel}</span>
-                                                    {currMonth.isPaid ? (
-                                                        <div className="text-center relative">
-                                                            <CheckCircle size={16} className="text-green-400 mx-auto mb-0.5" />
-                                                            <span className="font-bold font-mono text-white block">{formatCurrency(currMonth.amount)}</span>
-                                                            <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 group-hover/curr:opacity-100 bg-slate-800/90 transition z-10">
-                                                                <button onClick={() => openPaymentModal(obl, currMonth.billingDateStr, null, { id: currMonth.paymentId, amount: currMonth.amount, billing_month: currMonth.billingDateStr })} className="p-1 hover:text-blue-400"><Pencil size={12} /></button>
-                                                                <button onClick={() => handleDeleteHistory(currMonth.paymentId)} className="p-1 hover:text-red-400"><Trash2 size={12} /></button>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="text-center w-full relative">
-                                                            <div className="flex items-center justify-center gap-1 mb-1 relative">
-                                                                <span className="font-bold font-mono text-white text-sm">{formatCurrency(currMonth.amount)}</span>
-                                                                <button onClick={() => openObligationModal(obl)} className="text-gray-600 hover:text-white"><Pencil size={10} /></button>
-                                                            </div>
-                                                            <button
-                                                                onClick={() => openPaymentModal(obl, currMonth.billingDateStr, currMonth.amount)}
-                                                                className="w-full bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold py-1 px-2 rounded flex items-center justify-center gap-1"
-                                                            >
-                                                                Pay
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-blue-400 uppercase font-semibold">Budget</span>
+                                                <span className="text-blue-200 font-mono">{formatCurrency(stats.currentBudget)}</span>
+                                            </div>
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-green-400 uppercase font-semibold">Paid</span>
+                                                <span className="text-green-200 font-mono">{formatCurrency(stats.currentPaid)}</span>
                                             </div>
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    );
-                });
-            })()}
+                                    </div>
+
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-4">
+                                        {items.map(obl => {
+                                            const monthMinus3 = getMonthStatus(obl, -3);
+                                            const monthMinus2 = getMonthStatus(obl, -2);
+                                            const prevMonth = getMonthStatus(obl, -1);
+                                            const currMonth = getMonthStatus(obl, 0);
+
+                                            return (
+                                                <div key={obl.id} className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition group relative">
+                                                    {/* Compact Card Header */}
+                                                    <div className="bg-slate-900/40 px-3 py-2 border-b border-slate-700 flex justify-between items-center">
+                                                        <div className="flex items-center gap-2">
+                                                            <h3 className="text-sm font-bold text-white truncate max-w-[150px]">{obl.name}</h3>
+                                                            <span className="text-[10px] text-gray-500">Day: {obl.due_day}</span>
+                                                        </div>
+                                                        <div className="flex gap-2 opacity-50 group-hover:opacity-100 transition">
+                                                            <button onClick={() => openHistory(obl.id)}><History size={14} className="text-gray-400 hover:text-white" /></button>
+                                                            <button onClick={() => openObligationModal(obl)}><EditIcon size={14} className="text-gray-400 hover:text-white" /></button>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Compact 4-Month Grid */}
+                                                    <div className="grid grid-cols-4 divide-x divide-slate-700 text-xs">
+                                                        {/* Helper Render Function */}
+                                                        {[monthMinus3, monthMinus2, prevMonth].map((m, idx) => (
+                                                            <div key={idx} className="p-2 flex flex-col items-center justify-center relative hover:bg-slate-700/30 transition group/cell">
+                                                                <span className="text-[9px] uppercase font-bold text-gray-600 mb-0.5">{m.shortLabel}</span>
+                                                                {m.isPaid ? (
+                                                                    <div className="text-center group-hover/cell:opacity-20 transition">
+                                                                        <CheckCircle size={14} className="text-green-500/50 mx-auto" />
+                                                                        <span className="font-mono text-gray-400">{formatCurrency(m.amount)}</span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="text-center">
+                                                                        <span className="font-mono text-gray-500 block mb-1">{m.amount !== null ? formatCurrency(m.amount) : "-"}</span>
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, m.billingDateStr, m.amount || obl.amount); }}
+                                                                            className="text-[9px] bg-blue-900/40 text-blue-300 px-1.5 rounded hover:bg-blue-800 transition"
+                                                                        >
+                                                                            Pay
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                                {/* History Edit Overlay for Paid Items */}
+                                                                {m.isPaid && (
+                                                                    <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 group-hover/cell:opacity-100 bg-slate-800/90 transition z-10">
+                                                                        <button onClick={() => openPaymentModal(obl, m.billingDateStr, null, { id: m.paymentId, amount: m.amount, billing_month: m.billingDateStr })} className="p-1 hover:text-blue-400"><Pencil size={12} /></button>
+                                                                        <button onClick={() => handleDeleteHistory(m.paymentId)} className="p-1 hover:text-red-400"><Trash2 size={12} /></button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ))}
+
+                                                        {/* Current Month (Highlighted) */}
+                                                        <div className="p-2 flex flex-col items-center justify-center bg-slate-700/10 relative group/curr">
+                                                            <span className="text-[9px] uppercase font-bold text-blue-400 mb-0.5">{currMonth.shortLabel}</span>
+                                                            {currMonth.isPaid ? (
+                                                                <div className="text-center relative">
+                                                                    <CheckCircle size={16} className="text-green-400 mx-auto mb-0.5" />
+                                                                    <span className="font-bold font-mono text-white block">{formatCurrency(currMonth.amount)}</span>
+                                                                    <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 group-hover/curr:opacity-100 bg-slate-800/90 transition z-10">
+                                                                        <button onClick={() => openPaymentModal(obl, currMonth.billingDateStr, null, { id: currMonth.paymentId, amount: currMonth.amount, billing_month: currMonth.billingDateStr })} className="p-1 hover:text-blue-400"><Pencil size={12} /></button>
+                                                                        <button onClick={() => handleDeleteHistory(currMonth.paymentId)} className="p-1 hover:text-red-400"><Trash2 size={12} /></button>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="text-center w-full relative">
+                                                                    <div className="flex items-center justify-center gap-1 mb-1 relative">
+                                                                        <span className="font-bold font-mono text-white text-sm">{formatCurrency(currMonth.amount)}</span>
+                                                                        <button onClick={() => openObligationModal(obl)} className="text-gray-600 hover:text-white"><Pencil size={10} /></button>
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={() => openPaymentModal(obl, currMonth.billingDateStr, currMonth.amount)}
+                                                                        className="w-full bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold py-1 px-2 rounded flex items-center justify-center gap-1"
+                                                                    >
+                                                                        Pay
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            );
+                        });
+                </div>
+            )}
 
             {/* --- PAYMENT MODAL --- */}
             {showPaymentModal && (
