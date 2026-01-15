@@ -570,12 +570,11 @@ const Obligations = () => {
                             </div>
                         </div>
                     );
-                });
+                })()
+            }
                 </div>
     )
 }
-            </div >
-            )}
 
 {/* --- PAYMENT MODAL --- */ }
 {
