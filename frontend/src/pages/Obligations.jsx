@@ -297,8 +297,8 @@ const Obligations = () => {
         const currentHistoryObligation = obligations.find(o => o.id === viewingHistoryId) || {};
 
         // UI Constants for Dropdowns
-        const today = new Date();
-        const currentYear = today.getFullYear();
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
         const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
         const years = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
 
