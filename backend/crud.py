@@ -148,6 +148,15 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
     return db_tx
 
 def create_obligation_payment(db: Session, obligation_id: str, payment: schemas.ObligationHistoryCreate):
+    # Check for duplicate billing_month
+    if payment.billing_month:
+        existing = db.query(models.ObligationHistory).filter(
+            models.ObligationHistory.obligation_id == obligation_id,
+            models.ObligationHistory.billing_month == payment.billing_month
+        ).first()
+        if existing:
+            raise ValueError(f"Payment for billing month {payment.billing_month} already exists.")
+
     db_payment = models.ObligationHistory(
         obligation_id=obligation_id,
         amount=payment.amount,

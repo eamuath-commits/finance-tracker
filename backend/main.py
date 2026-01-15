@@ -120,7 +120,10 @@ def pay_obligation(obligation_id: str, payment: schemas.ObligationHistoryCreate,
     if not obligation:
         raise HTTPException(status_code=404, detail="Obligation not found")
     
-    return crud.create_obligation_payment(db=db, obligation_id=obligation_id, payment=payment)
+    try:
+        return crud.create_obligation_payment(db=db, obligation_id=obligation_id, payment=payment)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/obligations/{obligation_id}/history", response_model=List[schemas.ObligationHistory])
 def read_obligation_history(obligation_id: str, db: Session = Depends(get_db)):
