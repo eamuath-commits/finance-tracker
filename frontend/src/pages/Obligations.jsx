@@ -578,188 +578,186 @@ const Obligations = () => {
                         );
                     })()
                 }
-                </div >
-    )
-}
-
-{/* --- PAYMENT MODAL --- */ }
-{
-    showPaymentModal && (
-        <Modal title={`Pay Bill: ${paymentForm.name}`} onClose={() => setShowPaymentModal(false)}>
-            <form onSubmit={submitPayment} className="space-y-4">
-                <div className="bg-blue-900/20 p-3 rounded border border-blue-900/50 mb-4">
-                    <p className="text-sm text-blue-200">Select which <strong>Month</strong> you are paying for.</p>
-                </div>
-
-                <div>
-                    <label className="text-gray-400 text-xs uppercase mb-1 block">For Month</label>
-                    <div className="grid grid-cols-2 gap-3">
-                        <select
-                            className={`${selectClass} text-sm w-full`}
-                            value={parseInt(paymentForm.billing_month.split('-')[1]) - 1}
-                            onChange={e => {
-                                const parts = paymentForm.billing_month.split('-');
-                                const newMonth = (parseInt(e.target.value) + 1).toString().padStart(2, '0');
-                                setPaymentForm({ ...paymentForm, billing_month: `${parts[0]}-${newMonth}-01` });
-                            }}
-                        >
-                            {months.map((m, idx) => (
-                                <option key={idx} value={idx}>{m}</option>
-                            ))}
-                        </select>
-                        <select
-                            className={`${selectClass} text-sm w-full`}
-                            value={parseInt(paymentForm.billing_month.split('-')[0])}
-                            onChange={e => {
-                                const parts = paymentForm.billing_month.split('-');
-                                setPaymentForm({ ...paymentForm, billing_month: `${e.target.value}-${parts[1]}-01` });
-                            }}
-                        >
-                            {years.map(y => (
-                                <option key={y} value={y}>{y}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-
-                <div>
-                    <label className="text-gray-400 text-xs uppercase mb-1 block">Amount</label>
-                    <input type="number" step="0.01" className={inputClass} value={paymentForm.amount} onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
-                    <p className="text-xs text-gray-500 mt-1">Optional. Leave empty for 0.</p>
-                </div>
-
-                <div>
-                    <label className="text-gray-400 text-xs uppercase mb-1 block">Note</label>
-                    <input type="text" className={inputClass} value={paymentForm.note} onChange={e => setPaymentForm({ ...paymentForm, note: e.target.value })} />
-                </div>
-
-                <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white p-3 rounded font-bold shadow-lg mt-4">
-                    Confirm Payment
-                </button>
-            </form>
-        </Modal>
-    )
-}
-
-{/* Obligation Modal (Edit/Add) */ }
-{
-    showObligationModal && (
-        <Modal title={editingId ? "Edit Obligation" : "Add Obligation"} onClose={() => setShowObligationModal(false)}>
-            <form onSubmit={handleSaveObligation} className="space-y-4">
-                <div>
-                    <label className="text-gray-400 text-xs uppercase mb-1 block">Name</label>
-                    <input type="text" placeholder="e.g. Rent" required className={inputClass} value={obligationForm.name} onChange={e => setObligationForm({ ...obligationForm, name: e.target.value })} />
-                </div>
-                <div>
-                    <label className="text-gray-400 text-xs uppercase mb-1 block">Amount</label>
-                    <input type="number" placeholder="SAR" step="0.01" className={inputClass} value={obligationForm.amount} onChange={e => setObligationForm({ ...obligationForm, amount: e.target.value })} />
-                </div>
-                <div>
-                    <label className="text-gray-400 text-xs uppercase mb-1 block">Due Day</label>
-                    <input
-                        type="number"
-                        min="1"
-                        max="31"
-                        placeholder="1-31"
-                        required
-                        className={inputClass}
-                        value={obligationForm.due_day}
-                        onChange={e => setObligationForm({ ...obligationForm, due_day: e.target.value })}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Day of the month (1-31) for this bill.</p>
-                </div>
-                <div>
-                    <label className="text-gray-400 text-xs uppercase mb-1 block">Category</label>
-                    <select className={selectClass} value={obligationForm.category} onChange={e => setObligationForm({ ...obligationForm, category: e.target.value })}>
-                        <option value="">Select Category...</option>
-                        <option value="Salary">Salary</option>
-                        <option value="House">House</option>
-                        <option value="Utilities">Utilities</option>
-                        <option value="Food">Food & Groceries</option>
-                        <option value="Transport">Transport</option>
-                        <option value="Insurance">Insurance</option>
-                        <option value="Tech">Tech & Subscriptions</option>
-                        <option value="Subscription">Subscription</option>
-                        <option value="Loan">Loan</option>
-                        <option value="Auto Loan">Auto Loan</option>
-                        <option value="Credit Card">Credit Card</option>
-                        <option value="Pay Later">Pay Later</option>
-                        <option value="Other">Other</option>
 
 
-                    </select>
-                </div>
-                <div className="flex gap-2 mt-6">
-                    <button type="submit" className="flex-1 bg-blue-600 text-white p-3 rounded hover:bg-blue-500 font-bold shadow-lg">{editingId ? "Save Changes" : "Create"}</button>
-                    {editingId && <button type="button" onClick={handleDeleteObligation} className="bg-red-900/80 text-red-200 p-3 rounded hover:bg-red-800 font-bold"><Trash2 size={20} /></button>}
-                </div>
-            </form>
-        </Modal>
-    )
-}
-
-{/* History Modal */ }
-{
-    showHistoryModal && (
-        <Modal title={`History: ${currentHistoryObligation.name}`} onClose={() => setShowHistoryModal(false)}>
-            <div className="bg-slate-700/50 p-4 rounded-lg mb-6 border border-slate-600">
-                <div className="flex items-center gap-2 mb-3 text-blue-300">
-                    <Calendar size={16} />
-                    <h4 className="text-sm font-bold uppercase tracking-wide">Log Payment Record</h4>
-                </div>
-                <form onSubmit={handleAddPastPayment} className="grid grid-cols-2 gap-3">
-                    <div className="col-span-2">
-                        <label className="text-[10px] uppercase text-gray-400 block mb-1">For Month</label>
-                        <div className="grid grid-cols-2 gap-2">
-                            <select name="billing_month_idx" className={`${selectClass} text-sm w-full`} defaultValue={today.getMonth()}>
-                                {months.map((m, idx) => (
-                                    <option key={idx} value={idx}>{m}</option>
-                                ))}
-                            </select>
-                            <select name="billing_year" className={`${selectClass} text-sm w-full`} defaultValue={currentYear}>
-                                {years.map(y => (
-                                    <option key={y} value={y}>{y}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="col-span-2 grid grid-cols-2 gap-3">
-                        <div><input type="number" name="amount" defaultValue={currentHistoryObligation.amount} placeholder="Amount" step="0.01" className={`${inputClass} text-sm`} /></div>
-                        <div><input type="text" name="note" placeholder="Note (Optional)" className={`${inputClass} text-sm`} /></div>
-                    </div>
-
-                    <button type="submit" className="col-span-2 bg-slate-600 hover:bg-slate-500 text-white text-xs font-bold py-2 rounded uppercase tracking-wider transition">+ Add Record</button>
-                </form>
-            </div>
-            <div className="max-h-60 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                {selectedHistory.map(h => (
-                    <div key={h.id} className="bg-slate-800 p-3 rounded flex justify-between items-center border border-slate-700">
-                        <div>
-                            <p className="text-white font-medium text-sm">
-                                {h.billing_month ? (() => {
-                                    const [y, m] = h.billing_month.split('-').map(Number);
-                                    const date = new Date(y, m - 1, 1);
-                                    // Format: "December 2025" or similar
-                                    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-                                })() : 'Auto Log'}
-                            </p>
-                        </div>
-                        <div className="text-right flex flex-col items-end">
-                            <div className="flex items-center gap-3">
-                                <p className="text-green-400 font-bold text-sm">{formatCurrency(h.amount)}</p>
-                                <button onClick={() => handleDeleteHistory(h.id)} className="text-slate-500 hover:text-red-400 transition" title="Delete Record">
-                                    <Trash2 size={14} />
-                                </button>
+{/* --- PAYMENT MODAL --- */}
+            {
+                showPaymentModal && (
+                    <Modal title={`Pay Bill: ${paymentForm.name}`} onClose={() => setShowPaymentModal(false)}>
+                        <form onSubmit={submitPayment} className="space-y-4">
+                            <div className="bg-blue-900/20 p-3 rounded border border-blue-900/50 mb-4">
+                                <p className="text-sm text-blue-200">Select which <strong>Month</strong> you are paying for.</p>
                             </div>
-                            {h.note && <p className="text-xs text-gray-500">{h.note}</p>}
+
+                            <div>
+                                <label className="text-gray-400 text-xs uppercase mb-1 block">For Month</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <select
+                                        className={`${selectClass} text-sm w-full`}
+                                        value={parseInt(paymentForm.billing_month.split('-')[1]) - 1}
+                                        onChange={e => {
+                                            const parts = paymentForm.billing_month.split('-');
+                                            const newMonth = (parseInt(e.target.value) + 1).toString().padStart(2, '0');
+                                            setPaymentForm({ ...paymentForm, billing_month: `${parts[0]}-${newMonth}-01` });
+                                        }}
+                                    >
+                                        {months.map((m, idx) => (
+                                            <option key={idx} value={idx}>{m}</option>
+                                        ))}
+                                    </select>
+                                    <select
+                                        className={`${selectClass} text-sm w-full`}
+                                        value={parseInt(paymentForm.billing_month.split('-')[0])}
+                                        onChange={e => {
+                                            const parts = paymentForm.billing_month.split('-');
+                                            setPaymentForm({ ...paymentForm, billing_month: `${e.target.value}-${parts[1]}-01` });
+                                        }}
+                                    >
+                                        {years.map(y => (
+                                            <option key={y} value={y}>{y}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-gray-400 text-xs uppercase mb-1 block">Amount</label>
+                                <input type="number" step="0.01" className={inputClass} value={paymentForm.amount} onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
+                                <p className="text-xs text-gray-500 mt-1">Optional. Leave empty for 0.</p>
+                            </div>
+
+                            <div>
+                                <label className="text-gray-400 text-xs uppercase mb-1 block">Note</label>
+                                <input type="text" className={inputClass} value={paymentForm.note} onChange={e => setPaymentForm({ ...paymentForm, note: e.target.value })} />
+                            </div>
+
+                            <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white p-3 rounded font-bold shadow-lg mt-4">
+                                Confirm Payment
+                            </button>
+                        </form>
+                    </Modal>
+                )
+            }
+
+            {/* Obligation Modal (Edit/Add) */}
+            {
+                showObligationModal && (
+                    <Modal title={editingId ? "Edit Obligation" : "Add Obligation"} onClose={() => setShowObligationModal(false)}>
+                        <form onSubmit={handleSaveObligation} className="space-y-4">
+                            <div>
+                                <label className="text-gray-400 text-xs uppercase mb-1 block">Name</label>
+                                <input type="text" placeholder="e.g. Rent" required className={inputClass} value={obligationForm.name} onChange={e => setObligationForm({ ...obligationForm, name: e.target.value })} />
+                            </div>
+                            <div>
+                                <label className="text-gray-400 text-xs uppercase mb-1 block">Amount</label>
+                                <input type="number" placeholder="SAR" step="0.01" className={inputClass} value={obligationForm.amount} onChange={e => setObligationForm({ ...obligationForm, amount: e.target.value })} />
+                            </div>
+                            <div>
+                                <label className="text-gray-400 text-xs uppercase mb-1 block">Due Day</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="31"
+                                    placeholder="1-31"
+                                    required
+                                    className={inputClass}
+                                    value={obligationForm.due_day}
+                                    onChange={e => setObligationForm({ ...obligationForm, due_day: e.target.value })}
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Day of the month (1-31) for this bill.</p>
+                            </div>
+                            <div>
+                                <label className="text-gray-400 text-xs uppercase mb-1 block">Category</label>
+                                <select className={selectClass} value={obligationForm.category} onChange={e => setObligationForm({ ...obligationForm, category: e.target.value })}>
+                                    <option value="">Select Category...</option>
+                                    <option value="Salary">Salary</option>
+                                    <option value="House">House</option>
+                                    <option value="Utilities">Utilities</option>
+                                    <option value="Food">Food & Groceries</option>
+                                    <option value="Transport">Transport</option>
+                                    <option value="Insurance">Insurance</option>
+                                    <option value="Tech">Tech & Subscriptions</option>
+                                    <option value="Subscription">Subscription</option>
+                                    <option value="Loan">Loan</option>
+                                    <option value="Auto Loan">Auto Loan</option>
+                                    <option value="Credit Card">Credit Card</option>
+                                    <option value="Pay Later">Pay Later</option>
+                                    <option value="Other">Other</option>
+
+
+                                </select>
+                            </div>
+                            <div className="flex gap-2 mt-6">
+                                <button type="submit" className="flex-1 bg-blue-600 text-white p-3 rounded hover:bg-blue-500 font-bold shadow-lg">{editingId ? "Save Changes" : "Create"}</button>
+                                {editingId && <button type="button" onClick={handleDeleteObligation} className="bg-red-900/80 text-red-200 p-3 rounded hover:bg-red-800 font-bold"><Trash2 size={20} /></button>}
+                            </div>
+                        </form>
+                    </Modal>
+                )
+            }
+
+            {/* History Modal */}
+            {
+                showHistoryModal && (
+                    <Modal title={`History: ${currentHistoryObligation.name}`} onClose={() => setShowHistoryModal(false)}>
+                        <div className="bg-slate-700/50 p-4 rounded-lg mb-6 border border-slate-600">
+                            <div className="flex items-center gap-2 mb-3 text-blue-300">
+                                <Calendar size={16} />
+                                <h4 className="text-sm font-bold uppercase tracking-wide">Log Payment Record</h4>
+                            </div>
+                            <form onSubmit={handleAddPastPayment} className="grid grid-cols-2 gap-3">
+                                <div className="col-span-2">
+                                    <label className="text-[10px] uppercase text-gray-400 block mb-1">For Month</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <select name="billing_month_idx" className={`${selectClass} text-sm w-full`} defaultValue={today.getMonth()}>
+                                            {months.map((m, idx) => (
+                                                <option key={idx} value={idx}>{m}</option>
+                                            ))}
+                                        </select>
+                                        <select name="billing_year" className={`${selectClass} text-sm w-full`} defaultValue={currentYear}>
+                                            {years.map(y => (
+                                                <option key={y} value={y}>{y}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="col-span-2 grid grid-cols-2 gap-3">
+                                    <div><input type="number" name="amount" defaultValue={currentHistoryObligation.amount} placeholder="Amount" step="0.01" className={`${inputClass} text-sm`} /></div>
+                                    <div><input type="text" name="note" placeholder="Note (Optional)" className={`${inputClass} text-sm`} /></div>
+                                </div>
+
+                                <button type="submit" className="col-span-2 bg-slate-600 hover:bg-slate-500 text-white text-xs font-bold py-2 rounded uppercase tracking-wider transition">+ Add Record</button>
+                            </form>
                         </div>
-                    </div>
-                ))}
-            </div>
-        </Modal>
-    )
-}
+                        <div className="max-h-60 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                            {selectedHistory.map(h => (
+                                <div key={h.id} className="bg-slate-800 p-3 rounded flex justify-between items-center border border-slate-700">
+                                    <div>
+                                        <p className="text-white font-medium text-sm">
+                                            {h.billing_month ? (() => {
+                                                const [y, m] = h.billing_month.split('-').map(Number);
+                                                const date = new Date(y, m - 1, 1);
+                                                // Format: "December 2025" or similar
+                                                return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                                            })() : 'Auto Log'}
+                                        </p>
+                                    </div>
+                                    <div className="text-right flex flex-col items-end">
+                                        <div className="flex items-center gap-3">
+                                            <p className="text-green-400 font-bold text-sm">{formatCurrency(h.amount)}</p>
+                                            <button onClick={() => handleDeleteHistory(h.id)} className="text-slate-500 hover:text-red-400 transition" title="Delete Record">
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                        {h.note && <p className="text-xs text-gray-500">{h.note}</p>}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </Modal>
+                )
+            }
         </div >
     );
 };
