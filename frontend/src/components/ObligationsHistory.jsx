@@ -54,47 +54,9 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
             });
         });
 
-        // B. Generate Virtual "Unpaid" Items
-        // Only if Year is selected.
-        if (selectedYear !== 'All') {
-            // Determine range of months to generate
-            let monthsToGenerate = [];
-            if (selectedMonth !== 'All') {
-                monthsToGenerate = [selectedMonth];
-            } else {
-                // Generate for all 12 months if "All Months" is selected
-                monthsToGenerate = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
-            }
-
-            monthsToGenerate.forEach(month => {
-                const targetMonthStr = `${selectedYear}-${month}`; // YYYY-MM
-
-                obligations.forEach(obl => {
-                    // Check if this obligation has a payment for this specific billing month
-                    const hasPayment = flattened.some(item =>
-                        item.obligation_id === obl.id &&
-                        item.billing_month_sort.startsWith(targetMonthStr)
-                    );
-
-                    if (!hasPayment) {
-                        flattened.push({
-                            id: `virtual-${obl.id}-${targetMonthStr}`,
-                            obligation_id: obl.id,
-                            amount: obl.amount,
-                            payment_date: null,
-                            billing_month: `${targetMonthStr}-01`,
-                            note: 'Pending',
-                            oblName: obl.name,
-                            oblCategory: obl.category,
-                            billing_month_sort: `${targetMonthStr}-01`,
-                            year: selectedYear,
-                            month: month,
-                            status: 'Unpaid'
-                        });
-                    }
-                });
-            });
-        }
+        // B. Generate Virtual "Unpaid" Items - REMOVED!
+        // We only show actual payments now. 
+        // If it's not in the DB, it doesn't exist in the list.
 
         // Add Current Year to uniqueYears if not present (so it shows in filter even if emptiness)
         uniqueYears.add(currentDate.getFullYear().toString());
