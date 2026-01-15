@@ -388,6 +388,17 @@ const Obligations = () => {
                         </div>
                         <div>
                             <input type="text" placeholder="Note" className={inputClass} value={paymentForm.note} onChange={e => setPaymentForm({ ...paymentForm, note: e.target.value })} />
+                            <div className="mt-2">
+                                <label className="text-white text-xs uppercase font-bold mb-1 block">Status</label>
+                                <select
+                                    className={`${selectClass} w-full`}
+                                    value={paymentForm.status}
+                                    onChange={e => setPaymentForm({ ...paymentForm, status: e.target.value })}
+                                >
+                                    <option value="PAID">Paid</option>
+                                    <option value="PENDING">Pending (Unpaid)</option>
+                                </select>
+                            </div>
                         </div>
                         <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white p-3 rounded font-bold shadow-lg mt-4">Confirm</button>
                     </form>

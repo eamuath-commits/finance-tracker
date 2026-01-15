@@ -33,6 +33,14 @@ def run_migrations(engine):
                 conn.execute(text("UPDATE obligation_history SET billing_month = DATE_TRUNC('month', payment_date)"))
                 conn.commit()
 
+        # Check obligation_history for status
+        if 'status' not in history_columns:
+            print("Migrating: Adding status to obligation_history")
+            with engine.connect() as conn:
+                # Add column
+                conn.execute(text("ALTER TABLE obligation_history ADD COLUMN status VARCHAR DEFAULT 'PAID'"))
+                conn.commit()
+
     except Exception as e:
         print(f"Migration failed: {e}")
 

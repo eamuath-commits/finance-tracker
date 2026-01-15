@@ -102,6 +102,7 @@ class ObligationHistoryBase(BaseModel):
     billing_month: Optional[datetime] = None
     amount: float
     note: Optional[str] = None
+    status: str = "PAID" # "PAID" or "PENDING"
 
 class ObligationHistoryCreate(ObligationHistoryBase):
     pass
@@ -111,6 +112,7 @@ class ObligationHistoryUpdate(BaseModel):
     billing_month: Optional[datetime] = None
     amount: Optional[float] = None
     note: Optional[str] = None
+    status: Optional[str] = None
 
 class ObligationHistory(ObligationHistoryBase):
     id: int

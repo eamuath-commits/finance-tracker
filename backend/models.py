@@ -56,6 +56,10 @@ class MonthlyObligation(Base):
     due_day = Column(Integer, nullable=False) # e.g. 1 for 1st of month
     category = Column(String, nullable=True)
 
+class PaymentStatus(enum.Enum):
+    PAID = "PAID"
+    PENDING = "PENDING"
+
 class ObligationHistory(Base):
     __tablename__ = "obligation_history"
 
@@ -65,5 +69,6 @@ class ObligationHistory(Base):
     billing_month = Column(Date, nullable=True) # First day of the cycle month
     amount = Column(Float, nullable=False)
     note = Column(String, nullable=True)
+    status = Column(Enum(PaymentStatus), default=PaymentStatus.PAID)
 
     obligation = relationship("MonthlyObligation")
