@@ -123,6 +123,9 @@ def update_obligation(db: Session, obligation_id: str, obligation_update: schema
     return db_obj
 
 def delete_obligation(db: Session, obligation_id: str):
+    # Delete associated history first to prevent Foreign Key errors
+    db.query(models.ObligationHistory).filter(models.ObligationHistory.obligation_id == obligation_id).delete()
+    
     db_obj = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
     if db_obj:
         db.delete(db_obj)
