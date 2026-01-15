@@ -170,6 +170,7 @@ const Obligations = () => {
     };
 
     const openPaymentModal = (obl, targetMonthStr = null, defaultAmount = null, historyEntry = null) => {
+        console.log("💰 openPaymentModal called:", { obl: obl?.name, targetMonthStr, defaultAmount, historyEntry });
         const now = new Date();
         const defaultMonthStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-01`;
 
