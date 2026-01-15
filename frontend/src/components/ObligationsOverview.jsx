@@ -113,10 +113,10 @@ const ObligationsOverview = ({ obligations, getMonthStatus, monthOffset = 0 }) =
                             {isCompleted && <CheckCircle size={10} />}
                             {progress.toFixed(0)}%
                         </span>
-                        <span className="text-slate-500">
+                        <span className="text-slate-500 flex gap-1">
                             {isOverBudget
-                                ? `+${formatCurrency(stats.currentPaid - stats.currentBudget)}`
-                                : `${formatCurrency(stats.currentBudget - stats.currentPaid)} left`
+                                ? <><span className="text-red-400">+</span>{formatCurrency(stats.currentPaid - stats.currentBudget)}</>
+                                : <>{formatCurrency(stats.currentBudget - stats.currentPaid)} left</>
                             }
                         </span>
                     </div>
