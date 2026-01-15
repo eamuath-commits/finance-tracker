@@ -16,6 +16,43 @@ const Obligations = () => {
 
     // ... (fetchObligations and other handlers remain same)
 
+    const fetchObligations = async () => {
+        console.log("🚀 Starting fetchObligations...");
+        try {
+            const res = await axios.get(`${API_URL}/obligations/`);
+            console.log(`✅ Fetched ${res.data.length} obligations.`);
+            setObligations(res.data);
+
+            const historyData = {};
+            console.log("⏳ Fetching history for each obligation...");
+
+            await Promise.all(res.data.map(async (obl) => {
+                try {
+                    const hRes = await axios.get(`${API_URL}/obligations/${obl.id}/history`);
+                    historyData[obl.id] = hRes.data;
+                } catch (hErr) {
+                    console.error(`❌ Failed to fetch history for ${obl.name} (${obl.id}):`, hErr);
+                    historyData[obl.id] = []; // Fallback to empty array to prevent crash
+                }
+            }));
+
+            console.log("✅ History fetch complete.", historyData);
+            setHistory(historyData);
+        } catch (error) {
+            console.error("❌ CRTICAL ERROR fetching obligations:", error);
+            if (error.response) {
+                console.error("   Status:", error.response.status);
+                console.error("   Data:", error.response.data);
+            } else if (error.request) {
+                console.error("   No response received:", error.request);
+            } else {
+                console.error("   Error Message:", error.message);
+            }
+        } finally {
+            console.log("🏁 Loading finished (setting loading=false).");
+            setLoading(false);
+        }
+    };
     const handleDeleteHistory = async (historyId) => {
         if (!confirm("Delete this record?")) return;
         try {
