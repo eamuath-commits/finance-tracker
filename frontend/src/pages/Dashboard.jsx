@@ -63,7 +63,7 @@ const Dashboard = () => {
     const [editingId, setEditingId] = useState(null);
 
     // Form Data
-    const [accountForm, setAccountForm] = useState({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '' });
+    const [accountForm, setAccountForm] = useState({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '', credit_limit: '' });
     const [loanForm, setLoanForm] = useState({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '' });
     const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_day: '', category: '' });
     const [transactionForm, setTransactionForm] = useState({ category: '' });
@@ -109,7 +109,7 @@ const Dashboard = () => {
             }
             setShowAccountModal(false);
             setEditingId(null);
-            setAccountForm({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '' });
+            setAccountForm({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '', credit_limit: '' });
             fetchData();
         } catch (err) { alert('Error saving account'); }
     };
@@ -159,10 +159,16 @@ const Dashboard = () => {
     const openAccountModal = (acc = null) => {
         if (acc) {
             setEditingId(acc.id);
-            setAccountForm({ name: acc.name, account_type: acc.account_type, last_4_digits: acc.last_4_digits, current_balance: acc.current_balance });
+            setAccountForm({
+                name: acc.name,
+                account_type: acc.account_type,
+                last_4_digits: acc.last_4_digits,
+                current_balance: acc.current_balance,
+                credit_limit: acc.credit_limit || ''
+            });
         } else {
             setEditingId(null);
-            setAccountForm({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '' });
+            setAccountForm({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '', credit_limit: '' });
         }
         setShowAccountModal(true);
     };
@@ -237,11 +243,28 @@ const Dashboard = () => {
                         </select>
                         <input type="text" placeholder="Last 4 Digits" required className={inputClass} value={accountForm.last_4_digits} onChange={e => setAccountForm({ ...accountForm, last_4_digits: e.target.value })} />
                         <input type="number" step="0.01" placeholder="Current Balance" required className={inputClass} value={accountForm.current_balance} onChange={e => setAccountForm({ ...accountForm, current_balance: e.target.value })} />
+
+                        {/* Credit Limit Input (Only for Credit Cards) */}
+                        {accountForm.account_type === 'Credit Card' && (
+                            <div className="bg-slate-700/50 p-3 rounded border border-slate-600">
+                                <label className="text-xs text-gray-400 uppercase font-semibold">Credit Limit</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="Enter Credit Limit"
+                                    className={`${inputClass} mt-1`}
+                                    value={accountForm.credit_limit || ''}
+                                    onChange={e => setAccountForm({ ...accountForm, credit_limit: e.target.value })}
+                                />
+                            </div>
+                        )}
+
                         <button type="submit" className="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700 font-medium">Save Account</button>
                     </form>
                 </Modal>
             )}
 
+            {/* ... Loans Modal ... */}
             {showLoanModal && (
                 <Modal title={editingId ? "Edit Loan" : "Add New Loan"} onClose={() => setShowLoanModal(false)}>
                     <form onSubmit={handleSaveLoan} className="space-y-4">
@@ -289,27 +312,68 @@ const Dashboard = () => {
 
             <SectionHeader title="Your Accounts" onAdd={() => openAccountModal(null)} />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-                {accounts.map(acc => (
-                    <div key={acc.id} className="bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-700 group relative">
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition">
-                            <EditIcon onClick={() => openAccountModal(acc)} />
+                {accounts.map(acc => {
+                    const isCreditCard = acc.account_type === 'Credit Card';
+                    const hasLimit = isCreditCard && acc.credit_limit > 0;
+                    // For credit cards, balance is usually negative (dept) or zero. 
+                    // To calculate utilization: abs(balance) / limit
+                    // Wait, usually banks report balance as positive debt, or negative usually means credit? 
+                    // Let's assume standard logic: 
+                    // If balance is POSITIVE in DB, it means money we HAVE (Asset).
+                    // If balance is NEGATIVE in DB, it means money we OWE (Liability).
+                    // BUT many scrapers import credit card debt as negative.
+
+                    // Let's assume Credit Card Balance -500 means I owe 500.
+                    // Utilization = abs(-500) / 1000 = 50%
+
+                    const utilPercent = hasLimit ? Math.min(100, (Math.abs(acc.current_balance) / acc.credit_limit) * 100) : 0;
+
+                    return (
+                        <div key={acc.id} className="bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-700 group relative">
+                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition">
+                                <EditIcon onClick={() => openAccountModal(acc)} />
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="font-semibold text-white">{acc.name}</span>
+                                <span className="text-xs bg-slate-600 text-gray-200 px-2 py-1 rounded">*{acc.last_4_digits}</span>
+                            </div>
+                            <p className={`text-xl font-bold mt-2 ${acc.current_balance < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                                {formatCurrency(acc.current_balance)}
+                            </p>
+                            <div className="flex justify-between items-center mt-1">
+                                <p className="text-xs text-gray-500 uppercase">{acc.account_type}</p>
+                                {hasLimit && (
+                                    <p className="text-xs text-slate-400">
+                                        {utilPercent.toFixed(0)}% Used
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Utilization Bar for Credit Cards */}
+                            {hasLimit && (
+                                <div className="mt-3">
+                                    <div className="w-full bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                                        <div
+                                            className={`h-full rounded-full ${utilPercent > 90 ? 'bg-red-500' : utilPercent > 50 ? 'bg-yellow-500' : 'bg-blue-500'}`}
+                                            style={{ width: `${utilPercent}%` }}
+                                        />
+                                    </div>
+                                    <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+                                        <span>Limit: {formatCurrency(acc.credit_limit)}</span>
+                                        <span>Available: {formatCurrency(acc.credit_limit - Math.abs(acc.current_balance))}</span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                        <div className="flex justify-between items-center">
-                            <span className="font-semibold text-white">{acc.name}</span>
-                            <span className="text-xs bg-slate-600 text-gray-200 px-2 py-1 rounded">*{acc.last_4_digits}</span>
-                        </div>
-                        <p className={`text-xl font-bold mt-2 ${acc.current_balance < 0 ? 'text-red-400' : 'text-green-400'}`}>
-                            {formatCurrency(acc.current_balance)}
-                        </p>
-                        <p className="text-xs text-gray-500 uppercase mt-1">{acc.account_type}</p>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             <SectionHeader title="Active Loans" onAdd={() => openLoanModal(null)} />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
                 {loans.map(loan => (
                     <div key={loan.id} className="bg-slate-800 p-4 rounded-lg shadow-lg border border-red-900/30 group relative">
+
                         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition">
                             <EditIcon onClick={() => openLoanModal(loan)} />
                         </div>
