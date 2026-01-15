@@ -48,8 +48,20 @@ const Obligations = () => {
 
     // --- Helpers ---
     const getMonthStatus = (obl, offset) => {
-        const today = new Date();
-        const targetDate = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+        const now = new Date();
+        // Billing Cycle Logic: Cycle starts on the 23rd.
+        // If today is < 23rd, we are still considered to be in the Previous Month's cycle logic for "Current".
+        // e.g. Jan 15 (< 23) -> effectively Dec cycle is "Current" (offset 0).
+        // Jan 24 (>= 23) -> effectively Jan cycle is "Current" (offset 0).
+
+        let baseYear = now.getFullYear();
+        let baseMonth = now.getMonth();
+
+        if (now.getDate() < 23) {
+            baseMonth -= 1;
+        }
+
+        const targetDate = new Date(baseYear, baseMonth + offset, 1);
         const targetMonth = targetDate.getMonth();
         const targetYear = targetDate.getFullYear();
 
