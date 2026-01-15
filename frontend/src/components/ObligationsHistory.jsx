@@ -137,7 +137,8 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
     });
 
     // 4. Calculate Total
-    const totalAmount = sorted.reduce((sum, item) => item.status === 'Paid' ? sum + (item.amount || 0) : sum, 0);
+    const visiblePaid = sorted.reduce((sum, item) => item.status === 'Paid' ? sum + (item.amount || 0) : sum, 0);
+    const visibleUnpaid = sorted.reduce((sum, item) => item.status === 'Unpaid' ? sum + (item.amount || 0) : sum, 0);
 
     const requestSort = (key) => {
         let direction = 'asc';
@@ -163,15 +164,31 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
         { value: '11', label: 'November' }, { value: '12', label: 'December' }
     ];
 
+    let totalLabel = "Total Amount";
+    let totalDisplay = visiblePaid + visibleUnpaid;
+    let totalSubtext = `${sorted.length} records`;
+
+    if (selectedStatus === 'Paid') {
+        totalLabel = "Total Paid";
+        totalDisplay = visiblePaid;
+    } else if (selectedStatus === 'Unpaid') {
+        totalLabel = "Total Pending";
+        totalDisplay = visibleUnpaid;
+    } else {
+        // Status is All
+        totalLabel = "Total Value";
+        totalSubtext = `${formatCurrency(visiblePaid)} Paid · ${formatCurrency(visibleUnpaid)} Pending`;
+    }
+
     return (
         <div className="animate-fade-in-up space-y-4">
             {/* Top Stats & Filters Row */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {/* Total Summary Card */}
                 <div className="bg-gradient-to-br from-blue-900/50 to-slate-900 border border-blue-800/30 p-4 rounded-xl flex flex-col justify-center">
-                    <p className="text-blue-300 text-xs uppercase font-bold tracking-wider mb-1">Total Paid</p>
-                    <p className="text-2xl font-mono font-bold text-white">{formatCurrency(totalAmount)}</p>
-                    <p className="text-xs text-slate-500 mt-1">{sorted.filter(i => i.status === 'Paid').length} paid records</p>
+                    <p className="text-blue-300 text-xs uppercase font-bold tracking-wider mb-1">{totalLabel}</p>
+                    <p className="text-2xl font-mono font-bold text-white">{formatCurrency(totalDisplay)}</p>
+                    <p className="text-xs text-slate-500 mt-1">{totalSubtext}</p>
                 </div>
 
                 {/* Filters Area */}
