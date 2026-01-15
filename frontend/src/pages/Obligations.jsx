@@ -78,15 +78,14 @@ const Obligations = () => {
 
     const getMonthStatus = (obl, offset) => {
         const now = new Date();
-        const cutoffDate = 23;
-
+        // Simple Calendar Math for View Target to align with Header Navigation
+        // User selects "December", they expect December, regardless of billing cycle cutoffs.
         let baseYear = now.getFullYear();
         let baseMonth = now.getMonth();
 
-        // If today is before the 23rd, our "current" cycle is technically last month's cycle
-        if (now.getDate() < cutoffDate) {
-            baseMonth -= 1;
-        }
+        // Note: Cutoff logic (23rd) might be relevant for *status* (is it due?), 
+        // but for *identifying which month to show*, using simple calendar offset is safer 
+        // to prevent mismatch with the Header.
 
         const targetDate = new Date(baseYear, baseMonth + offset, 1);
         const targetMonth = targetDate.getMonth();
