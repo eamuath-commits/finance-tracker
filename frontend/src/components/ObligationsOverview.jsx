@@ -12,8 +12,11 @@ const ObligationsOverview = ({ obligations, getMonthStatus }) => {
         items.forEach(obl => {
             const prev = getMonthStatus(obl, -1);
             const curr = getMonthStatus(obl, 0);
-            if (prev.amount) prevPaid += prev.amount;
-            if (curr.amount) currentBudget += curr.amount;
+            if (prev.amount) {
+                prevPaid += prev.amount;
+                // Budget for current month is based on PREVIOUS month's total
+                currentBudget += prev.amount;
+            }
             if (curr.isPaid && curr.amount) currentPaid += curr.amount;
         });
 
@@ -59,8 +62,7 @@ const ObligationsOverview = ({ obligations, getMonthStatus }) => {
                         <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${progress}%`, backgroundColor: accentColor }}></div>
                     </div>
 
-                    <div className="flex justify-between items-center text-[10px]">
-                        <span className="text-gray-500">Prev: {formatCurrency(stats.prevPaid)}</span>
+                    <div className="flex justify-end items-center text-[10px]">
                         <span style={{ color: accentColor }}>{progress.toFixed(0)}%</span>
                     </div>
                 </div>

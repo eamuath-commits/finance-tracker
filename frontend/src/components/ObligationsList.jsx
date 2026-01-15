@@ -42,8 +42,11 @@ const ObligationsList = ({
         items.forEach(obl => {
             const prev = getMonthStatus(obl, -1);
             const curr = getMonthStatus(obl, 0);
-            if (prev.amount) prevPaid += prev.amount;
-            if (curr.amount) currentBudget += curr.amount;
+            if (prev.amount) {
+                prevPaid += prev.amount;
+                // Budget is based on Prev Month's actuals
+                currentBudget += prev.amount;
+            }
             if (curr.isPaid && curr.amount) currentPaid += curr.amount;
         });
 
@@ -66,11 +69,7 @@ const ObligationsList = ({
 
                             <div className="flex gap-4 text-xs">
                                 <div className="flex flex-col items-end">
-                                    <span className="text-gray-500 uppercase font-semibold">Prev Total</span>
-                                    <span className="text-gray-300 font-mono">{formatCurrency(stats.prevPaid)}</span>
-                                </div>
-                                <div className="flex flex-col items-end">
-                                    <span className="text-blue-400 uppercase font-semibold">Budget</span>
+                                    <span className="text-blue-400 uppercase font-semibold">Budget (Prev Month)</span>
                                     <span className="text-blue-200 font-mono">{formatCurrency(stats.currentBudget)}</span>
                                 </div>
                                 <div className="flex flex-col items-end">
