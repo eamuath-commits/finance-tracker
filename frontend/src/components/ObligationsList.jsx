@@ -96,7 +96,7 @@ const ObligationsList = ({
                     <div className="flex flex-col items-end">
                         <span className="text-blue-400 uppercase font-bold text-[10px] tracking-wider">Total Budget</span>
                         <div className="flex items-center gap-2">
-                            <span className="text-2xl font-mono text-white font-bold">{formatCurrency(globalStats.budget)}</span>
+                            <span className="text-2xl font-mono text-blue-200 font-bold">{formatCurrency(globalStats.budget)}</span>
                         </div>
                     </div>
 
