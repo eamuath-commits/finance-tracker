@@ -117,9 +117,10 @@ const Obligations = () => {
             label: targetDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
             shortLabel: targetDate.toLocaleDateString('en-US', { month: 'short' }),
             billingDateStr,
-            isPaid: !!payment,
+            isPaid: payment && payment.status === 'PAID',
             amount: displayAmount,
-            paymentId: payment ? payment.id : null
+            paymentId: payment ? payment.id : null,
+            status: payment ? payment.status : null
         };
     };
 
