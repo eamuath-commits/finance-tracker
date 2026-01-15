@@ -39,7 +39,7 @@ const Obligations = () => {
             setObligations(res.data);
 
             const paymentsData = {};
-            // console.log("⏳ Fetching payments for each obligation...");
+            console.log("⏳ Fetching payments for each obligation...");
 
             await Promise.all(res.data.map(async (obl) => {
                 try {
@@ -52,7 +52,7 @@ const Obligations = () => {
                 }
             }));
 
-            // console.log("✅ Payments fetch complete.", paymentsData);
+            console.log("✅ Payments fetch complete:", paymentsData);
             setPayments(paymentsData);
         } catch (error) {
             console.error("❌ CRITICAL ERROR fetching obligations:", error);
@@ -98,6 +98,15 @@ const Obligations = () => {
 
         if (payment) {
             displayAmount = payment.amount;
+        }
+
+        // DEBUG LOGGING
+        if (offset === 0 && obl.name === 'test') { // Targeted logging
+            console.log(`🔍 Status for ${obl.name} (${billingDateStr}):`, {
+                paymentFound: !!payment,
+                paymentId: payment ? payment.id : 'null',
+                status: payment ? payment.status : 'NO_RECORD'
+            });
         }
 
         // Strict "Delete means Gone" logic:
@@ -232,17 +241,31 @@ const Obligations = () => {
     };
 
     const handleDeleteHistory = async (historyId) => {
+        console.log("🗑️ Request check to delete history ID:", historyId);
+
+        // Check for "virtual" ID just in case
+        if (historyId && typeof historyId === 'string' && historyId.startsWith('virtual-')) {
+            console.warn("⚠️ Attempted to delete a VIRTUAL ID (Refusing):", historyId);
+            alert("Cannot delete a non-existent (virtual) record. Please refresh functionality.");
+            return;
+        }
+
         // No more "Virtual" items. Since we only show real payments, we only delete real IDs.
-        if (!confirm("Delete this payment record?")) return;
+        if (!confirm(`Delete payment record ID: ${historyId}?`)) return;
         try {
+            console.log(`🚀 Sending DELETE request for ID: ${historyId}`);
             // Using legacy endpoint
             await axios.delete(`${API_URL}/obligations/history/${historyId}`);
+            console.log("✅ Delete success.");
             if (viewingHistoryId) {
                 const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/payments`);
                 setSelectedHistory(hRes.data);
             }
             fetchObligations();
-        } catch (err) { alert("Error deleting payment"); }
+        } catch (err) {
+            console.error("❌ Error deleting payment:", err);
+            alert("Error deleting payment (Check console)");
+        }
     };
 
     const openObligationModal = (obl = null) => {
