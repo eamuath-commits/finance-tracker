@@ -59,6 +59,7 @@ class MonthlyObligation(Base):
 class PaymentStatus(enum.Enum):
     PAID = "PAID"
     PENDING = "PENDING"
+    # Status Enum Definition
 
 class ObligationHistory(Base):
     __tablename__ = "obligation_history"
