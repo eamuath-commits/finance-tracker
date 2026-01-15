@@ -199,6 +199,14 @@ def update_transaction(transaction_id: str, transaction_update: schemas.Transact
         raise HTTPException(status_code=404, detail="Transaction not found")
     return updated_tx
 
+@app.post("/transactions/", response_model=schemas.Transaction)
+def create_transaction(transaction: schemas.TransactionCreate, db: Session = Depends(get_db)):
+    # Verify account exists
+    account = db.query(models.Account).filter(models.Account.id == transaction.account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return crud.create_transaction(db=db, transaction=transaction)
+
 # --- Analysis Endpoints ---
 @app.get("/analysis/allocation", response_model=analysis_schema.AllocationResponse)
 def get_allocation_analysis(db: Session = Depends(get_db)):
