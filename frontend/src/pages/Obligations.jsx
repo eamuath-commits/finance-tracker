@@ -238,14 +238,14 @@ const Obligations = () => {
     };
 
     // Quick Pay Handler (Bypasses Modal)
-    const handleQuickPay = async (oblId, amount, billingMonth) => {
+    const handleQuickPay = async (oblId, amount, billingMonth, status = "PAID") => {
         try {
             const payload = {
                 payment_date: new Date().toISOString(),
                 amount: parseFloat(amount),
                 billing_month: billingMonth,
-                note: "Quick Pay",
-                status: "PAID"
+                note: status === "PENDING" ? "Draft Amount" : "Quick Pay",
+                status: status
             };
             // Always use the /pay endpoint (which now handles upserts)
             await axios.post(`${API_URL}/obligations/${oblId}/pay`, payload);
