@@ -161,12 +161,15 @@ const Obligations = () => {
         const defaultMonthStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-01`;
 
         if (historyEntry) {
+            // Check if this is a "virtual" (Unpaid) entry
+            const isVirtual = historyEntry.id && historyEntry.id.toString().startsWith('virtual-');
+
             setPaymentForm({
                 id: obl.id,
-                historyId: historyEntry.id,
+                historyId: isVirtual ? null : historyEntry.id, // If virtual, we are creating NEW payment (POST), not updating (PUT)
                 name: obl.name,
                 amount: historyEntry.amount,
-                note: historyEntry.note || "",
+                note: historyEntry.note === 'Pending' ? '' : (historyEntry.note || ""),
                 billing_month: historyEntry.billing_month || targetMonthStr
             });
         } else {
@@ -229,6 +232,11 @@ const Obligations = () => {
     };
 
     const handleDeleteHistory = async (historyId) => {
+        if (historyId && historyId.toString().startsWith('virtual-')) {
+            alert("This item is Unpaid, so there is no record to delete.");
+            return;
+        }
+
         if (!confirm("Delete this record?")) return;
         try {
             await axios.delete(`${API_URL}/obligations/history/${historyId}`);
