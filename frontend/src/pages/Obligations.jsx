@@ -414,8 +414,8 @@ const Obligations = () => {
                                     value={paymentForm.status}
                                     onChange={e => setPaymentForm({ ...paymentForm, status: e.target.value })}
                                 >
-                                    <option value="PAID">Paid</option>
-                                    <option value="PENDING">Pending (Unpaid)</option>
+                                    <option value="PAID">PAID</option>
+                                    <option value="PENDING">UNPAID</option>
                                 </select>
                             </div>
                         </div>
