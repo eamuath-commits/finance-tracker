@@ -4,7 +4,7 @@ import { LayoutDashboard, Wallet, CreditCard, Receipt, FileBarChart, Settings } 
 
 const Sidebar = () => {
     const navItems = [
-        { path: '/', label: 'Overview', icon: LayoutDashboard },
+        { path: '/', label: 'Dashboard', icon: LayoutDashboard },
         { path: '/transactions', label: 'Transactions', icon: Receipt },
         { path: '/loans', label: 'Loans', icon: Wallet },
         { path: '/obligations', label: 'Obligations', icon: CreditCard },
