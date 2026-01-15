@@ -67,6 +67,10 @@ const Obligations = () => {
         } catch (err) { alert("Error deleting history"); }
     };
 
+    useEffect(() => {
+        fetchObligations();
+    }, []);
+
     // ... (other handlers)
 
     if (loading) return <div className="p-10 text-white">Loading...</div>;
