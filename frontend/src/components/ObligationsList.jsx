@@ -17,9 +17,15 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
     }, [prevMonth.amount, obl.amount, monthOffset]);
 
     const handlePay = (e) => {
+        e.preventDefault();
         e.stopPropagation();
-        // If input is empty, fallback to the initial default we calculated
-        const finalAmount = payAmount !== "" ? parseFloat(payAmount) : (initialAmount || 0);
+
+        // Logic: Empty or 0 -> Revert to Initial Default (Prev Month or Obligation Default)
+        let finalAmount = payAmount !== "" ? parseFloat(payAmount) : (initialAmount || 0);
+        if (finalAmount === 0 && initialAmount > 0) {
+            finalAmount = initialAmount;
+        }
+
         openPaymentModal(obl, currMonth.billingDateStr, finalAmount);
     };
 
@@ -27,7 +33,12 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
         if (e.key === 'Enter') {
             e.preventDefault();
             e.stopPropagation();
-            const finalAmount = payAmount !== "" ? parseFloat(payAmount) : (initialAmount || 0);
+
+            let finalAmount = payAmount !== "" ? parseFloat(payAmount) : (initialAmount || 0);
+            if (finalAmount === 0 && initialAmount > 0) {
+                finalAmount = initialAmount;
+            }
+
             handleQuickPay(obl.id, finalAmount, currMonth.billingDateStr);
         }
     };
@@ -57,6 +68,7 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
                         <div className="text-center group-hover/cell:opacity-20 transition">
                             <CheckCircle size={14} className="text-green-500/50 mx-auto" />
                             <span className="font-mono text-gray-400">{formatCurrency(prevMonth.amount)}</span>
+                            <span className="text-[8px] text-gray-600 block">#{prevMonth.paymentId}</span>
                         </div>
                     ) : (
                         <div className="text-center">
@@ -84,6 +96,7 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
                         <div className="text-center relative">
                             <CheckCircle size={16} className="text-green-400 mx-auto mb-0.5" />
                             <span className="font-bold font-mono text-white block">{formatCurrency(currMonth.amount)}</span>
+                            <span className="text-[8px] text-slate-600 block absolute bottom-[-10px] w-full text-center group-hover/curr:opacity-100 opacity-0 transition">#{currMonth.paymentId}</span>
                             <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 group-hover/curr:opacity-100 bg-slate-800/90 transition z-10">
                                 <button onClick={() => openPaymentModal(obl, currMonth.billingDateStr, null, { id: currMonth.paymentId, amount: currMonth.amount, billing_month: currMonth.billingDateStr })} className="p-1 hover:text-blue-400"><Pencil size={12} /></button>
                                 <button onClick={() => handleDeleteHistory(currMonth.paymentId)} className="p-1 hover:text-red-400"><Trash2 size={12} /></button>
