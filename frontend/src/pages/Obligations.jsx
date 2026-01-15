@@ -576,11 +576,12 @@ const Obligations = () => {
                                 </div>
                             </div>
                         );
-                    })()
-                }
+                    });
+                })()
+            }
 
 
-{/* --- PAYMENT MODAL --- */}
+            {/* --- PAYMENT MODAL --- */}
             {
                 showPaymentModal && (
                     <Modal title={`Pay Bill: ${paymentForm.name}`} onClose={() => setShowPaymentModal(false)}>
