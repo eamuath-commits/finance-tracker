@@ -1,23 +1,23 @@
 import React from 'react';
-import { Landmark, Zap, Car, CreditCard, Smartphone } from 'lucide-react';
+import { Landmark, Zap, Car, CreditCard, Smartphone, Banknote, Home, Utensils, Shield, Clock, Box, TrendingUp, AlertCircle, CheckCircle } from 'lucide-react';
 import { formatCurrency } from '../components/UI';
 
 const ObligationsOverview = ({ obligations, getMonthStatus, monthOffset = 0 }) => {
 
-    const CATEGORY_COLORS = {
-        "Salary": "#10b981", // Emerald
-        "House": "#3b82f6", // Blue
-        "Utilities": "#f59e0b", // Amber
-        "Food & Groceries": "#f97316", // Orange
-        "Transport": "#ef4444", // Red
-        "Insurance": "#a855f7", // Purple
-        "Subscription": "#06b6d4", // Cyan
-        "Tech & Subscriptions": "#06b6d4",
-        "Loan": "#e11d48", // Rose
-        "Auto Loan": "#be123c",
-        "Credit Card": "#ec4899", // Pink
-        "Pay Later": "#8b5cf6", // Violet
-        "Other": "#9ca3af" // Gray
+    const CATEGORY_CONFIG = {
+        "Salary": { color: "#10b981", icon: <Banknote size={18} /> },       // Emerald
+        "House": { color: "#3b82f6", icon: <Home size={18} /> },           // Blue
+        "Utilities": { color: "#f59e0b", icon: <Zap size={18} /> },        // Amber
+        "Food & Groceries": { color: "#f97316", icon: <Utensils size={18} /> }, // Orange
+        "Transport": { color: "#ef4444", icon: <Car size={18} /> },        // Red
+        "Insurance": { color: "#a855f7", icon: <Shield size={18} /> },     // Purple
+        "Subscription": { color: "#06b6d4", icon: <Smartphone size={18} /> }, // Cyan
+        "Tech & Subscriptions": { color: "#06b6d4", icon: <Smartphone size={18} /> },
+        "Loan": { color: "#e11d48", icon: <Landmark size={18} /> },        // Rose
+        "Auto Loan": { color: "#be123c", icon: <Car size={18} /> },
+        "Credit Card": { color: "#ec4899", icon: <CreditCard size={18} /> }, // Pink
+        "Pay Later": { color: "#8b5cf6", icon: <Clock size={18} /> },      // Violet
+        "Other": { color: "#9ca3af", icon: <Box size={18} /> }             // Gray
     };
 
     const getStats = (items) => {
@@ -27,21 +27,13 @@ const ObligationsOverview = ({ obligations, getMonthStatus, monthOffset = 0 }) =
         let itemCount = 0;
 
         items.forEach(obl => {
-            // Only count active obligations (optional: could filter out those with 0 amount?)
-            // For now, we count all assigned to this category
             const prev = getMonthStatus(obl, monthOffset - 1);
             const curr = getMonthStatus(obl, monthOffset);
 
             if (prev.amount) {
                 prevPaid += prev.amount;
                 currentBudget += prev.amount;
-            } else if (obl.amount) {
-                // Fallback: if no prev month data, use default amount?
-                // Or purely rely on prev month as budget?
-                // User said "Budget = Sum of Previous Month". So if 0, then 0.
-                // But initially might be mostly 0. Let's stick to strict prev month.
             }
-
             if (curr.isPaid && curr.amount) currentPaid += curr.amount;
             itemCount++;
         });
@@ -62,47 +54,80 @@ const ObligationsOverview = ({ obligations, getMonthStatus, monthOffset = 0 }) =
 
     // 3. Generate Stats for each Category
     const categoryCards = Object.entries(grouped).map(([category, items]) => {
+        const config = CATEGORY_CONFIG[category] || CATEGORY_CONFIG["Other"];
         return {
             title: category,
             stats: getStats(items),
-            color: CATEGORY_COLORS[category] || CATEGORY_COLORS["Other"],
-            Icon: null // Icons are handled inside render or we can map them if needed, but text title is enough with color
+            color: config.color,
+            icon: config.icon
         };
     });
 
-    const renderSummaryCard = (title, stats, accentColor, isTotal = false) => {
-        // Safe division
+    const renderSummaryCard = (title, stats, color, icon, isTotal = false) => {
         const progress = stats.currentBudget > 0 ? (stats.currentPaid / stats.currentBudget) * 100 : 0;
-        const displayProgress = Math.min(progress, 100); // Cap visual bar at 100%
+        const displayProgress = Math.min(progress, 100);
+
+        // Status determination
+        const isOverBudget = stats.currentPaid > stats.currentBudget;
+        const isCompleted = progress >= 100 && !isOverBudget;
+
+        // Dynamic border color based on status
+        const borderColor = isTotal
+            ? 'border-blue-500/30'
+            : (isOverBudget ? 'border-red-500/30' : (isCompleted ? 'border-green-500/30' : 'border-slate-700'));
 
         return (
-            <div key={title} className={`bg-slate-800 border border-slate-700 rounded-lg p-4 shadow-lg relative overflow-hidden group hover:border-[${accentColor}]/50 transition flex flex-col justify-between h-32`}>
-                <div className="absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none opacity-10" style={{ backgroundColor: accentColor }}></div>
+            <div key={title} className={`bg-slate-800/80 backdrop-blur-sm border ${borderColor} rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300 group relative overflow-hidden flex flex-col justify-between h-[140px]`}>
+
+                {/* Background Glow */}
+                <div className="absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none opacity-[0.08]" style={{ backgroundColor: color }}></div>
 
                 <div className="relative z-10">
-                    <div className="flex justify-between items-start mb-2">
-                        <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accentColor }}></span>
-                            {title}
-                        </h2>
-                        {isTotal && <Landmark size={14} className="text-gray-600" />}
+                    <div className="flex justify-between items-start mb-3">
+                        <div className="flex items-center gap-2">
+                            <div className={`p-1.5 rounded-lg bg-slate-900/50 text-white/80 shadow-inner ring-1 ring-white/5`}>
+                                {icon || <Box size={18} />}
+                            </div>
+                            <div>
+                                <h2 className="text-xs font-bold text-slate-300 uppercase tracking-wide truncate max-w-[100px]">{title}</h2>
+                                {!isTotal && <span className="text-[10px] text-slate-500 font-medium">{stats.itemCount} items</span>}
+                            </div>
+                        </div>
+                        {isTotal && (
+                            <div className="bg-blue-500/10 text-blue-400 p-1.5 rounded-lg">
+                                <TrendingUp size={16} />
+                            </div>
+                        )}
                     </div>
 
-                    <div className="flex items-baseline gap-1.5">
-                        <span className="text-xl font-bold text-white">{formatCurrency(stats.currentPaid)}</span>
-                        <span className="text-gray-600 text-[10px]">/ {formatCurrency(stats.currentBudget)}</span>
+                    <div className="flex items-baseline gap-1.5 mb-1">
+                        <span className="text-2xl font-bold text-white tracking-tight">{formatCurrency(stats.currentPaid)}</span>
+                        <span className="text-slate-500 text-[10px] font-medium uppercase">of {formatCurrency(stats.currentBudget)}</span>
                     </div>
                 </div>
 
                 <div className="relative z-10 mt-auto">
-                    <div className="w-full bg-slate-700 h-1 rounded-full mb-2 overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${displayProgress}%`, backgroundColor: accentColor }}></div>
+                    <div className="flex justify-between items-end mb-1.5 text-[10px]">
+                        <span className={`${isOverBudget ? 'text-red-400' : (isCompleted ? 'text-emerald-400' : 'text-blue-400')} font-bold flex items-center gap-1`}>
+                            {isOverBudget && <AlertCircle size={10} />}
+                            {isCompleted && <CheckCircle size={10} />}
+                            {progress.toFixed(0)}%
+                        </span>
+                        <span className="text-slate-500">
+                            {isOverBudget
+                                ? `+${formatCurrency(stats.currentPaid - stats.currentBudget)}`
+                                : `${formatCurrency(stats.currentBudget - stats.currentPaid)} left`
+                            }
+                        </span>
                     </div>
-
-                    <div className="flex justify-end items-center text-[10px]">
-                        {/* Show count for categories */}
-                        {!isTotal && <span className="text-gray-500 mr-auto">{stats.itemCount} Items</span>}
-                        <span style={{ color: accentColor }}>{progress.toFixed(0)}%</span>
+                    <div className="w-full bg-slate-900/50 h-1.5 rounded-full overflow-hidden ring-1 ring-white/5">
+                        <div
+                            className={`h-full rounded-full transition-all duration-1000 ease-out ${isOverBudget ? 'bg-red-500' : ''}`}
+                            style={{
+                                width: `${displayProgress}%`,
+                                backgroundColor: isOverBudget ? undefined : color
+                            }}
+                        ></div>
                     </div>
                 </div>
             </div>
@@ -111,14 +136,21 @@ const ObligationsOverview = ({ obligations, getMonthStatus, monthOffset = 0 }) =
 
     return (
         <div className="animate-fade-in-up">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                {/* Always show Total First */}
-                {renderSummaryCard("Total Overview", globalStats, "#3b82f6", true)}
-
-                {/* Dynamically render all other categories */}
-                {categoryCards.sort((a, b) => b.stats.currentBudget - a.stats.currentBudget).map(card =>
-                    renderSummaryCard(card.title, card.stats, card.color)
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
+                {/* Total Overview Card */}
+                {renderSummaryCard(
+                    "Total Spending",
+                    globalStats,
+                    "#3b82f6",
+                    <Landmark size={18} className="text-blue-400" />,
+                    true
                 )}
+
+                {/* Category Cards */}
+                {categoryCards
+                    .sort((a, b) => b.stats.currentBudget - a.stats.currentBudget)
+                    .map(card => renderSummaryCard(card.title, card.stats, card.color, React.cloneElement(card.icon, { className: `text-[${card.color}]` })))
+                }
             </div>
         </div>
     );
