@@ -333,42 +333,49 @@ const Obligations = () => {
                     return { prevPaid, currentBudget, currentPaid };
                 };
 
-                const liabilities = obligations.filter(o => !['Loan', 'Auto Loan'].includes(o.category));
+                // Filter Logic
+                const creditCards = obligations.filter(o => o.category === 'Credit Card');
                 const loans = obligations.filter(o => ['Loan', 'Auto Loan'].includes(o.category));
+                // Liabilities = Everything else (excluding Loans and Credit Cards)
+                const liabilities = obligations.filter(o => !['Loan', 'Auto Loan', 'Credit Card'].includes(o.category));
 
                 const globalStats = getStats(obligations);
                 const liabilityStats = getStats(liabilities);
                 const loanStats = getStats(loans);
+                const creditCardStats = getStats(creditCards);
 
-                const renderSummaryCard = (title, stats, accentColor) => {
+                // Compact Summary Card Renderer
+                const renderSummaryCard = (title, stats, accentColor, Icon) => {
                     const progress = stats.currentBudget > 0 ? (stats.currentPaid / stats.currentBudget) * 100 : 0;
 
                     return (
-                        <div className={`bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-lg relative overflow-hidden group hover:border-[${accentColor}]/50 transition`}>
-                            {/* Decorative Blur */}
-                            <div className="absolute top-0 right-0 w-32 h-32 rounded-full blur-2xl -mr-16 -mt-16 pointer-events-none opacity-20" style={{ backgroundColor: accentColor }}></div>
+                        <div className={`bg-slate-800 border border-slate-700 rounded-lg p-4 shadow-lg relative overflow-hidden group hover:border-[${accentColor}]/50 transition flex flex-col justify-between h-32`}>
+                            {/* subtle bg tint */}
+                            <div className="absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none opacity-10" style={{ backgroundColor: accentColor }}></div>
 
-                            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: accentColor }}></span>
-                                {title}
-                            </h2>
-
-                            <div className="flex items-baseline gap-2 mb-4">
-                                <span className="text-2xl font-bold text-white">{formatCurrency(stats.currentPaid)}</span>
-                                <span className="text-gray-500 text-xs">/ {formatCurrency(stats.currentBudget)}</span>
-                            </div>
-
-                            <div className="w-full bg-slate-700 h-1.5 rounded-full mb-4 overflow-hidden">
-                                <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${progress}%`, backgroundColor: accentColor }}></div>
-                            </div>
-
-                            <div className="flex justify-between items-end text-xs border-t border-slate-700/50 pt-3">
-                                <div>
-                                    <span className="text-gray-500 block mb-0.5">Prev Month</span>
-                                    <span className="text-gray-300 font-mono">{formatCurrency(stats.prevPaid)}</span>
+                            <div className="relative z-10">
+                                <div className="flex justify-between items-start mb-2">
+                                    <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accentColor }}></span>
+                                        {title}
+                                    </h2>
+                                    {Icon && <Icon size={14} className="text-gray-600" />}
                                 </div>
-                                <div className="text-right">
-                                    <span className="block mb-0.5" style={{ color: accentColor }}>{progress.toFixed(0)}% Paid</span>
+
+                                <div className="flex items-baseline gap-1.5">
+                                    <span className="text-xl font-bold text-white">{formatCurrency(stats.currentPaid)}</span>
+                                    <span className="text-gray-600 text-[10px]">/ {formatCurrency(stats.currentBudget)}</span>
+                                </div>
+                            </div>
+
+                            <div className="relative z-10 mt-auto">
+                                <div className="w-full bg-slate-700 h-1 rounded-full mb-2 overflow-hidden">
+                                    <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${progress}%`, backgroundColor: accentColor }}></div>
+                                </div>
+
+                                <div className="flex justify-between items-center text-[10px]">
+                                    <span className="text-gray-500">Prev: {formatCurrency(stats.prevPaid)}</span>
+                                    <span style={{ color: accentColor }}>{progress.toFixed(0)}%</span>
                                 </div>
                             </div>
                         </div>
@@ -376,10 +383,11 @@ const Obligations = () => {
                 };
 
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                        {renderSummaryCard("Total Overview", globalStats, "#3b82f6")} {/* blue-500 */}
-                        {renderSummaryCard("Liabilities", liabilityStats, "#f97316")} {/* orange-500 */}
-                        {renderSummaryCard("Loans", loanStats, "#a855f7")} {/* purple-500 */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                        {renderSummaryCard("Total Overview", globalStats, "#3b82f6", Landmark)}
+                        {renderSummaryCard("Liabilities", liabilityStats, "#f97316", Zap)}
+                        {renderSummaryCard("Loans", loanStats, "#a855f7", Car)}
+                        {renderSummaryCard("Credit Cards", creditCardStats, "#ec4899", CreditCard)}
                     </div>
                 );
             })()}
