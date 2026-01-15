@@ -233,7 +233,26 @@ const Obligations = () => {
 
     const handleDeleteHistory = async (historyId) => {
         if (historyId && historyId.toString().startsWith('virtual-')) {
-            alert("This item is Unpaid, so there is no record to delete.");
+            // ID Format: virtual-{oblId}-{year}-{month}
+            const parts = historyId.toString().split('-');
+            if (parts.length >= 2) {
+                const oblId = parts[1];
+                const obl = obligations.find(o => o.id === oblId);
+                const oblName = obl ? obl.name : "this item";
+
+                const choice = confirm(
+                    `"${oblName}" is a recurring obligation.\n\n` +
+                    `• To skip THIS month only: Mark as Paid $0.00.\n` +
+                    `• To delete it FOREVER: Click OK to delete the main obligation.`
+                );
+
+                if (choice) {
+                    try {
+                        await axios.delete(`${API_URL}/obligations/${oblId}`);
+                        fetchObligations(); // Refresh list
+                    } catch (err) { alert("Error deleting obligation"); }
+                }
+            }
             return;
         }
 
