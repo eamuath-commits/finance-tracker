@@ -102,10 +102,16 @@ const Dashboard = () => {
     const handleSaveAccount = async (e) => {
         e.preventDefault();
         try {
+            // Sanitize payload: valid float or null
+            const payload = {
+                ...accountForm,
+                credit_limit: accountForm.credit_limit ? parseFloat(accountForm.credit_limit) : null
+            };
+
             if (editingId) {
-                await axios.put(`${API_URL}/accounts/${editingId}`, accountForm);
+                await axios.put(`${API_URL}/accounts/${editingId}`, payload);
             } else {
-                await axios.post(`${API_URL}/accounts/`, accountForm);
+                await axios.post(`${API_URL}/accounts/`, payload);
             }
             setShowAccountModal(false);
             setEditingId(null);
