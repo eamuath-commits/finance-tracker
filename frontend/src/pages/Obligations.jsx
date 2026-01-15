@@ -170,7 +170,8 @@ const Obligations = () => {
                 name: obl.name,
                 amount: historyEntry.amount,
                 note: historyEntry.note === 'Pending' ? '' : (historyEntry.note || ""),
-                billing_month: historyEntry.billing_month || targetMonthStr
+                billing_month: historyEntry.billing_month || targetMonthStr,
+                status: historyEntry.status || "PAID"
             });
         } else {
             setPaymentForm({
@@ -179,7 +180,8 @@ const Obligations = () => {
                 name: obl.name,
                 amount: defaultAmount !== null ? defaultAmount : obl.amount,
                 note: "Manual Payment",
-                billing_month: targetMonthStr || defaultMonthStr
+                billing_month: targetMonthStr || defaultMonthStr,
+                status: "PAID"
             });
         }
         setShowPaymentModal(true);
@@ -193,7 +195,8 @@ const Obligations = () => {
                 payment_date: new Date().toISOString(),
                 amount: parseFloat(paymentForm.amount || 0),
                 billing_month: paymentForm.billing_month,
-                note: paymentForm.note
+                note: paymentForm.note,
+                status: paymentForm.status
             };
 
             if (paymentForm.historyId) {
