@@ -315,9 +315,9 @@ const Obligations = () => {
                 </button>
             </div>
 
-            {/* Global Stats Summary */}
+            {/* Global Stats Summaries */}
             {(() => {
-                const getGlobalStats = (items) => {
+                const getStats = (items) => {
                     let prevPaid = 0;
                     let currentBudget = 0;
                     let currentPaid = 0;
@@ -333,43 +333,53 @@ const Obligations = () => {
                     return { prevPaid, currentBudget, currentPaid };
                 };
 
-                const globalStats = getGlobalStats(obligations);
-                const progress = globalStats.currentBudget > 0 ? (globalStats.currentPaid / globalStats.currentBudget) * 100 : 0;
+                const liabilities = obligations.filter(o => !['Loan', 'Auto Loan'].includes(o.category));
+                const loans = obligations.filter(o => ['Loan', 'Auto Loan'].includes(o.category));
 
-                return (
-                    <div className="bg-gradient-to-r from-slate-900 to-slate-800 border border-slate-700 rounded-xl p-6 mb-8 shadow-2xl relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
+                const globalStats = getStats(obligations);
+                const liabilityStats = getStats(liabilities);
+                const loanStats = getStats(loans);
 
-                        <div className="flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
-                            <div>
-                                <h2 className="text-lg font-semibold text-slate-300 uppercase tracking-wider mb-1">Total Monthly Overview</h2>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-3xl font-bold text-white">{formatCurrency(globalStats.currentPaid)}</span>
-                                    <span className="text-gray-500 text-sm">/ {formatCurrency(globalStats.currentBudget)}</span>
-                                </div>
-                                <div className="w-full md:w-64 bg-slate-700 h-2 rounded-full mt-3 overflow-hidden">
-                                    <div className="bg-blue-500 h-full rounded-full transition-all duration-1000" style={{ width: `${progress}%` }}></div>
-                                </div>
-                                <p className="text-xs text-blue-400 mt-1 font-medium">{progress.toFixed(0)}% of budget paid</p>
+                const renderSummaryCard = (title, stats, accentColor) => {
+                    const progress = stats.currentBudget > 0 ? (stats.currentPaid / stats.currentBudget) * 100 : 0;
+
+                    return (
+                        <div className={`bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-lg relative overflow-hidden group hover:border-[${accentColor}]/50 transition`}>
+                            {/* Decorative Blur */}
+                            <div className="absolute top-0 right-0 w-32 h-32 rounded-full blur-2xl -mr-16 -mt-16 pointer-events-none opacity-20" style={{ backgroundColor: accentColor }}></div>
+
+                            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: accentColor }}></span>
+                                {title}
+                            </h2>
+
+                            <div className="flex items-baseline gap-2 mb-4">
+                                <span className="text-2xl font-bold text-white">{formatCurrency(stats.currentPaid)}</span>
+                                <span className="text-gray-500 text-xs">/ {formatCurrency(stats.currentBudget)}</span>
                             </div>
 
-                            <div className="flex items-center gap-8">
-                                <div className="text-right">
-                                    <p className="text-xs text-gray-500 uppercase font-bold mb-1">Previous Month</p>
-                                    <p className="text-xl font-mono text-gray-300">{formatCurrency(globalStats.prevPaid)}</p>
+                            <div className="w-full bg-slate-700 h-1.5 rounded-full mb-4 overflow-hidden">
+                                <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${progress}%`, backgroundColor: accentColor }}></div>
+                            </div>
+
+                            <div className="flex justify-between items-end text-xs border-t border-slate-700/50 pt-3">
+                                <div>
+                                    <span className="text-gray-500 block mb-0.5">Prev Month</span>
+                                    <span className="text-gray-300 font-mono">{formatCurrency(stats.prevPaid)}</span>
                                 </div>
-                                <div className="h-10 w-px bg-slate-700"></div>
                                 <div className="text-right">
-                                    <p className="text-xs text-green-500 uppercase font-bold mb-1">Total Paid</p>
-                                    <p className="text-xl font-mono text-green-400">{formatCurrency(globalStats.currentPaid)}</p>
-                                </div>
-                                <div className="h-10 w-px bg-slate-700"></div>
-                                <div className="text-right">
-                                    <p className="text-xs text-blue-500 uppercase font-bold mb-1">Total Budget</p>
-                                    <p className="text-xl font-mono text-blue-400">{formatCurrency(globalStats.currentBudget)}</p>
+                                    <span className="block mb-0.5" style={{ color: accentColor }}>{progress.toFixed(0)}% Paid</span>
                                 </div>
                             </div>
                         </div>
+                    );
+                };
+
+                return (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        {renderSummaryCard("Total Overview", globalStats, "#3b82f6")} {/* blue-500 */}
+                        {renderSummaryCard("Liabilities", liabilityStats, "#f97316")} {/* orange-500 */}
+                        {renderSummaryCard("Loans", loanStats, "#a855f7")} {/* purple-500 */}
                     </div>
                 );
             })()}
