@@ -1,7 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { Wallet, PiggyBank, CreditCard } from 'lucide-react';
 import Analytics from '../Analytics';
 import { Card, SectionHeader, Modal, EditIcon, formatCurrency, inputClass, selectClass } from '../components/UI';
+
+const getAccountIcon = (type) => {
+    switch (type) {
+        case 'Savings': return <PiggyBank className="w-6 h-6 text-green-400" />;
+        case 'Credit Card': return <CreditCard className="w-6 h-6 text-blue-400" />;
+        default: return <Wallet className="w-6 h-6 text-indigo-400" />;
+    }
+};
 
 const AllocationCard = ({ analysis }) => {
     if (!analysis) return null;
@@ -317,20 +326,11 @@ const Dashboard = () => {
             {/* --- LISTS --- */}
 
             <SectionHeader title="Your Accounts" onAdd={() => openAccountModal(null)} />
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
                 {accounts.map(acc => {
                     const isCreditCard = acc.account_type === 'Credit Card';
                     const hasLimit = isCreditCard && acc.credit_limit > 0;
-                    // For credit cards, balance is usually negative (dept) or zero. 
-                    // To calculate utilization: abs(balance) / limit
-                    // Wait, usually banks report balance as positive debt, or negative usually means credit? 
-                    // Let's assume standard logic: 
-                    // If balance is POSITIVE in DB, it means money we HAVE (Asset).
-                    // If balance is NEGATIVE in DB, it means money we OWE (Liability).
-                    // BUT many scrapers import credit card debt as negative.
-
-                    // Let's assume Credit Card Balance -500 means I owe 500.
-                    // Utilization = abs(-500) / 1000 = 50%
 
                     const utilPercent = hasLimit ? Math.min(100, (Math.abs(acc.current_balance) / acc.credit_limit) * 100) : 0;
 
@@ -339,25 +339,33 @@ const Dashboard = () => {
                             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition">
                                 <EditIcon onClick={() => openAccountModal(acc)} />
                             </div>
-                            <div className="flex justify-between items-center">
-                                <span className="font-semibold text-white">{acc.name}</span>
-                                <span className="text-xs bg-slate-600 text-gray-200 px-2 py-1 rounded">*{acc.last_4_digits}</span>
+
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="p-2 bg-slate-700/50 rounded-lg">
+                                    {getAccountIcon(acc.account_type)}
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-semibold text-white">{acc.name}</span>
+                                        <span className="text-xs bg-slate-600 text-gray-200 px-1.5 py-0.5 rounded">*{acc.last_4_digits}</span>
+                                    </div>
+                                    <p className="text-xs text-gray-500 uppercase">{acc.account_type}</p>
+                                </div>
                             </div>
+
                             <p className={`text-xl font-bold mt-2 ${acc.current_balance < 0 ? 'text-red-400' : 'text-green-400'}`}>
                                 {formatCurrency(acc.current_balance)}
                             </p>
-                            <div className="flex justify-between items-center mt-1">
-                                <p className="text-xs text-gray-500 uppercase">{acc.account_type}</p>
-                                {hasLimit && (
-                                    <p className="text-xs text-slate-400">
-                                        {utilPercent.toFixed(0)}% Used
-                                    </p>
-                                )}
-                            </div>
+
+                            {hasLimit && (
+                                <div className="mt-1 flex justify-between items-center text-xs text-slate-400">
+                                    <span>{utilPercent.toFixed(0)}% Utilized</span>
+                                </div>
+                            )}
 
                             {/* Utilization Bar for Credit Cards */}
                             {hasLimit && (
-                                <div className="mt-3">
+                                <div className="mt-2">
                                     <div className="w-full bg-slate-700 h-1.5 rounded-full overflow-hidden">
                                         <div
                                             className={`h-full rounded-full ${utilPercent > 90 ? 'bg-red-500' : utilPercent > 50 ? 'bg-yellow-500' : 'bg-blue-500'}`}
@@ -366,7 +374,7 @@ const Dashboard = () => {
                                     </div>
                                     <div className="flex justify-between text-[10px] text-gray-500 mt-1">
                                         <span>Limit: {formatCurrency(acc.credit_limit)}</span>
-                                        <span>Available: {formatCurrency(acc.credit_limit - Math.abs(acc.current_balance))}</span>
+                                        <span>Avail: {formatCurrency(acc.credit_limit - Math.abs(acc.current_balance))}</span>
                                     </div>
                                 </div>
                             )}
