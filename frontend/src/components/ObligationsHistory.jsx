@@ -10,6 +10,7 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
     const [selectedYear, setSelectedYear] = useState('All');
     const [selectedMonth, setSelectedMonth] = useState('All');
     const [selectedCategory, setSelectedCategory] = useState('All');
+    const [selectedStatus, setSelectedStatus] = useState('All');
 
     // 1. Flatten Data & Prepare Options
     const { allHistory, years, categories } = useMemo(() => {
@@ -20,10 +21,11 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
 
         obligations.forEach(o => oblMap[o.id] = o);
 
+        // A. Process Actual History (Paid Items)
         Object.entries(history).forEach(([oblId, records]) => {
             const obl = oblMap[oblId] || { name: 'Unknown', category: 'Unknown' };
             records.forEach(r => {
-                const bMonth = r.billing_month || r.payment_date.split('T')[0]; // Fallback
+                const bMonth = r.billing_month || r.payment_date.split('T')[0];
                 const year = bMonth.split('-')[0];
 
                 uniqueYears.add(year);
@@ -35,17 +37,48 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                     oblCategory: obl.category,
                     billing_month_sort: bMonth,
                     year: year,
-                    month: bMonth.split('-')[1]
+                    month: bMonth.split('-')[1],
+                    status: 'Paid'
                 });
             });
         });
+
+        // B. Generate Virtual "Unpaid" Items (Only if specific Month & Year selected)
+        if (selectedYear !== 'All' && selectedMonth !== 'All') {
+            const targetMonthStr = `${selectedYear}-${selectedMonth}`; // YYYY-MM
+
+            obligations.forEach(obl => {
+                // Check if this obligation has a payment for this specific billing month
+                const hasPayment = flattened.some(item =>
+                    item.obligation_id === obl.id &&
+                    item.billing_month_sort.startsWith(targetMonthStr)
+                );
+
+                if (!hasPayment) {
+                    flattened.push({
+                        id: `virtual-${obl.id}-${targetMonthStr}`,
+                        obligation_id: obl.id,
+                        amount: obl.amount,
+                        payment_date: null,
+                        billing_month: `${targetMonthStr}-01`,
+                        note: 'Pending',
+                        oblName: obl.name,
+                        oblCategory: obl.category,
+                        billing_month_sort: `${targetMonthStr}-01`,
+                        year: selectedYear,
+                        month: selectedMonth,
+                        status: 'Unpaid'
+                    });
+                }
+            });
+        }
 
         return {
             allHistory: flattened,
             years: Array.from(uniqueYears).sort().reverse(),
             categories: Array.from(uniqueCategories).sort()
         };
-    }, [obligations, history]);
+    }, [obligations, history, selectedYear, selectedMonth, selectedStatus]);
 
     // 2. Filter
     const filtered = allHistory.filter(item => {
@@ -61,8 +94,9 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
         const matchesYear = selectedYear === 'All' || item.year === selectedYear;
         const matchesMonth = selectedMonth === 'All' || item.month === selectedMonth;
         const matchesCategory = selectedCategory === 'All' || item.oblCategory === selectedCategory;
+        const matchesStatus = selectedStatus === 'All' || item.status === selectedStatus;
 
-        return matchesSearch && matchesYear && matchesMonth && matchesCategory;
+        return matchesSearch && matchesYear && matchesMonth && matchesCategory && matchesStatus;
     });
 
     // 3. Sort
@@ -77,7 +111,7 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
     });
 
     // 4. Calculate Total
-    const totalAmount = sorted.reduce((sum, item) => sum + (item.amount || 0), 0);
+    const totalAmount = sorted.reduce((sum, item) => item.status === 'Paid' ? sum + (item.amount || 0) : sum, 0);
 
     const requestSort = (key) => {
         let direction = 'asc';
@@ -111,7 +145,7 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                 <div className="bg-gradient-to-br from-blue-900/50 to-slate-900 border border-blue-800/30 p-4 rounded-xl flex flex-col justify-center">
                     <p className="text-blue-300 text-xs uppercase font-bold tracking-wider mb-1">Total Paid</p>
                     <p className="text-2xl font-mono font-bold text-white">{formatCurrency(totalAmount)}</p>
-                    <p className="text-xs text-slate-500 mt-1">{sorted.length} records found</p>
+                    <p className="text-xs text-slate-500 mt-1">{sorted.filter(i => i.status === 'Paid').length} paid records</p>
                 </div>
 
                 {/* Filters Area */}
@@ -119,7 +153,7 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                     <div className="flex items-center gap-2 mb-3 text-slate-400 text-xs uppercase font-bold">
                         <Filter size={14} /> Filter History
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                         {/* Search */}
                         <div className="relative md:col-span-1">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" size={14} />
@@ -152,6 +186,17 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                             {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                         </select>
 
+                        {/* Status Filter */}
+                        <select
+                            className={`${selectClass} text-xs py-2`}
+                            value={selectedStatus}
+                            onChange={(e) => setSelectedStatus(e.target.value)}
+                        >
+                            <option value="All">All Status</option>
+                            <option value="Paid">Paid</option>
+                            <option value="Unpaid">Unpaid</option>
+                        </select>
+
                         {/* Category Filter */}
                         <select
                             className={`${selectClass} text-xs py-2`}
@@ -177,8 +222,8 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                                 <th className="px-6 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('oblName')}>
                                     <div className="flex items-center gap-1">Name {getSortIcon('oblName')}</div>
                                 </th>
-                                <th className="px-6 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('oblCategory')}>
-                                    <div className="flex items-center gap-1">Category {getSortIcon('oblCategory')}</div>
+                                <th className="px-6 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('status')}>
+                                    <div className="flex items-center gap-1">Status {getSortIcon('status')}</div>
                                 </th>
                                 <th className="px-6 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('payment_date')}>
                                     <div className="flex items-center gap-1">Paid On {getSortIcon('payment_date')}</div>
@@ -197,13 +242,17 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                                         {item.billing_month ? item.billing_month.substring(0, 7) : '-'}
                                     </td>
                                     <td className="px-6 py-3 font-semibold text-white">{item.oblName}</td>
+
                                     <td className="px-6 py-3">
-                                        <span className="bg-slate-700/50 px-2 py-1 rounded text-[10px] text-slate-300 border border-slate-600/50">
-                                            {item.oblCategory}
-                                        </span>
+                                        {item.status === 'Paid' ? (
+                                            <span className="bg-green-500/20 text-green-400 text-[10px] px-2 py-1 rounded border border-green-500/30 font-bold uppercase tracking-wider">Paid</span>
+                                        ) : (
+                                            <span className="bg-red-500/20 text-red-400 text-[10px] px-2 py-1 rounded border border-red-500/30 font-bold uppercase tracking-wider">Unpaid</span>
+                                        )}
                                     </td>
+
                                     <td className="px-6 py-3 text-xs text-slate-500">
-                                        {new Date(item.payment_date).toLocaleDateString()}
+                                        {item.payment_date ? new Date(item.payment_date).toLocaleDateString() : '-'}
                                     </td>
                                     <td className="px-6 py-3 font-mono text-emerald-400 font-medium">
                                         {formatCurrency(item.amount)}
@@ -212,20 +261,37 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                                         {item.note || '-'}
                                     </td>
                                     <td className="px-6 py-3 text-right flex justify-end gap-2">
-                                        <button
-                                            onClick={() => onEdit(item)}
-                                            className="bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white p-1.5 rounded transition-all duration-200"
-                                            title="Edit Payment"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
-                                        </button>
-                                        <button
-                                            onClick={() => onDelete(item)}
-                                            className="bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white p-1.5 rounded transition-all duration-200"
-                                            title="Delete Payment"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
-                                        </button>
+                                        {item.status === 'Paid' ? (
+                                            <>
+                                                <button
+                                                    onClick={() => onEdit(item)}
+                                                    className="bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white p-1.5 rounded transition-all duration-200"
+                                                    title="Edit Payment"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
+                                                </button>
+                                                <button
+                                                    onClick={() => onDelete(item)}
+                                                    className="bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white p-1.5 rounded transition-all duration-200"
+                                                    title="Delete Payment"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <button
+                                                onClick={() => onEdit({
+                                                    obligation_id: item.obligation_id,
+                                                    amount: item.amount,
+                                                    billing_month: item.billing_month,
+                                                    note: "",
+                                                    isNew: true // Flag to tell handler this is a new payment
+                                                })}
+                                                className="bg-green-600 hover:bg-green-500 text-white text-xs px-3 py-1.5 rounded font-bold shadow-sm transition"
+                                            >
+                                                Pay Now
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             )) : (
@@ -233,6 +299,7 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                                     <td colSpan="7" className="px-6 py-12 text-center text-slate-500 flex flex-col items-center gap-2">
                                         <Filter className="opacity-20" size={48} />
                                         <span>No history found matching your filters.</span>
+                                        {selectedYear === 'All' && selectedStatus === 'Unpaid' && <span className="text-xs text-slate-600 block mt-1">Select a specific Year and Month to see Unpaid items.</span>}
                                     </td>
                                 </tr>
                             )}
