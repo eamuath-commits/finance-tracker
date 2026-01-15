@@ -128,18 +128,23 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
 
     let totalLabel = "Total Amount";
     let totalDisplay = visiblePaid + visibleUnpaid;
-    let totalSubtext = `${sorted.length} records`;
+    // Fix: Don't use template literal for components
+    let totalSubtext = (
+        <span className="flex items-center gap-1">
+            <span className="text-white">{formatCurrency(visiblePaid)}</span> <span className="text-slate-500">Paid</span>
+            <span className="mx-1">·</span>
+            <span className="text-white">{formatCurrency(visibleUnpaid)}</span> <span className="text-slate-500">Pending</span>
+        </span>
+    );
 
     if (selectedStatus === 'Paid') {
         totalLabel = "Total Paid";
         totalDisplay = visiblePaid;
+        totalSubtext = `${sorted.length} records`;
     } else if (selectedStatus === 'Unpaid') {
         totalLabel = "Total Pending";
         totalDisplay = visibleUnpaid;
-    } else {
-        // Status is All
-        totalLabel = "Total Value";
-        totalSubtext = `${formatCurrency(visiblePaid)} Paid · ${formatCurrency(visibleUnpaid)} Pending`;
+        totalSubtext = `${sorted.length} records`;
     }
 
     return (
@@ -147,16 +152,24 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
             {/* Top Stats & Filters Row */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {/* Total Summary Card */}
-                <div className="bg-gradient-to-br from-blue-900/50 to-slate-900 border border-blue-800/30 p-4 rounded-xl flex flex-col justify-center">
+                <div className="bg-gradient-to-br from-blue-900/50 to-slate-900 border border-blue-800/30 p-4 rounded-xl flex flex-col justify-center relative">
                     <p className="text-blue-300 text-xs uppercase font-bold tracking-wider mb-1">{totalLabel}</p>
                     <p className="text-2xl font-mono font-bold text-white">{formatCurrency(totalDisplay)}</p>
-                    <p className="text-xs text-slate-500 mt-1">{totalSubtext}</p>
+                    <div className="text-xs text-slate-500 mt-1">{totalSubtext}</div>
                 </div>
 
                 {/* Filters Area */}
                 <div className="md:col-span-3 bg-slate-800/50 border border-slate-700/50 p-4 rounded-xl flex flex-col justify-between">
-                    <div className="flex items-center gap-2 mb-3 text-slate-400 text-xs uppercase font-bold">
-                        <Filter size={14} /> Filter History
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2 text-slate-400 text-xs uppercase font-bold">
+                            <Filter size={14} /> Filter History
+                        </div>
+                        <button
+                            onClick={() => onEdit(null)}
+                            className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm flex items-center gap-1 transition"
+                        >
+                            + New Payment
+                        </button>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                         {/* Search */}

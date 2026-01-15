@@ -174,15 +174,23 @@ const Obligations = () => {
                 billing_month: historyEntry.billing_month || targetMonthStr,
                 status: historyEntry.status || "PAID"
             });
-        } else {
-            // New Payment
-            // If obl.amount is null, defaultAmount might be null. 
-            // We leave amount empty so user must type it.
+        } else if (obl) {
             setPaymentForm({
                 id: obl.id,
                 historyId: null,
                 name: obl.name,
                 amount: defaultAmount !== null ? defaultAmount : (obl.amount || ''), // Use empty string if no amount
+                note: "Manual Payment",
+                billing_month: targetMonthStr || defaultMonthStr,
+                status: "PAID"
+            });
+        } else {
+            // Completely New Payment (No Obligation Selected Yet)
+            setPaymentForm({
+                id: null,
+                historyId: null,
+                name: '',
+                amount: '',
                 note: "Manual Payment",
                 billing_month: targetMonthStr || defaultMonthStr,
                 status: "PAID"
@@ -362,8 +370,14 @@ const Obligations = () => {
                     obligations={obligations}
                     history={payments} // Passing payments as history prop
                     onEdit={(item) => {
-                        const obl = obligations.find(o => o.id === item.obligation_id);
-                        if (obl) openPaymentModal(obl, null, null, item);
+                        if (item) {
+                            // Edit existing payment
+                            const obl = obligations.find(o => o.id === item.obligation_id);
+                            if (obl) openPaymentModal(obl, null, null, item);
+                        } else {
+                            // Add New Payment (Global)
+                            openPaymentModal(null);
+                        }
                     }}
                     onDelete={(item) => handleDeleteHistory(item.id)}
                 />
@@ -373,8 +387,39 @@ const Obligations = () => {
 
             {/* Payment Modal */}
             {showPaymentModal && (
-                <Modal title={`Pay: ${paymentForm.name}`} onClose={() => setShowPaymentModal(false)}>
+                <Modal title={paymentForm.id ? `Pay: ${paymentForm.name}` : "Log New Payment"} onClose={() => setShowPaymentModal(false)}>
                     <form onSubmit={submitPayment} className="space-y-4">
+
+                        {/* If ID is missing, show Dropdown to select Obligation */}
+                        {!paymentForm.id ? (
+                            <div className="bg-slate-700/50 p-3 rounded mb-4 border border-slate-600">
+                                <label className="text-white text-xs uppercase font-bold mb-1 block">Select Obligation</label>
+                                <select
+                                    className={selectClass}
+                                    onChange={(e) => {
+                                        const selectedObl = obligations.find(o => o.id === e.target.value);
+                                        if (selectedObl) {
+                                            setPaymentForm(prev => ({
+                                                ...prev,
+                                                id: selectedObl.id,
+                                                name: selectedObl.name,
+                                                amount: selectedObl.amount || ''
+                                            }));
+                                        }
+                                    }}
+                                    defaultValue=""
+                                >
+                                    <option value="" disabled>-- Choose Obligation --</option>
+                                    {obligations.sort((a, b) => a.name.localeCompare(b.name)).map(obl => (
+                                        <option key={obl.id} value={obl.id}>{obl.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        ) : (
+                            // Helper text or mini-summary could go here
+                            null
+                        )}
+
                         <div className="bg-blue-900/20 p-3 rounded border border-blue-900/50 mb-4">
                             <p className="text-sm text-blue-200">Select Month</p>
                         </div>
@@ -405,6 +450,7 @@ const Obligations = () => {
                         </div>
                         <div>
                             <input type="number" step="0.01" placeholder="Amount" className={inputClass} value={paymentForm.amount} onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
+                            {/* If amount is empty, maybe show a hint if obligation has a default? */}
                         </div>
                         <div>
                             <input type="text" placeholder="Note" className={inputClass} value={paymentForm.note} onChange={e => setPaymentForm({ ...paymentForm, note: e.target.value })} />
@@ -420,7 +466,13 @@ const Obligations = () => {
                                 </select>
                             </div>
                         </div>
-                        <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white p-3 rounded font-bold shadow-lg mt-4">Confirm</button>
+                        <button
+                            type="submit"
+                            disabled={!paymentForm.id}
+                            className={`w-full p-3 rounded font-bold shadow-lg mt-4 ${!paymentForm.id ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500 text-white'}`}
+                        >
+                            Confirm
+                        </button>
                     </form>
                 </Modal>
             )}
