@@ -7,14 +7,15 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
     const currMonth = getMonthStatus(obl, monthOffset);
 
     // Initial value for input: Prioritize Prev Month Amount -> Obligation Default -> Empty
-    const initialAmount = prevMonth.amount !== null ? prevMonth.amount : (obl.amount || "");
+    // Initial value for input: Prioritize Current Month (if saved/pending) -> Prev Month -> Obligation Default -> Empty
+    const initialAmount = currMonth.amount !== null ? currMonth.amount : (prevMonth.amount !== null ? prevMonth.amount : (obl.amount || ""));
     const [payAmount, setPayAmount] = React.useState(initialAmount);
 
     // Update local state if the underlying data changes significantly (e.g. month navigation)
     React.useEffect(() => {
-        const newVal = prevMonth.amount !== null ? prevMonth.amount : (obl.amount || "");
+        const newVal = currMonth.amount !== null ? currMonth.amount : (prevMonth.amount !== null ? prevMonth.amount : (obl.amount || ""));
         setPayAmount(newVal);
-    }, [prevMonth.amount, obl.amount, monthOffset]);
+    }, [currMonth.amount, prevMonth.amount, obl.amount, monthOffset]);
 
     const handlePay = (e) => {
         e.preventDefault();
