@@ -35,6 +35,7 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
 
     const handleKeyDown = (e) => {
         if (e.key === 'Enter') {
+            console.log("👉 Enter Key Pressed!", { payAmount });
             e.preventDefault();
             e.stopPropagation();
 
@@ -124,7 +125,7 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
                             </div>
                             <button
                                 onClick={handlePay}
-                                className="w-full bg-blue-600 hover:bg-blue-500 text-white text-[9px] font-bold py-px px-1 rounded flex items-center justify-center gap-1 mt-1 opacity-80 hover:opacity-100 transition"
+                                className="w-full bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold py-0.5 px-2 rounded flex items-center justify-center gap-1 mt-1"
                             >
                                 Pay
                             </button>
