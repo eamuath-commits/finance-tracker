@@ -237,6 +237,25 @@ const Obligations = () => {
         } catch (err) { alert("Error processing payment"); }
     };
 
+    // Quick Pay Handler (Bypasses Modal)
+    const handleQuickPay = async (oblId, amount, billingMonth) => {
+        try {
+            const payload = {
+                payment_date: new Date().toISOString(),
+                amount: parseFloat(amount),
+                billing_month: billingMonth,
+                note: "Quick Pay",
+                status: "PAID"
+            };
+            // Always use the /pay endpoint (which now handles upserts)
+            await axios.post(`${API_URL}/obligations/${oblId}/pay`, payload);
+            fetchObligations(); // Refresh UI
+        } catch (err) {
+            console.error("Quick Pay Error:", err);
+            alert("Error processing quick payment");
+        }
+    };
+
     const handleAddPastPayment = async (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);

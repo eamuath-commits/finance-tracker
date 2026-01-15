@@ -2,7 +2,7 @@ import React from 'react';
 import { CheckCircle, History, Pencil, Trash2, Banknote, Home, Zap, Utensils, Car, Shield, Smartphone, Landmark, CreditCard, Clock, Box } from 'lucide-react';
 import { formatCurrency, EditIcon } from '../components/UI';
 
-const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObligationModal, openPaymentModal, handleDeleteHistory, CATEGORY_ICONS }) => {
+const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObligationModal, openPaymentModal, handleQuickPay, handleDeleteHistory, CATEGORY_ICONS }) => {
     const prevMonth = getMonthStatus(obl, monthOffset - 1);
     const currMonth = getMonthStatus(obl, monthOffset);
 
@@ -21,6 +21,15 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
         // If input is empty, fallback to the initial default we calculated
         const finalAmount = payAmount !== "" ? parseFloat(payAmount) : (initialAmount || 0);
         openPaymentModal(obl, currMonth.billingDateStr, finalAmount);
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            const finalAmount = payAmount !== "" ? parseFloat(payAmount) : (initialAmount || 0);
+            handleQuickPay(obl.id, finalAmount, currMonth.billingDateStr);
+        }
     };
 
     return (
@@ -90,6 +99,7 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
                                     value={payAmount}
                                     onChange={(e) => setPayAmount(e.target.value)}
                                     onClick={(e) => e.stopPropagation()}
+                                    onKeyDown={handleKeyDown}
                                 />
                                 <button onClick={() => openObligationModal(obl)} className="text-gray-600 hover:text-white"><Pencil size={10} /></button>
                             </div>
@@ -107,11 +117,13 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
     );
 };
 
+
 const ObligationsList = ({
     obligations,
     getMonthStatus,
     openObligationModal,
     openPaymentModal,
+    handleQuickPay,
     openHistory,
     handleDeleteHistory,
     monthOffset = 0
