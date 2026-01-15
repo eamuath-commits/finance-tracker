@@ -324,6 +324,7 @@ const Obligations = () => {
                     "Salary": <Banknote size={20} className="text-emerald-400" />,
                     "House": <Home size={20} className="text-blue-400" />,
                     "Utilities": <Zap size={20} className="text-yellow-400" />,
+                    "Auto Loan": <Car size={20} className="text-red-400" />,
                     "Food & Groceries": <Utensils size={20} className="text-orange-400" />,
                     "Transport": <Car size={20} className="text-red-400" />,
                     "Insurance": <Shield size={20} className="text-purple-400" />,
@@ -581,6 +582,7 @@ const Obligations = () => {
                                 <option value="Insurance">Insurance</option>
                                 <option value="Tech">Tech & Subscriptions</option>
                                 <option value="Loan">Loan</option>
+                                <option value="Auto Loan">Auto Loan</option>
                                 <option value="Credit Card">Credit Card</option>
                                 <option value="Pay Later">Pay Later</option>
                                 <option value="Other">Other</option>
