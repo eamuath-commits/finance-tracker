@@ -70,8 +70,22 @@ const ObligationsList = ({
 
                             <div className="flex gap-4 text-xs">
                                 <div className="flex flex-col items-end">
-                                    <span className="text-blue-400 uppercase font-semibold">Budget (Prev Month)</span>
-                                    <span className="text-blue-200 font-mono">{formatCurrency(stats.currentBudget)}</span>
+                                    <span className={`uppercase font-semibold ${stats.currentPaid > stats.currentBudget ? 'text-red-400' : 'text-blue-400'}`}>Budget</span>
+                                    <div className="flex items-center gap-1">
+                                        <span className={`font-mono ${stats.currentPaid > stats.currentBudget ? 'text-red-300' : 'text-blue-200'}`}>
+                                            {formatCurrency(stats.currentBudget)}
+                                        </span>
+                                        {stats.currentPaid > stats.currentBudget && (
+                                            <span className="text-[10px] text-red-400 font-bold bg-red-900/30 px-1 rounded">
+                                                +{formatCurrency(stats.currentPaid - stats.currentBudget)}
+                                            </span>
+                                        )}
+                                        {stats.currentPaid <= stats.currentBudget && (
+                                            <span className="text-[10px] text-emerald-500/50 font-mono">
+                                                ({formatCurrency(stats.currentBudget - stats.currentPaid)} left)
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="flex flex-col items-end">
                                     <span className="text-green-400 uppercase font-semibold">Paid</span>
