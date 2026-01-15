@@ -2,7 +2,7 @@ import React from 'react';
 import { Landmark, Zap, Car, CreditCard, Smartphone } from 'lucide-react';
 import { formatCurrency } from '../components/UI';
 
-const ObligationsOverview = ({ obligations, getMonthStatus }) => {
+const ObligationsOverview = ({ obligations, getMonthStatus, monthOffset = 0 }) => {
 
     const getStats = (items) => {
         let prevPaid = 0;
@@ -10,8 +10,8 @@ const ObligationsOverview = ({ obligations, getMonthStatus }) => {
         let currentPaid = 0;
 
         items.forEach(obl => {
-            const prev = getMonthStatus(obl, -1);
-            const curr = getMonthStatus(obl, 0);
+            const prev = getMonthStatus(obl, monthOffset - 1);
+            const curr = getMonthStatus(obl, monthOffset);
             if (prev.amount) {
                 prevPaid += prev.amount;
                 // Budget for current month is based on PREVIOUS month's total

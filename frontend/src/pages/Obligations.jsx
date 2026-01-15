@@ -17,6 +17,16 @@ const Obligations = () => {
         localStorage.setItem('obligationsViewMode', mode);
     };
 
+    // Month Navigation State
+    const [monthOffset, setMonthOffset] = useState(0);
+
+    // Calculate current view Date Label
+    const currentDateView = (() => {
+        const now = new Date();
+        const target = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
+        return target.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    })();
+
     // Modal State
     const [showObligationModal, setShowObligationModal] = useState(false);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -334,6 +344,32 @@ const Obligations = () => {
                         Payments
                     </button>
                 </div>
+
+                {/* Month Navigation Controls */}
+                {viewMode !== 'history' && (
+                    <div className="flex items-center gap-2 bg-slate-800 p-1 rounded-lg ml-4">
+                        <button
+                            onClick={() => setMonthOffset(prev => prev - 1)}
+                            className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+                        </button>
+                        <span className="text-xs font-mono font-bold text-white min-w-[100px] text-center">{currentDateView}</span>
+                        <button
+                            onClick={() => setMonthOffset(prev => prev + 1)}
+                            className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+                        </button>
+                        <button
+                            onClick={() => setMonthOffset(0)}
+                            className="bg-blue-900/40 text-blue-400 text-[10px] font-bold px-2 py-1 rounded hover:bg-blue-900/60 uppercase tracking-wider ml-1"
+                            title="Reset to Current Month"
+                        >
+                            Today
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Content Area */}
@@ -341,6 +377,7 @@ const Obligations = () => {
                 <ObligationsOverview
                     obligations={obligations}
                     getMonthStatus={getMonthStatus}
+                    monthOffset={monthOffset}
                 />
             )}
 
@@ -361,6 +398,7 @@ const Obligations = () => {
                         openPaymentModal={openPaymentModal}
                         openHistory={openHistory}
                         handleDeleteHistory={handleDeleteHistory}
+                        monthOffset={monthOffset}
                     />
                 </div>
             )}

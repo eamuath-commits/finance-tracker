@@ -8,7 +8,8 @@ const ObligationsList = ({
     openObligationModal,
     openPaymentModal,
     openHistory,
-    handleDeleteHistory
+    handleDeleteHistory,
+    monthOffset = 0
 }) => {
 
     const CATEGORY_ICONS = {
@@ -40,8 +41,8 @@ const ObligationsList = ({
         let currentPaid = 0;
 
         items.forEach(obl => {
-            const prev = getMonthStatus(obl, -1);
-            const curr = getMonthStatus(obl, 0);
+            const prev = getMonthStatus(obl, monthOffset - 1);
+            const curr = getMonthStatus(obl, monthOffset);
             if (prev.amount) {
                 prevPaid += prev.amount;
                 // Budget is based on Prev Month's actuals
@@ -81,10 +82,10 @@ const ObligationsList = ({
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-4">
                             {items.map(obl => {
-                                const monthMinus3 = getMonthStatus(obl, -3);
-                                const monthMinus2 = getMonthStatus(obl, -2);
-                                const prevMonth = getMonthStatus(obl, -1);
-                                const currMonth = getMonthStatus(obl, 0);
+                                const monthMinus3 = getMonthStatus(obl, monthOffset - 3);
+                                const monthMinus2 = getMonthStatus(obl, monthOffset - 2);
+                                const prevMonth = getMonthStatus(obl, monthOffset - 1);
+                                const currMonth = getMonthStatus(obl, monthOffset);
 
                                 return (
                                     <div key={obl.id} className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition group relative">
