@@ -6,11 +6,12 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: 'billing_month', direction: 'desc' });
 
-    // Filters
-    const [selectedYear, setSelectedYear] = useState('All');
-    const [selectedMonth, setSelectedMonth] = useState('All');
+    // Filters - Default to Current Year and Month to show "Unpaid" immediately
+    const currentDate = new Date();
+    const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear().toString());
+    const [selectedMonth, setSelectedMonth] = useState((currentDate.getMonth() + 1).toString().padStart(2, '0'));
     const [selectedCategory, setSelectedCategory] = useState('All');
-    const [selectedStatus, setSelectedStatus] = useState('All');
+    const [selectedStatus, setSelectedStatus] = useState('All'); // Default to All, can switch to 'Unpaid'
 
     // 1. Flatten Data & Prepare Options
     const { allHistory, years, categories } = useMemo(() => {
@@ -43,35 +44,50 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
             });
         });
 
-        // B. Generate Virtual "Unpaid" Items (Only if specific Month & Year selected)
-        if (selectedYear !== 'All' && selectedMonth !== 'All') {
-            const targetMonthStr = `${selectedYear}-${selectedMonth}`; // YYYY-MM
+        // B. Generate Virtual "Unpaid" Items
+        // Only if Year is selected.
+        if (selectedYear !== 'All') {
+            // Determine range of months to generate
+            let monthsToGenerate = [];
+            if (selectedMonth !== 'All') {
+                monthsToGenerate = [selectedMonth];
+            } else {
+                // Generate for all 12 months if "All Months" is selected
+                monthsToGenerate = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
+            }
 
-            obligations.forEach(obl => {
-                // Check if this obligation has a payment for this specific billing month
-                const hasPayment = flattened.some(item =>
-                    item.obligation_id === obl.id &&
-                    item.billing_month_sort.startsWith(targetMonthStr)
-                );
+            monthsToGenerate.forEach(month => {
+                const targetMonthStr = `${selectedYear}-${month}`; // YYYY-MM
 
-                if (!hasPayment) {
-                    flattened.push({
-                        id: `virtual-${obl.id}-${targetMonthStr}`,
-                        obligation_id: obl.id,
-                        amount: obl.amount,
-                        payment_date: null,
-                        billing_month: `${targetMonthStr}-01`,
-                        note: 'Pending',
-                        oblName: obl.name,
-                        oblCategory: obl.category,
-                        billing_month_sort: `${targetMonthStr}-01`,
-                        year: selectedYear,
-                        month: selectedMonth,
-                        status: 'Unpaid'
-                    });
-                }
+                obligations.forEach(obl => {
+                    // Check if this obligation has a payment for this specific billing month
+                    const hasPayment = flattened.some(item =>
+                        item.obligation_id === obl.id &&
+                        item.billing_month_sort.startsWith(targetMonthStr)
+                    );
+
+                    if (!hasPayment) {
+                        flattened.push({
+                            id: `virtual-${obl.id}-${targetMonthStr}`,
+                            obligation_id: obl.id,
+                            amount: obl.amount,
+                            payment_date: null,
+                            billing_month: `${targetMonthStr}-01`,
+                            note: 'Pending',
+                            oblName: obl.name,
+                            oblCategory: obl.category,
+                            billing_month_sort: `${targetMonthStr}-01`,
+                            year: selectedYear,
+                            month: month,
+                            status: 'Unpaid'
+                        });
+                    }
+                });
             });
         }
+
+        // Add Current Year to uniqueYears if not present (so it shows in filter even if emptiness)
+        uniqueYears.add(currentDate.getFullYear().toString());
 
         return {
             allHistory: flattened,
@@ -299,7 +315,7 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                                     <td colSpan="7" className="px-6 py-12 text-center text-slate-500 flex flex-col items-center gap-2">
                                         <Filter className="opacity-20" size={48} />
                                         <span>No history found matching your filters.</span>
-                                        {selectedYear === 'All' && selectedStatus === 'Unpaid' && <span className="text-xs text-slate-600 block mt-1">Select a specific Year and Month to see Unpaid items.</span>}
+                                        {selectedYear === 'All' && <span className="text-xs text-slate-600 block mt-1">Please select a Year to see Unpaid history.</span>}
                                     </td>
                                 </tr>
                             )}
