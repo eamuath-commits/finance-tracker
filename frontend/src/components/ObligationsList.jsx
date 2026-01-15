@@ -117,10 +117,11 @@ const ObligationsList = ({
                         </span>
                         <div className="flex items-center gap-2">
                             <span className={`text-2xl font-mono font-bold ${globalStats.paid > globalStats.budget ? 'text-red-400' : 'text-slate-500'}`}>
-                                {globalStats.paid > globalStats.budget ?
-                                    `+${formatCurrency(globalStats.paid - globalStats.budget)}` :
+                                {globalStats.paid > globalStats.budget ? (
+                                    <>+{formatCurrency(globalStats.paid - globalStats.budget)}</>
+                                ) : (
                                     formatCurrency(globalStats.budget - globalStats.paid)
-                                }
+                                )}
                             </span>
                         </div>
                     </div>
