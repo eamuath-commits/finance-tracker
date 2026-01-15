@@ -10,7 +10,12 @@ const Obligations = () => {
     const [obligations, setObligations] = useState([]);
     const [history, setHistory] = useState({});
     const [loading, setLoading] = useState(true);
-    const [viewMode, setViewMode] = useState('overview'); // 'overview' | 'manager' | 'history'
+    const [viewMode, setViewModeState] = useState(localStorage.getItem('obligationsViewMode') || 'overview');
+
+    const setViewMode = (mode) => {
+        setViewModeState(mode);
+        localStorage.setItem('obligationsViewMode', mode);
+    };
 
     // Modal State
     const [showObligationModal, setShowObligationModal] = useState(false);
