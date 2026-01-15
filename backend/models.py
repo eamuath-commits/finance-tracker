@@ -18,8 +18,10 @@ class Account(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, nullable=False)
     account_type = Column(Enum(AccountType), nullable=False)
+    first_4_digits = Column(String, nullable=True) # Optional for verification
     last_4_digits = Column(String, unique=True, index=True) # Critical for SMS matching
     current_balance = Column(Float, default=0.0)
+    credit_limit = Column(Float, nullable=True) # New: For Credit Card Utilization
     
     transactions = relationship("Transaction", back_populates="account")
 

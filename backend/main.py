@@ -57,6 +57,22 @@ def run_migrations(engine):
                     conn.execute(text("ALTER TABLE payments ADD COLUMN status VARCHAR DEFAULT 'PAID'"))
                     conn.commit()
 
+        # Check accounts table for credit_limit
+        if 'accounts' in inspector.get_table_names():
+            a_columns = [col['name'] for col in inspector.get_columns('accounts')]
+            if 'credit_limit' not in a_columns:
+                print("Migrating: Adding credit_limit to accounts")
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE accounts ADD COLUMN credit_limit FLOAT"))
+                    conn.commit()
+            
+            # Check for first_4_digits while we are at it
+            if 'first_4_digits' not in a_columns:
+                 print("Migrating: Adding first_4_digits to accounts")
+                 with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE accounts ADD COLUMN first_4_digits VARCHAR"))
+                    conn.commit()
+
     except Exception as e:
         print(f"Migration failed: {e}")
 
