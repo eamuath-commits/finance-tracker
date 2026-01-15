@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { formatCurrency, selectClass } from '../components/UI';
 import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter } from 'lucide-react';
 
-const ObligationsHistory = ({ obligations, history }) => {
+const ObligationsHistory = ({ obligations, history, onEdit }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: 'billing_month', direction: 'desc' });
 
@@ -187,6 +187,7 @@ const ObligationsHistory = ({ obligations, history }) => {
                                     <div className="flex items-center gap-1">Amount {getSortIcon('amount')}</div>
                                 </th>
                                 <th className="px-6 py-4 border-b border-slate-700">Note</th>
+                                <th className="px-6 py-4 border-b border-slate-700 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-700/50">
@@ -210,10 +211,19 @@ const ObligationsHistory = ({ obligations, history }) => {
                                     <td className="px-6 py-3 text-xs italic text-slate-500 max-w-xs truncate">
                                         {item.note || '-'}
                                     </td>
+                                    <td className="px-6 py-3 text-right">
+                                        <button
+                                            onClick={() => onEdit(item)}
+                                            className="text-slate-400 hover:text-blue-400 transition"
+                                            title="Edit Payment"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
+                                        </button>
+                                    </td>
                                 </tr>
                             )) : (
                                 <tr>
-                                    <td colSpan="6" className="px-6 py-12 text-center text-slate-500 flex flex-col items-center gap-2">
+                                    <td colSpan="7" className="px-6 py-12 text-center text-slate-500 flex flex-col items-center gap-2">
                                         <Filter className="opacity-20" size={48} />
                                         <span>No history found matching your filters.</span>
                                     </td>

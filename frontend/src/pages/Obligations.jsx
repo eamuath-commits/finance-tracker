@@ -328,6 +328,10 @@ const Obligations = () => {
                 <ObligationsHistory
                     obligations={obligations}
                     history={history}
+                    onEdit={(item) => {
+                        const obl = obligations.find(o => o.id === item.obligation_id);
+                        if (obl) openPaymentModal(obl, null, null, item);
+                    }}
                 />
             )}
 
