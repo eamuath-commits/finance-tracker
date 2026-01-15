@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text, inspect
@@ -214,12 +214,33 @@ def get_allocation_analysis(db: Session = Depends(get_db)):
 
 # --- Webhook Endpoint ---
 @app.post("/webhook/sms")
-def receive_sms(payload: schemas.SMSPayload, db: Session = Depends(get_db)):
+async def receive_sms(request: Request, db: Session = Depends(get_db)):
     """
-    Receives an SMS body, parses it, finds the matching account, 
+    Receives an SMS body, logs the raw request, parses it, finds the matching account, 
     and logs the transaction.
     """
-    print(f"Received SMS Webhook Payload: {payload.dict()}") # Debug log
+    try:
+        raw_body = await request.json()
+        print(f"DEBUG: Received SMS Webhook RAW Payload: {raw_body}") # Debug log
+    except Exception as e:
+        print(f"DEBUG: Failed to parse JSON body: {e}")
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+
+    # Manually validate against schema to catch errors gracefully
+    try:
+        payload = schemas.SMSPayload(**raw_body)
+    except Exception as e:
+        print(f"DEBUG: Schema Validation Failed: {e}")
+        parsed_data = parser.parse(str(raw_body)) # Try parsing raw dict/str anyway
+        if parsed_data:
+             print("DEBUG: Managed to parse content from raw body directly despite schema fail.")
+             # Continue logic below...
+             sms_text = str(raw_body) 
+             # Mock payload for logic flow if we want to support non-compliant requests temporarily
+             # But better to just error out after logging for now
+             return {"status": "error", "message": f"Schema validation failed: {str(e)}", "received": raw_body}
+        return {"status": "error", "message": "Invalid Payload Structure. Expecting {body, sender}", "received": raw_body}
+
     sms_text = payload.body
     print(f"Extract SMS Body: {sms_text}")
 
