@@ -158,16 +158,33 @@ def create_obligation_payment(db: Session, obligation_id: str, payment: schemas.
             models.ObligationHistory.billing_month == payment.billing_month
         ).first()
         if existing:
-            # If it exists, check if we should allow overwrite or if it's just an update?
-            # For now, stick to "Error if duplicate" UNLESS the existing one is just a placeholder (which we don't really have yet, 
-            # as virtual items are frontend only). 
-            # If user "edits" a virtual item, it sends a POST. If a real record exists, it fails.
-            # But what if the record exists and is UNPAID? 
-            # If it exists, we should arguably UPDATE it, not create new. 
-            # But the frontend logic might be confused. 
-            # Let's keep duplicate check but allow "update if exists" logic in frontend (PUT).
-            # The strictly duplicate check creates a ValueError.
-            raise ValueError(f"Payment for billing month {payment.billing_month} already exists.")
+            # If the existing payment is PENDING, we should treat this "New Payment" as an update/confirmation
+            if existing.status == models.PaymentStatus.PENDING:
+                # Update the existing record
+                status_enum = models.PaymentStatus.PAID
+                if payment.status:
+                    try:
+                        status_enum = models.PaymentStatus(payment.status)
+                    except ValueError:
+                        pass
+                
+                existing.amount = payment.amount
+                existing.payment_date = payment.payment_date
+                existing.note = payment.note
+                existing.status = status_enum
+                
+                # Auto-update expected amount if PAID
+                if status_enum == models.PaymentStatus.PAID:
+                    obligation = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
+                    if obligation:
+                        obligation.amount = payment.amount
+                        db.add(obligation)
+                
+                db.commit()
+                db.refresh(existing)
+                return existing
+
+            raise ValueError(f"Payment for billing month {payment.billing_month} already exists and is marked as PAID.")
 
     # Convert status string to Enum
     status_enum = models.PaymentStatus.PAID
