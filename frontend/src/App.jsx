@@ -6,9 +6,9 @@ import Dashboard from './pages/Dashboard';
 import Obligations from './pages/Obligations';
 
 import Reports from './pages/Reports';
+import Transactions from './pages/Transactions';
 
 // Placeholder pages for now (to be extracted later)
-const Transactions = () => <div className="text-white p-8">Transaction Management Page (Coming Soon)</div>;
 const Loans = () => <div className="text-white p-8">Loan Management Page (Coming Soon)</div>;
 
 function App() {
