@@ -290,6 +290,7 @@ const ObligationsList = ({
                                     openHistory={openHistory}
                                     openObligationModal={openObligationModal}
                                     openPaymentModal={openPaymentModal}
+                                    handleQuickPay={handleQuickPay}
                                     handleDeleteHistory={handleDeleteHistory}
                                     CATEGORY_ICONS={CATEGORY_ICONS}
                                 />
