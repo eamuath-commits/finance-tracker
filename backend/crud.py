@@ -158,36 +158,31 @@ def create_payment(db: Session, obligation_id: str, payment: schemas.PaymentCrea
             models.Payment.billing_month == payment.billing_month
         ).first()
         if existing:
-            # If the existing payment is PENDING, we should treat this "New Payment" as an update/confirmation
-            if existing.status == models.PaymentStatus.PENDING:
-                # Update the existing record
-                status_enum = models.PaymentStatus.PAID
-                if payment.status:
-                    try:
-                        status_enum = models.PaymentStatus(payment.status)
-                    except ValueError:
-                        pass
-                
-                existing.amount = payment.amount
-                existing.payment_date = payment.payment_date
-                existing.note = payment.note
-                existing.status = status_enum
-                
-                # Auto-update expected amount if PAID (and if obligation has an amount set)
-                if status_enum == models.PaymentStatus.PAID:
-                    obligation = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
-                    # Only update obligation preference if it HAS a preference? Or always update?
-                    # If obligation amount is None, and we pay X, maybe we set it to X?
-                    # User said "obligation not require amount".
-                    if obligation:
-                        obligation.amount = payment.amount
-                        db.add(obligation)
-                
-                db.commit()
-                db.refresh(existing)
-                return existing
-
-            raise ValueError(f"Payment for billing month {payment.billing_month} already exists and is marked as PAID.")
+            # Upsert Logic: If it exists (PENDING or PAID), update it with the new details.
+            # This handles cases where user edits the amount/date via the "Pay" button (POST).
+            
+            status_enum = models.PaymentStatus.PAID
+            if payment.status:
+                try:
+                    status_enum = models.PaymentStatus(payment.status)
+                except ValueError:
+                    pass
+            
+            existing.amount = payment.amount
+            existing.payment_date = payment.payment_date
+            existing.note = payment.note
+            existing.status = status_enum
+            
+            # Auto-update expected amount if PAID
+            if status_enum == models.PaymentStatus.PAID:
+                obligation = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
+                if obligation:
+                    obligation.amount = payment.amount
+                    db.add(obligation)
+            
+            db.commit()
+            db.refresh(existing)
+            return existing
 
     # Convert status string to Enum
     status_enum = models.PaymentStatus.PAID
