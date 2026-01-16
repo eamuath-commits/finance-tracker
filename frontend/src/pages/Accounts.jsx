@@ -316,10 +316,56 @@ const Accounts = () => {
             {activeTab === 'manager' && (
                 <div className="animate-fade-in">
                     <SectionHeader title="Manage Accounts" onAdd={() => openAccountModal(null)} />
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                        {accounts.map(acc => (
-                            <AccountCard key={acc.id} acc={acc} onEdit={openAccountModal} />
-                        ))}
+
+                    <div className="bg-slate-800 rounded-xl shadow-lg border border-slate-700 overflow-hidden">
+                        <table className="min-w-full divide-y divide-slate-700">
+                            <thead className="bg-slate-900">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Account Name</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Type</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Last 4</th>
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Balance</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider pl-8">Aliases</th>
+                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-slate-800 divide-y divide-slate-700">
+                                {accounts.map(acc => (
+                                    <tr key={acc.id} className="hover:bg-slate-700/50 transition-colors">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">{acc.name}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{acc.account_type}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400 font-mono">•••• {acc.last_4_digits}</td>
+                                        <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${acc.current_balance < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                                            {formatCurrency(acc.current_balance)}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm pl-8">
+                                            {acc.aliases && acc.aliases.length > 0 ? (
+                                                <div className="flex gap-1 flex-wrap">
+                                                    {acc.aliases.map(a => (
+                                                        <span key={a.id} className="text-[10px] bg-slate-900 px-2 py-0.5 rounded-full border border-slate-600 text-gray-400">
+                                                            {a.alias_name}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <span className="text-gray-600 italic text-xs">-</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
+                                            <button
+                                                onClick={() => openAccountModal(acc)}
+                                                className="text-blue-400 hover:text-blue-300 transition-colors p-2 bg-slate-700/50 rounded-lg hover:bg-slate-700"
+                                            >
+                                                <Edit3 size={16} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {accounts.length === 0 && (
+                                    <tr><td colSpan="6" className="px-6 py-8 text-center text-gray-500">No accounts found. Add one to get started.</td></tr>
+                                )}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             )}
