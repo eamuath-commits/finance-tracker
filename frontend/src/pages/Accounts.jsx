@@ -250,6 +250,34 @@ const Accounts = () => {
         fetchData();
     }, []);
 
+    // Derived Data
+    const filteredTransactions = transactions.filter(tx => {
+        // Search Term (Merchant or Category)
+        const matchSearch = tx.merchant.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (tx.category && tx.category.toLowerCase().includes(searchTerm.toLowerCase()));
+
+        // Category Filter
+        const matchCategory = categoryFilter ? tx.category === categoryFilter : true;
+
+        // Account Filter
+        const matchAccount = accountFilter ? tx.account_id === accountFilter : true;
+
+        // Type Filter (Credit vs Debit vs Transfer)
+        const isCredit = CREDIT_CATEGORIES.includes(tx.category);
+        const isTransfer = tx.category === 'Transfer';
+        let matchType = true;
+        if (typeFilter === 'Credit') matchType = isCredit;
+        else if (typeFilter === 'Debit') matchType = !isCredit && !isTransfer;
+        else if (typeFilter === 'Transfer') matchType = isTransfer;
+
+        // Date Range Filter
+        let matchDate = true;
+        if (dateRange.start) matchDate = matchDate && tx.timestamp >= dateRange.start;
+        if (dateRange.end) matchDate = matchDate && tx.timestamp.split('T')[0] <= dateRange.end;
+
+        return matchSearch && matchCategory && matchAccount && matchType && matchDate;
+    });
+
     // --- Account Handlers ---
     // (Existing Handlers will remain below, we just insert Tx handlers before return)
 
@@ -473,6 +501,83 @@ const Accounts = () => {
                         </button>
                     </div>
 
+                    {/* Filters Bar */}
+                    <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg mb-6 space-y-4">
+                        {/* Search Row */}
+                        <div className="relative">
+                            <Search className="absolute left-3 top-3 text-gray-400" size={18} />
+                            <input
+                                type="text"
+                                placeholder="Search merchant, category, or notes..."
+                                className="w-full pl-10 pr-4 py-2.5 bg-slate-900/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+
+                        {/* Filters Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                            {/* Account */}
+                            <div className="relative">
+                                <select
+                                    className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 appearance-none"
+                                    value={accountFilter}
+                                    onChange={e => setAccountFilter(e.target.value)}
+                                >
+                                    <option value="">All Accounts</option>
+                                    {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                                </select>
+                                <div className="absolute right-3 top-3.5 text-gray-400 pointer-events-none">▼</div>
+                            </div>
+
+                            {/* Type */}
+                            <div className="relative">
+                                <select
+                                    className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 appearance-none"
+                                    value={typeFilter}
+                                    onChange={e => setTypeFilter(e.target.value)}
+                                >
+                                    <option value="">All Types</option>
+                                    <option value="Debit">Expense (Debit)</option>
+                                    <option value="Credit">Income (Credit)</option>
+                                    <option value="Transfer">Transfer</option>
+                                </select>
+                                <div className="absolute right-3 top-3.5 text-gray-400 pointer-events-none">▼</div>
+                            </div>
+
+                            {/* Category */}
+                            <div className="relative">
+                                <select
+                                    className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 appearance-none"
+                                    value={categoryFilter}
+                                    onChange={e => setCategoryFilter(e.target.value)}
+                                >
+                                    <option value="">All Categories</option>
+                                    {Categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                </select>
+                                <div className="absolute right-3 top-3.5 text-gray-400 pointer-events-none">▼</div>
+                            </div>
+
+                            {/* Start Date */}
+                            <input
+                                type="date"
+                                className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                                value={dateRange.start}
+                                onChange={e => setDateRange({ ...dateRange, start: e.target.value })}
+                                placeholder="Start Date"
+                            />
+
+                            {/* End Date */}
+                            <input
+                                type="date"
+                                className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                                value={dateRange.end}
+                                onChange={e => setDateRange({ ...dateRange, end: e.target.value })}
+                                placeholder="End Date"
+                            />
+                        </div>
+                    </div>
+
                     <div className="bg-slate-800 rounded-xl shadow-lg border border-slate-700 overflow-hidden">
                         <table className="min-w-full divide-y divide-slate-700">
                             <thead className="bg-slate-900">
@@ -486,7 +591,7 @@ const Accounts = () => {
                                 </tr>
                             </thead>
                             <tbody className="bg-slate-800 divide-y divide-slate-700">
-                                {transactions.map(tx => {
+                                {filteredTransactions.map(tx => {
                                     const acc = accounts.find(a => a.id === tx.account_id);
                                     const isCredit = CREDIT_CATEGORIES.includes(tx.category);
                                     const isTransfer = tx.category === 'Transfer';
@@ -524,7 +629,7 @@ const Accounts = () => {
                                         </tr>
                                     );
                                 })}
-                                {transactions.length === 0 && (
+                                {filteredTransactions.length === 0 && (
                                     <tr><td colSpan="6" className="px-6 py-8 text-center text-gray-500">No transactions recorded yet.</td></tr>
                                 )}
                             </tbody>
