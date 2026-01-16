@@ -105,7 +105,6 @@ const AccountCard = ({ acc, onEdit = null }) => {
             </div>
         </div>
     );
-    );
 };
 
 const OverviewAccountRow = ({ acc, allTransactions }) => {
