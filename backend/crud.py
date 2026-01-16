@@ -199,17 +199,20 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
 def delete_transaction(db: Session, transaction_id: str):
     db_tx = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
     if db_tx:
-        # Revert balance change?? 
-        # Ideally yes, but that gets complex if we want to be perfect.
-        # For now, simplest approach is just delete the record so it doesn't show in logs.
-        # IF we want to revert balance:
-        # account = db_tx.account
-        # if account:
-        #    if db_tx.category in CREDIT_CATEGORIES:
-        #        account.current_balance -= db_tx.amount
-        #    else:
-        #        account.current_balance += db_tx.amount
-        #    db.add(account)
+        # Revert balance change
+        account = db_tx.account
+        if account:
+            # Same categories as in create_transaction to determine direction
+            CREDIT_CATEGORIES = ['Income', 'Deposit', 'Refund', 'Interest']
+            
+            if db_tx.category and db_tx.category in CREDIT_CATEGORIES:
+                # Original was ADD, so removal is SUBTRACT
+                account.current_balance -= db_tx.amount
+            else:
+                # Original was SUBTRACT, so removal is ADD
+                account.current_balance += db_tx.amount
+            
+            db.add(account)
         
         db.delete(db_tx)
         db.commit()
