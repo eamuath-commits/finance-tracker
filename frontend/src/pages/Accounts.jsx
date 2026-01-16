@@ -120,7 +120,6 @@ const OverviewAccountRow = ({ acc, allTransactions }) => {
         .slice(0, 5); // Show top 5
 
     return (
-    return (
         <div className="bg-slate-800 rounded-xl p-4 shadow-lg border border-slate-700 w-full max-w-md mx-auto md:max-w-none">
             {/* Top Row: Balance & Logo */}
             <div className="flex justify-between items-center mb-2">
