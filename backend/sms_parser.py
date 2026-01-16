@@ -16,8 +16,10 @@ class SMSParser:
             r"Authori[sz]ed: (?P<currency>\w+) (?P<amount>[\d\.]+) at (?P<merchant>.+) on card (?P<last_4>\d+)",
             # PoS Format: By:9365... Amount:SAR 57.04 ... At:StoreName ...
             r"By:(?P<last_4>\d+).*?Amount:(?P<currency>\w+)\s*(?P<amount>[\d\.]+)\s*At:(?P<merchant>.+)",
-            # Jazira Internet Purchase: ... on: 2026-01-17 00:01 ... FX Markup: 7.18
-            r"Credit card: (?P<last_4>\d+) of: (?P<amount>[\d\.]+) (?P<currency>\w+) At (?P<merchant>.+?) on:(?P<date>[\d\-\s:]+).*?(?:FX Markup: (?P<fee>[\d\.]+))?"
+            # Jazira Internet Purchase (With FX Fee) - PRIORITIZED
+            r"Credit card: (?P<last_4>\d+) of: (?P<amount>[\d\.]+) (?P<currency>\w+) At (?P<merchant>.+?) on:(?P<date>[\d\-\s:]+).*?FX Markup: (?P<fee>[\d\.]+)",
+            # Jazira Internet Purchase (Standard)
+            r"Credit card: (?P<last_4>\d+) of: (?P<amount>[\d\.]+) (?P<currency>\w+) At (?P<merchant>.+?) on:(?P<date>[\d\-\s:]+)"
         ]
 
     def parse(self, text: str) -> Optional[Dict]:
