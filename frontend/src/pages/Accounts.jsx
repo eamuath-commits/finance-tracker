@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Wallet, PiggyBank, CreditCard, LayoutGrid, List, Receipt, CreditCard as ChipIcon, Edit3 } from 'lucide-react';
+import { Wallet, PiggyBank, CreditCard, LayoutGrid, List, Receipt, CreditCard as ChipIcon, Edit3, Trash2, Plus } from 'lucide-react';
 import { Card, SectionHeader, Modal, formatCurrency, inputClass, selectClass } from '../components/UI';
 
 const getAccountTheme = (type) => {
@@ -186,15 +186,23 @@ const Accounts = () => {
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // Modal Visibility
+    // Account Modal State
     const [showAccountModal, setShowAccountModal] = useState(false);
-
-    // Editing State
     const [editingId, setEditingId] = useState(null);
-
-    // Form Data
     const [accountForm, setAccountForm] = useState({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '', credit_limit: '', aliases: [] });
 
+    // Transaction Modal State
+    const [showTxModal, setShowTxModal] = useState(false);
+    const [editingTx, setEditingTx] = useState(null);
+    const [txForm, setTxForm] = useState({
+        account_id: '',
+        amount: '',
+        merchant: '',
+        category: '',
+        timestamp: new Date().toISOString().split('T')[0]
+    });
+
+    const Categories = ['Food', 'Transport', 'Utilities', 'Entertainment', 'Shopping', 'Housing', 'Health', 'Income', 'Transfer', 'Subscription', 'Obligation', 'Credit Card Payment'];
     const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
     const fetchData = async () => {
@@ -215,6 +223,65 @@ const Accounts = () => {
     useEffect(() => {
         fetchData();
     }, []);
+
+    // --- Account Handlers ---
+    // (Existing Handlers will remain below, we just insert Tx handlers before return)
+
+    // --- Transaction Handlers ---
+    const openTxModal = (tx = null) => {
+        if (tx) {
+            setEditingTx(tx);
+            setTxForm({
+                account_id: tx.account_id,
+                amount: tx.amount,
+                merchant: tx.merchant,
+                category: tx.category || '',
+                timestamp: tx.timestamp ? new Date(tx.timestamp).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+            });
+        } else {
+            setEditingTx(null);
+            setTxForm({
+                account_id: accounts.length > 0 ? accounts[0].id : '',
+                amount: '',
+                merchant: '',
+                category: '',
+                timestamp: new Date().toISOString().split('T')[0]
+            });
+        }
+        setShowTxModal(true);
+    };
+
+    const handleSaveTx = async (e) => {
+        e.preventDefault();
+        try {
+            if (editingTx) {
+                await axios.put(`${API_URL}/transactions/${editingTx.id}`, {
+                    merchant: txForm.merchant,
+                    category: txForm.category,
+                    amount: parseFloat(txForm.amount),
+                    account_id: txForm.account_id,
+                    timestamp: new Date(txForm.timestamp).toISOString()
+                });
+            } else {
+                await axios.post(`${API_URL}/transactions/`, {
+                    ...txForm,
+                    amount: parseFloat(txForm.amount),
+                    timestamp: new Date(txForm.timestamp).toISOString()
+                });
+            }
+            setShowTxModal(false);
+            fetchData();
+        } catch (err) { alert('Error saving transaction'); }
+    };
+
+    const handleDeleteTx = async (id) => {
+        if (confirm('Are you sure you want to delete this transaction?')) {
+            try {
+                await axios.delete(`${API_URL}/transactions/${id}`);
+                fetchData();
+            } catch (err) { alert('Error deleting transaction'); }
+        }
+    };
 
     const handleSaveAccount = async (e) => {
         e.preventDefault();
@@ -373,39 +440,126 @@ const Accounts = () => {
             {/* --- TRANSACTIONS TAB --- */}
             {activeTab === 'transactions' && (
                 <div className="animate-fade-in">
-                    <SectionHeader title="Transactions Log" />
+                    <div className="flex justify-between items-center mb-6">
+                        <SectionHeader title="Transaction Log" />
+                        <button onClick={() => openTxModal(null)} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm transition shadow border border-blue-500">
+                            <Plus size={16} /> Add Transaction
+                        </button>
+                    </div>
+
                     <div className="bg-slate-800 rounded-xl shadow-lg border border-slate-700 overflow-hidden">
                         <table className="min-w-full divide-y divide-slate-700">
                             <thead className="bg-slate-900">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Merchant</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Account / Card</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Merchant</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Category</th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Amount</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider pl-8">Category</th>
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-slate-800 divide-y divide-slate-700">
-                                {transactions.map(tx => (
-                                    <tr key={tx.id}>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                                            {tx.merchant}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{new Date(tx.timestamp).toLocaleDateString()}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-red-400">- {formatCurrency(tx.amount)}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm pl-8">
-                                            {tx.category ? (
-                                                <span className="px-2 py-1 rounded text-xs bg-slate-700 text-blue-300 border border-slate-600">{tx.category}</span>
-                                            ) : <span className="text-gray-600 italic text-xs">Uncategorized</span>}
-                                        </td>
-                                    </tr>
-                                ))}
+                                {transactions.map(tx => {
+                                    const acc = accounts.find(a => a.id === tx.account_id);
+                                    return (
+                                        <tr key={tx.id} className="hover:bg-slate-700/50 transition-colors">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {new Date(tx.timestamp).toLocaleDateString()}
+                                                <div className="text-[10px] opacity-70">{new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                                                {acc ? (
+                                                    <div className="flex flex-col">
+                                                        <span>{acc.name}</span>
+                                                        <span className="text-xs text-gray-500 font-mono">•••• {acc.last_4_digits}</span>
+                                                    </div>
+                                                ) : <span className="text-gray-500">Unknown Account</span>}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">{tx.merchant}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                                                {tx.category ? <span className="bg-slate-700 px-2 py-0.5 rounded text-xs text-blue-300 border border-slate-600">{tx.category}</span> : '-'}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-white">{formatCurrency(tx.amount)}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    <button onClick={() => openTxModal(tx)} className="text-blue-400 hover:text-blue-300 p-1"><Edit3 size={16} /></button>
+                                                    <button onClick={() => handleDeleteTx(tx.id)} className="text-red-400 hover:text-red-300 p-1"><Trash2 size={16} /></button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                                 {transactions.length === 0 && (
-                                    <tr><td colSpan="4" className="px-6 py-8 text-center text-gray-500">No transactions recorded yet.</td></tr>
+                                    <tr><td colSpan="6" className="px-6 py-8 text-center text-gray-500">No transactions recorded yet.</td></tr>
                                 )}
                             </tbody>
                         </table>
                     </div>
                 </div>
+            )}
+
+            {/* Transaction Modal */}
+            {showTxModal && (
+                <Modal title={editingTx ? "Edit Transaction" : "Add Transaction"} onClose={() => setShowTxModal(false)}>
+                    <form onSubmit={handleSaveTx} className="space-y-4">
+                        <div>
+                            <label className="text-xs text-gray-400 uppercase font-bold mb-1 block">Account</label>
+                            <select
+                                required
+                                className={selectClass}
+                                value={txForm.account_id}
+                                onChange={e => setTxForm({ ...txForm, account_id: e.target.value })}
+                            >
+                                <option value="" disabled>Select Account</option>
+                                {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name} (...{acc.last_4_digits})</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-400 uppercase font-bold mb-1 block">Merchant</label>
+                            <input
+                                type="text" required placeholder="Starbucks, Uber, etc."
+                                className={inputClass}
+                                value={txForm.merchant}
+                                onChange={e => setTxForm({ ...txForm, merchant: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-400 uppercase font-bold mb-1 block">Amount</label>
+                            <input
+                                type="number" required step="0.01" placeholder="0.00"
+                                className={inputClass}
+                                value={txForm.amount}
+                                onChange={e => setTxForm({ ...txForm, amount: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-400 uppercase font-bold mb-1 block">Category</label>
+                            <select
+                                className={selectClass}
+                                value={txForm.category}
+                                onChange={e => setTxForm({ ...txForm, category: e.target.value })}
+                            >
+                                <option value="">Select Category (Optional)</option>
+                                {Categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-400 uppercase font-bold mb-1 block">Date</label>
+                            <input
+                                type="date" required
+                                className={inputClass}
+                                value={txForm.timestamp}
+                                onChange={e => setTxForm({ ...txForm, timestamp: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="flex justify-end gap-2 mt-6">
+                            <button type="button" onClick={() => setShowTxModal(false)} className="px-4 py-2 text-gray-300 hover:text-white transition">Cancel</button>
+                            <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition shadow-lg border border-green-500">Save Transaction</button>
+                        </div>
+                    </form>
+                </Modal>
             )}
 
             {/* --- ACCOUNT MODAL (Shared) --- */}
