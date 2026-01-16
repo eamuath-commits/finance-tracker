@@ -127,7 +127,8 @@ const Transactions = () => {
     });
 
     const sortedTransactions = sortData(filteredTransactions);
-    const Categories = ['Food', 'Transport', 'Utilities', 'Entertainment', 'Shopping', 'Housing', 'Health', 'Income', 'Transfer', 'Subscription', 'Obligation', 'Credit Card Payment'];
+    const Categories = ['Food', 'Transport', 'Utilities', 'Entertainment', 'Shopping', 'Housing', 'Health', 'Income', 'Transfer', 'Subscription', 'Obligation', 'Credit Card Payment', 'Deposit', 'Refund'];
+    const CREDIT_CATEGORIES = ['Income', 'Deposit', 'Refund', 'Interest'];
 
     if (loading) return <div className="p-10 text-center text-white">Loading Transactions...</div>;
 
@@ -178,7 +179,7 @@ const Transactions = () => {
                                     className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white"
                                     onClick={() => handleSort('merchant')}
                                 >
-                                    <div className="flex items-center gap-1">Merchant <ArrowUpDown size={14} /></div>
+                                    <div className="flex items-center gap-1">Beneficiary / Source <ArrowUpDown size={14} /></div>
                                 </th>
                                 <th
                                     className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white"
@@ -198,33 +199,40 @@ const Transactions = () => {
                             </tr>
                         </thead>
                         <tbody className="bg-slate-800 divide-y divide-slate-700">
-                            {sortedTransactions.map(tx => (
-                                <tr key={tx.id} className="hover:bg-slate-700/50 transition-colors">
-                                    <td className="px-6 py-4 text-sm font-medium text-white">{tx.merchant}</td>
-                                    <td className="px-6 py-4 text-sm text-gray-400">
-                                        {new Date(tx.timestamp).toLocaleDateString()}
-                                        <div className="text-xs text-slate-600">{new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        {tx.category ? (
-                                            <span className="px-2 py-1 bg-slate-700 border border-slate-600 rounded text-xs text-blue-300">
-                                                {tx.category}
-                                            </span>
-                                        ) : (
-                                            <span className="text-gray-500 text-xs italic">Uncategorized</span>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-gray-400">
-                                        {accounts.find(a => a.id === tx.account_id)?.name || 'Unknown'}
-                                    </td>
-                                    <td className="px-6 py-4 text-right text-sm font-bold text-white">
-                                        {formatCurrency(tx.amount)}
-                                    </td>
-                                    <td className="px-6 py-4 text-right text-sm font-medium">
-                                        <button onClick={() => openEditModal(tx)} className="text-blue-400 hover:text-blue-300 transition">Edit</button>
-                                    </td>
-                                </tr>
-                            ))}
+                            {sortedTransactions.map(tx => {
+                                const isCredit = CREDIT_CATEGORIES.includes(tx.category);
+                                const isTransfer = tx.category === 'Transfer';
+                                return (
+                                    <tr key={tx.id} className="hover:bg-slate-700/50 transition-colors">
+                                        <td className="px-6 py-4 text-sm font-medium text-white">
+                                            {isTransfer && <span className="text-xs text-blue-400 mr-2 uppercase font-bold tracking-wider">{isCredit ? 'FROM:' : 'TO:'}</span>}
+                                            {tx.merchant}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-gray-400">
+                                            {new Date(tx.timestamp).toLocaleDateString()}
+                                            <div className="text-xs text-slate-600">{new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            {tx.category ? (
+                                                <span className={`px-2 py-0.5 rounded text-xs border ${isCredit ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800' : 'bg-slate-700 text-blue-300 border-slate-600'}`}>
+                                                    {tx.category}
+                                                </span>
+                                            ) : (
+                                                <span className="text-gray-500 text-xs italic">Uncategorized</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-gray-400">
+                                            {accounts.find(a => a.id === tx.account_id)?.name || 'Unknown'}
+                                        </td>
+                                        <td className={`px-6 py-4 text-right text-sm font-bold ${isCredit ? 'text-emerald-400' : 'text-red-400'}`}>
+                                            {isCredit ? '+' : '-'} {formatCurrency(tx.amount)}
+                                        </td>
+                                        <td className="px-6 py-4 text-right text-sm font-medium">
+                                            <button onClick={() => openEditModal(tx)} className="text-blue-400 hover:text-blue-300 transition">Edit</button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                             {sortedTransactions.length === 0 && (
                                 <tr>
                                     <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
@@ -241,6 +249,23 @@ const Transactions = () => {
             {showAddModal && (
                 <Modal title="Add Manual Transaction" onClose={() => setShowAddModal(false)}>
                     <form onSubmit={handleSaveAdd} className="space-y-4">
+                        {/* Transaction Type Indicator */}
+                        <div className="flex gap-4 p-1 bg-slate-700 rounded-lg mb-4">
+                            <button
+                                type="button"
+                                onClick={() => setForm(f => ({ ...f, category: '' }))}
+                                className="flex-1 py-1.5 text-xs font-bold uppercase rounded-md bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 transition text-center"
+                            >
+                                Expense / Debit
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setForm(f => ({ ...f, category: 'Income' }))}
+                                className="flex-1 py-1.5 text-xs font-bold uppercase rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition text-center"
+                            >
+                                Income / Credit
+                            </button>
+                        </div>
                         <select
                             required
                             className={selectClass}
