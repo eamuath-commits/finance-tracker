@@ -265,6 +265,11 @@ const Accounts = () => {
     }, []);
 
     // Derived Data
+    const sortOrder = { 'Checking': 1, 'Savings': 2, 'Credit Card': 3 };
+    const sortedAccounts = [...accounts].sort((a, b) => {
+        return (sortOrder[a.account_type] || 99) - (sortOrder[b.account_type] || 99);
+    });
+
     const filteredTransactions = transactions.filter(tx => {
         // Search Term (Merchant or Category)
         const matchSearch = tx.merchant.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -440,7 +445,7 @@ const Accounts = () => {
 
                     {/* List of Account Rows */}
                     <div className="flex flex-col gap-4 mb-8">
-                        {accounts.map(acc => (
+                        {sortedAccounts.map(acc => (
                             <OverviewAccountRow key={acc.id} acc={acc} allTransactions={transactions} />
                         ))}
                     </div>
@@ -465,7 +470,7 @@ const Accounts = () => {
                                 </tr>
                             </thead>
                             <tbody className="bg-slate-800 divide-y divide-slate-700">
-                                {accounts.map(acc => (
+                                {sortedAccounts.map(acc => (
                                     <tr key={acc.id} className="hover:bg-slate-700/50 transition-colors">
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">{acc.name}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{acc.account_type}</td>
