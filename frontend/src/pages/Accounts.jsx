@@ -120,46 +120,36 @@ const OverviewAccountRow = ({ acc, allTransactions }) => {
         .slice(0, 5); // Show top 5
 
     return (
-        <div className="bg-[#1c1c1e] rounded-2xl p-5 shadow-lg border border-white/5 w-full max-w-md mx-auto md:max-w-none">
+        <div className="bg-[#1c1c1e] rounded-xl p-4 shadow-lg border border-white/5 w-full max-w-md mx-auto md:max-w-none">
             {/* Top Row: Balance & Logo */}
-            <div className="flex justify-between items-start mb-1">
+            <div className="flex justify-between items-center mb-2">
                 <div>
                     <div className="flex items-baseline gap-1">
-                        <span className="text-2xl font-bold text-white tracking-tight">JL {acc.current_balance?.toFixed(2)}</span>
+                        <span className="text-xl font-bold text-white tracking-tight">SAR {acc.current_balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                 </div>
-                {/* Mada Logo Simulation */}
+                {/* Mada Logo Image */}
                 <div className="flex flex-col items-end">
-                    <div className="w-12 h-7 bg-white/90 rounded px-1 flex flex-col justify-center items-center shadow-sm">
-                        <span className="text-[8px] font-black tracking-widest text-[#005a9e] leading-none uppercase" style={{ fontFamily: 'sans-serif' }}>mada</span>
-                        <div className="flex w-full h-[2px] mt-[1px] gap-[1px]">
-                            <div className="bg-[#005a9e] h-full w-[70%]"></div>
-                            <div className="bg-[#a2d45e] h-full w-[30%]"></div>
-                        </div>
-                    </div>
+                    <img src="/mada-logo.png" alt="Mada" className="w-10 h-auto opacity-90" />
                 </div>
             </div>
 
-            {/* Middle Row: Name & Dots & Last 4 */}
-            <div className="flex items-center gap-2 mb-4">
+            {/* Middle Row: Name & Last 4 */}
+            <div className="flex items-center gap-2 mb-3">
                 <span className="text-gray-300 font-medium text-sm">{acc.name}</span>
                 <span className="text-gray-500 text-xs">•</span>
                 <span className="text-gray-400 text-sm font-mono">{acc.last_4_digits}</span>
-                {/* Star Icon (Static for now) */}
-                <svg className="w-4 h-4 text-orange-400 fill-current ml-1" viewBox="0 0 24 24">
-                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                </svg>
             </div>
 
             {/* Bottom Row: View Transactions Toggle */}
-            <div className="border-t border-white/10 pt-3">
+            <div className="border-t border-white/10 pt-2">
                 <button
                     onClick={() => setExpanded(!expanded)}
-                    className="flex items-center gap-2 text-blue-400 text-sm font-medium hover:text-blue-300 transition-colors w-full"
+                    className="flex justify-between items-center text-blue-400 text-xs font-medium hover:text-blue-300 transition-colors w-full"
                 >
-                    View Transactions
+                    <span>View Transactions</span>
                     <svg
-                        className={`w-4 h-4 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+                        className={`w-3 h-3 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
                         fill="none" viewBox="0 0 24 24" stroke="currentColor"
                     >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -169,21 +159,21 @@ const OverviewAccountRow = ({ acc, allTransactions }) => {
 
             {/* Expanded Content: Transactions List */}
             {expanded && (
-                <div className="mt-4 space-y-3 animate-fade-in">
+                <div className="mt-3 space-y-2 animate-fade-in border-t border-white/5 pt-2">
                     {accountTransactions.length > 0 ? (
                         accountTransactions.map(tx => (
-                            <div key={tx.id} className="flex justify-between items-center text-sm py-2 border-b border-white/5 last:border-0">
+                            <div key={tx.id} className="flex justify-between items-center text-xs py-1.5 border-b border-white/5 last:border-0">
                                 <div>
-                                    <p className="text-white">{tx.merchant}</p>
-                                    <p className="text-xs text-gray-500">{new Date(tx.timestamp).toLocaleDateString()}</p>
+                                    <p className="text-white truncate max-w-[150px]">{tx.merchant}</p>
+                                    <p className="text-[10px] text-gray-500">{new Date(tx.timestamp).toLocaleDateString()}</p>
                                 </div>
-                                <span className="text-red-400 font-mono">-{tx.amount}</span>
+                                <span className="text-red-400 font-mono">-{tx.amount?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                             </div>
                         ))
                     ) : (
-                        <p className="text-xs text-gray-500 italic py-2">No recent transactions found.</p>
+                        <p className="text-[10px] text-gray-500 italic py-1">No recent transactions.</p>
                     )}
-                    <button className="text-xs text-center text-gray-500 w-full pt-2 hover:text-white transition">View All in Transactions Tab</button>
+                    <button className="text-[10px] text-center text-gray-500 w-full pt-1 hover:text-white transition">View All in Transactions Tab</button>
                 </div>
             )}
         </div>
