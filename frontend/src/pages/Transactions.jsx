@@ -170,73 +170,81 @@ const Transactions = () => {
             </div>
 
             {/* Filters Bar */}
-            <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg mb-6 flex flex-col md:flex-row gap-4">
-                <div className="relative flex-1">
+            {/* Filters Bar */}
+            <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg mb-6 space-y-4">
+                {/* Search Row */}
+                <div className="relative">
                     <Search className="absolute left-3 top-3 text-gray-400" size={18} />
                     <input
                         type="text"
-                        placeholder="Search merchant or description..."
-                        className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                        placeholder="Search merchant, category, or notes..."
+                        className="w-full pl-10 pr-4 py-2.5 bg-slate-900/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                     />
                 </div>
-            </div>
 
-            {/* Account Filter */}
-            <div className="w-full md:w-48">
-                <select
-                    className="w-full p-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                    value={accountFilter}
-                    onChange={e => setAccountFilter(e.target.value)}
-                >
-                    <option value="">All Accounts</option>
-                    {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
-                </select>
-            </div>
+                {/* Filters Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    {/* Account */}
+                    <div className="relative">
+                        <select
+                            className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 appearance-none"
+                            value={accountFilter}
+                            onChange={e => setAccountFilter(e.target.value)}
+                        >
+                            <option value="">All Accounts</option>
+                            {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                        </select>
+                        <Filter className="absolute right-3 top-3 text-gray-400 pointer-events-none" size={14} />
+                    </div>
 
-            {/* Type Filter */}
-            <div className="w-full md:w-32">
-                <select
-                    className="w-full p-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                    value={typeFilter}
-                    onChange={e => setTypeFilter(e.target.value)}
-                >
-                    <option value="">All Types</option>
-                    <option value="Debit">Debit</option>
-                    <option value="Credit">Credit</option>
-                    <option value="Transfer">Transfer</option>
-                </select>
-            </div>
+                    {/* Type */}
+                    <div className="relative">
+                        <select
+                            className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 appearance-none"
+                            value={typeFilter}
+                            onChange={e => setTypeFilter(e.target.value)}
+                        >
+                            <option value="">All Types</option>
+                            <option value="Debit">Expense (Debit)</option>
+                            <option value="Credit">Income (Credit)</option>
+                            <option value="Transfer">Transfer</option>
+                        </select>
+                        <div className="absolute right-3 top-3.5 text-gray-400 pointer-events-none">▼</div>
+                    </div>
 
-            {/* Category Filter */}
-            <div className="w-full md:w-36">
-                <select
-                    className="w-full p-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                    value={categoryFilter}
-                    onChange={e => setCategoryFilter(e.target.value)}
-                >
-                    <option value="">All Categories</option>
-                    {Categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                </select>
-            </div>
+                    {/* Category */}
+                    <div className="relative">
+                        <select
+                            className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 appearance-none"
+                            value={categoryFilter}
+                            onChange={e => setCategoryFilter(e.target.value)}
+                        >
+                            <option value="">All Categories</option>
+                            {Categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        </select>
+                        <div className="absolute right-3 top-3.5 text-gray-400 pointer-events-none">▼</div>
+                    </div>
 
-            {/* Date Range Filter */}
-            <div className="flex gap-2">
-                <input
-                    type="date"
-                    className="p-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-xs focus:outline-none focus:border-blue-500"
-                    value={dateRange.start}
-                    onChange={e => setDateRange({ ...dateRange, start: e.target.value })}
-                    placeholder="Start Date"
-                />
-                <input
-                    type="date"
-                    className="p-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-xs focus:outline-none focus:border-blue-500"
-                    value={dateRange.end}
-                    onChange={e => setDateRange({ ...dateRange, end: e.target.value })}
-                    placeholder="End Date"
-                />
+                    {/* Start Date */}
+                    <input
+                        type="date"
+                        className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                        value={dateRange.start}
+                        onChange={e => setDateRange({ ...dateRange, start: e.target.value })}
+                        placeholder="Start Date"
+                    />
+
+                    {/* End Date */}
+                    <input
+                        type="date"
+                        className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                        value={dateRange.end}
+                        onChange={e => setDateRange({ ...dateRange, end: e.target.value })}
+                        placeholder="End Date"
+                    />
+                </div>
             </div>
 
 
