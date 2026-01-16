@@ -48,18 +48,28 @@ const AccountCard = ({ acc, onEdit = null }) => {
                         </div>
                         <span className="font-semibold tracking-wide text-sm opacity-90">{acc.name}</span>
                     </div>
-                    {onEdit && (
-                        <button
-                            onClick={() => onEdit(acc)}
-                            className="p-2 bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-md transition opacity-0 group-hover:opacity-100"
-                        >
-                            <Edit3 size={16} />
-                        </button>
-                    )}
+                    {/* Logo (Mada/Visa) */}
+                    <div className="h-6">
+                        {isCreditCard ? (
+                            <img src="/visa-logo.png" alt="Visa" className="h-full object-contain brightness-0 invert opacity-80" />
+                        ) : (
+                            <img src="/mada-logo.png" alt="Mada" className="h-full object-contain opacity-80" />
+                        )}
+                    </div>
                 </div>
 
+                {/* Edit Button (Absolute positioned now or next to name?) - Let's keep it consistent layout-wise */}
+                {onEdit && (
+                    <button
+                        onClick={() => onEdit(acc)}
+                        className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-md transition opacity-0 group-hover:opacity-100"
+                    >
+                        <Edit3 size={16} />
+                    </button>
+                )}
+
                 {/* Middle (Chip & Aliases) */}
-                <div className="flex justify-between items-center my-2">
+                <div className="flex justify-between items-center my-2 mt-4">
                     <ChipIcon className="w-8 h-8 text-yellow-500/80 opacity-80" style={{ transform: 'rotate(90deg)' }} />
 
                     {/* Aliases Chips */}
@@ -129,9 +139,13 @@ const OverviewAccountRow = ({ acc, allTransactions }) => {
                         <span className="text-xl font-bold text-white tracking-tight">{formatCurrency(acc.current_balance)}</span>
                     </div>
                 </div>
-                {/* Mada Logo Image */}
+                {/* Logo Image */}
                 <div className="flex flex-col items-end">
-                    <img src="/mada-logo.png" alt="Mada" className="w-12 h-auto bg-white rounded-sm px-1 py-0.5" />
+                    {acc.account_type === 'Credit Card' ? (
+                        <img src="/visa-logo.png" alt="Visa" className="w-12 h-auto object-contain bg-white rounded-sm px-1 py-0.5" />
+                    ) : (
+                        <img src="/mada-logo.png" alt="Mada" className="w-12 h-auto object-contain bg-white rounded-sm px-1 py-0.5" />
+                    )}
                 </div>
             </div>
 
