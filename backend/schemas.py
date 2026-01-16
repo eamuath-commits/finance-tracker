@@ -52,6 +52,7 @@ class TransactionBase(BaseModel):
     merchant: str
     category: Optional[str] = None
     raw_sms_content: Optional[str] = None
+    timestamp: Optional[datetime] = None
 
 class TransactionCreate(TransactionBase):
     account_id: str # Needs to be linked manually if not via SMS
