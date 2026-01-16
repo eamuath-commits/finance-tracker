@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Modal, formatCurrency, inputClass, selectClass } from '../components/UI';
-import { Calendar, Trash2 } from 'lucide-react';
+import { Calendar, Trash2, LayoutGrid, List, Receipt } from 'lucide-react';
 import ObligationsOverview from '../components/ObligationsOverview';
 import ObligationsList from '../components/ObligationsList';
 import ObligationsHistory from '../components/ObligationsHistory';
@@ -338,35 +338,15 @@ const Obligations = () => {
     return (
         <div>
             {/* Header / Nav */}
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-end mb-6">
                 <div>
                     <h1 className="text-3xl font-bold text-white">Obligations</h1>
-                    <p className="text-gray-400 text-sm">Track monthly payments</p>
-                </div>
-                <div className="flex bg-slate-800 p-1 rounded-lg">
-                    <button
-                        onClick={() => setViewMode('overview')}
-                        className={`px-4 py-2 rounded-md text-sm font-bold transition ${viewMode === 'overview' ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
-                    >
-                        Overview
-                    </button>
-                    <button
-                        onClick={() => setViewMode('manager')}
-                        className={`px-4 py-2 rounded-md text-sm font-bold transition ${viewMode === 'manager' ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
-                    >
-                        Manager
-                    </button>
-                    <button
-                        onClick={() => setViewMode('history')}
-                        className={`px-4 py-2 rounded-md text-sm font-bold transition ${viewMode === 'history' ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
-                    >
-                        Payments
-                    </button>
+                    <p className="text-gray-400">Track monthly payments</p>
                 </div>
 
-                {/* Month Navigation Controls */}
+                {/* Month Navigation Controls (Top Right) */}
                 {viewMode !== 'history' && (
-                    <div className="flex items-center gap-2 bg-slate-800 p-1 rounded-lg ml-4">
+                    <div className="flex items-center gap-2 bg-slate-800 p-1 rounded-lg">
                         <button
                             onClick={() => setMonthOffset(prev => prev - 1)}
                             className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition"
@@ -389,6 +369,28 @@ const Obligations = () => {
                         </button>
                     </div>
                 )}
+            </div>
+
+            {/* Tabs (Below Header, Left Aligned) */}
+            <div className="flex space-x-1 bg-slate-800/50 p-1 rounded-lg mb-8 w-fit border border-slate-700">
+                <button
+                    onClick={() => setViewMode('overview')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition ${viewMode === 'overview' ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                >
+                    <LayoutGrid size={16} /> Overview
+                </button>
+                <button
+                    onClick={() => setViewMode('manager')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition ${viewMode === 'manager' ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                >
+                    <List size={16} /> Manager
+                </button>
+                <button
+                    onClick={() => setViewMode('history')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition ${viewMode === 'history' ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                >
+                    <Receipt size={16} /> Payments
+                </button>
             </div>
 
             {/* Content Area */}
