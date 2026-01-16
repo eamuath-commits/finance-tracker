@@ -9,6 +9,9 @@ class SMSParser:
         self.patterns = [
             r"Purchase of (?P<currency>\w+) (?P<amount>[\d\.]+) on card ending (?P<last_4>\d+) at (?P<merchant>.+)",
             r"Paid (?P<currency>\w+) (?P<amount>[\d\.]+) to (?P<merchant>.+) using card (?P<last_4>\d+)",
+            # Apple Pay / Online Purchase Format
+            # "Online Purchase Apple Pay Credit Card: 1645 at :HUNGERSTATION LLC of : 154.00 SAR on ..."
+            r"Credit Card: (?P<last_4>\d+) at :(?P<merchant>.+?) of : (?P<amount>[\d\.]+) (?P<currency>\w+)",
             # Generic catch-all attempt (more risky)
             r"Authori[sz]ed: (?P<currency>\w+) (?P<amount>[\d\.]+) at (?P<merchant>.+) on card (?P<last_4>\d+)"
         ]
