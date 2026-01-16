@@ -294,6 +294,10 @@ async def receive_sms(request: Request, db: Session = Depends(get_db)):
         merchant=merchant,
         raw_sms_content=body
     )
+    # Use parsed timestamp if available
+    if parsed_data.get("timestamp"):
+        transaction_data.timestamp = parsed_data["timestamp"]
+
     crud.create_transaction(db, transaction_data)
 
     # 5. Update Status
@@ -348,6 +352,10 @@ def retry_message(message_id: str, db: Session = Depends(get_db)):
         merchant=parsed_data["merchant"],
         raw_sms_content=msg.body
     )
+    # Use parsed timestamp if available
+    if parsed_data.get("timestamp"):
+        transaction_data.timestamp = parsed_data["timestamp"]
+
     crud.create_transaction(db, transaction_data)
     
     msg.status = models.MessageStatus.PARSED

@@ -16,18 +16,16 @@ class SMSParser:
             r"Authori[sz]ed: (?P<currency>\w+) (?P<amount>[\d\.]+) at (?P<merchant>.+) on card (?P<last_4>\d+)",
             # PoS Format: By:9365... Amount:SAR 57.04 ... At:StoreName ...
             r"By:(?P<last_4>\d+).*?Amount:(?P<currency>\w+)\s*(?P<amount>[\d\.]+)\s*At:(?P<merchant>.+)",
-            # Jazira Internet Purchase: Credit card: 1645 of: 312.22 SAR At PAYPAL ... (Optional FX Markup)
-            r"Credit card: (?P<last_4>\d+) of: (?P<amount>[\d\.]+) (?P<currency>\w+) At (?P<merchant>.+?) on:.*?(?:FX Markup: (?P<fee>[\d\.]+))?"
+            # Jazira Internet Purchase: ... on: 2026-01-17 00:01
+            r"Credit card: (?P<last_4>\d+) of: (?P<amount>[\d\.]+) (?P<currency>\w+) At (?P<merchant>.+?) on:(?P<date>[\d\-\s:]+)(?:Country|FX Markup|$)"
         ]
 
     def parse(self, text: str) -> Optional[Dict]:
         """
-        Parses SMS text and returns a dictionary with:
-        - last_4
-        - amount
-        - merchant
-        Or None if no match found.
+        Parses SMS text and returns transaction data incl. timestamp if found.
         """
+        from datetime import datetime
+        
         for pattern in self.patterns:
             # Use DOTALL to allow . to match newlines (crucial for multi-line SMS)
             match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
@@ -38,12 +36,27 @@ class SMSParser:
                 # Add FX Fee if present
                 if data.get("fee"):
                     amount += float(data.get("fee"))
+                
+                # Parse Date if present
+                parsed_date = None
+                raw_date = data.get("date")
+                if raw_date:
+                    raw_date = raw_date.strip()
+                    # Try common formats
+                    # 1. 2026-01-17 00:01 (ISO-like)
+                    try:
+                        parsed_date = datetime.strptime(raw_date, "%Y-%m-%d %H:%M")
+                    except ValueError:
+                        pass
                     
+                    # Add more formats here if needed
+                
                 return {
                     "last_4": data.get("last_4"),
                     "amount": amount,
                     "merchant": data.get("merchant").strip(),
-                    "currency": data.get("currency")
+                    "currency": data.get("currency"),
+                    "timestamp": parsed_date 
                 }
         return None
 
