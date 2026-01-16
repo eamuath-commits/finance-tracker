@@ -4,6 +4,9 @@ import { Search, Plus, ArrowUpDown, Filter } from 'lucide-react';
 import { Card, SectionHeader, Modal, inputClass, selectClass, formatCurrency } from '../components/UI';
 
 const Transactions = () => {
+    const Categories = ['Food', 'Transport', 'Utilities', 'Entertainment', 'Shopping', 'Housing', 'Health', 'Income', 'Transfer', 'Subscription', 'Obligation', 'Credit Card Payment', 'Deposit', 'Refund'];
+    const CREDIT_CATEGORIES = ['Income', 'Deposit', 'Refund', 'Interest'];
+
     const [transactions, setTransactions] = useState([]);
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -150,8 +153,6 @@ const Transactions = () => {
     });
 
     const sortedTransactions = sortData(filteredTransactions);
-    const Categories = ['Food', 'Transport', 'Utilities', 'Entertainment', 'Shopping', 'Housing', 'Health', 'Income', 'Transfer', 'Subscription', 'Obligation', 'Credit Card Payment', 'Deposit', 'Refund'];
-    const CREDIT_CATEGORIES = ['Income', 'Deposit', 'Refund', 'Interest'];
 
     if (loading) return <div className="p-10 text-center text-white">Loading Transactions...</div>;
 
