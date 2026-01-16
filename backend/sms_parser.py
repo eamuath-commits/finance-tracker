@@ -17,9 +17,9 @@ class SMSParser:
             # PoS Format: By:9365... Amount:SAR 57.04 ... At:StoreName ...
             r"By:(?P<last_4>\d+).*?Amount:(?P<currency>\w+)\s*(?P<amount>[\d\.]+)\s*At:(?P<merchant>.+)",
             # Jazira Internet Purchase (With FX Fee) - PRIORITIZED
-            r"Credit card: (?P<last_4>\d+) of: (?P<amount>[\d\.]+) (?P<currency>\w+) At (?P<merchant>.+?) on:(?P<date>[\d\-\s:]+).*?FX Markup: (?P<fee>[\d\.]+)",
+            r"Credit card: (?P<last_4>\d+) of: (?P<amount>[\d\.]+) (?P<currency>\w+) At (?P<merchant>.+?) on:\s*(?P<date>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}).*?FX Markup: (?P<fee>[\d\.]+)",
             # Jazira Internet Purchase (Standard)
-            r"Credit card: (?P<last_4>\d+) of: (?P<amount>[\d\.]+) (?P<currency>\w+) At (?P<merchant>.+?) on:(?P<date>[\d\-\s:]+)"
+            r"Credit card: (?P<last_4>\d+) of: (?P<amount>[\d\.]+) (?P<currency>\w+) At (?P<merchant>.+?) on:\s*(?P<date>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})"
         ]
 
     def parse(self, text: str) -> Optional[Dict]:
