@@ -24,6 +24,17 @@ class Account(Base):
     credit_limit = Column(Float, nullable=True) # New: For Credit Card Utilization
     
     transactions = relationship("Transaction", back_populates="account")
+    aliases = relationship("AccountAlias", back_populates="account", cascade="all, delete-orphan")
+
+class AccountAlias(Base):
+    __tablename__ = "account_aliases"
+
+    id = Column(Integer, primary_key=True, index=True)
+    account_id = Column(String, ForeignKey("accounts.id"), nullable=False)
+    alias_name = Column(String, nullable=False) # e.g. "Debit Card", "Apple Pay"
+    last_4_digits = Column(String, nullable=False) # The fallback/linked number
+
+    account = relationship("Account", back_populates="aliases")
 
 class Transaction(Base):
     __tablename__ = "transactions"

@@ -179,7 +179,8 @@ const Dashboard = () => {
                 account_type: acc.account_type,
                 last_4_digits: acc.last_4_digits,
                 current_balance: acc.current_balance,
-                credit_limit: acc.credit_limit || ''
+                credit_limit: acc.credit_limit || '',
+                aliases: acc.aliases || []
             });
         } else {
             setEditingId(null);
@@ -276,6 +277,69 @@ const Dashboard = () => {
 
                         <button type="submit" className="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700 font-medium">Save Account</button>
                     </form>
+
+                    {/* Linked Aliases Section (Only when editing) */}
+                    {editingId && (
+                        <div className="mt-6 pt-4 border-t border-slate-700">
+                            <h3 className="text-sm font-bold text-gray-300 mb-2">Linked Cards / Identifiers</h3>
+                            <div className="space-y-2 mb-3">
+                                {accountForm.aliases && accountForm.aliases.map(alias => (
+                                    <div key={alias.id} className="flex justify-between items-center bg-slate-700/50 p-2 rounded text-sm">
+                                        <span>{alias.alias_name} (x{alias.last_4_digits})</span>
+                                        <button
+                                            onClick={async () => {
+                                                if (!confirm('Delete this alias?')) return;
+                                                try {
+                                                    await axios.delete(`${API_URL}/aliases/${alias.id}`);
+                                                    // Refresh list locally
+                                                    setAccountForm(prev => ({
+                                                        ...prev,
+                                                        aliases: prev.aliases.filter(a => a.id !== alias.id)
+                                                    }));
+                                                    fetchData(); // Sync global state
+                                                } catch (err) { alert('Failed to delete alias'); }
+                                            }}
+                                            className="text-red-400 hover:text-red-300 text-xs"
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                ))}
+                                {(!accountForm.aliases || accountForm.aliases.length === 0) && (
+                                    <p className="text-xs text-gray-500 italic">No linked cards yet.</p>
+                                )}
+                            </div>
+
+                            {/* Add Alias Mini-Form */}
+                            <form
+                                onSubmit={async (e) => {
+                                    e.preventDefault();
+                                    const aliasName = e.target.aliasName.value;
+                                    const aliasLast4 = e.target.aliasLast4.value;
+                                    if (!aliasName || !aliasLast4) return;
+
+                                    try {
+                                        const res = await axios.post(`${API_URL}/accounts/${editingId}/aliases`, {
+                                            alias_name: aliasName,
+                                            last_4_digits: aliasLast4
+                                        });
+                                        // Update UI
+                                        setAccountForm(prev => ({
+                                            ...prev,
+                                            aliases: [...(prev.aliases || []), res.data]
+                                        }));
+                                        e.target.reset();
+                                        fetchData();
+                                    } catch (err) { alert('Failed to add alias'); }
+                                }}
+                                className="flex gap-2"
+                            >
+                                <input name="aliasName" type="text" placeholder="Name (e.g. Virtual Card)" className={inputClass + " text-xs"} required />
+                                <input name="aliasLast4" type="text" placeholder="Last 4" className={inputClass + " w-20 text-xs"} required maxLength={4} />
+                                <button type="submit" className="bg-slate-700 text-blue-300 text-xs px-3 rounded hover:bg-slate-600">Add</button>
+                            </form>
+                        </div>
+                    )}
                 </Modal>
             )}
 

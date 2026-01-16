@@ -20,8 +20,22 @@ class AccountUpdate(BaseModel):
     current_balance: Optional[float] = None
     credit_limit: Optional[float] = None
 
+class AccountAliasBase(BaseModel):
+    alias_name: str
+    last_4_digits: str
+
+class AccountAliasCreate(AccountAliasBase):
+    pass
+
+class AccountAlias(AccountAliasBase):
+    id: int
+    account_id: str
+    class Config:
+        orm_mode = True
+
 class Account(AccountBase):
     id: str
+    aliases: List[AccountAlias] = []
     class Config:
         orm_mode = True
 

@@ -5,19 +5,48 @@ import uuid
 from datetime import datetime
 
 def get_account_by_last_4(db: Session, last_4: str):
-    return db.query(models.Account).filter(models.Account.last_4_digits == last_4).first()
+    # 1. Try matching main account last_4
+    account = db.query(models.Account).filter(models.Account.last_4_digits == last_4).first()
+    if account:
+        return account
+    
+    # 2. Try matching aliases
+    alias = db.query(models.AccountAlias).filter(models.AccountAlias.last_4_digits == last_4).first()
+    if alias:
+        return alias.account
+        
+    return None
 
 def create_account(db: Session, account: schemas.AccountCreate):
     db_account = models.Account(
         name=account.name,
         account_type=account.account_type,
         last_4_digits=account.last_4_digits,
-        current_balance=account.current_balance
+        current_balance=account.current_balance,
+        credit_limit=account.credit_limit
     )
     db.add(db_account)
     db.commit()
     db.refresh(db_account)
     return db_account
+
+def create_account_alias(db: Session, account_id: str, alias: schemas.AccountAliasCreate):
+    db_alias = models.AccountAlias(
+        account_id=account_id,
+        alias_name=alias.alias_name,
+        last_4_digits=alias.last_4_digits
+    )
+    db.add(db_alias)
+    db.commit()
+    db.refresh(db_alias)
+    return db_alias
+
+def delete_account_alias(db: Session, alias_id: int):
+    db_alias = db.query(models.AccountAlias).filter(models.AccountAlias.id == alias_id).first()
+    if db_alias:
+        db.delete(db_alias)
+        db.commit()
+    return db_alias
 
 def get_accounts(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Account).offset(skip).limit(limit).all()

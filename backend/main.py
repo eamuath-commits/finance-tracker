@@ -113,6 +113,21 @@ def update_account(account_id: str, account_update: schemas.AccountUpdate, db: S
         raise HTTPException(status_code=404, detail="Account not found")
     return updated_account
 
+@app.post("/accounts/{account_id}/aliases", response_model=schemas.AccountAlias)
+def create_alias(account_id: str, alias: schemas.AccountAliasCreate, db: Session = Depends(get_db)):
+    # Verify account exists
+    account = db.query(models.Account).filter(models.Account.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return crud.create_account_alias(db, account_id, alias)
+
+@app.delete("/aliases/{alias_id}")
+def delete_alias(alias_id: int, db: Session = Depends(get_db)):
+    deleted = crud.delete_account_alias(db, alias_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Alias not found")
+    return {"message": "Alias deleted"}
+
 # --- Loan Endpoints ---
 @app.post("/loans/", response_model=schemas.Loan)
 def create_loan(loan: schemas.LoanCreate, db: Session = Depends(get_db)):
