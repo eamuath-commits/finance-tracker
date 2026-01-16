@@ -92,3 +92,19 @@ class Payment(Base):
     status = Column(Enum(PaymentStatus), default=PaymentStatus.PAID)
 
     obligation = relationship("MonthlyObligation")
+
+class MessageStatus(enum.Enum):
+    PENDING = "PENDING"
+    PARSED = "PARSED"
+    FAILED = "FAILED"
+    IGNORED = "IGNORED"
+
+class RawMessage(Base):
+    __tablename__ = "raw_messages"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    sender = Column(String, nullable=True)
+    body = Column(Text, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    status = Column(Enum(MessageStatus), default=MessageStatus.PENDING)
+    error_log = Column(Text, nullable=True) # To store why it failed

@@ -148,7 +148,18 @@ class PaymentUpdate(BaseModel):
     status: Optional[str] = None
 
 class Payment(PaymentBase):
-    id: int
     obligation_id: str
+    class Config:
+        orm_mode = True
+
+class RawMessageBase(BaseModel):
+    sender: Optional[str] = None
+    body: str
+    status: str
+    error_log: Optional[str] = None
+    timestamp: datetime
+
+class RawMessage(RawMessageBase):
+    id: str
     class Config:
         orm_mode = True

@@ -237,63 +237,121 @@ def get_allocation_analysis(db: Session = Depends(get_db)):
 # --- Webhook Endpoint ---
 @app.post("/webhook/sms")
 async def receive_sms(request: Request, db: Session = Depends(get_db)):
-    """
-    Receives an SMS body, logs the raw request, parses it, finds the matching account, 
-    and logs the transaction.
-    """
     try:
         raw_body = await request.json()
-        print(f"DEBUG: Received SMS Webhook RAW Payload: {raw_body}") # Debug log
     except Exception as e:
-        print(f"DEBUG: Failed to parse JSON body: {e}")
         raise HTTPException(status_code=400, detail="Invalid JSON")
 
-    # Manually validate against schema to catch errors gracefully
-    try:
-        payload = schemas.SMSPayload(**raw_body)
-    except Exception as e:
-        print(f"DEBUG: Schema Validation Failed: {e}")
-        parsed_data = parser.parse(str(raw_body)) # Try parsing raw dict/str anyway
-        if parsed_data:
-             print("DEBUG: Managed to parse content from raw body directly despite schema fail.")
-             # Continue logic below...
-             sms_text = str(raw_body) 
-             # Mock payload for logic flow if we want to support non-compliant requests temporarily
-             # But better to just error out after logging for now
-             return {"status": "error", "message": f"Schema validation failed: {str(e)}", "received": raw_body}
-        return {"status": "error", "message": "Invalid Payload Structure. Expecting {body, sender}", "received": raw_body}
+    # Validate or Fallback
+    sender = raw_body.get("sender", "Unknown")
+    body = raw_body.get("body", "")
+    
+    if not body:
+         # Try full dump if body key doesn't exist
+         body = str(raw_body)
 
-    sms_text = payload.body
-    print(f"Extract SMS Body: {sms_text}")
+    # 1. Save Raw Message
+    raw_msg = models.RawMessage(
+        sender=sender,
+        body=body,
+        status=models.MessageStatus.PENDING
+    )
+    db.add(raw_msg)
+    db.commit() # Commit to get ID and ensure persistence even if crash
+    db.refresh(raw_msg)
+    
+    print(f"Extract SMS Body: {body}")
 
-    parsed_data = parser.parse(sms_text)
+    # 2. Parse
+    parsed_data = parser.parse(body)
     
     if not parsed_data:
-        return {"status": "ignored", "reason": "No pattern matched", "raw": sms_text}
+        raw_msg.status = models.MessageStatus.FAILED
+        raw_msg.error_log = "No pattern matched"
+        db.commit()
+        return {"status": "ignored", "reason": "No pattern matched"}
     
     last_4 = parsed_data["last_4"]
     amount = parsed_data["amount"]
     merchant = parsed_data["merchant"]
 
-    # Find Account
+    # 3. Find Account
     account = crud.get_account_by_last_4(db, last_4=last_4)
     if not account:
+        raw_msg.status = models.MessageStatus.FAILED
+        raw_msg.error_log = f"Account with last 4 digits {last_4} not found"
+        db.commit()
         return {
             "status": "warning", 
             "reason": f"Account with last 4 digits {last_4} not found",
             "parsed": parsed_data
         }
 
-    # Create Transaction & Update Balance
+    # 4. Create Transaction
     transaction_data = schemas.TransactionCreate(
         account_id=account.id,
         amount=amount,
         merchant=merchant,
-        raw_sms_content=sms_text
+        raw_sms_content=body
     )
     crud.create_transaction(db, transaction_data)
+
+    # 5. Update Status
+    raw_msg.status = models.MessageStatus.PARSED
+    db.commit()
 
     return {
         "status": "success",
         "message": f"Logged {amount} at {merchant} for account {account.name}"
     }
+
+    return {
+        "status": "success",
+        "message": f"Logged {amount} at {merchant} for account {account.name}"
+    }
+
+# --- SMS Inbox Endpoints ---
+@app.get("/messages/", response_model=List[schemas.RawMessage])
+def read_messages(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return db.query(models.RawMessage).order_by(models.RawMessage.timestamp.desc()).offset(skip).limit(limit).all()
+
+@app.post("/messages/{message_id}/retry")
+def retry_message(message_id: str, db: Session = Depends(get_db)):
+    # Fetch Message
+    msg = db.query(models.RawMessage).filter(models.RawMessage.id == message_id).first()
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    # Re-run logic (Duplicate of receive_sms almost, should refactor)
+    # Refactor: Encapsulate parse-and-log logic?
+    # For now, inline for speed.
+    
+    parsed_data = parser.parse(msg.body)
+    if not parsed_data:
+        msg.status = models.MessageStatus.FAILED
+        msg.error_log = "Retry: No pattern matched"
+        db.commit()
+        return {"status": "failed", "reason": "No pattern matched"}
+
+    last_4 = parsed_data["last_4"]
+    account = crud.get_account_by_last_4(db, last_4=last_4)
+    if not account:
+        msg.status = models.MessageStatus.FAILED
+        msg.error_log = f"Retry: Account {last_4} not found"
+        db.commit()
+        return {"status": "warning", "reason": "Account not found"}
+
+    # Success
+    transaction_data = schemas.TransactionCreate(
+        account_id=account.id,
+        amount=parsed_data["amount"],
+        merchant=parsed_data["merchant"],
+        raw_sms_content=msg.body
+    )
+    crud.create_transaction(db, transaction_data)
+    
+    msg.status = models.MessageStatus.PARSED
+    msg.error_log = None
+    db.commit()
+    
+    return {"status": "success", "message": "Message parsed and logged successfully"}
