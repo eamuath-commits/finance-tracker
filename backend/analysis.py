@@ -1,79 +1,143 @@
-from sqlalchemy import extract
-from sqlalchemy.orm import Session
-from datetime import datetime
-from models import Account, MonthlyObligation, AccountType, Payment
-from analysis_schema import AllocationResponse, Recommendation
+from typing import List, Dict, Optional
+from datetime import date, timedelta
+import math
 
-def calculate_allocation(db: Session) -> AllocationResponse:
-    # 1. Get Liquid Cash (Checking + Savings)
-    accounts = db.query(Account).filter(
-        Account.account_type.in_([AccountType.CHECKING, AccountType.SAVINGS])
-    ).all()
+def calculate_amortization(
+    principal: float, 
+    annual_interest_rate: float, 
+    monthly_payment: float
+) -> Dict:
+    """
+    Calculates the time to payoff and total interest for a single debt.
+    Rate is percentage (e.g. 24.0 for 24%).
+    """
+    if principal <= 0:
+        return {"months": 0, "total_interest": 0.0, "payoff_date": date.today()}
     
-    liquid_cash = sum(acc.current_balance for acc in accounts)
+    if monthly_payment <= 0:
+         return {"months": float('inf'), "total_interest": float('inf'), "payoff_date": None}
+
+    monthly_rate = (annual_interest_rate / 100) / 12
     
-    # 2. Get Today's Date
-    today = datetime.now()
-    current_month = today.month
-    current_year = today.year
+    # Check if payment covers interest
+    monthly_interest_only = principal * monthly_rate
+    if monthly_payment <= monthly_interest_only:
+        return {
+            "months": float('inf'), 
+            "total_interest": float('inf'), 
+            "warning": "Payment too low to cover interest",
+            "payoff_date": None
+        }
+
+    # Amortization calculation
+    balance = principal
+    total_interest = 0.0
+    months = 0
     
-    # 3. Calculate Unpaid Obligations (Rest of Month)
-    obligations = db.query(MonthlyObligation).all()
+    # Preventing infinite loops with a cap (e.g. 100 years)
+    max_months = 1200 
     
-    unpaid_amount = 0.0
-    upcoming_bills = []
-    
-    for obl in obligations:
-        # Check if paid this month
-        payment = db.query(Payment).filter(
-            Payment.obligation_id == obl.id,
-            extract('month', Payment.payment_date) == current_month,
-            extract('year', Payment.payment_date) == current_year
-        ).first()
+    while balance > 0 and months < max_months:
+        interest_charge = balance * monthly_rate
+        total_interest += interest_charge
+        principal_paid = monthly_payment - interest_charge
+        balance -= principal_paid
+        months += 1
         
-        if not payment:
-            # It is unpaid. Proceed to reserve.
-            unpaid_amount += obl.amount
-            upcoming_bills.append(obl)
-            
-    # 4. Calculate Freedom Cash
-    freedom_cash = liquid_cash - unpaid_amount
+    payoff_date = date.today() + timedelta(days=months*30)
     
-    recommendations = []
-    message = ""
-    
-    # 5. Generate Recommendations
-    if upcoming_bills:
-        bill_names = ", ".join([b.name for b in upcoming_bills])
-        recommendations.append(Recommendation(
-            type="bill",
-            text=f"Reserve ${unpaid_amount:.2f} for unpaid bills: {bill_names}"
-        ))
-    else:
-        recommendations.append(Recommendation(
-            type="info",
-            text="All bills for this month are confirmed paid! 🎉"
-        ))
+    return {
+        "months": months,
+        "total_interest": round(total_interest, 2),
+        "payoff_date": payoff_date
+    }
 
-    if freedom_cash < 0:
-        shortfall = abs(freedom_cash)
-        message = f"Warning: You are short ${shortfall:.2f} for this month."
-        recommendations.append(Recommendation(
-            type="warning",
-            text=f"You need ${shortfall:.2f} more to cover remaining bills."
-        ))
-    else:
-        message = "You are in a safe financial position."
-        if freedom_cash > 0:
-            recommendations.append(Recommendation(
-                type="save",
-                text=f"You have ${freedom_cash:.2f} available. Consider moving some to Savings."
-            ))
-            
-    return AllocationResponse(
-        liquid_cash=liquid_cash,
-        unpaid_obligations_this_month=unpaid_amount,
-        freedom_cash=freedom_cash,
-        message=message,
-        recommendations=recommendations
-    )
+def simulate_payoff_plan(
+    debts: List[Dict], 
+    strategy: str = "AVALANCHE", 
+    extra_monthly_payment: float = 0.0
+) -> Dict:
+    """
+    Simulates paying off multiple debts with a specific strategy.
+    debts: List of dicts {id, name, balance, rate, min_payment}
+    strategy: 'AVALANCHE' (High Rate First) or 'SNOWBALL' (Low Balance First)
+    """
+    # Deep copy to avoid mutating inputs
+    active_debts = [d.copy() for d in debts]
+    
+    # Sort debts based on strategy
+    if strategy == "AVALANCHE":
+        # Sort by Rate DESC
+        active_debts.sort(key=lambda x: x['rate'], reverse=True)
+    else: # SNOWBALL
+        # Sort by Balance ASC
+        active_debts.sort(key=lambda x: x['balance'])
+        
+    total_interest_paid = 0.0
+    months_passed = 0
+    timeline = []
+    
+    # Simulation loop
+    # We simulate month by month
+    max_months = 600 # 50 years cap
+    
+    while any(d['balance'] > 0.1 for d in active_debts) and months_passed < max_months:
+        months_passed += 1
+        month_budget_extra = extra_monthly_payment
+        
+        month_log = {"month": months_passed, "payments": {}, "remaining_per_debt": {}}
+        
+        # 1. Charge Interest & set Min Payments
+        required_payments = 0.0
+        for debt in active_debts:
+            if debt['balance'] > 0:
+                monthly_rate = (debt['rate'] / 100) / 12
+                interest = debt['balance'] * monthly_rate
+                total_interest_paid += interest
+                debt['balance'] += interest # Add interest first
+                
+                # Determine min payment (cannot exceed balance)
+                min_pay = min(debt['min_payment'], debt['balance'])
+                debt['payment_this_month'] = min_pay
+                debt['balance'] -= min_pay
+                required_payments += min_pay
+        
+        # 2. Apply "Snowball" (Extra Payment + Freed up Minimums)
+        # In a real snowball, when a debt is killed, its min payment is added to the budget.
+        # But here 'extra_monthly_payment' is the *additional* on top of sum(original_min_payments)?
+        # Or is it a fixed total budget? 
+        # Usually: Budget = Sum(All Min Payments) + Extra.
+        # As debts die, the Sum(Min) decreases, so the "Avalanche/Snowball" portion increases.
+        
+        # Let's assume strict snowball:
+        # We apply 'month_budget_extra' to the top priority debt.
+        # Note: If we already paid min_payments above, 'month_budget_extra' is purely extra.
+        # What about the "Freed up min payment"? 
+        # If a debt was paid off LAST month, its min payment is correctly gone from 'required_payments',
+        # preventing us from "saving" it unless we track a "Global Fixed Monthly Commitment".
+        
+        # Improved Logic: 
+        # Total Monthly Commitment = Sum of Initial Minimum Payments + Extra.
+        # Available for Overpayment = (Total Commitment) - (Current Required Minimums).
+        
+        # We need the INITIAL min payments sum
+        # But simplistically, let's just say we have `extra_monthly_payment` available to target highest priority.
+        
+        for debt in active_debts:
+            if debt['balance'] > 0 and month_budget_extra > 0:
+                payment = min(month_budget_extra, debt['balance'])
+                debt['balance'] -= payment
+                debt['payment_this_month'] += payment
+                month_budget_extra -= payment
+        
+        for debt in active_debts:
+             month_log["remaining_per_debt"][debt['name']] = round(max(0, debt['balance']), 2)
+
+        timeline.append(month_log)
+
+    return {
+        "months_to_freedom": months_passed,
+        "final_date": date.today() + timedelta(days=months_passed*30),
+        "total_interest": round(total_interest_paid, 2),
+        "timeline": timeline
+    }

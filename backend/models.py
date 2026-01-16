@@ -21,7 +21,9 @@ class Account(Base):
     first_4_digits = Column(String, nullable=True) # Optional for verification
     last_4_digits = Column(String, unique=True, index=True) # Critical for SMS matching
     current_balance = Column(Float, default=0.0)
-    credit_limit = Column(Float, nullable=True) # New: For Credit Card Utilization
+    credit_limit = Column(Float, nullable=True) 
+    interest_rate = Column(Float, nullable=True) # APR for Credit Cards
+    minimum_payment = Column(Float, nullable=True) # Minimum monthly payment
     
     transactions = relationship("Transaction", back_populates="account")
     aliases = relationship("AccountAlias", back_populates="account", cascade="all, delete-orphan")
@@ -59,7 +61,10 @@ class Loan(Base):
     interest_rate = Column(Float, nullable=False) # Annual percentage
     start_date = Column(Date, nullable=False)
     term_months = Column(Integer, nullable=False)
+    start_date = Column(Date, nullable=False)
+    term_months = Column(Integer, nullable=False)
     remaining_balance = Column(Float, nullable=False)
+    monthly_payment = Column(Float, nullable=True) # Explicit monthly payment amount
 
 class MonthlyObligation(Base):
     __tablename__ = "obligations"

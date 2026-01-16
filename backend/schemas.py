@@ -8,7 +8,11 @@ class AccountBase(BaseModel):
     account_type: AccountType
     last_4_digits: str
     current_balance: float
+    last_4_digits: str
+    current_balance: float
     credit_limit: Optional[float] = None
+    interest_rate: Optional[float] = None
+    minimum_payment: Optional[float] = None
 
 class AccountCreate(AccountBase):
     pass
@@ -18,7 +22,11 @@ class AccountUpdate(BaseModel):
     account_type: Optional[AccountType] = None
     last_4_digits: Optional[str] = None
     current_balance: Optional[float] = None
+    last_4_digits: Optional[str] = None
+    current_balance: Optional[float] = None
     credit_limit: Optional[float] = None
+    interest_rate: Optional[float] = None
+    minimum_payment: Optional[float] = None
 
 class AccountAliasBase(BaseModel):
     alias_name: str
@@ -70,7 +78,10 @@ class LoanBase(BaseModel):
     principal_amount: float
     interest_rate: float
     start_date: datetime
+    interest_rate: float
+    start_date: datetime
     term_months: int
+    monthly_payment: Optional[float] = None
 
 class LoanCreate(LoanBase):
     pass
@@ -81,11 +92,16 @@ class LoanUpdate(BaseModel):
     interest_rate: Optional[float] = None
     start_date: Optional[datetime] = None
     term_months: Optional[int] = None
+    start_date: Optional[datetime] = None
+    term_months: Optional[int] = None
     remaining_balance: Optional[float] = None
+    monthly_payment: Optional[float] = None
 
 class Loan(LoanBase):
     id: str
+    id: str
     remaining_balance: float
+    monthly_payment: Optional[float] = None
     class Config:
         orm_mode = True
 
