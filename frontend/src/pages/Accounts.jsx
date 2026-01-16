@@ -167,7 +167,7 @@ const OverviewAccountRow = ({ acc, allTransactions }) => {
                                     <p className="text-white truncate max-w-[150px]">{tx.merchant}</p>
                                     <p className="text-[10px] text-gray-500">{new Date(tx.timestamp).toLocaleDateString()}</p>
                                 </div>
-                                <span className="text-red-400 font-mono">-{tx.amount?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                <span className="text-red-400 font-mono">-{formatCurrency(tx.amount)}</span>
                             </div>
                         ))
                     ) : (
