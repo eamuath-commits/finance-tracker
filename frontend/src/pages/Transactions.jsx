@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Search, Plus, ArrowUpDown, Filter, Edit3, Trash2 } from 'lucide-react';
+import { Search, Plus, ArrowUpDown, Filter, Edit3, Trash2, MessageSquareText, User } from 'lucide-react';
 import { Card, SectionHeader, Modal, inputClass, selectClass, formatCurrency } from '../components/UI';
 
 const Transactions = () => {
@@ -301,8 +301,17 @@ const Transactions = () => {
                                             {tx.merchant}
                                         </td>
                                         <td className="px-6 py-4 text-sm text-gray-400">
-                                            {new Date(tx.timestamp).toLocaleDateString()}
-                                            <div className="text-xs text-slate-600">{new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                            <div className="flex items-center gap-2">
+                                                {tx.raw_sms_content ? (
+                                                    <MessageSquareText size={14} className="text-blue-400" title="Source: SMS" />
+                                                ) : (
+                                                    <User size={14} className="text-gray-500" title="Source: Manual Entry" />
+                                                )}
+                                                <div>
+                                                    {new Date(tx.timestamp).toLocaleDateString()}
+                                                    <div className="text-xs text-slate-600">{new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                                </div>
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             {tx.category ? (

@@ -619,8 +619,17 @@ const Accounts = () => {
                                     return (
                                         <tr key={tx.id} className="hover:bg-slate-700/50 transition-colors">
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {new Date(tx.timestamp).toLocaleDateString()}
-                                                <div className="text-[10px] opacity-70">{new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                                <div className="flex items-center gap-2">
+                                                    {tx.raw_sms_content ? (
+                                                        <MessageSquareText size={14} className="text-blue-400" title="Source: SMS" />
+                                                    ) : (
+                                                        <User size={14} className="text-slate-600" title="Source: Manual Entry" />
+                                                    )}
+                                                    <div>
+                                                        {new Date(tx.timestamp).toLocaleDateString()}
+                                                        <div className="text-[10px] opacity-70">{new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                                    </div>
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                                                 {acc ? (
