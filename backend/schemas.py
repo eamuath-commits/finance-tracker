@@ -61,6 +61,7 @@ class Transaction(TransactionBase):
     id: str
     account_id: str
     timestamp: datetime
+    balance_after_transaction: Optional[float] = None
     class Config:
         orm_mode = True
 

@@ -66,25 +66,42 @@ def update_account(db: Session, account_id: str, account_update: schemas.Account
     return db_account
 
 def create_transaction(db: Session, transaction: schemas.TransactionCreate):
+    # Update Account Balance FIRST so we can record it
+    account = db.query(models.Account).filter(models.Account.id == transaction.account_id).first()
+    new_balance = 0.0
+    
+    if account:
+        # Assuming outgoing transaction amount is positive in payload if it is a debit.
+        # But wait, logic depends on type.
+        # Currently standard: Spent 50 -> Amount 50.
+        # Account Balance 1000 - 50 = 950.
+        
+        # NOTE: If we implement Income/Credit properly, we should check category or amount sign.
+        # For now, relying on simple subtraction logic as per previous implementation (Lines 86).
+        # "Credit" category logic handles display, but backend needs to know direction?
+        # Let's check crud.py existing lines 86: account.current_balance -= transaction.amount
+        
+        # We need to refine this slightly:
+        # If Category is 'Income'/'Deposit', add. Else subtract.
+        CREDIT_CATEGORIES = ['Income', 'Deposit', 'Refund', 'Interest']
+        if transaction.category and transaction.category in CREDIT_CATEGORIES:
+             account.current_balance += transaction.amount
+        else:
+             account.current_balance -= transaction.amount
+        
+        new_balance = account.current_balance
+        db.add(account)
+
     db_transaction = models.Transaction(
         account_id=transaction.account_id,
         amount=transaction.amount,
         merchant=transaction.merchant,
         raw_sms_content=transaction.raw_sms_content,
-        timestamp=datetime.utcnow()
+        timestamp=datetime.utcnow(),
+        category=transaction.category,
+        balance_after_transaction=new_balance if account else None
     )
     db.add(db_transaction)
-    
-    # Update Account Balance
-    account = db.query(models.Account).filter(models.Account.id == transaction.account_id).first()
-    if account:
-        # Assuming outgoing transaction is negative? Or positive?
-        # Convention: User spends money -> Subtract from checking, Add to Credit Card debt?
-        # For simplicity Phase 1: Just subtract from "Balance".
-        # If it's a Credit Card, "Balance" usually means "Limit Available" or "Debt"?
-        # Let's assume Balance is "Net Worth" style. Spending decreases it.
-        account.current_balance -= transaction.amount
-        db.add(account)
 
     db.commit()
     db.refresh(db_transaction)

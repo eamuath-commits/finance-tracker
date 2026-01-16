@@ -606,6 +606,7 @@ const Accounts = () => {
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Beneficiary / Source</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Category</th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Amount</th>
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Balance</th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
@@ -638,6 +639,11 @@ const Accounts = () => {
                                             </td>
                                             <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${isCredit ? 'text-emerald-400' : 'text-red-400'}`}>
                                                 {isCredit ? '+' : '-'} {formatCurrency(tx.amount)}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-400 font-mono">
+                                                {tx.balance_after_transaction !== null && tx.balance_after_transaction !== undefined
+                                                    ? formatCurrency(tx.balance_after_transaction)
+                                                    : '-'}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                                                 <div className="flex justify-end gap-2">

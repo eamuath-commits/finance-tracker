@@ -274,6 +274,7 @@ const Transactions = () => {
                                 >
                                     <div className="flex items-center justify-end gap-1">Amount <ArrowUpDown size={14} /></div>
                                 </th>
+                                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Balance</th>
                                 <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
@@ -305,6 +306,11 @@ const Transactions = () => {
                                         </td>
                                         <td className={`px-6 py-4 text-right text-sm font-bold ${isCredit ? 'text-emerald-400' : 'text-red-400'}`}>
                                             {isCredit ? '+' : '-'} {formatCurrency(tx.amount)}
+                                        </td>
+                                        <td className="px-6 py-4 text-right text-sm text-gray-400 font-mono">
+                                            {tx.balance_after_transaction !== null && tx.balance_after_transaction !== undefined
+                                                ? formatCurrency(tx.balance_after_transaction)
+                                                : '-'}
                                         </td>
                                         <td className="px-6 py-4 text-right text-sm font-medium">
                                             <button onClick={() => openEditModal(tx)} className="text-blue-400 hover:text-blue-300 transition">Edit</button>
