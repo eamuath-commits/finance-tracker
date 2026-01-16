@@ -624,7 +624,7 @@ const Accounts = () => {
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                 <div className="flex items-center gap-2">
                                                     {tx.raw_sms_content ? (
-                                                        <MessageSquareText size={14} className="text-blue-400" title="Source: SMS" />
+                                                        <img src="/sms-icon.png" alt="SMS" className="w-4 h-4 object-contain" title="Source: SMS" />
                                                     ) : (
                                                         <User size={14} className="text-slate-600" title="Source: Manual Entry" />
                                                     )}
