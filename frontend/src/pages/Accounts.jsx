@@ -51,9 +51,9 @@ const AccountCard = ({ acc, onEdit = null }) => {
                     {/* Logo (Mada/Visa) */}
                     <div className="h-6">
                         {isCreditCard ? (
-                            <img src="/visa-logo.png" alt="Visa" className="h-full object-contain brightness-0 invert opacity-80" />
+                            <img src="/visa-logo.png" alt="Visa" className="h-full object-contain" />
                         ) : (
-                            <img src="/mada-logo.png" alt="Mada" className="h-full object-contain opacity-80" />
+                            <img src="/mada-logo.png" alt="Mada" className="h-full object-contain" />
                         )}
                     </div>
                 </div>
@@ -142,9 +142,9 @@ const OverviewAccountRow = ({ acc, allTransactions }) => {
                 {/* Logo Image */}
                 <div className="flex flex-col items-end">
                     {acc.account_type === 'Credit Card' ? (
-                        <img src="/visa-logo.png" alt="Visa" className="w-12 h-auto object-contain bg-white rounded-sm px-1 py-0.5" />
+                        <img src="/visa-logo.png" alt="Visa" className="w-12 h-auto object-contain" />
                     ) : (
-                        <img src="/mada-logo.png" alt="Mada" className="w-12 h-auto object-contain bg-white rounded-sm px-1 py-0.5" />
+                        <img src="/mada-logo.png" alt="Mada" className="w-12 h-auto object-contain" />
                     )}
                 </div>
             </div>
