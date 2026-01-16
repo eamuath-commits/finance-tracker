@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Search, Plus, ArrowUpDown, Filter } from 'lucide-react';
+import { Search, Plus, ArrowUpDown, Filter, Edit3, Trash2 } from 'lucide-react';
 import { Card, SectionHeader, Modal, inputClass, selectClass, formatCurrency } from '../components/UI';
 
 const Transactions = () => {
@@ -122,6 +122,18 @@ const Transactions = () => {
             setEditingTx(null);
             fetchData();
         } catch (err) { alert('Error updating transaction'); }
+    };
+
+    const handleDelete = async (id) => {
+        if (window.confirm('Are you sure you want to delete this transaction?')) {
+            try {
+                await axios.delete(`${API_URL}/transactions/${id}`);
+                fetchData();
+            } catch (err) {
+                console.error("Error deleting transaction", err);
+                alert('Error deleting transaction');
+            }
+        }
     };
 
     // Derived Data
@@ -313,7 +325,10 @@ const Transactions = () => {
                                                 : '-'}
                                         </td>
                                         <td className="px-6 py-4 text-right text-sm font-medium">
-                                            <button onClick={() => openEditModal(tx)} className="text-blue-400 hover:text-blue-300 transition">Edit</button>
+                                            <div className="flex justify-end gap-2">
+                                                <button onClick={() => openEditModal(tx)} className="text-blue-400 hover:text-blue-300 p-1"><Edit3 size={16} /></button>
+                                                <button onClick={() => handleDelete(tx.id)} className="text-red-400 hover:text-red-300 p-1"><Trash2 size={16} /></button>
+                                            </div>
                                         </td>
                                     </tr>
                                 );
