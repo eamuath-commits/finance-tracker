@@ -198,15 +198,18 @@ const OverviewAccountRow = ({ acc, allTransactions }) => {
 const Accounts = () => {
     const [searchParams, setSearchParams] = useSearchParams();
 
-    // Initialize activeTab: Check URL first, then localStorage, then default to 'overview'
-    const activeTab = searchParams.get('tab') || localStorage.getItem('finance_accounts_tab') || 'overview';
+    // Initialize activeTab: Strictly from URL to ensure History works
+    const activeTab = searchParams.get('tab') || 'overview';
 
-    // Sync URL if it's missing the tab but we found one in localStorage
+    // Sync URL on mount if missing
     useEffect(() => {
-        if (!searchParams.get('tab') && localStorage.getItem('finance_accounts_tab')) {
-            setSearchParams({ tab: localStorage.getItem('finance_accounts_tab') }, { replace: true });
+        if (!searchParams.get('tab')) {
+            const saved = localStorage.getItem('finance_accounts_tab');
+            if (saved) {
+                setSearchParams({ tab: saved }, { replace: true });
+            }
         }
-    }, []);
+    }, [searchParams, setSearchParams]);
 
     // Save to localStorage whenever tab changes
     useEffect(() => {
