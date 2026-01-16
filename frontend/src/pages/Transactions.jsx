@@ -13,7 +13,7 @@ const Transactions = () => {
     const [categoryFilter, setCategoryFilter] = useState('');
     const [accountFilter, setAccountFilter] = useState('');
     const [typeFilter, setTypeFilter] = useState('');
-    const [dateFilter, setDateFilter] = useState('');
+    const [dateRange, setDateRange] = useState({ start: '', end: '' });
     const [sortConfig, setSortConfig] = useState({ key: 'timestamp', direction: 'desc' });
 
     // Modal State
@@ -141,8 +141,10 @@ const Transactions = () => {
         else if (typeFilter === 'Debit') matchType = !isCredit && !isTransfer;
         else if (typeFilter === 'Transfer') matchType = isTransfer;
 
-        // Date Filter (YYYY-MM)
-        const matchDate = dateFilter ? tx.timestamp.startsWith(dateFilter) : true;
+        // Date Range Filter
+        let matchDate = true;
+        if (dateRange.start) matchDate = matchDate && tx.timestamp >= dateRange.start;
+        if (dateRange.end) matchDate = matchDate && tx.timestamp.split('T')[0] <= dateRange.end;
 
         return matchSearch && matchCategory && matchAccount && matchType && matchDate;
     });
@@ -218,13 +220,21 @@ const Transactions = () => {
                 </select>
             </div>
 
-            {/* Date Filter */}
-            <div className="w-full md:w-40">
+            {/* Date Range Filter */}
+            <div className="flex gap-2">
                 <input
-                    type="month"
-                    className="w-full p-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                    value={dateFilter}
-                    onChange={e => setDateFilter(e.target.value)}
+                    type="date"
+                    className="p-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-xs focus:outline-none focus:border-blue-500"
+                    value={dateRange.start}
+                    onChange={e => setDateRange({ ...dateRange, start: e.target.value })}
+                    placeholder="Start Date"
+                />
+                <input
+                    type="date"
+                    className="p-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-xs focus:outline-none focus:border-blue-500"
+                    value={dateRange.end}
+                    onChange={e => setDateRange({ ...dateRange, end: e.target.value })}
+                    placeholder="End Date"
                 />
             </div>
         </div>
