@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Wallet, PiggyBank, CreditCard, LayoutGrid, List, Receipt, CreditCard as ChipIcon, Edit3, Trash2, Plus } from 'lucide-react';
 import { Card, SectionHeader, Modal, formatCurrency, inputClass, selectClass } from '../components/UI';
@@ -181,7 +182,8 @@ const OverviewAccountRow = ({ acc, allTransactions }) => {
 };
 
 const Accounts = () => {
-    const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'manager', 'transactions'
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeTab = searchParams.get('tab') || 'overview'; // Default to 'overview'
     const [accounts, setAccounts] = useState([]);
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -341,19 +343,19 @@ const Accounts = () => {
             {/* Tabs */}
             <div className="flex space-x-1 bg-slate-800/50 p-1 rounded-lg mb-8 w-fit border border-slate-700">
                 <button
-                    onClick={() => setActiveTab('overview')}
+                    onClick={() => setSearchParams({ tab: 'overview' })}
                     className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'overview' ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
                 >
                     <LayoutGrid size={16} /> Overview
                 </button>
                 <button
-                    onClick={() => setActiveTab('manager')}
+                    onClick={() => setSearchParams({ tab: 'manager' })}
                     className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'manager' ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
                 >
                     <List size={16} /> Manager
                 </button>
                 <button
-                    onClick={() => setActiveTab('transactions')}
+                    onClick={() => setSearchParams({ tab: 'transactions' })}
                     className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'transactions' ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
                 >
                     <Receipt size={16} /> Transactions
