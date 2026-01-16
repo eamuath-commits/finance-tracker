@@ -202,7 +202,8 @@ const Accounts = () => {
         timestamp: new Date().toISOString().split('T')[0]
     });
 
-    const Categories = ['Food', 'Transport', 'Utilities', 'Entertainment', 'Shopping', 'Housing', 'Health', 'Income', 'Transfer', 'Subscription', 'Obligation', 'Credit Card Payment'];
+    const Categories = ['Food', 'Transport', 'Utilities', 'Entertainment', 'Shopping', 'Housing', 'Health', 'Income', 'Transfer', 'Subscription', 'Obligation', 'Credit Card Payment', 'Deposit', 'Refund'];
+    const CREDIT_CATEGORIES = ['Income', 'Deposit', 'Refund', 'Interest'];
     const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
     const fetchData = async () => {
@@ -453,7 +454,7 @@ const Accounts = () => {
                                 <tr>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Account / Card</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Merchant</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Beneficiary / Source</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Category</th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Amount</th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
@@ -462,6 +463,9 @@ const Accounts = () => {
                             <tbody className="bg-slate-800 divide-y divide-slate-700">
                                 {transactions.map(tx => {
                                     const acc = accounts.find(a => a.id === tx.account_id);
+                                    const isCredit = CREDIT_CATEGORIES.includes(tx.category);
+                                    const isTransfer = tx.category === 'Transfer';
+
                                     return (
                                         <tr key={tx.id} className="hover:bg-slate-700/50 transition-colors">
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -476,11 +480,16 @@ const Accounts = () => {
                                                     </div>
                                                 ) : <span className="text-gray-500">Unknown Account</span>}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">{tx.merchant}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                                                {tx.category ? <span className="bg-slate-700 px-2 py-0.5 rounded text-xs text-blue-300 border border-slate-600">{tx.category}</span> : '-'}
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                                                {isTransfer && <span className="text-xs text-blue-400 mr-2 uppercase font-bold tracking-wider">{isCredit ? 'FROM:' : 'TO:'}</span>}
+                                                {tx.merchant}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-white">{formatCurrency(tx.amount)}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                                                {tx.category ? <span className={`px-2 py-0.5 rounded text-xs border ${isCredit ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800' : 'bg-slate-700 text-blue-300 border-slate-600'}`}>{tx.category}</span> : '-'}
+                                            </td>
+                                            <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${isCredit ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                {isCredit ? '+' : '-'} {formatCurrency(tx.amount)}
+                                            </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                                                 <div className="flex justify-end gap-2">
                                                     <button onClick={() => openTxModal(tx)} className="text-blue-400 hover:text-blue-300 p-1"><Edit3 size={16} /></button>
@@ -503,6 +512,23 @@ const Accounts = () => {
             {showTxModal && (
                 <Modal title={editingTx ? "Edit Transaction" : "Add Transaction"} onClose={() => setShowTxModal(false)}>
                     <form onSubmit={handleSaveTx} className="space-y-4">
+                        {/* Transaction Type Indicator */}
+                        <div className="flex gap-4 p-1 bg-slate-700 rounded-lg mb-4">
+                            <button
+                                type="button"
+                                onClick={() => setTxForm(f => ({ ...f, category: '' }))}
+                                className="flex-1 py-1.5 text-xs font-bold uppercase rounded-md bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 transition text-center"
+                            >
+                                Expense / Debit
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTxForm(f => ({ ...f, category: 'Income' }))}
+                                className="flex-1 py-1.5 text-xs font-bold uppercase rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition text-center"
+                            >
+                                Income / Credit
+                            </button>
+                        </div>
                         <div>
                             <label className="text-xs text-gray-400 uppercase font-bold mb-1 block">Account</label>
                             <select
