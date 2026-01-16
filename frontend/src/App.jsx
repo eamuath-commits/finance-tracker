@@ -8,8 +8,8 @@ import Obligations from './pages/Obligations';
 import Reports from './pages/Reports';
 import Transactions from './pages/Transactions';
 
-// Placeholder pages for now (to be extracted later)
-const Loans = () => <div className="text-white p-8">Loan Management Page (Coming Soon)</div>;
+import Accounts from './pages/Accounts';
+import Loans from './pages/Loans';
 
 function App() {
     return (
@@ -17,6 +17,7 @@ function App() {
             <Routes>
                 <Route path="/" element={<MainLayout />}>
                     <Route index element={<Dashboard />} />
+                    <Route path="accounts" element={<Accounts />} />
                     <Route path="transactions" element={<Transactions />} />
                     <Route path="loans" element={<Loans />} />
                     <Route path="obligations" element={<Obligations />} />

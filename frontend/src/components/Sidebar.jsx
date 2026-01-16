@@ -4,10 +4,11 @@ import { LayoutDashboard, Wallet, CreditCard, Receipt, FileBarChart, Settings } 
 
 const Sidebar = () => {
     const navItems = [
-        { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+        { path: '/', label: 'Overview', icon: LayoutDashboard },
+        { path: '/accounts', label: 'Accounts', icon: Wallet },
         { path: '/transactions', label: 'Transactions', icon: Receipt },
-        { path: '/loans', label: 'Loans', icon: Wallet },
         { path: '/obligations', label: 'Obligations', icon: CreditCard },
+        { path: '/loans', label: 'Loans', icon: FileBarChart /* Reusing icon or pick better one */ },
         { path: '/reports', label: 'Reports', icon: FileBarChart },
     ];
 
