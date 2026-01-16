@@ -53,7 +53,7 @@ const AccountCard = ({ acc, onEdit = null }) => {
                         {isCreditCard ? (
                             <img src="/visa-logo.png" alt="Visa" className="h-full object-contain" />
                         ) : (
-                            <img src="/mada-logo.png" alt="Mada" className="h-full object-contain" />
+                            <img src="/mada-logo.png" alt="Mada" className="h-full object-contain" style={{ filter: 'invert(1) hue-rotate(180deg)' }} />
                         )}
                     </div>
                 </div>
@@ -144,7 +144,7 @@ const OverviewAccountRow = ({ acc, allTransactions }) => {
                     {acc.account_type === 'Credit Card' ? (
                         <img src="/visa-logo.png" alt="Visa" className="w-12 h-auto object-contain" />
                     ) : (
-                        <img src="/mada-logo.png" alt="Mada" className="w-12 h-auto object-contain" />
+                        <img src="/mada-logo.png" alt="Mada" className="w-12 h-auto object-contain" style={{ filter: 'invert(1) hue-rotate(180deg)' }} />
                     )}
                 </div>
             </div>
