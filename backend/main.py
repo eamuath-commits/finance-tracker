@@ -222,6 +222,13 @@ def create_transaction(transaction: schemas.TransactionCreate, db: Session = Dep
         raise HTTPException(status_code=404, detail="Account not found")
     return crud.create_transaction(db=db, transaction=transaction)
 
+@app.delete("/transactions/{transaction_id}")
+def delete_transaction(transaction_id: str, db: Session = Depends(get_db)):
+    deleted = crud.delete_transaction(db, transaction_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    return {"message": "Transaction deleted"}
+
 # --- Analysis Endpoints ---
 @app.get("/analysis/allocation", response_model=analysis_schema.AllocationResponse)
 def get_allocation_analysis(db: Session = Depends(get_db)):
