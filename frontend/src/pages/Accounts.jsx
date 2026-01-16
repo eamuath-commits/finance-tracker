@@ -120,17 +120,18 @@ const OverviewAccountRow = ({ acc, allTransactions }) => {
         .slice(0, 5); // Show top 5
 
     return (
-        <div className="bg-[#1c1c1e] rounded-xl p-4 shadow-lg border border-white/5 w-full max-w-md mx-auto md:max-w-none">
+    return (
+        <div className="bg-slate-800 rounded-xl p-4 shadow-lg border border-slate-700 w-full max-w-md mx-auto md:max-w-none">
             {/* Top Row: Balance & Logo */}
             <div className="flex justify-between items-center mb-2">
                 <div>
                     <div className="flex items-baseline gap-1">
-                        <span className="text-xl font-bold text-white tracking-tight">SAR {acc.current_balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span className="text-xl font-bold text-white tracking-tight">{formatCurrency(acc.current_balance)}</span>
                     </div>
                 </div>
                 {/* Mada Logo Image */}
                 <div className="flex flex-col items-end">
-                    <img src="/mada-logo.png" alt="Mada" className="w-10 h-auto opacity-90" />
+                    <img src="/mada-logo.png" alt="Mada" className="w-12 h-auto bg-white rounded-sm px-1 py-0.5" />
                 </div>
             </div>
 
