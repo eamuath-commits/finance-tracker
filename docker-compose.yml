@@ -24,7 +24,9 @@ services:
       - db
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/finance_db
+      - TZ=Asia/Riyadh
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - ./backend:/app
 
   frontend:
