@@ -203,7 +203,14 @@ const Accounts = () => {
     const [accounts, setAccounts] = useState([]);
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
+    // Filtering & Sorting State
+    const [searchTerm, setSearchTerm] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('');
+    const [accountFilter, setAccountFilter] = useState('');
+    const [typeFilter, setTypeFilter] = useState('');
+    const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
+    // Account Modal State
     // Account Modal State
     const [showAccountModal, setShowAccountModal] = useState(false);
     const [editingId, setEditingId] = useState(null);
