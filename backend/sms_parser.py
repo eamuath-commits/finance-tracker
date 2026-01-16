@@ -27,7 +27,8 @@ class SMSParser:
         Or None if no match found.
         """
         for pattern in self.patterns:
-            match = re.search(pattern, text, re.IGNORECASE)
+            # Use DOTALL to allow . to match newlines (crucial for multi-line SMS)
+            match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
             if match:
                 data = match.groupdict()
                 return {
