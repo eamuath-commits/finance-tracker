@@ -141,3 +141,55 @@ def simulate_payoff_plan(
         "total_interest": round(total_interest_paid, 2),
         "timeline": timeline
     }
+
+from sqlalchemy.orm import Session
+import models
+
+def calculate_allocation(db: Session):
+    """
+    Analyzes liquid cash vs upcoming obligations to recommend allocation.
+    """
+    # 1. Calculate Liquid Cash (Checking Accounts primarily)
+    # Defaulting to checking accounts only for "Spendable" cash
+    checking_accounts = db.query(models.Account).filter(models.Account.account_type == models.AccountType.CHECKING).all()
+    liquid_cash = sum(acc.current_balance for acc in checking_accounts)
+    
+    # 2. Calculate Unpaid Obligations for Current Month
+    # This logic assumes we look at "Estimated" amount of Obligations
+    # A true implementation would check if a Payment exists for THIS month for each obligation.
+    # For now, let's keep it simple: Sum of all obligation amounts.
+    # Refined: We should filter out those marked as PAID for this month. 
+    # (But that requires complex query). 
+    # Let's start with Total Obligations vs Cash.
+    
+    obligations = db.query(models.MonthlyObligation).all()
+    # TODO: Filter out paid ones. For now, assume full burden.
+    unpaid_obligations = sum(ob.amount for ob in obligations if ob.amount)
+    
+    freedom_cash = liquid_cash - unpaid_obligations
+    
+    recommendations = []
+    
+    if freedom_cash < 0:
+        recommendations.append({
+            "type": "warning", 
+            "text": f"Deficit warning! You are short {abs(freedom_cash)} SAR for bills."
+        })
+    elif freedom_cash > 0:
+        recommendations.append({
+            "type": "save",
+            "text": f"You have {freedom_cash} SAR free. Consider moving some to savings."
+        })
+    else:
+        recommendations.append({
+            "type": "bill",
+            "text": "You are exactly breaking even. Monitor closely."
+        })
+
+    return {
+        "liquid_cash": liquid_cash,
+        "unpaid_obligations_this_month": unpaid_obligations,
+        "freedom_cash": freedom_cash,
+        "message": "Allocation Analysis",
+        "recommendations": recommendations
+    }
