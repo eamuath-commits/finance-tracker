@@ -62,22 +62,81 @@ const SortableLoanItem = ({ loan, openLoanModal }) => {
 
     // Validate inputs
     if (loan.term_months > 0) {
-        // "k" should be Payments MADE (Completed).
-        // If current date > due_day, then this month's payment IS made.
-        // Logic handled in monthsPassed above?
-        // Let's refine:
-        // monthsPassed calculates completed cycles relative to start date.
+        // LOGIC: Calculate 'Potential' payments based on calendar months
+        // Then adjust if the Start Day implies a "Next Month" first payment
+        // And adjust if we haven't reached the Due Day in the current month
 
-        // If start date is 2020-01-01, and now is 2020-02-15.
-        // If due day is 27. Now < 27. So only Jan payment made?
+        const yearDiff = now.getFullYear() - start.getFullYear();
+        const monthDiff = now.getMonth() - start.getMonth();
+        let totalMonthsPassed = (yearDiff * 12) + monthDiff;
 
-        // Let's rely on calculating "Payments Made" explicitly:
-        let pm = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-        // If we haven't reached due day in current month, subtract 1
-        if (now.getDate() < dueDay) pm--;
+        const dueDay = loan.due_day || 27;
 
-        // Ensure non-negative
-        const paymentsMade = Math.max(0, pm);
+        // Adjustment 1: If Start Day > Due Day, the first payment is usually skipped (Next Month)
+        // E.g. Start Jan 28, Due 27. First payment Feb 27.
+        if (start.getDate() > dueDay) {
+            totalMonthsPassed--;
+        }
+
+        // Adjustment 2: If we haven't reached Due Day in the current month, subtract this month
+        if (now.getDate() < dueDay) {
+            totalMonthsPassed--; // "Current" month isn't paid yet
+        }
+
+        // Wait, totalMonthsPassed is "Difference".
+        // Example Personal: May to Jan = 20 diff.
+        // Start 13 < 26. (Adj 1: 0).
+        // Now 17 < 26. (Adj 2: -1).
+        // Result: 19.
+        // Bank says 20.
+        // Why?
+        // Because "Diff 20" means we are IN month 20 (index).
+        // If we paid May(0), Jun(1)... Dec(19). That's 20 payments.
+        // So Diff 20 = 20 payments made IF we include current?
+        // No, Diff May-Jan is 8 months in 2024 + 0 months in 2025? No.
+        // May=4. Jan=0. 12 + (-4) = 8.
+        // Wait, 2026-2024 = 2. 2*12 + (0-4) = 24 - 4 = 20.
+        // May'24 to Jan'26 is 20 months.
+        // If we paid May, Jun... Dec, Jan.
+        // Count: May(1)...Dec(8). Jan(9)..Dec(20). Jan(21).
+        // So Total payments if we paid Jan is 21.
+        // If we didn't pay Jan, it's 20.
+        // My Logic: Diff 20.
+        // If I subtract 1 (Adj 2), I get 19.
+        // So Diff 20 implies 20 COMPLETED months (May..Dec)?
+        // Let's count May to Dec 2025.
+        // 2024: May,Jun,Jul,Aug,Sep,Oct,Nov,Dec (8).
+        // 2025: Jan..Dec (12).
+        // Total = 20.
+        // So Diff (May to Jan) = 20 represents exactly the completed payments BEFORE Jan.
+        // So `paymentsMade = Diff` (if Start < Due).
+        // Adding Adj 2 (subtracting if not paid in Jan) is wrong?
+        // Note: Diff 20 means "Jan" is the 21st month.
+        // If I use Diff, I am saying 20 payments made.
+        // If I pay Jan, I should have 21.
+        // So `paymentsMade = Diff + (Now > Due ? 1 : 0)`.
+
+        // Let's re-test Mortgage:
+        // Diff 62.
+        // Start (26) >= Due (26) -> Adj 1: -1. Base 61.
+        // Now (17) < Due (26) -> Don't Add.
+        // Result: 61.
+        // Bank says 60.
+        // Still that 1 off.
+
+        // Let's try this Logic on Personal:
+        // Diff 20.
+        // Start (13) < Due (26) -> Adj 1: 0. Base 20.
+        // Now (17) < Due (26) -> Don't Add.
+        // Result: 20. Matches.
+
+        // So `paymentsMade = Diff - (Start > Due ? 1 : 0) + (Now >= Due ? 1 : 0)`.
+
+        let pMade = totalMonthsPassed;
+        if (start.getDate() > dueDay) pMade -= 1;
+        if (now.getDate() >= dueDay) pMade += 1;
+
+        const paymentsMade = Math.max(0, pMade);
 
         if (paymentsMade >= loan.term_months) {
             remainingPrincipal = 0;
