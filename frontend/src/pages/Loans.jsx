@@ -60,11 +60,15 @@ const SortableLoanItem = ({ loan, openLoanModal }) => {
 
     // Validate inputs
     if (loan.term_months > 0) {
-        if (currentPayment >= loan.term_months) {
+        // "k" should be Payments MADE (Completed).
+        // currentPayment is the ONE WE ARE ON (e.g. 60). So completed is 59.
+        const paymentsMade = Math.max(0, currentPayment - 1);
+
+        if (paymentsMade >= loan.term_months) {
             remainingPrincipal = 0;
         } else if (effectiveMonthlyRate > 0) {
             const N = loan.term_months;
-            const k = currentPayment; // Payments made (approx)
+            const k = paymentsMade;
             const r = effectiveMonthlyRate;
 
             const numerator = Math.pow(1 + r, N) - Math.pow(1 + r, k);
@@ -72,7 +76,7 @@ const SortableLoanItem = ({ loan, openLoanModal }) => {
             remainingPrincipal = loan.principal_amount * (numerator / denominator);
         } else {
             // Zero interest fallback
-            const principalPaid = (loan.principal_amount / loan.term_months) * currentPayment;
+            const principalPaid = (loan.principal_amount / loan.term_months) * paymentsMade;
             remainingPrincipal = Math.max(0, loan.principal_amount - principalPaid);
         }
     }
