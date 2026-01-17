@@ -29,26 +29,56 @@ const SortableLoanItem = ({ loan, openLoanModal }) => {
     // Calculate percentage based on TIME (Payments Made vs Total Payments)
     const progressPercent = Math.min(100, Math.max(0, (currentPayment / loan.term_months) * 100));
 
-    // DYNAMIC BALANCE CALCULATION (Standard Amortization)
-    // Formula: B = P * [ (1+r)^N - (1+r)^n ] / [ (1+r)^N - 1 ]
-    let calculatedRemaining = 0;
+    // --- SOLVER FOR EFFECTIVE RATE ---
+    // User enters Flat Rate, but Amortization needs Effective APR.
+    // We derive Effective Rate 'r' from: Principal, Term, MonthlyPayment
+    // Formula: P = (PMT/r) * (1 - (1+r)^-N)
+    // Newton-Raphson Method
+    const solveEffectiveMonthlyRate = (P, N, PMT) => {
+        let r = 0.004; // Initial guess (approx 4.8% APR)
+        for (let i = 0; i < 20; i++) {
+            const numerator = (PMT / r) * (1 - Math.pow(1 + r, -N)) - P;
+            const derivative = (PMT / r) * (N * Math.pow(1 + r, -N - 1)) - (PMT / (r * r)) * (1 - Math.pow(1 + r, -N));
+            const nextR = r - (numerator / derivative);
+            if (Math.abs(nextR - r) < 0.0000001) return nextR;
+            r = nextR;
+        }
+        return r;
+    };
 
-    // Safety check for rates
-    const annualRate = parseFloat(loan.interest_rate || 0);
-    const monthlyRate = annualRate / 100 / 12;
-
-    if (monthlyRate > 0 && loan.term_months > 0) {
-        const numerator = Math.pow(1 + monthlyRate, loan.term_months) - Math.pow(1 + monthlyRate, currentPayment);
-        const denominator = Math.pow(1 + monthlyRate, loan.term_months) - 1;
-        calculatedRemaining = loan.principal_amount * (numerator / denominator);
+    let effectiveMonthlyRate = 0;
+    if (loan.monthly_payment && loan.term_months && loan.principal_amount) {
+        effectiveMonthlyRate = solveEffectiveMonthlyRate(loan.principal_amount, loan.term_months, loan.monthly_payment);
     } else {
-        // Fallback to straight line if rate is 0 (interest free?)
-        const principalPaid = (loan.principal_amount / loan.term_months) * currentPayment;
-        calculatedRemaining = Math.max(0, loan.principal_amount - principalPaid);
+        // Fallback if payment is missing (use provided rate as APR roughly)
+        effectiveMonthlyRate = (parseFloat(loan.interest_rate || 0) / 100) / 12;
+    }
+
+    // DYNAMIC BALANCE CALCULATION (Using Effective Rate)
+    // Formula: B_k = P * [ (1+r)^N - (1+r)^k ] / [ (1+r)^N - 1 ]
+    let calculatedRemaining = loan.principal_amount; // Default to full
+
+    // Validate inputs
+    if (loan.term_months > 0) {
+        if (currentPayment >= loan.term_months) {
+            calculatedRemaining = 0;
+        } else if (effectiveMonthlyRate > 0) {
+            const N = loan.term_months;
+            const k = currentPayment; // Payments made (approx)
+            const r = effectiveMonthlyRate;
+
+            const numerator = Math.pow(1 + r, N) - Math.pow(1 + r, k);
+            const denominator = Math.pow(1 + r, N) - 1;
+            calculatedRemaining = loan.principal_amount * (numerator / denominator);
+        } else {
+            // Zero interest fallback
+            const principalPaid = (loan.principal_amount / loan.term_months) * currentPayment;
+            calculatedRemaining = Math.max(0, loan.principal_amount - principalPaid);
+        }
     }
 
     // SAMA Rule: Settlement = Remaining Principal + 3 Months of Future Profit
-    const threeMonthsProfit = calculatedRemaining * monthlyRate * 3;
+    const threeMonthsProfit = calculatedRemaining * effectiveMonthlyRate * 3;
     const settlementEstimate = calculatedRemaining + threeMonthsProfit;
 
     return (
