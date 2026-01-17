@@ -173,6 +173,11 @@ def read_loans(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     loans = crud.get_loans(db, skip=skip, limit=limit)
     return loans
 
+@app.put("/loans/reorder")
+def reorder_loans(payload: schemas.ReorderSchema, db: Session = Depends(get_db)):
+    crud.reorder_loans(db, payload.ordered_ids)
+    return {"status": "success"}
+
 @app.put("/loans/{loan_id}", response_model=schemas.Loan)
 def update_loan(loan_id: str, loan_update: schemas.LoanUpdate, db: Session = Depends(get_db)):
     updated_loan = crud.update_loan(db, loan_id, loan_update)
@@ -181,11 +186,6 @@ def update_loan(loan_id: str, loan_update: schemas.LoanUpdate, db: Session = Dep
     if not updated_loan:
         raise HTTPException(status_code=404, detail="Loan not found")
     return updated_loan
-
-@app.put("/loans/reorder")
-def reorder_loans(payload: schemas.ReorderSchema, db: Session = Depends(get_db)):
-    crud.reorder_loans(db, payload.ordered_ids)
-    return {"status": "success"}
 
 @app.delete("/loans/{loan_id}", response_model=schemas.Loan)
 def delete_loan(loan_id: str, db: Session = Depends(get_db)):
@@ -203,17 +203,17 @@ def create_obligation(obligation: schemas.ObligationCreate, db: Session = Depend
 def read_obligations(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return crud.get_obligations(db, skip=skip, limit=limit)
 
+@app.put("/obligations/reorder")
+def reorder_obligations(payload: schemas.ReorderSchema, db: Session = Depends(get_db)):
+    crud.reorder_obligations(db, payload.ordered_ids)
+    return {"status": "success"}
+
 @app.put("/obligations/{obligation_id}", response_model=schemas.Obligation)
 def update_obligation(obligation_id: str, obligation_update: schemas.ObligationUpdate, db: Session = Depends(get_db)):
     updated_obj = crud.update_obligation(db, obligation_id, obligation_update)
     if not updated_obj:
         raise HTTPException(status_code=404, detail="Obligation not found")
     return updated_obj
-
-@app.put("/obligations/reorder")
-def reorder_obligations(payload: schemas.ReorderSchema, db: Session = Depends(get_db)):
-    crud.reorder_obligations(db, payload.ordered_ids)
-    return {"status": "success"}
 
 @app.delete("/obligations/{obligation_id}", response_model=schemas.Obligation)
 def delete_obligation(obligation_id: str, db: Session = Depends(get_db)):
