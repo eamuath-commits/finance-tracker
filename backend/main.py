@@ -73,8 +73,7 @@ def run_migrations(engine):
                     conn.execute(text("ALTER TABLE accounts ADD COLUMN first_4_digits VARCHAR"))
                     conn.commit()
 
-                     conn.execute(text("ALTER TABLE accounts ADD COLUMN first_4_digits VARCHAR"))
-                     conn.commit()
+
 
         # Check loans table for display_order
         if 'loans' in inspector.get_table_names():
