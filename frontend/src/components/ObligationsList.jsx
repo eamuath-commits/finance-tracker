@@ -1,8 +1,11 @@
-import React from 'react';
-import { CheckCircle, History, Pencil, Trash2, Banknote, Home, Zap, Utensils, Car, Shield, Smartphone, Landmark, CreditCard, Clock, Box } from 'lucide-react';
+import React, { useState } from 'react';
+import { CheckCircle, History, Pencil, Trash2, Banknote, Home, Zap, Utensils, Car, Shield, Smartphone, Landmark, CreditCard, Clock, Box, GripVertical } from 'lucide-react';
 import { formatCurrency, EditIcon } from '../components/UI';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
-const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObligationModal, openPaymentModal, handleQuickPay, handleDeleteHistory, CATEGORY_ICONS }) => {
+const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObligationModal, openPaymentModal, handleQuickPay, handleDeleteHistory, CATEGORY_ICONS, dragHandleProps }) => {
     const prevMonth = getMonthStatus(obl, monthOffset - 1);
     const currMonth = getMonthStatus(obl, monthOffset);
 
@@ -52,7 +55,12 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
 
     return (
         <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition group relative">
-            <div className="bg-slate-900/40 px-3 py-2 border-b border-slate-700 flex justify-between items-center">
+            <div className="bg-slate-900/40 px-3 py-2 border-b border-slate-700 flex justify-between items-center pl-8"> {/* Added pl-8 for drag handle */}
+                {/* Drag Handle */}
+                <div {...dragHandleProps} className="absolute top-2 left-2 cursor-grab opacity-30 hover:opacity-100 z-10 p-1 bg-slate-900/50 rounded touch-none">
+                    <GripVertical size={14} className="text-gray-400" />
+                </div>
+
                 <div className="flex items-center gap-2">
                     {/* Icon next to name */}
                     <div className="text-slate-400 opacity-70 scale-75">
@@ -137,6 +145,24 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
     );
 };
 
+const SortableObligationItem = (props) => {
+    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: props.obl.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+    };
+
+    // Pass attributes and listeners to the drag handle inside the Card
+    const dragHandleProps = { ...attributes, ...listeners };
+
+    return (
+        <div ref={setNodeRef} style={style}>
+            <ObligationCard {...props} dragHandleProps={dragHandleProps} />
+        </div>
+    );
+};
+
 
 const ObligationsList = ({
     obligations,
@@ -146,7 +172,8 @@ const ObligationsList = ({
     handleQuickPay,
     openHistory,
     handleDeleteHistory,
-    monthOffset = 0
+    monthOffset = 0,
+    onReorder
 }) => {
 
     const CATEGORY_ICONS = {
@@ -210,6 +237,63 @@ const ObligationsList = ({
         return acc;
     }, { budget: 0, paid: 0 });
 
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    );
+
+    const handleDragEnd = (event) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+
+        // Find which category group these items belong to
+        const activeObl = obligations.find(o => o.id === active.id);
+        const overObl = obligations.find(o => o.id === over.id);
+
+        if (!activeObl || !overObl) return;
+        if (activeObl.category !== overObl.category) return; // Prevent cross-category drag
+
+        // 1. Get all items in this category
+        const categoryName = activeObl.category || "Other";
+        const categoryItems = grouped[categoryName];
+        // Note: categoryItems is derived from sorted state, so it reflects current order.
+
+        // 2. Calculate new order for THIS category
+        const oldIndex = categoryItems.findIndex(i => i.id === active.id);
+        const newIndex = categoryItems.findIndex(i => i.id === over.id);
+        const newCategoryOrder = arrayMove(categoryItems, oldIndex, newIndex);
+
+        // 3. Reconstruct the GLOBAL list
+        // We modify 'grouped' copy, then flatten it.
+        // We must preserve the order of other categories.
+        // The display order of categories themselves is determined by Object.entries(grouped) loop below.
+        // But grouped is derived.
+        // We need a stable list.
+
+        // Simpler approach:
+        // We know 'obligations' is the global list. 
+        // We can just construct a new global list where we replace the items of THIS category with 'newCategoryOrder',
+        // and keep others as is.
+        // But since 'obligations' might be interleaved if sort is weird,
+        // it's safest to rely on the current visual grouping logic to determine "Global Order".
+        // i.e. The intended Global Order IS the Flattened Grouped List.
+
+        const newGrouped = { ...grouped, [categoryName]: newCategoryOrder };
+
+        // Flatten, preserving key order of original 'grouped'
+        // (Note: Object.keys order is generally insertion order for strings, which matches render order)
+        const flattened = [];
+        Object.keys(grouped).forEach(cat => {
+            if (cat === categoryName) {
+                flattened.push(...newCategoryOrder);
+            } else {
+                flattened.push(...grouped[cat]);
+            }
+        });
+
+        if (onReorder) onReorder(flattened);
+    };
+
     return (
         <div className="animate-fade-in-up">
             {/* Global Summary Card */}
@@ -262,63 +346,67 @@ const ObligationsList = ({
                 </div>
             </div>
 
-            {Object.entries(grouped).map(([category, items]) => {
-                const stats = getCategoryStats(items);
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                {Object.entries(grouped).map(([category, items]) => {
+                    const stats = getCategoryStats(items);
 
-                return (
-                    <div key={category} className="mb-8">
-                        <div className="flex items-center justify-between mb-4 border-b border-slate-700 pb-2">
-                            <div className="flex items-center gap-2">
-                                {CATEGORY_ICONS[category] || <Box size={20} className="text-gray-400" />}
-                                <h2 className="text-xl font-bold text-slate-200">{category}</h2>
-                                <span className="bg-slate-800 text-slate-400 text-xs px-2 py-0.5 rounded-full border border-slate-700">{items.length}</span>
-                            </div>
+                    return (
+                        <div key={category} className="mb-8">
+                            <div className="flex items-center justify-between mb-4 border-b border-slate-700 pb-2">
+                                <div className="flex items-center gap-2">
+                                    {CATEGORY_ICONS[category] || <Box size={20} className="text-gray-400" />}
+                                    <h2 className="text-xl font-bold text-slate-200">{category}</h2>
+                                    <span className="bg-slate-800 text-slate-400 text-xs px-2 py-0.5 rounded-full border border-slate-700">{items.length}</span>
+                                </div>
 
-                            <div className="flex gap-4 text-xs">
-                                <div className="flex flex-col items-end">
-                                    <span className={`uppercase font-semibold ${stats.currentPaid > stats.currentBudget ? 'text-red-400' : 'text-blue-400'}`}>Budget</span>
-                                    <div className="flex items-center gap-1">
-                                        <span className={`font-mono ${stats.currentPaid > stats.currentBudget ? 'text-red-300' : 'text-blue-200'}`}>
-                                            {formatCurrency(stats.currentBudget)}
-                                        </span>
-                                        {stats.currentPaid > stats.currentBudget && (
-                                            <span className="text-[10px] text-red-400 font-bold bg-red-900/30 px-1 rounded">
-                                                +{formatCurrency(stats.currentPaid - stats.currentBudget)}
+                                <div className="flex gap-4 text-xs">
+                                    <div className="flex flex-col items-end">
+                                        <span className={`uppercase font-semibold ${stats.currentPaid > stats.currentBudget ? 'text-red-400' : 'text-blue-400'}`}>Budget</span>
+                                        <div className="flex items-center gap-1">
+                                            <span className={`font-mono ${stats.currentPaid > stats.currentBudget ? 'text-red-300' : 'text-blue-200'}`}>
+                                                {formatCurrency(stats.currentBudget)}
                                             </span>
-                                        )}
-                                        {stats.currentPaid <= stats.currentBudget && (
-                                            <span className="text-[10px] text-emerald-500/50 font-mono">
-                                                ({formatCurrency(stats.currentBudget - stats.currentPaid)} left)
-                                            </span>
-                                        )}
+                                            {stats.currentPaid > stats.currentBudget && (
+                                                <span className="text-[10px] text-red-400 font-bold bg-red-900/30 px-1 rounded">
+                                                    +{formatCurrency(stats.currentPaid - stats.currentBudget)}
+                                                </span>
+                                            )}
+                                            {stats.currentPaid <= stats.currentBudget && (
+                                                <span className="text-[10px] text-emerald-500/50 font-mono">
+                                                    ({formatCurrency(stats.currentBudget - stats.currentPaid)} left)
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-green-400 uppercase font-semibold">Paid</span>
+                                        <span className="text-green-200 font-mono">{formatCurrency(stats.currentPaid)}</span>
                                     </div>
                                 </div>
-                                <div className="flex flex-col items-end">
-                                    <span className="text-green-400 uppercase font-semibold">Paid</span>
-                                    <span className="text-green-200 font-mono">{formatCurrency(stats.currentPaid)}</span>
-                                </div>
                             </div>
-                        </div>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-4">
-                            {items.map(obl => (
-                                <ObligationCard
-                                    key={obl.id}
-                                    obl={obl}
-                                    getMonthStatus={getMonthStatus}
-                                    monthOffset={monthOffset}
-                                    openHistory={openHistory}
-                                    openObligationModal={openObligationModal}
-                                    openPaymentModal={openPaymentModal}
-                                    handleQuickPay={handleQuickPay}
-                                    handleDeleteHistory={handleDeleteHistory}
-                                    CATEGORY_ICONS={CATEGORY_ICONS}
-                                />
-                            ))}
+                            <SortableContext items={items.map(i => i.id)} strategy={rectSortingStrategy}>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-4">
+                                    {items.map(obl => (
+                                        <SortableObligationItem
+                                            key={obl.id}
+                                            obl={obl}
+                                            getMonthStatus={getMonthStatus}
+                                            monthOffset={monthOffset}
+                                            openHistory={openHistory}
+                                            openObligationModal={openObligationModal}
+                                            openPaymentModal={openPaymentModal}
+                                            handleQuickPay={handleQuickPay}
+                                            handleDeleteHistory={handleDeleteHistory}
+                                            CATEGORY_ICONS={CATEGORY_ICONS}
+                                        />
+                                    ))}
+                                </div>
+                            </SortableContext>
                         </div>
-                    </div>
-                );
-            })}
+                    );
+                })}
+            </DndContext>
         </div>
     );
 };

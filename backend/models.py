@@ -75,6 +75,8 @@ class MonthlyObligation(Base):
     amount = Column(Float, nullable=True) # User requested optional amount
     due_day = Column(Integer, nullable=False) # e.g. 1 for 1st of month
     category = Column(String, nullable=True)
+    display_order = Column(Integer, default=0) # For UI ordering
+
 
 class PaymentStatus(enum.Enum):
     PAID = "PAID"

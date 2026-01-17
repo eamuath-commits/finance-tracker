@@ -158,7 +158,12 @@ def create_obligation(db: Session, obligation: schemas.ObligationCreate):
     return db_obj
 
 def get_obligations(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.MonthlyObligation).offset(skip).limit(limit).all()
+    return db.query(models.MonthlyObligation).order_by(models.MonthlyObligation.display_order.asc(), models.MonthlyObligation.due_day.asc()).offset(skip).limit(limit).all()
+
+def reorder_obligations(db: Session, ordered_ids: list[str]):
+    for index, obj_id in enumerate(ordered_ids):
+        db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obj_id).update({"display_order": index})
+    db.commit()
 
 def update_obligation(db: Session, obligation_id: str, obligation_update: schemas.ObligationUpdate):
     db_obj = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()

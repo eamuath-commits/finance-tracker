@@ -335,6 +335,19 @@ const Obligations = () => {
 
     if (loading) return <div className="p-10 text-white">Loading...</div>;
 
+    const handleReorder = async (newOrderedObligations) => {
+        // Optimistic Update
+        setObligations(newOrderedObligations);
+
+        try {
+            const ids = newOrderedObligations.map(o => o.id);
+            await axios.put(`${API_URL}/obligations/reorder`, ids);
+        } catch (err) {
+            console.error("Reorder failed", err);
+            // Optionally revert fetchObligations() here
+        }
+    };
+
     return (
         <div>
             {/* Header / Nav */}
@@ -421,6 +434,7 @@ const Obligations = () => {
                         openHistory={openHistory}
                         handleDeleteHistory={handleDeleteHistory}
                         monthOffset={monthOffset}
+                        onReorder={handleReorder}
                     />
                 </div>
             )}

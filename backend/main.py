@@ -84,6 +84,15 @@ def run_migrations(engine):
                     conn.execute(text("ALTER TABLE loans ADD COLUMN display_order INTEGER DEFAULT 0"))
                     conn.commit()
 
+        # Check obligations table for display_order
+        if 'obligations' in inspector.get_table_names():
+            o_columns = [col['name'] for col in inspector.get_columns('obligations')]
+            if 'display_order' not in o_columns:
+                print("Migrating: Adding display_order to obligations")
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE obligations ADD COLUMN display_order INTEGER DEFAULT 0"))
+                    conn.commit()
+
     except Exception as e:
         print(f"Migration failed: {e}")
 
@@ -175,9 +184,15 @@ def read_obligations(skip: int = 0, limit: int = 100, db: Session = Depends(get_
 @app.put("/obligations/{obligation_id}", response_model=schemas.Obligation)
 def update_obligation(obligation_id: str, obligation_update: schemas.ObligationUpdate, db: Session = Depends(get_db)):
     updated_obj = crud.update_obligation(db, obligation_id, obligation_update)
+    updated_obj = crud.update_obligation(db, obligation_id, obligation_update)
     if not updated_obj:
         raise HTTPException(status_code=404, detail="Obligation not found")
     return updated_obj
+
+@app.put("/obligations/reorder")
+def reorder_obligations(ordered_ids: List[str], db: Session = Depends(get_db)):
+    crud.reorder_obligations(db, ordered_ids)
+    return {"status": "success"}
 
 @app.delete("/obligations/{obligation_id}", response_model=schemas.Obligation)
 def delete_obligation(obligation_id: str, db: Session = Depends(get_db)):
