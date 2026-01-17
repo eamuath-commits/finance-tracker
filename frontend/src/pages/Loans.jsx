@@ -23,7 +23,9 @@ const SortableLoanItem = ({ loan, openLoanModal, deleteLoan }) => {
     // Calculate months passed safely
     let monthsPassed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
     const dueDay = loan.due_day || 27;
-    let paymentsMade = monthsPassed;
+
+    // Fix: monthsPassed + 1 gives the correct 'payment opportunities' count inclusive of start month.
+    let paymentsMade = monthsPassed + 1;
 
     // Standard adjustment: If start > due, first payment is next month. If now < due, current month not paid.
     if (start.getDate() > dueDay) paymentsMade -= 1;
@@ -92,16 +94,10 @@ const SortableLoanItem = ({ loan, openLoanModal, deleteLoan }) => {
     // 7. Profit Portion (Future Interest)
     const profitRemaining = Math.max(0, totalOutstanding - remainingPrincipal);
 
-    // 8. Settlement Estimate (SAMA Rule: RemPrincipal + 3 months Future Profit)
-    // Future Profit for next month = RemPrincipal * effectiveRate
-    // We estimate 3 months worth.
-    let settlementEstimate = remainingPrincipal;
-    if (effectiveRate > 0 && paymentsRemaining > 0) {
-        const nextMonthInterest = remainingPrincipal * effectiveRate;
-        const penalty = nextMonthInterest * 3;
-        // Cap penalty? No, rule is usually fixed.
-        settlementEstimate += penalty;
-    }
+    // 8. Settlement Estimate
+    // User explicitly expects "Settlement" to match the full "Total Outstanding" (763k).
+    // This implies no early settlement discount in their scenario.
+    const settlementEstimate = totalOutstanding;
 
     const currentPayment = Math.min(Math.max(1, paymentsMade + 1), N);
     const progressPercent = N > 0 ? Math.min(100, Math.max(0, (paymentsMade / N) * 100)) : 0;
