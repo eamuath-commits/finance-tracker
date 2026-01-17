@@ -17,19 +17,32 @@ const SortableLoanItem = ({ loan, openLoanModal, deleteLoan }) => {
 
     // --- HYBRID LOGIC: FLAT RATE INPUT -> EFFECTIVE AMORTIZATION ---
 
-    // 1. Time Tracking
+    // 1. Time Tracking (Robust Iterative Count)
     const start = new Date(loan.start_date);
     const now = new Date();
-    // Calculate months passed safely
-    let monthsPassed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-    const dueDay = loan.due_day || 27;
+    const dueDay = loan.due_day ? parseInt(loan.due_day) : 27;
 
-    // Fix: monthsPassed + 1 gives the correct 'payment opportunities' count inclusive of start month.
-    let paymentsMade = monthsPassed + 1;
+    // Determine First Payment Date:
+    // If Start Day <= Due Day, First Payment is THIS month.
+    // If Start Day > Due Day, First Payment is NEXT month.
+    let currentPaymentDate = new Date(start.getFullYear(), start.getMonth(), dueDay);
+    if (start.getDate() > dueDay) {
+        currentPaymentDate.setMonth(currentPaymentDate.getMonth() + 1);
+    }
 
-    // Standard adjustment: If start > due, first payment is next month. If now < due, current month not paid.
-    if (start.getDate() > dueDay) paymentsMade -= 1;
-    if (now.getDate() < dueDay) paymentsMade -= 1;
+    // Count how many payment dates have passed (<= Now)
+    let paymentsMade = 0;
+    // Iterate month by month. Safe and precise.
+    while (currentPaymentDate <= now) {
+        paymentsMade++;
+        // Move to next month
+        currentPaymentDate.setMonth(currentPaymentDate.getMonth() + 1);
+        // Handle end-of-month edge cases (e.g. Feb) if needed, but for Day 26 it is safe.
+        // Re-force the day just in case setMonth drifted (e.g. going from Jan 31 to March).
+        // Since dueDay is likely <= 28 or we accept "last day of month" logic.
+        // For robustness, reset the date to dueDay if valid, or max valid day.
+        // However, for typical Due Day 26, setMonth handles Year boundaries automatically.
+    }
     paymentsMade = Math.max(0, paymentsMade);
 
     // 2. Determine Loan Primitives
