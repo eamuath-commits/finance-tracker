@@ -324,18 +324,53 @@ const Loans = () => {
                         <input type="number" placeholder="Interest Rate %" required step="0.1" className={inputClass} value={loanForm.interest_rate} onChange={e => setLoanForm({ ...loanForm, interest_rate: e.target.value })} />
                         <input type="number" placeholder="Term (Months)" required className={inputClass} value={loanForm.term_months} onChange={e => setLoanForm({ ...loanForm, term_months: e.target.value })} />
 
-                        <div className="bg-slate-700/50 p-3 rounded border border-slate-600">
-                            <label className="text-xs text-gray-400 uppercase font-semibold">Monthly Payment (Actual)</label>
-                            <input
-                                type="number"
-                                placeholder="Enter exact monthly payment"
-                                step="0.01"
-                                className={`${inputClass} mt-1`}
-                                value={loanForm.monthly_payment}
-                                onChange={e => setLoanForm({ ...loanForm, monthly_payment: e.target.value })}
-                            />
-                            <p className="text-[10px] text-gray-500 mt-1">Leave empty to auto-estimate (2% of balance).</p>
-                        </div>
+                        {/* Dynamic Payment Calculation Logic for Modal */}
+                        {(() => {
+                            const P = parseFloat(loanForm.principal_amount || 0);
+                            const R = parseFloat(loanForm.interest_rate || 0) / 100;
+                            const N = parseFloat(loanForm.term_months || 0);
+                            let autoPayment = 0;
+                            if (P > 0 && N > 0) {
+                                autoPayment = (P + (P * R * (N / 12))) / N;
+                            }
+
+                            return (
+                                <div className="bg-slate-700/50 p-3 rounded border border-slate-600 transition-all">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="text-xs text-gray-400 uppercase font-semibold">Monthly Payment</label>
+                                        {autoPayment > 0 && (
+                                            <span className="text-[10px] text-emerald-400 bg-emerald-900/20 px-1.5 py-0.5 rounded cursor-pointer hover:bg-emerald-900/40"
+                                                onClick={() => setLoanForm({ ...loanForm, monthly_payment: '' })} title="Click to use auto-calculated"
+                                            >
+                                                Auto: {autoPayment.toFixed(2)}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            placeholder={autoPayment > 0 ? `Auto: ${autoPayment.toFixed(2)}` : "Enter exact monthly payment"}
+                                            step="0.01"
+                                            className={`${inputClass} mt-0`}
+                                            value={loanForm.monthly_payment}
+                                            onChange={e => setLoanForm({ ...loanForm, monthly_payment: e.target.value })}
+                                        />
+                                        {loanForm.monthly_payment && autoPayment > 0 && Math.abs(parseFloat(loanForm.monthly_payment) - autoPayment) > 0.009 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setLoanForm({ ...loanForm, monthly_payment: '' })}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-blue-300 hover:text-white bg-slate-800 px-2 py-1 rounded border border-slate-600"
+                                            >
+                                                Use Auto
+                                            </button>
+                                        )}
+                                    </div>
+                                    <p className="text-[10px] text-gray-500 mt-1">
+                                        {loanForm.monthly_payment ? "Using manual value." : "Using auto-calculation (Flat Rate Formula)."}
+                                    </p>
+                                </div>
+                            );
+                        })()}
 
                         <p className="text-xs text-gray-400">Start Date:</p>
                         <input type="date" required className={inputClass} value={loanForm.start_date} onChange={e => setLoanForm({ ...loanForm, start_date: e.target.value })} />
