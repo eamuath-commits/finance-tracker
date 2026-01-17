@@ -99,15 +99,15 @@ const Loans = () => {
                         </div>
                         <div className="flex justify-between items-center">
                             <span className="font-bold text-white">{loan.name}</span>
-                            <span className="text-sm bg-red-900/40 text-red-300 px-2 py-1 rounded">-{loan.interest_rate}%</span>
+                            <span className="text-sm bg-red-900/40 text-red-300 px-2 py-1 rounded">-{Number(loan.interest_rate).toFixed(2)}%</span>
                         </div>
                         <div className="mt-3 flex justify-between text-sm">
                             <span className="text-gray-400">Principal: {formatCurrency(loan.principal_amount)}</span>
                             <span className="font-bold text-red-400">Remaining: {formatCurrency(loan.remaining_balance)}</span>
                         </div>
                         {/* Utilization Bar */}
-                        <div className="w-full bg-slate-700 h-2 rounded-full mt-2">
-                            <div className="bg-red-500 h-2 rounded-full" style={{ width: `${loan.principal_amount ? (loan.remaining_balance / loan.principal_amount) * 100 : 0}%` }}></div>
+                        <div className="w-full bg-slate-700 h-2 rounded-full mt-2 overflow-hidden">
+                            <div className="bg-red-500 h-2 rounded-full" style={{ width: `${Math.min(100, loan.principal_amount ? (loan.remaining_balance / loan.principal_amount) * 100 : 0)}%` }}></div>
                         </div>
                         <div className="flex justify-between items-end mt-2">
                             <p className="text-xs text-gray-500">{loan.term_months} months term</p>
