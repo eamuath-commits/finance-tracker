@@ -13,7 +13,7 @@ const Loans = () => {
     const [editingId, setEditingId] = useState(null);
 
     // Form Data
-    const [loanForm, setLoanForm] = useState({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '' });
+    const [loanForm, setLoanForm] = useState({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '', monthly_payment: '' });
 
     const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
@@ -35,14 +35,20 @@ const Loans = () => {
     const handleSaveLoan = async (e) => {
         e.preventDefault();
         try {
+            const payload = {
+                ...loanForm,
+                // Ensure Monthly Payment is float or null
+                monthly_payment: loanForm.monthly_payment ? parseFloat(loanForm.monthly_payment) : null
+            };
+
             if (editingId) {
-                await axios.put(`${API_URL}/loans/${editingId}`, loanForm);
+                await axios.put(`${API_URL}/loans/${editingId}`, payload);
             } else {
-                await axios.post(`${API_URL}/loans/`, loanForm);
+                await axios.post(`${API_URL}/loans/`, payload);
             }
             setShowLoanModal(false);
             setEditingId(null);
-            setLoanForm({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '' });
+            setLoanForm({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '', monthly_payment: '' });
             fetchLoans();
         } catch (err) { alert('Error saving loan'); }
     };
@@ -56,11 +62,12 @@ const Loans = () => {
                 interest_rate: loan.interest_rate,
                 // Format date to YYYY-MM-DD for input
                 start_date: loan.start_date ? new Date(loan.start_date).toISOString().split('T')[0] : '',
-                term_months: loan.term_months
+                term_months: loan.term_months,
+                monthly_payment: loan.monthly_payment || ''
             });
         } else {
             setEditingId(null);
-            setLoanForm({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '' });
+            setLoanForm({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '', monthly_payment: '' });
         }
         setShowLoanModal(true);
     };
@@ -98,10 +105,16 @@ const Loans = () => {
                             <span className="text-gray-400">Principal: {formatCurrency(loan.principal_amount)}</span>
                             <span className="font-bold text-red-400">Remaining: {formatCurrency(loan.remaining_balance)}</span>
                         </div>
+                        {/* Utilization Bar */}
                         <div className="w-full bg-slate-700 h-2 rounded-full mt-2">
                             <div className="bg-red-500 h-2 rounded-full" style={{ width: `${loan.principal_amount ? (loan.remaining_balance / loan.principal_amount) * 100 : 0}%` }}></div>
                         </div>
-                        <p className="text-xs text-gray-500 mt-1 text-right">{loan.term_months} months term</p>
+                        <div className="flex justify-between items-end mt-2">
+                            <p className="text-xs text-gray-500">{loan.term_months} months term</p>
+                            {loan.monthly_payment && (
+                                <p className="text-xs text-blue-300 bg-blue-900/20 px-2 py-1 rounded">Pay: {formatCurrency(loan.monthly_payment)}/mo</p>
+                            )}
+                        </div>
                     </div>
                 ))}
                 {loans.length === 0 && <p className="text-gray-500 italic">No loans active.</p>}
@@ -115,6 +128,20 @@ const Loans = () => {
                         <input type="number" placeholder="Principal Amount" required className={inputClass} value={loanForm.principal_amount} onChange={e => setLoanForm({ ...loanForm, principal_amount: e.target.value })} />
                         <input type="number" placeholder="Interest Rate %" required step="0.1" className={inputClass} value={loanForm.interest_rate} onChange={e => setLoanForm({ ...loanForm, interest_rate: e.target.value })} />
                         <input type="number" placeholder="Term (Months)" required className={inputClass} value={loanForm.term_months} onChange={e => setLoanForm({ ...loanForm, term_months: e.target.value })} />
+
+                        <div className="bg-slate-700/50 p-3 rounded border border-slate-600">
+                            <label className="text-xs text-gray-400 uppercase font-semibold">Monthly Payment (Actual)</label>
+                            <input
+                                type="number"
+                                placeholder="Enter exact monthly payment"
+                                step="0.01"
+                                className={`${inputClass} mt-1`}
+                                value={loanForm.monthly_payment}
+                                onChange={e => setLoanForm({ ...loanForm, monthly_payment: e.target.value })}
+                            />
+                            <p className="text-[10px] text-gray-500 mt-1">Leave empty to auto-estimate (2% of balance).</p>
+                        </div>
+
                         <p className="text-xs text-gray-400">Start Date:</p>
                         <input type="date" required className={inputClass} value={loanForm.start_date} onChange={e => setLoanForm({ ...loanForm, start_date: e.target.value })} />
                         <button type="submit" className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 font-medium">Save Loan</button>

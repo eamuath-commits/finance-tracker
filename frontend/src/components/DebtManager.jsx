@@ -209,7 +209,7 @@ const DebtManager = () => {
                             </div>
 
                             <div className="flex flex-col justify-center border-l border-slate-700 pl-8">
-                                <h2 className="text-sm text-gray-400 uppercase tracking-wider font-bold mb-1">Total Interest Interest</h2>
+                                <h2 className="text-sm text-gray-400 uppercase tracking-wider font-bold mb-1">Total Interest Paid</h2>
                                 <div className="text-4xl font-bold text-red-400 mb-1">
                                     {formatCurrency(simulationResult.totalInterest)}
                                 </div>
