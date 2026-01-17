@@ -73,6 +73,18 @@ def run_migrations(engine):
                     conn.execute(text("ALTER TABLE accounts ADD COLUMN first_4_digits VARCHAR"))
                     conn.commit()
 
+                     conn.execute(text("ALTER TABLE accounts ADD COLUMN first_4_digits VARCHAR"))
+                     conn.commit()
+
+        # Check loans table for display_order
+        if 'loans' in inspector.get_table_names():
+            l_columns = [col['name'] for col in inspector.get_columns('loans')]
+            if 'display_order' not in l_columns:
+                print("Migrating: Adding display_order to loans")
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE loans ADD COLUMN display_order INTEGER DEFAULT 0"))
+                    conn.commit()
+
     except Exception as e:
         print(f"Migration failed: {e}")
 
