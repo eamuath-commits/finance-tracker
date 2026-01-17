@@ -203,6 +203,10 @@ const ObligationsList = ({
     const handleExportSnapshot = () => {
         const snapshotData = obligations.map(obl => {
             const status = getMonthStatus(obl, monthOffset); // Get status for CURRENT VIEWED MONTH
+            const prevStatus = getMonthStatus(obl, monthOffset - 1); // Get status for PREVIOUS MONTH for dynamic budget
+
+            // Dynamic Budget: Use Previous Month's Actual if available, else Fallback to Default
+            const budgetAmount = (prevStatus.amount && prevStatus.amount > 0) ? prevStatus.amount : (obl.amount || 0);
 
             let statusLabel = "Unpaid";
             if (status.isPaid) statusLabel = "Paid";
@@ -213,7 +217,7 @@ const ObligationsList = ({
                 "Category": obl.category,
                 "Target Month": status.billingDateStr,
                 "Due Day": obl.due_day,
-                "Budget Amount": obl.amount,
+                "Budget Amount": budgetAmount,
                 "Paid Amount": status.isPaid ? (status.amount || 0) : 0,
                 "Pending Amount": status.status === 'PENDING' ? (status.amount || 0) : 0,
                 "Status": statusLabel,
