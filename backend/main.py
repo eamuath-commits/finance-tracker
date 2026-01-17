@@ -41,6 +41,15 @@ def run_migrations(engine):
                 conn.commit()
         except Exception:
             pass # Already nullable or other error
+            
+        # Check for display_order in loans
+        if 'loans' in table_names:
+            loan_columns = [col['name'] for col in inspector.get_columns('loans')]
+            if 'display_order' not in loan_columns:
+                print("Migrating: Adding display_order to loans")
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE loans ADD COLUMN display_order INTEGER DEFAULT 0"))
+                    conn.commit()
 
         # Check payments for billing_month (if renaming didn't happen or previously migrated)
         # Note: If we renamed, the columns are there.
