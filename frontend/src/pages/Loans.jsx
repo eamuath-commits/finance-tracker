@@ -70,6 +70,13 @@ const SortableLoanItem = ({ loan, openLoanModal }) => {
                     )}
                 </div>
             </div>
+
+            {/* Early Settlement Estimate (Based on SAMA Rule: 3 Months Future Profit) */}
+            <div className="mt-2 text-center">
+                <p className="text-[10px] text-gray-500 bg-slate-900/30 py-1 rounded">
+                    Payoff Estimate: <strong className="text-emerald-400">{formatCurrency(loan.remaining_balance + (loan.remaining_balance * (loan.interest_rate / 100 / 12) * 3))}</strong>
+                </p>
+            </div>
         </div>
     );
 };
