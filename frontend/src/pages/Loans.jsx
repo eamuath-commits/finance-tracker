@@ -59,7 +59,7 @@ const SortableLoanItem = ({ loan, openLoanModal }) => {
                 <div className="flex justify-between items-start w-full">
                     <p className="text-xs text-gray-500">
                         <span className="flex flex-col">
-                            <span>Payment <strong className="text-white">{currentPayment}</strong> of {loan.term_months}</span>
+                            <span>Payment <strong className="text-white">{currentPayment}</strong> of {loan.term_months} <span className="text-blue-400 ml-1">({progressPercent.toFixed(0)}%)</span></span>
                             <span className="text-[10px] opacity-70">({Math.max(0, loan.term_months - currentPayment)} left)</span>
                         </span>
                     </p>
