@@ -33,22 +33,38 @@ const SavingsGoals = () => {
 
     const handleCreate = async (e) => {
         e.preventDefault();
+        console.log("Submit clicked! Current State:", newGoal);
+
         setError(null);
         setSubmitting(true);
 
+        // Manual Validation
+        if (!newGoal.name) {
+            setError("Goal Name is required");
+            setSubmitting(false);
+            return;
+        }
+        if (!newGoal.target_amount) {
+            setError("Target Amount is required");
+            setSubmitting(false);
+            return;
+        }
+
         try {
+            console.log("Sending payload...");
             await axios.post(`${API_URL}/goals/`, {
                 name: newGoal.name,
                 target_amount: parseFloat(newGoal.target_amount),
                 current_amount: parseFloat(newGoal.current_amount || 0),
                 target_date: newGoal.target_date || null
             });
+            console.log("Success!");
             setIsAdding(false);
             setNewGoal({ name: '', target_amount: '', current_amount: '', target_date: '' });
             fetchGoals();
         } catch (error) {
             console.error("Error creating goal", error);
-            setError("Failed to create goal. Please check your inputs.");
+            setError("Failed to create goal: " + (error.response?.data?.detail || error.message));
         } finally {
             setSubmitting(false);
         }
@@ -172,7 +188,7 @@ const SavingsGoals = () => {
 
             {isAdding && (
                 <Card className="mb-6 border border-blue-500">
-                    <form onSubmit={handleCreate} className="space-y-4">
+                    <form onSubmit={handleCreate} className="space-y-4" noValidate>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="text-gray-400 text-xs uppercase font-bold">Goal Name</label>
