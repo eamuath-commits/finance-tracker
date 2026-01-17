@@ -75,13 +75,19 @@ def run_migrations(engine):
 
 
 
-        # Check loans table for display_order
+        # Check loans table for display_order and due_day
         if 'loans' in inspector.get_table_names():
             l_columns = [col['name'] for col in inspector.get_columns('loans')]
             if 'display_order' not in l_columns:
                 print("Migrating: Adding display_order to loans")
                 with engine.connect() as conn:
                     conn.execute(text("ALTER TABLE loans ADD COLUMN display_order INTEGER DEFAULT 0"))
+                    conn.commit()
+            
+            if 'due_day' not in l_columns:
+                print("Migrating: Adding due_day to loans")
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE loans ADD COLUMN due_day INTEGER"))
                     conn.commit()
 
         # Check obligations table for display_order

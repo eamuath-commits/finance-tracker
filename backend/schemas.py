@@ -79,10 +79,9 @@ class LoanBase(BaseModel):
     principal_amount: float
     interest_rate: float
     start_date: datetime
-    interest_rate: float
-    start_date: datetime
     term_months: int
     monthly_payment: Optional[float] = None
+    due_day: Optional[int] = None
 
 class LoanCreate(LoanBase):
     pass
@@ -93,16 +92,16 @@ class LoanUpdate(BaseModel):
     interest_rate: Optional[float] = None
     start_date: Optional[datetime] = None
     term_months: Optional[int] = None
-    start_date: Optional[datetime] = None
-    term_months: Optional[int] = None
     remaining_balance: Optional[float] = None
     monthly_payment: Optional[float] = None
+    due_day: Optional[int] = None
 
 class Loan(LoanBase):
     id: str
-    id: str
     remaining_balance: float
     monthly_payment: Optional[float] = None
+    due_day: Optional[int] = None
+    display_order: int = 0
     class Config:
         orm_mode = True
 

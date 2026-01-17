@@ -21,13 +21,15 @@ const SortableLoanItem = ({ loan, openLoanModal }) => {
     const now = new Date();
 
     let monthsPassed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-    if (now.getDate() < start.getDate()) {
+    // If we have a custom due day (e.g. 27), check if we passed it this month
+    const dueDay = loan.due_day || 27; // Default to 27th if not set
+    if (now.getDate() < dueDay) {
         monthsPassed--;
     }
 
     const currentPayment = Math.min(Math.max(1, monthsPassed + 1), loan.term_months);
     // Calculate percentage based on TIME (Payments Made vs Total Payments)
-    const progressPercent = Math.min(100, Math.max(0, (currentPayment / loan.term_months) * 100));
+    const progressPercent = Math.min(100, Math.max(0, (monthsPassed / loan.term_months) * 100));
 
     // --- SOLVER FOR EFFECTIVE RATE ---
     // User enters Flat Rate, but Amortization needs Effective APR.
@@ -61,8 +63,21 @@ const SortableLoanItem = ({ loan, openLoanModal }) => {
     // Validate inputs
     if (loan.term_months > 0) {
         // "k" should be Payments MADE (Completed).
-        // currentPayment is the ONE WE ARE ON (e.g. 60). So completed is 59.
-        const paymentsMade = Math.max(0, currentPayment - 1);
+        // If current date > due_day, then this month's payment IS made.
+        // Logic handled in monthsPassed above?
+        // Let's refine:
+        // monthsPassed calculates completed cycles relative to start date.
+
+        // If start date is 2020-01-01, and now is 2020-02-15.
+        // If due day is 27. Now < 27. So only Jan payment made?
+
+        // Let's rely on calculating "Payments Made" explicitly:
+        let pm = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+        // If we haven't reached due day in current month, subtract 1
+        if (now.getDate() < dueDay) pm--;
+
+        // Ensure non-negative
+        const paymentsMade = Math.max(0, pm);
 
         if (paymentsMade >= loan.term_months) {
             remainingPrincipal = 0;
@@ -146,7 +161,7 @@ const Loans = () => {
     const [loading, setLoading] = useState(true);
     const [showLoanModal, setShowLoanModal] = useState(false);
     const [editingId, setEditingId] = useState(null);
-    const [loanForm, setLoanForm] = useState({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '', monthly_payment: '' });
+    const [loanForm, setLoanForm] = useState({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '', monthly_payment: '', due_day: '' });
 
     const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
@@ -193,7 +208,8 @@ const Loans = () => {
         try {
             const payload = {
                 ...loanForm,
-                monthly_payment: loanForm.monthly_payment ? parseFloat(loanForm.monthly_payment) : null
+                monthly_payment: loanForm.monthly_payment ? parseFloat(loanForm.monthly_payment) : null,
+                due_day: loanForm.due_day ? parseInt(loanForm.due_day) : null
             };
 
             if (editingId) {
@@ -203,7 +219,7 @@ const Loans = () => {
             }
             setShowLoanModal(false);
             setEditingId(null);
-            setLoanForm({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '', monthly_payment: '' });
+            setLoanForm({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '', monthly_payment: '', due_day: '' });
             fetchLoans();
         } catch (err) { alert('Error saving loan'); }
     };
@@ -217,11 +233,12 @@ const Loans = () => {
                 interest_rate: loan.interest_rate,
                 start_date: loan.start_date ? new Date(loan.start_date).toISOString().split('T')[0] : '',
                 term_months: loan.term_months,
-                monthly_payment: loan.monthly_payment || ''
+                monthly_payment: loan.monthly_payment || '',
+                due_day: loan.due_day || ''
             });
         } else {
             setEditingId(null);
-            setLoanForm({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '', monthly_payment: '' });
+            setLoanForm({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '', monthly_payment: '', due_day: '' });
         }
         setShowLoanModal(true);
     };
@@ -279,7 +296,15 @@ const Loans = () => {
 
                         <p className="text-xs text-gray-400">Start Date:</p>
                         <input type="date" required className={inputClass} value={loanForm.start_date} onChange={e => setLoanForm({ ...loanForm, start_date: e.target.value })} />
-                        <button type="submit" className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 font-medium">Save Loan</button>
+
+                        <div className="flex gap-4 items-center">
+                            <div className="flex-1">
+                                <label className="text-xs text-gray-400">Due Day (1-31)</label>
+                                <input type="number" placeholder="27" min="1" max="31" className={inputClass} value={loanForm.due_day} onChange={e => setLoanForm({ ...loanForm, due_day: e.target.value })} />
+                            </div>
+                        </div>
+
+                        <button type="submit" className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 font-medium mt-4">Save Loan</button>
                     </form>
                 </Modal>
             )}
