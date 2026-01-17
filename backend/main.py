@@ -178,6 +178,13 @@ def reorder_loans(ordered_ids: List[str], db: Session = Depends(get_db)):
     crud.reorder_loans(db, ordered_ids)
     return {"status": "success"}
 
+@app.delete("/loans/{loan_id}", response_model=schemas.Loan)
+def delete_loan(loan_id: str, db: Session = Depends(get_db)):
+    deleted = crud.delete_loan(db, loan_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Loan not found")
+    return deleted
+
 # --- Obligation Endpoints ---
 @app.post("/obligations/", response_model=schemas.Obligation)
 def create_obligation(obligation: schemas.ObligationCreate, db: Session = Depends(get_db)):

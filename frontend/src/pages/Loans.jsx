@@ -289,6 +289,17 @@ const Loans = () => {
         } catch (err) { alert('Error saving loan'); }
     };
 
+    const handleDeleteLoan = async () => {
+        if (!editingId) return;
+        if (!confirm("Are you sure you want to delete this loan?")) return;
+        try {
+            await axios.delete(`${API_URL}/loans/${editingId}`);
+            setShowLoanModal(false);
+            setEditingId(null);
+            fetchLoans();
+        } catch (err) { alert('Error deleting loan'); }
+    };
+
     const openLoanModal = (loan = null) => {
         if (loan) {
             setEditingId(loan.id);
@@ -369,7 +380,16 @@ const Loans = () => {
                             </div>
                         </div>
 
-                        <button type="submit" className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 font-medium mt-4">Save Loan</button>
+                        <div className="flex gap-4 mt-6">
+                            {editingId && (
+                                <button type="button" onClick={handleDeleteLoan} className="bg-red-900/50 text-red-400 p-2 rounded hover:bg-red-900 border border-red-800 flex-1">
+                                    Delete
+                                </button>
+                            )}
+                            <button type="submit" className="bg-blue-600 text-white p-2 rounded hover:bg-blue-700 font-medium flex-1">
+                                Save Loan
+                            </button>
+                        </div>
                     </form>
                 </Modal>
             )}

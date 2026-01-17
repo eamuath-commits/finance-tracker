@@ -145,6 +145,13 @@ def update_loan(db: Session, loan_id: str, loan_update: schemas.LoanUpdate):
     db.refresh(db_loan)
     return db_loan
 
+def delete_loan(db: Session, loan_id: str):
+    db_loan = db.query(models.Loan).filter(models.Loan.id == loan_id).first()
+    if db_loan:
+        db.delete(db_loan)
+        db.commit()
+    return db_loan
+
 def create_obligation(db: Session, obligation: schemas.ObligationCreate):
     db_obj = models.MonthlyObligation(
         name=obligation.name,
