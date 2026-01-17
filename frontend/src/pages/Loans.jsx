@@ -56,12 +56,12 @@ const SortableLoanItem = ({ loan, openLoanModal }) => {
 
     // DYNAMIC BALANCE CALCULATION (Using Effective Rate)
     // Formula: B_k = P * [ (1+r)^N - (1+r)^k ] / [ (1+r)^N - 1 ]
-    let calculatedRemaining = loan.principal_amount; // Default to full
+    let remainingPrincipal = loan.principal_amount; // Default to full
 
     // Validate inputs
     if (loan.term_months > 0) {
         if (currentPayment >= loan.term_months) {
-            calculatedRemaining = 0;
+            remainingPrincipal = 0;
         } else if (effectiveMonthlyRate > 0) {
             const N = loan.term_months;
             const k = currentPayment; // Payments made (approx)
@@ -69,17 +69,22 @@ const SortableLoanItem = ({ loan, openLoanModal }) => {
 
             const numerator = Math.pow(1 + r, N) - Math.pow(1 + r, k);
             const denominator = Math.pow(1 + r, N) - 1;
-            calculatedRemaining = loan.principal_amount * (numerator / denominator);
+            remainingPrincipal = loan.principal_amount * (numerator / denominator);
         } else {
             // Zero interest fallback
             const principalPaid = (loan.principal_amount / loan.term_months) * currentPayment;
-            calculatedRemaining = Math.max(0, loan.principal_amount - principalPaid);
+            remainingPrincipal = Math.max(0, loan.principal_amount - principalPaid);
         }
     }
 
+    // "Remaining" in UI = Total Outstanding (Principal + Future Profit)
+    // This is simply Monthly Payment * Remaining Months
+    const remainingMonths = Math.max(0, loan.term_months - currentPayment);
+    const totalOutstanding = loan.monthly_payment ? (loan.monthly_payment * remainingMonths) : remainingPrincipal;
+
     // SAMA Rule: Settlement = Remaining Principal + 3 Months of Future Profit
-    const threeMonthsProfit = calculatedRemaining * effectiveMonthlyRate * 3;
-    const settlementEstimate = calculatedRemaining + threeMonthsProfit;
+    const threeMonthsProfit = remainingPrincipal * effectiveMonthlyRate * 3;
+    const settlementEstimate = remainingPrincipal + threeMonthsProfit;
 
     return (
         <div ref={setNodeRef} style={style} className="bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-700 group relative hover:border-blue-500/50 transition-colors">
@@ -98,7 +103,7 @@ const SortableLoanItem = ({ loan, openLoanModal }) => {
             </div>
             <div className="mt-3 flex justify-between text-sm">
                 <span className="text-gray-400">Principal: {formatCurrency(loan.principal_amount)}</span>
-                <span className="font-bold text-slate-200">Remaining: {formatCurrency(calculatedRemaining)}</span>
+                <span className="font-bold text-slate-200">Remaining: {formatCurrency(totalOutstanding)}</span>
             </div>
 
             {/* Progress Bar (Blue - Based on Payments Made) */}
