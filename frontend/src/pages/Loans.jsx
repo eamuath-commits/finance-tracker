@@ -110,7 +110,16 @@ const Loans = () => {
                             <div className="bg-red-500 h-2 rounded-full" style={{ width: `${Math.min(100, loan.principal_amount ? (loan.remaining_balance / loan.principal_amount) * 100 : 0)}%` }}></div>
                         </div>
                         <div className="flex justify-between items-end mt-2">
-                            <p className="text-xs text-gray-500">{loan.term_months} months term</p>
+                            <p className="text-xs text-gray-500">
+                                {(() => {
+                                    if (!loan.start_date) return `${loan.term_months} months term`;
+                                    const start = new Date(loan.start_date);
+                                    const now = new Date();
+                                    const monthsPassed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+                                    const currentPayment = Math.min(Math.max(1, monthsPassed + 1), loan.term_months);
+                                    return `Payment ${currentPayment} of ${loan.term_months}`;
+                                })()}
+                            </p>
                             {loan.monthly_payment ? (
                                 <p className="text-xs text-blue-300 bg-blue-900/20 px-2 py-1 rounded">Pay: {formatCurrency(loan.monthly_payment)}/mo</p>
                             ) : (
