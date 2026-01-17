@@ -15,78 +15,96 @@ const SortableLoanItem = ({ loan, openLoanModal, deleteLoan }) => {
         transition,
     };
 
-    // --- FLAT RATE / FIXED PAYMENT LOGIC ---
-    // User Input Assumptions:
-    // - Principal Amount (Original Loan Amount)
-    // - Fixed Monthly Payment (Total paid per month)
-    // - Term Length (Months)
-    // - Interest Rate (Flat rate % per year - optional, derived from totals if pmt exists)
+    // --- HYBRID LOGIC: FLAT RATE INPUT -> EFFECTIVE AMORTIZATION ---
 
-    // 1. Calculate Payments Made (Time Based)
+    // 1. Time Tracking
     const start = new Date(loan.start_date);
     const now = new Date();
-
+    // Calculate months passed safely
     let monthsPassed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
     const dueDay = loan.due_day || 27;
-
-    // Adjust payments made logic
     let paymentsMade = monthsPassed;
+
+    // Standard adjustment: If start > due, first payment is next month. If now < due, current month not paid.
     if (start.getDate() > dueDay) paymentsMade -= 1;
     if (now.getDate() < dueDay) paymentsMade -= 1;
     paymentsMade = Math.max(0, paymentsMade);
 
-    // 2. Derive Totals
-    // If we have a Monthly Payment, that is the source of truth for "Total Payable"
-    const monthlyPayment = loan.monthly_payment || 0;
-    const term = loan.term_months || 1;
-    const principal = loan.principal_amount || 0;
+    // 2. Determine Loan Primitives
+    const P = parseFloat(loan.principal_amount || 0);
+    const N = parseInt(loan.term_months || 60);
+    // Rate Input is "Flat Rate per Year" (e.g. 3.1)
+    const flatRate = (parseFloat(loan.interest_rate || 0) / 100);
 
-    let totalPayable = 0;
-    let totalProfit = 0;
-
-    if (monthlyPayment > 0) {
-        // Source of Truth: Monthly Payment
-        totalPayable = monthlyPayment * term;
-        totalProfit = Math.max(0, totalPayable - principal);
-    } else {
-        // Fallback: If no payment set, assume Rate is Flat Rate
-        // Total Interest = P * R * (T/12)
-        const rate = (parseFloat(loan.interest_rate || 0) / 100);
-        const years = term / 12;
-        totalProfit = principal * rate * years;
-        totalPayable = principal + totalProfit;
+    // 3. Calculate Monthly Payment (Fixed / Flat)
+    // If user provided a manual monthly payment, respect it.
+    // Otherwise, Formula: (P + (P * FlatRate * Years)) / N
+    let PMT = parseFloat(loan.monthly_payment || 0);
+    if (!PMT && P > 0 && N > 0) {
+        const totalInterest = P * flatRate * (N / 12);
+        PMT = (P + totalInterest) / N;
     }
 
-    // 3. Pro-rata Breakdown per Month
-    // In flat rate, every month has equal principal and equal profit portion??
-    // Actually, usually in flat rate:
-    // Profit Per Month = Total Profit / Term
-    // Principal Per Month = Total Principal / Term
-    const monthlyProfitPortion = totalProfit / term;
-    const monthlyPrincipalPortion = principal / term;
+    // 4. Solve for Effective Annual/Monthly Rate (IRR)
+    // We need 'r' such that P = PMT * (1 - (1+r)^-N) / r
+    const solveEffectiveRate = (p, n, pmt) => {
+        if (pmt <= p / n) return 0; // No interest case
 
-    const displayMonthlyPayment = monthlyPayment > 0 ? monthlyPayment : (totalPayable / term);
+        let r = 0.004; // Guess 0.4% month
+        for (let i = 0; i < 20; i++) {
+            const num = (pmt / r) * (1 - Math.pow(1 + r, -n)) - p;
+            const den = (pmt / r) * (n * Math.pow(1 + r, -n - 1)) - (pmt / (r * r)) * (1 - Math.pow(1 + r, -n));
+            const nextR = r - num / den;
+            if (Math.abs(nextR - r) < 1e-9) return nextR;
+            r = nextR;
+        }
+        return r;
+    };
 
-    // 4. Remaining Balance
-    // Remaining Balance is simply: Monthly Payment * Remaining Months
-    // OR: Total Payable - (Monthly Payment * Payments Made)
-    const paymentsRemaining = Math.max(0, term - paymentsMade);
-    const totalOutstanding = displayMonthlyPayment * paymentsRemaining;
+    let effectiveRate = 0;
+    if (P > 0 && N > 0 && PMT > 0) {
+        effectiveRate = solveEffectiveRate(P, N, PMT);
+    }
 
-    // 5. Breakdown of Remaining
-    const remainingPrincipal = monthlyPrincipalPortion * paymentsRemaining;
-    const remainingProfit = monthlyProfitPortion * paymentsRemaining; // or totalOutstanding - remainingPrincipal
+    // 5. Calculate Amortized State at Current Month (k)
+    // Remaining Principal (Reducing Balance) formula:
+    // Bal = P * [ (1+r)^N - (1+r)^k ] / [ (1+r)^N - 1 ]
+    // Where k = paymentsMade
+    let remainingPrincipal = P;
+    if (effectiveRate > 0) {
+        if (paymentsMade >= N) {
+            remainingPrincipal = 0;
+        } else {
+            const termFactor = Math.pow(1 + effectiveRate, N);
+            const paidFactor = Math.pow(1 + effectiveRate, paymentsMade);
+            remainingPrincipal = P * (termFactor - paidFactor) / (termFactor - 1);
+        }
+    } else {
+        // Fallback for 0 interest
+        remainingPrincipal = Math.max(0, P - (PMT * paymentsMade)); // Simplified
+    }
 
-    // 6. Early Settlement (Payoff)
-    // Common rule: Remaining Principal + 3 Months of Future Profit (or just remaining principal if near end)
-    // Wait, if "Profit" is fixed and upfront, banks usually charge "Remaining Principal" + Penalty (e.g. 3 months profit).
-    // So Base Payoff = Remaining Principal.
-    // Penalty = 3 * monthlyProfitPortion.
-    const penalty = 3 * monthlyProfitPortion;
-    const settlementEstimate = remainingPrincipal + Math.min(remainingProfit, penalty);
+    // 6. Remaining Balance (Total Outstanding)
+    // This is simply Future Payments
+    const paymentsRemaining = Math.max(0, N - paymentsMade);
+    const totalOutstanding = PMT * paymentsRemaining;
 
-    const currentPayment = Math.min(Math.max(1, paymentsMade + 1), term);
-    const progressPercent = term > 0 ? Math.min(100, Math.max(0, (paymentsMade / term) * 100)) : 0;
+    // 7. Profit Portion (Future Interest)
+    const profitRemaining = Math.max(0, totalOutstanding - remainingPrincipal);
+
+    // 8. Settlement Estimate (SAMA Rule: RemPrincipal + 3 months Future Profit)
+    // Future Profit for next month = RemPrincipal * effectiveRate
+    // We estimate 3 months worth.
+    let settlementEstimate = remainingPrincipal;
+    if (effectiveRate > 0 && paymentsRemaining > 0) {
+        const nextMonthInterest = remainingPrincipal * effectiveRate;
+        const penalty = nextMonthInterest * 3;
+        // Cap penalty? No, rule is usually fixed.
+        settlementEstimate += penalty;
+    }
+
+    const currentPayment = Math.min(Math.max(1, paymentsMade + 1), N);
+    const progressPercent = N > 0 ? Math.min(100, Math.max(0, (paymentsMade / N) * 100)) : 0;
 
     return (
         <div ref={setNodeRef} style={style} className="bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-700 group relative hover:border-blue-500/50 transition-colors">
@@ -108,15 +126,16 @@ const SortableLoanItem = ({ loan, openLoanModal, deleteLoan }) => {
             </div>
             <div className="mt-3 flex justify-between items-start text-sm">
                 <div>
-                    <span className="text-gray-400">Principal: {formatCurrency(loan.principal_amount)}</span>
+                    <span className="text-gray-400">Principal: {formatCurrency(P)}</span>
                 </div>
                 <div className="flex flex-col items-end">
                     <span className="font-bold text-slate-200">Remaining: {formatCurrency(totalOutstanding)}</span>
                     <span className="text-[10px] text-slate-400 font-medium mt-0.5">Principal: {formatCurrency(remainingPrincipal)}</span>
-                    <span className="text-[10px] text-slate-500 font-medium">Profit: {formatCurrency(Math.max(0, totalOutstanding - remainingPrincipal))}</span>
+                    <span className="text-[10px] text-slate-500 font-medium">Profit: {formatCurrency(Math.max(0, profitRemaining))}</span>
                 </div>
             </div>
 
+            {/* Progress Bar */}
             <div className="w-full bg-slate-900 h-2 rounded-full mt-2 overflow-hidden relative" title={`Progress: ${progressPercent.toFixed(1)}%`}>
                 <div className="bg-blue-600 h-2 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
             </div>
@@ -125,14 +144,14 @@ const SortableLoanItem = ({ loan, openLoanModal, deleteLoan }) => {
                 <div className="flex justify-between items-start w-full">
                     <p className="text-xs text-gray-500">
                         <span className="flex flex-col">
-                            <span>Payment <strong className="text-white">{currentPayment}</strong> of {loan.term_months} <span className="text-blue-400 ml-1">({progressPercent.toFixed(0)}%)</span></span>
-                            <span className="text-[10px] opacity-70">({Math.max(0, loan.term_months - currentPayment)} left)</span>
+                            <span>Payment <strong className="text-white">{currentPayment}</strong> of {N} <span className="text-blue-400 ml-1">({progressPercent.toFixed(0)}%)</span></span>
+                            <span className="text-[10px] opacity-70">({Math.max(0, N - currentPayment)} left)</span>
                         </span>
                     </p>
                     {loan.monthly_payment ? (
                         <p className="text-xs text-blue-300 bg-blue-900/20 px-2 py-1 rounded">Pay: {formatCurrency(loan.monthly_payment)}</p>
                     ) : (
-                        <p className="text-xs text-orange-300 bg-orange-900/20 px-2 py-1 rounded" title="Estimated at 2% of balance">Est: {formatCurrency(remainingPrincipal * 0.02)}</p>
+                        <p className="text-xs text-orange-300 bg-orange-900/20 px-2 py-1 rounded" title="Estimated Payment">Est: {formatCurrency(PMT)}</p>
                     )}
                 </div>
             </div>
