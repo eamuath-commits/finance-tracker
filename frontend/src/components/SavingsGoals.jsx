@@ -89,8 +89,8 @@ const SavingsGoals = () => {
                                 <input
                                     type="text"
                                     required
-                                    className="w-full bg-slate-800 text-white p-2 rounded border border-slate-700"
-                                    value={newGoal.name}
+                                    className="w-full bg-slate-800 text-white p-2 rounded border border-slate-700 focus:border-blue-500 outline-none"
+                                    value={newGoal.name || ''}
                                     onChange={e => setNewGoal({ ...newGoal, name: e.target.value })}
                                     placeholder="e.g. Vacation"
                                 />
@@ -100,8 +100,8 @@ const SavingsGoals = () => {
                                 <input
                                     type="number"
                                     required
-                                    className="w-full bg-slate-800 text-white p-2 rounded border border-slate-700"
-                                    value={newGoal.target_amount}
+                                    className="w-full bg-slate-800 text-white p-2 rounded border border-slate-700 focus:border-blue-500 outline-none"
+                                    value={newGoal.target_amount || ''}
                                     onChange={e => setNewGoal({ ...newGoal, target_amount: e.target.value })}
                                     placeholder="20000"
                                 />
@@ -110,8 +110,8 @@ const SavingsGoals = () => {
                                 <label className="text-gray-400 text-xs uppercase font-bold">Currently Saved</label>
                                 <input
                                     type="number"
-                                    className="w-full bg-slate-800 text-white p-2 rounded border border-slate-700"
-                                    value={newGoal.current_amount}
+                                    className="w-full bg-slate-800 text-white p-2 rounded border border-slate-700 focus:border-blue-500 outline-none"
+                                    value={newGoal.current_amount || ''}
                                     onChange={e => setNewGoal({ ...newGoal, current_amount: e.target.value })}
                                     placeholder="0"
                                 />
@@ -120,8 +120,8 @@ const SavingsGoals = () => {
                                 <label className="text-gray-400 text-xs uppercase font-bold">Target Date</label>
                                 <input
                                     type="date"
-                                    className="w-full bg-slate-800 text-white p-2 rounded border border-slate-700"
-                                    value={newGoal.target_date}
+                                    className="w-full bg-slate-800 text-white p-2 rounded border border-slate-700 focus:border-blue-500 outline-none"
+                                    value={newGoal.target_date || ''}
                                     onChange={e => setNewGoal({ ...newGoal, target_date: e.target.value })}
                                 />
                             </div>

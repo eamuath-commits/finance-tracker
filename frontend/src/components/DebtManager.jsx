@@ -131,7 +131,19 @@ const DebtManager = () => {
         });
     };
 
-    if (loading) return <div className="text-white p-8">Loading...</div>;
+    if (loading) return (
+        <div className="flex justify-center items-center h-64">
+            <div className="text-blue-400 animate-pulse text-xl font-bold">Loading Debt Data...</div>
+        </div>
+    );
+
+    if (debts.length === 0) return (
+        <div className="text-center py-20 bg-slate-800 rounded-xl border border-dashed border-slate-700">
+            <TrendingDown className="mx-auto text-slate-600 mb-4" size={48} />
+            <h3 className="text-xl font-bold text-white mb-2">No Active Debts Found</h3>
+            <p className="text-gray-400">Great job! You have no credit card balances or loans to track.</p>
+        </div>
+    );
 
     return (
         <div className="space-y-6">
