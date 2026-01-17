@@ -115,32 +115,27 @@ const Loans = () => {
                                     {(() => {
                                         if (!loan.term_months) return '';
 
-                                        // 1. Calculate Remaining Payments using NPER formula
-                                        // n = -ln(1 - (r*PV)/PMT) / ln(1+r)
-                                        const r = (loan.interest_rate || 0) / 100 / 12;
-                                        const pv = loan.remaining_balance;
-                                        const pmt = loan.monthly_payment || (pv * 0.02); // Fallback to est if needed
+                                        // 1. Calculate Payments based on TIME (Time Elapsed)
+                                        // This is more robust if the Remaining Balance includes future interest (common in some loans)
+                                        const start = new Date(loan.start_date);
+                                        const now = new Date();
 
-                                        let remainingMonths = 0;
-                                        if (r === 0) {
-                                            remainingMonths = pv / pmt;
-                                        } else {
-                                            // Check if payment covers interest
-                                            if (pmt <= pv * r) {
-                                                remainingMonths = loan.term_months; // Indefinite/stuck
-                                            } else {
-                                                remainingMonths = -Math.log(1 - (r * pv) / pmt) / Math.log(1 + r);
-                                            }
+                                        // Standard difference in months
+                                        let monthsPassed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+
+                                        // Adjust for day of month (if we haven't reached the due date this month, don't count it yet)
+                                        // Assuming start_date day is the due day
+                                        if (now.getDate() < start.getDate()) {
+                                            monthsPassed--;
                                         }
 
-                                        // 2. Derive "Current Payment" (effective)
-                                        // Total Term - Remaining
-                                        const currentPayment = Math.max(1, Math.min(loan.term_months, Math.round(loan.term_months - remainingMonths)));
+                                        // Current Payment is the one we are working on (Completed + 1)
+                                        const currentPayment = Math.min(Math.max(1, monthsPassed + 1), loan.term_months);
 
                                         return (
                                             <span className="flex flex-col">
                                                 <span>Payment <strong className="text-white">{currentPayment}</strong> of {loan.term_months}</span>
-                                                <span className="text-[10px] opacity-70">({Math.round(remainingMonths)} left)</span>
+                                                <span className="text-[10px] opacity-70">({Math.max(0, loan.term_months - currentPayment)} left)</span>
                                             </span>
                                         );
                                     })()}
