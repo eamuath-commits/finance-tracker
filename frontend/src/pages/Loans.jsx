@@ -29,15 +29,26 @@ const SortableLoanItem = ({ loan, openLoanModal }) => {
     // Calculate percentage based on TIME (Payments Made vs Total Payments)
     const progressPercent = Math.min(100, Math.max(0, (currentPayment / loan.term_months) * 100));
 
-    // DYNAMIC BALANCE CALCULATION (Amortization)
-    // We assume straight-line principal reduction for display purposes
-    const principalPaid = (loan.principal_amount / loan.term_months) * currentPayment;
-    const calculatedRemaining = Math.max(0, loan.principal_amount - principalPaid);
+    // DYNAMIC BALANCE CALCULATION (Standard Amortization)
+    // Formula: B = P * [ (1+r)^N - (1+r)^n ] / [ (1+r)^N - 1 ]
+    let calculatedRemaining = 0;
+
+    // Safety check for rates
+    const annualRate = parseFloat(loan.interest_rate || 0);
+    const monthlyRate = annualRate / 100 / 12;
+
+    if (monthlyRate > 0 && loan.term_months > 0) {
+        const numerator = Math.pow(1 + monthlyRate, loan.term_months) - Math.pow(1 + monthlyRate, currentPayment);
+        const denominator = Math.pow(1 + monthlyRate, loan.term_months) - 1;
+        calculatedRemaining = loan.principal_amount * (numerator / denominator);
+    } else {
+        // Fallback to straight line if rate is 0 (interest free?)
+        const principalPaid = (loan.principal_amount / loan.term_months) * currentPayment;
+        calculatedRemaining = Math.max(0, loan.principal_amount - principalPaid);
+    }
 
     // SAMA Rule: Settlement = Remaining Principal + 3 Months of Future Profit
-    // We assume the entered Interest Rate is the Annual Reducing Balance Rate. 
-    // If user entered Flat Rate, this might be slightly off, but it's an estimate.
-    const threeMonthsProfit = calculatedRemaining * (loan.interest_rate / 100 / 12) * 3;
+    const threeMonthsProfit = calculatedRemaining * monthlyRate * 3;
     const settlementEstimate = calculatedRemaining + threeMonthsProfit;
 
     return (
