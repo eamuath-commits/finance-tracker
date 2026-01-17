@@ -28,8 +28,14 @@ const SavingsGoals = () => {
         }
     };
 
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState(null);
+
     const handleCreate = async (e) => {
         e.preventDefault();
+        setError(null);
+        setSubmitting(true);
+
         try {
             await axios.post(`${API_URL}/goals/`, {
                 name: newGoal.name,
@@ -42,8 +48,92 @@ const SavingsGoals = () => {
             fetchGoals();
         } catch (error) {
             console.error("Error creating goal", error);
+            setError("Failed to create goal. Please check your inputs.");
+        } finally {
+            setSubmitting(false);
         }
     };
+
+    // ... inside render:
+
+    {
+        isAdding && (
+            <Card className="mb-6 border border-blue-500">
+                <form onSubmit={handleCreate} className="space-y-4">
+                    {error && (
+                        <div className="bg-red-500/10 text-red-500 p-3 rounded text-sm font-bold border border-red-500/20">
+                            {error}
+                        </div>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-gray-400 text-xs uppercase font-bold">Goal Name</label>
+                            <input
+                                type="text"
+                                required
+                                className="w-full bg-slate-800 text-white p-2 rounded border border-slate-700 focus:border-blue-500 outline-none"
+                                value={newGoal.name || ''}
+                                onChange={e => setNewGoal({ ...newGoal, name: e.target.value })}
+                                placeholder="e.g. Vacation"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-gray-400 text-xs uppercase font-bold">Target Amount</label>
+                            <input
+                                type="number"
+                                required
+                                className="w-full bg-slate-800 text-white p-2 rounded border border-slate-700 focus:border-blue-500 outline-none"
+                                value={newGoal.target_amount || ''}
+                                onChange={e => setNewGoal({ ...newGoal, target_amount: e.target.value })}
+                                placeholder="20000"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-gray-400 text-xs uppercase font-bold">Currently Saved</label>
+                            <input
+                                type="number"
+                                className="w-full bg-slate-800 text-white p-2 rounded border border-slate-700 focus:border-blue-500 outline-none"
+                                value={newGoal.current_amount || ''}
+                                onChange={e => setNewGoal({ ...newGoal, current_amount: e.target.value })}
+                                placeholder="0"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-gray-400 text-xs uppercase font-bold">Target Date (Optional)</label>
+                            <input
+                                type="date"
+                                className="w-full bg-slate-800 text-white p-2 rounded border border-slate-700 focus:border-blue-500 outline-none"
+                                value={newGoal.target_date || ''}
+                                onChange={e => setNewGoal({ ...newGoal, target_date: e.target.value })}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                        <button
+                            type="button"
+                            onClick={() => setIsAdding(false)}
+                            className="text-gray-400 hover:text-white px-4 py-2"
+                            disabled={submitting}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            disabled={submitting}
+                        >
+                            {submitting ? (
+                                <>
+                                    <span className="animate-spin h-4 w-4 border-2 border-white rounded-full border-t-transparent"></span>
+                                    Saving...
+                                </>
+                            ) : "Save Goal"}
+                        </button>
+                    </div>
+                </form>
+            </Card>
+        )
+    }
 
     const handleDelete = async (id) => {
         if (!confirm("Delete this goal?")) return;
