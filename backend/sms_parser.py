@@ -17,9 +17,9 @@ class SMSParser:
             # PoS Format: By:9365... Amount:SAR 57.04 ... At:StoreName ...
             r"By:(?P<last_4>\d+).*?Amount:(?P<currency>\w+)\s*(?P<amount>[\d\.]+)\s*At:(?P<merchant>.+)",
             # Jazira Internet Purchase (With FX Fee) - PRIORITIZED
-            r"Credit card: (?P<last_4>\d+) of: (?P<amount>[\d\.]+) (?P<currency>\w+) At (?P<merchant>.+?) on:\s*(?P<date>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}).*?FX Markup: (?P<fee>[\d\.]+)",
+            r"Credit card: (?P<last_4>\d+) of: (?P<amount>[\d\.]+) (?P<currency>\w+) At (?P<merchant>.+?) on:\s*(?P<date>(?:\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{4})\s+\d{2}:\d{2}).*?FX Markup: (?P<fee>[\d\.]+)",
             # Jazira Internet Purchase (Standard)
-            r"Credit card: (?P<last_4>\d+) of: (?P<amount>[\d\.]+) (?P<currency>\w+) At (?P<merchant>.+?) on:\s*(?P<date>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})"
+            r"Credit card: (?P<last_4>\d+) of: (?P<amount>[\d\.]+) (?P<currency>\w+) At (?P<merchant>.+?) on:\s*(?P<date>(?:\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{4})\s+\d{2}:\d{2})"
         ]
 
     def parse(self, text: str) -> Optional[Dict]:
@@ -44,12 +44,27 @@ class SMSParser:
                 raw_date = data.get("date")
                 if raw_date:
                     raw_date = raw_date.strip()
+                    print(f"[SMS Parser] Found raw date string: '{raw_date}'")
+                    
                     # Try common formats
-                    # 1. 2026-01-17 00:01 (ISO-like)
-                    try:
-                        parsed_date = datetime.strptime(raw_date, "%Y-%m-%d %H:%M")
-                    except ValueError:
-                        pass
+                    date_formats = [
+                        "%Y-%m-%d %H:%M",   # 2026-01-17 00:01
+                        "%d/%m/%Y %H:%M",   # 17/01/2026 00:01
+                        "%m/%d/%Y %H:%M",   # 01/17/2026 00:01
+                        "%Y/%m/%d %H:%M",   # 2026/01/17 00:01
+                        "%d-%m-%Y %H:%M",   # 17-01-2026 00:01
+                    ]
+                    
+                    for fmt in date_formats:
+                        try:
+                            parsed_date = datetime.strptime(raw_date, fmt)
+                            print(f"[SMS Parser] Successfully parsed date: {parsed_date}")
+                            break
+                        except ValueError:
+                            continue
+                            
+                    if not parsed_date:
+                        print(f"[SMS Parser] Failed to parse date '{raw_date}' with any known format.")
                     
                     # Add more formats here if needed
                 

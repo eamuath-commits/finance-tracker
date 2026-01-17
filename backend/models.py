@@ -45,7 +45,7 @@ class Transaction(Base):
     account_id = Column(String, ForeignKey("accounts.id"))
     amount = Column(Float, nullable=False)
     merchant = Column(String)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=datetime.now)
     category = Column(String, nullable=True)
     raw_sms_content = Column(Text, nullable=True)
     balance_after_transaction = Column(Float, nullable=True)
@@ -85,7 +85,7 @@ class Payment(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     obligation_id = Column(String, ForeignKey("obligations.id"), nullable=False)
-    payment_date = Column(DateTime, default=datetime.utcnow)
+    payment_date = Column(DateTime, default=datetime.now)
     billing_month = Column(Date, nullable=True) # First day of the cycle month
     amount = Column(Float, nullable=False)
     note = Column(String, nullable=True)
@@ -105,6 +105,6 @@ class RawMessage(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     sender = Column(String, nullable=True)
     body = Column(Text, nullable=False)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=datetime.now)
     status = Column(Enum(MessageStatus), default=MessageStatus.PENDING)
     error_log = Column(Text, nullable=True) # To store why it failed
