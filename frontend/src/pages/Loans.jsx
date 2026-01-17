@@ -95,9 +95,18 @@ const SortableLoanItem = ({ loan, openLoanModal, deleteLoan }) => {
     const profitRemaining = Math.max(0, totalOutstanding - remainingPrincipal);
 
     // 8. Settlement Estimate
-    // User explicitly expects "Settlement" to match the full "Total Outstanding" (763k).
-    // This implies no early settlement discount in their scenario.
-    const settlementEstimate = totalOutstanding;
+    // User Figure: 702,769.82.
+    // Logic: Remaining Principal (692k) + 3 Months Interest (approx 10k).
+    let settlementEstimate = remainingPrincipal;
+    if (effectiveRate > 0 && paymentsRemaining > 0) {
+        // Calculate interest for ONE month on the current balance
+        const nextMonthInterest = remainingPrincipal * effectiveRate;
+        const penalty = nextMonthInterest * 3;
+        settlementEstimate += penalty;
+    } else {
+        // Fallback if no rate derived (shouldn't happen with valid inputs)
+        settlementEstimate = totalOutstanding;
+    }
 
     const currentPayment = Math.min(Math.max(1, paymentsMade + 1), N);
     const progressPercent = N > 0 ? Math.min(100, Math.max(0, (paymentsMade / N) * 100)) : 0;
