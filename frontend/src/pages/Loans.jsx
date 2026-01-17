@@ -125,6 +125,12 @@ const SortableLoanItem = ({ loan, openLoanModal }) => {
                 <span className="font-bold text-slate-200">Remaining: {formatCurrency(totalOutstanding)}</span>
             </div>
 
+            {/* Breakdown of Remaining */}
+            <div className="flex justify-end gap-3 text-[10px] text-gray-500 -mt-1 mb-2">
+                <span>(Princ: {formatCurrency(remainingPrincipal)})</span>
+                <span>(Profit: {formatCurrency(Math.max(0, totalOutstanding - remainingPrincipal))})</span>
+            </div>
+
             {/* Progress Bar (Blue - Based on Payments Made) */}
             <div className="w-full bg-slate-900 h-2 rounded-full mt-2 overflow-hidden relative" title={`Progress: ${progressPercent.toFixed(1)}%`}>
                 <div className="bg-blue-600 h-2 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
