@@ -227,30 +227,15 @@ const ObligationsList = ({
         const curr = getMonthStatus(obl, monthOffset);
 
         let budget = 0;
-        // Budget Strategy: Use Prev Month's actual if available, else Obligation Default
         if (prev.amount) budget = prev.amount;
-        else if (obl.amount) budget = obl.amount;
 
         let paid = 0;
-        let pending = 0;
-        let unpaid = 0;
-
-        if (curr.status === 'PAID') {
-            paid = curr.amount || 0;
-        } else if (curr.status === 'PENDING') {
-            pending = curr.amount || 0;
-        } else {
-            // No record -> Unpaid
-            // Assume unpaid amount is equal to the expected budget
-            unpaid = budget;
-        }
+        if (curr.isPaid && curr.amount) paid = curr.amount;
 
         acc.budget += budget;
         acc.paid += paid;
-        acc.pending += pending;
-        acc.unpaid += unpaid;
         return acc;
-    }, { budget: 0, paid: 0, pending: 0, unpaid: 0 });
+    }, { budget: 0, paid: 0 });
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -279,9 +264,24 @@ const ObligationsList = ({
         const newCategoryOrder = arrayMove(categoryItems, oldIndex, newIndex);
 
         // 3. Reconstruct the GLOBAL list
+        // We modify 'grouped' copy, then flatten it.
+        // We must preserve the order of other categories.
+        // The display order of categories themselves is determined by Object.entries(grouped) loop below.
+        // But grouped is derived.
+        // We need a stable list.
+
+        // Simpler approach:
+        // We know 'obligations' is the global list. 
+        // We can just construct a new global list where we replace the items of THIS category with 'newCategoryOrder',
+        // and keep others as is.
+        // But since 'obligations' might be interleaved if sort is weird,
+        // it's safest to rely on the current visual grouping logic to determine "Global Order".
+        // i.e. The intended Global Order IS the Flattened Grouped List.
+
         const newGrouped = { ...grouped, [categoryName]: newCategoryOrder };
 
         // Flatten, preserving key order of original 'grouped'
+        // (Note: Object.keys order is generally insertion order for strings, which matches render order)
         const flattened = [];
         Object.keys(grouped).forEach(cat => {
             if (cat === categoryName) {
@@ -310,42 +310,37 @@ const ObligationsList = ({
                     </div>
                 </div>
 
-                <div className="flex gap-6 text-sm">
-                    {/* Paid */}
+                <div className="flex gap-8 text-sm">
                     <div className="flex flex-col items-end">
-                        <span className="text-emerald-400 uppercase font-bold text-[10px] tracking-wider">Total Paid</span>
+                        <span className="text-blue-400 uppercase font-bold text-[10px] tracking-wider">Total Budget</span>
                         <div className="flex items-center gap-2">
-                            <span className="text-2xl font-mono text-emerald-400 font-bold">{formatCurrency(globalStats.paid)}</span>
+                            <span className="text-2xl font-mono text-blue-200 font-bold">{formatCurrency(globalStats.budget)}</span>
                         </div>
                     </div>
 
                     <div className="w-px bg-slate-700 h-10 hidden md:block"></div>
 
-                    {/* Pending */}
                     <div className="flex flex-col items-end">
-                        <span className="text-amber-400 uppercase font-bold text-[10px] tracking-wider">Total Pending</span>
+                        <span className="text-green-400 uppercase font-bold text-[10px] tracking-wider">Total Paid</span>
                         <div className="flex items-center gap-2">
-                            <span className="text-2xl font-mono text-amber-400 font-bold">{formatCurrency(globalStats.pending)}</span>
+                            <span className="text-2xl font-mono text-green-400 font-bold">{formatCurrency(globalStats.paid)}</span>
                         </div>
                     </div>
 
                     <div className="w-px bg-slate-700 h-10 hidden md:block"></div>
 
-                    {/* Unpaid (Future/Due) */}
                     <div className="flex flex-col items-end">
-                        <span className="text-blue-400 uppercase font-bold text-[10px] tracking-wider">Total Unpaid</span>
+                        <span className={`uppercase font-bold text-[10px] tracking-wider ${globalStats.paid > globalStats.budget ? 'text-red-400' : 'text-slate-400'}`}>
+                            {globalStats.paid > globalStats.budget ? 'Over Budget' : 'Remaining'}
+                        </span>
                         <div className="flex items-center gap-2">
-                            <span className="text-2xl font-mono text-blue-400 font-bold">{formatCurrency(globalStats.unpaid)}</span>
-                        </div>
-                    </div>
-
-                    <div className="w-px bg-slate-700 h-10 hidden md:block"></div>
-
-                    {/* Total Budget */}
-                    <div className="flex flex-col items-end opacity-70">
-                        <span className="text-slate-400 uppercase font-bold text-[10px] tracking-wider">Est. Budget</span>
-                        <div className="flex items-center gap-2">
-                            <span className="text-xl font-mono text-slate-300 font-bold">{formatCurrency(globalStats.budget)}</span>
+                            <span className={`text-2xl font-mono font-bold ${globalStats.paid > globalStats.budget ? 'text-red-400' : 'text-slate-500'}`}>
+                                {globalStats.paid > globalStats.budget ? (
+                                    <>+{formatCurrency(globalStats.paid - globalStats.budget)}</>
+                                ) : (
+                                    formatCurrency(globalStats.budget - globalStats.paid)
+                                )}
+                            </span>
                         </div>
                     </div>
                 </div>
