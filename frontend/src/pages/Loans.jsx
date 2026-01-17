@@ -110,21 +110,47 @@ const Loans = () => {
                             <div className="bg-red-500 h-2 rounded-full" style={{ width: `${Math.min(100, loan.principal_amount ? (loan.remaining_balance / loan.principal_amount) * 100 : 0)}%` }}></div>
                         </div>
                         <div className="flex justify-between items-end mt-2">
-                            <p className="text-xs text-gray-500">
-                                {(() => {
-                                    if (!loan.start_date) return `${loan.term_months} months term`;
-                                    const start = new Date(loan.start_date);
-                                    const now = new Date();
-                                    const monthsPassed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-                                    const currentPayment = Math.min(Math.max(1, monthsPassed + 1), loan.term_months);
-                                    return `Payment ${currentPayment} of ${loan.term_months}`;
-                                })()}
-                            </p>
-                            {loan.monthly_payment ? (
-                                <p className="text-xs text-blue-300 bg-blue-900/20 px-2 py-1 rounded">Pay: {formatCurrency(loan.monthly_payment)}/mo</p>
-                            ) : (
-                                <p className="text-xs text-orange-300 bg-orange-900/20 px-2 py-1 rounded" title="Estimated at 2% of balance">Est. {formatCurrency(loan.remaining_balance * 0.02)}/mo</p>
-                            )}
+                            <div className="flex justify-between items-start">
+                                <p className="text-xs text-gray-500">
+                                    {(() => {
+                                        if (!loan.term_months) return '';
+
+                                        // 1. Calculate Remaining Payments using NPER formula
+                                        // n = -ln(1 - (r*PV)/PMT) / ln(1+r)
+                                        const r = (loan.interest_rate || 0) / 100 / 12;
+                                        const pv = loan.remaining_balance;
+                                        const pmt = loan.monthly_payment || (pv * 0.02); // Fallback to est if needed
+
+                                        let remainingMonths = 0;
+                                        if (r === 0) {
+                                            remainingMonths = pv / pmt;
+                                        } else {
+                                            // Check if payment covers interest
+                                            if (pmt <= pv * r) {
+                                                remainingMonths = loan.term_months; // Indefinite/stuck
+                                            } else {
+                                                remainingMonths = -Math.log(1 - (r * pv) / pmt) / Math.log(1 + r);
+                                            }
+                                        }
+
+                                        // 2. Derive "Current Payment" (effective)
+                                        // Total Term - Remaining
+                                        const currentPayment = Math.max(1, Math.min(loan.term_months, Math.round(loan.term_months - remainingMonths)));
+
+                                        return (
+                                            <span className="flex flex-col">
+                                                <span>Payment <strong className="text-white">{currentPayment}</strong> of {loan.term_months}</span>
+                                                <span className="text-[10px] opacity-70">({Math.round(remainingMonths)} left)</span>
+                                            </span>
+                                        );
+                                    })()}
+                                </p>
+                                {loan.monthly_payment ? (
+                                    <p className="text-xs text-blue-300 bg-blue-900/20 px-2 py-1 rounded">Pay: {formatCurrency(loan.monthly_payment)}</p>
+                                ) : (
+                                    <p className="text-xs text-orange-300 bg-orange-900/20 px-2 py-1 rounded" title="Estimated at 2% of balance">Est: {formatCurrency(loan.remaining_balance * 0.02)}</p>
+                                )}
+                            </div>
                         </div>
                     </div>
                 ))}
