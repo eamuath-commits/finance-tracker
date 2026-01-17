@@ -15,8 +15,23 @@ const SortableLoanItem = ({ loan, openLoanModal }) => {
         transition,
     };
 
+    // --- PROGRESS LOGIC ---
+    // Calculate how many months have passed since Start Date
+    const start = new Date(loan.start_date);
+    const now = new Date();
+
+    let monthsPassed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+    if (now.getDate() < start.getDate()) {
+        monthsPassed--;
+    }
+
+    const currentPayment = Math.min(Math.max(1, monthsPassed + 1), loan.term_months);
+    // Calculate percentage based on TIME (Payments Made vs Total Payments)
+    const progressPercent = Math.min(100, Math.max(0, (currentPayment / loan.term_months) * 100));
+
+
     return (
-        <div ref={setNodeRef} style={style} className="bg-slate-800 p-4 rounded-lg shadow-lg border border-red-900/30 group relative hover:border-red-700/50 transition-colors">
+        <div ref={setNodeRef} style={style} className="bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-700 group relative hover:border-blue-500/50 transition-colors">
             {/* Drag Handle */}
             <div {...attributes} {...listeners} className="absolute top-3 left-3 cursor-grab opacity-30 hover:opacity-100 z-10 p-1 bg-slate-900/50 rounded touch-none">
                 <GripVertical size={16} className="text-gray-400" />
@@ -28,38 +43,25 @@ const SortableLoanItem = ({ loan, openLoanModal }) => {
             {/* Added padding-left to avoid overlap with handle */}
             <div className="flex justify-between items-center pl-8">
                 <span className="font-bold text-white">{loan.name}</span>
-                <span className="text-sm bg-red-900/40 text-red-300 px-2 py-1 rounded">-{Number(loan.interest_rate).toFixed(2)}%</span>
+                <span className="text-sm bg-slate-900 text-blue-300 px-2 py-1 rounded">-{Number(loan.interest_rate).toFixed(2)}%</span>
             </div>
             <div className="mt-3 flex justify-between text-sm">
                 <span className="text-gray-400">Principal: {formatCurrency(loan.principal_amount)}</span>
-                <span className="font-bold text-red-400">Remaining: {formatCurrency(loan.remaining_balance)}</span>
+                <span className="font-bold text-slate-200">Remaining: {formatCurrency(loan.remaining_balance)}</span>
             </div>
-            {/* Utilization Bar */}
-            <div className="w-full bg-slate-700 h-2 rounded-full mt-2 overflow-hidden">
-                <div className="bg-red-500 h-2 rounded-full" style={{ width: `${Math.min(100, loan.principal_amount ? (loan.remaining_balance / loan.principal_amount) * 100 : 0)}%` }}></div>
+
+            {/* Progress Bar (Blue - Based on Payments Made) */}
+            <div className="w-full bg-slate-900 h-2 rounded-full mt-2 overflow-hidden relative" title={`Progress: ${progressPercent.toFixed(1)}%`}>
+                <div className="bg-blue-600 h-2 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
             </div>
+
             <div className="flex justify-between items-end mt-2">
                 <div className="flex justify-between items-start w-full">
                     <p className="text-xs text-gray-500">
-                        {(() => {
-                            if (!loan.term_months) return '';
-                            const start = new Date(loan.start_date);
-                            const now = new Date();
-
-                            let monthsPassed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-                            if (now.getDate() < start.getDate()) {
-                                monthsPassed--;
-                            }
-
-                            const currentPayment = Math.min(Math.max(1, monthsPassed + 1), loan.term_months);
-
-                            return (
-                                <span className="flex flex-col">
-                                    <span>Payment <strong className="text-white">{currentPayment}</strong> of {loan.term_months}</span>
-                                    <span className="text-[10px] opacity-70">({Math.max(0, loan.term_months - currentPayment)} left)</span>
-                                </span>
-                            );
-                        })()}
+                        <span className="flex flex-col">
+                            <span>Payment <strong className="text-white">{currentPayment}</strong> of {loan.term_months}</span>
+                            <span className="text-[10px] opacity-70">({Math.max(0, loan.term_months - currentPayment)} left)</span>
+                        </span>
                     </p>
                     {loan.monthly_payment ? (
                         <p className="text-xs text-blue-300 bg-blue-900/20 px-2 py-1 rounded">Pay: {formatCurrency(loan.monthly_payment)}</p>
@@ -182,9 +184,9 @@ const Loans = () => {
                             <SortableLoanItem key={loan.id} loan={loan} openLoanModal={openLoanModal} />
                         ))}
                     </div>
-                    {loans.length === 0 && <p className="text-gray-500 italic">No loans active.</p>}
                 </SortableContext>
             </DndContext>
+            {loans.length === 0 && <p className="text-gray-500 italic">No loans active.</p>}
 
             {/* --- MODAL --- */}
             {showLoanModal && (
