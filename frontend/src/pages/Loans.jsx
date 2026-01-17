@@ -162,8 +162,8 @@ const SortableLoanItem = ({ loan, openLoanModal, deleteLoan }) => {
                 <div className="flex justify-between items-start w-full">
                     <p className="text-xs text-gray-500">
                         <span className="flex flex-col">
-                            <span>Payment <strong className="text-white">{currentPayment}</strong> of {N} <span className="text-blue-400 ml-1">({progressPercent.toFixed(0)}%)</span></span>
-                            <span className="text-[10px] opacity-70">({Math.max(0, N - currentPayment)} left)</span>
+                            <span>Paid <strong className="text-white">{paymentsMade}</strong> of {N} <span className="text-blue-400 ml-1">({progressPercent.toFixed(0)}%)</span></span>
+                            <span className="text-[10px] opacity-70">({Math.max(0, N - paymentsMade)} left)</span>
                         </span>
                     </p>
                     {loan.monthly_payment ? (
