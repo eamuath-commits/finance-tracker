@@ -15,35 +15,78 @@ const SortableLoanItem = ({ loan, openLoanModal, deleteLoan }) => {
         transition,
     };
 
-    // --- PROGRESS LOGIC ---
-    // --- PROGRESS LOGIC ---
+    // --- FLAT RATE / FIXED PAYMENT LOGIC ---
+    // User Input Assumptions:
+    // - Principal Amount (Original Loan Amount)
+    // - Fixed Monthly Payment (Total paid per month)
+    // - Term Length (Months)
+    // - Interest Rate (Flat rate % per year - optional, derived from totals if pmt exists)
+
+    // 1. Calculate Payments Made (Time Based)
     const start = new Date(loan.start_date);
     const now = new Date();
 
     let monthsPassed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
     const dueDay = loan.due_day || 27;
-    if (now.getDate() < dueDay) monthsPassed--;
 
-    // Simple Adjustments for Payments Made
+    // Adjust payments made logic
     let paymentsMade = monthsPassed;
     if (start.getDate() > dueDay) paymentsMade -= 1;
     if (now.getDate() < dueDay) paymentsMade -= 1;
-
     paymentsMade = Math.max(0, paymentsMade);
-    const currentPayment = Math.min(Math.max(1, paymentsMade + 1), loan.term_months);
 
-    const progressPercent = loan.term_months > 0 ? Math.min(100, Math.max(0, (paymentsMade / loan.term_months) * 100)) : 0;
+    // 2. Derive Totals
+    // If we have a Monthly Payment, that is the source of truth for "Total Payable"
+    const monthlyPayment = loan.monthly_payment || 0;
+    const term = loan.term_months || 1;
+    const principal = loan.principal_amount || 0;
 
-    // --- REMOVED COMPLEX CALCS PER USER REQUEST ---
-    // Using linear amortization as a temporary placeholder
-    // Remaining = Principal - (Principal / Term * PaymentsMade)
-    const principalPaid = loan.term_months > 0 ? (loan.principal_amount / loan.term_months) * paymentsMade : 0;
-    const remainingPrincipal = Math.max(0, loan.principal_amount - principalPaid);
+    let totalPayable = 0;
+    let totalProfit = 0;
 
-    // Total Outstanding & Estimates
-    // Just showing standard Principal remaining for now to avoid the 700k error.
-    const totalOutstanding = remainingPrincipal;
-    const settlementEstimate = remainingPrincipal; // Placeholder
+    if (monthlyPayment > 0) {
+        // Source of Truth: Monthly Payment
+        totalPayable = monthlyPayment * term;
+        totalProfit = Math.max(0, totalPayable - principal);
+    } else {
+        // Fallback: If no payment set, assume Rate is Flat Rate
+        // Total Interest = P * R * (T/12)
+        const rate = (parseFloat(loan.interest_rate || 0) / 100);
+        const years = term / 12;
+        totalProfit = principal * rate * years;
+        totalPayable = principal + totalProfit;
+    }
+
+    // 3. Pro-rata Breakdown per Month
+    // In flat rate, every month has equal principal and equal profit portion??
+    // Actually, usually in flat rate:
+    // Profit Per Month = Total Profit / Term
+    // Principal Per Month = Total Principal / Term
+    const monthlyProfitPortion = totalProfit / term;
+    const monthlyPrincipalPortion = principal / term;
+
+    const displayMonthlyPayment = monthlyPayment > 0 ? monthlyPayment : (totalPayable / term);
+
+    // 4. Remaining Balance
+    // Remaining Balance is simply: Monthly Payment * Remaining Months
+    // OR: Total Payable - (Monthly Payment * Payments Made)
+    const paymentsRemaining = Math.max(0, term - paymentsMade);
+    const totalOutstanding = displayMonthlyPayment * paymentsRemaining;
+
+    // 5. Breakdown of Remaining
+    const remainingPrincipal = monthlyPrincipalPortion * paymentsRemaining;
+    const remainingProfit = monthlyProfitPortion * paymentsRemaining; // or totalOutstanding - remainingPrincipal
+
+    // 6. Early Settlement (Payoff)
+    // Common rule: Remaining Principal + 3 Months of Future Profit (or just remaining principal if near end)
+    // Wait, if "Profit" is fixed and upfront, banks usually charge "Remaining Principal" + Penalty (e.g. 3 months profit).
+    // So Base Payoff = Remaining Principal.
+    // Penalty = 3 * monthlyProfitPortion.
+    const penalty = 3 * monthlyProfitPortion;
+    const settlementEstimate = remainingPrincipal + Math.min(remainingProfit, penalty);
+
+    const currentPayment = Math.min(Math.max(1, paymentsMade + 1), term);
+    const progressPercent = term > 0 ? Math.min(100, Math.max(0, (paymentsMade / term) * 100)) : 0;
 
     return (
         <div ref={setNodeRef} style={style} className="bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-700 group relative hover:border-blue-500/50 transition-colors">
