@@ -1,18 +1,82 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Card, SectionHeader, Modal, EditIcon, formatCurrency, inputClass } from '../components/UI';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { GripVertical } from 'lucide-react';
+
+const SortableLoanItem = ({ loan, openLoanModal }) => {
+    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: loan.id });
+
+    // Default transition is usually fine, but specifying transform is crucial
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} className="bg-slate-800 p-4 rounded-lg shadow-lg border border-red-900/30 group relative hover:border-red-700/50 transition-colors">
+            {/* Drag Handle */}
+            <div {...attributes} {...listeners} className="absolute top-3 left-3 cursor-grab opacity-30 hover:opacity-100 z-10 p-1 bg-slate-900/50 rounded touch-none">
+                <GripVertical size={16} className="text-gray-400" />
+            </div>
+
+            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition z-10">
+                <EditIcon onClick={() => openLoanModal(loan)} />
+            </div>
+            {/* Added padding-left to avoid overlap with handle */}
+            <div className="flex justify-between items-center pl-8">
+                <span className="font-bold text-white">{loan.name}</span>
+                <span className="text-sm bg-red-900/40 text-red-300 px-2 py-1 rounded">-{Number(loan.interest_rate).toFixed(2)}%</span>
+            </div>
+            <div className="mt-3 flex justify-between text-sm">
+                <span className="text-gray-400">Principal: {formatCurrency(loan.principal_amount)}</span>
+                <span className="font-bold text-red-400">Remaining: {formatCurrency(loan.remaining_balance)}</span>
+            </div>
+            {/* Utilization Bar */}
+            <div className="w-full bg-slate-700 h-2 rounded-full mt-2 overflow-hidden">
+                <div className="bg-red-500 h-2 rounded-full" style={{ width: `${Math.min(100, loan.principal_amount ? (loan.remaining_balance / loan.principal_amount) * 100 : 0)}%` }}></div>
+            </div>
+            <div className="flex justify-between items-end mt-2">
+                <div className="flex justify-between items-start w-full">
+                    <p className="text-xs text-gray-500">
+                        {(() => {
+                            if (!loan.term_months) return '';
+                            const start = new Date(loan.start_date);
+                            const now = new Date();
+
+                            let monthsPassed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+                            if (now.getDate() < start.getDate()) {
+                                monthsPassed--;
+                            }
+
+                            const currentPayment = Math.min(Math.max(1, monthsPassed + 1), loan.term_months);
+
+                            return (
+                                <span className="flex flex-col">
+                                    <span>Payment <strong className="text-white">{currentPayment}</strong> of {loan.term_months}</span>
+                                    <span className="text-[10px] opacity-70">({Math.max(0, loan.term_months - currentPayment)} left)</span>
+                                </span>
+                            );
+                        })()}
+                    </p>
+                    {loan.monthly_payment ? (
+                        <p className="text-xs text-blue-300 bg-blue-900/20 px-2 py-1 rounded">Pay: {formatCurrency(loan.monthly_payment)}</p>
+                    ) : (
+                        <p className="text-xs text-orange-300 bg-orange-900/20 px-2 py-1 rounded" title="Estimated at 2% of balance">Est: {formatCurrency(loan.remaining_balance * 0.02)}</p>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const Loans = () => {
     const [loans, setLoans] = useState([]);
     const [loading, setLoading] = useState(true);
-
-    // Modal Visibility
     const [showLoanModal, setShowLoanModal] = useState(false);
-
-    // Editing State
     const [editingId, setEditingId] = useState(null);
-
-    // Form Data
     const [loanForm, setLoanForm] = useState({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '', monthly_payment: '' });
 
     const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
@@ -32,12 +96,34 @@ const Loans = () => {
         fetchLoans();
     }, []);
 
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    );
+
+    const handleDragEnd = async (event) => {
+        const { active, over } = event;
+
+        if (active.id !== over.id) {
+            setLoans((items) => {
+                const oldIndex = items.findIndex(item => item.id === active.id);
+                const newIndex = items.findIndex(item => item.id === over.id);
+                const newOrder = arrayMove(items, oldIndex, newIndex);
+
+                // Save Order
+                const ids = newOrder.map(l => l.id);
+                axios.put(`${API_URL}/loans/reorder`, ids).catch(err => console.error("Reorder failed", err));
+
+                return newOrder;
+            });
+        }
+    };
+
     const handleSaveLoan = async (e) => {
         e.preventDefault();
         try {
             const payload = {
                 ...loanForm,
-                // Ensure Monthly Payment is float or null
                 monthly_payment: loanForm.monthly_payment ? parseFloat(loanForm.monthly_payment) : null
             };
 
@@ -60,7 +146,6 @@ const Loans = () => {
                 name: loan.name,
                 principal_amount: loan.principal_amount,
                 interest_rate: loan.interest_rate,
-                // Format date to YYYY-MM-DD for input
                 start_date: loan.start_date ? new Date(loan.start_date).toISOString().split('T')[0] : '',
                 term_months: loan.term_months,
                 monthly_payment: loan.monthly_payment || ''
@@ -90,67 +175,16 @@ const Loans = () => {
 
             <SectionHeader title="Active Loans" onAdd={() => openLoanModal(null)} />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                {loans.map(loan => (
-                    <div key={loan.id} className="bg-slate-800 p-4 rounded-lg shadow-lg border border-red-900/30 group relative">
-
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition">
-                            <EditIcon onClick={() => openLoanModal(loan)} />
-                        </div>
-                        <div className="flex justify-between items-center">
-                            <span className="font-bold text-white">{loan.name}</span>
-                            <span className="text-sm bg-red-900/40 text-red-300 px-2 py-1 rounded">-{Number(loan.interest_rate).toFixed(2)}%</span>
-                        </div>
-                        <div className="mt-3 flex justify-between text-sm">
-                            <span className="text-gray-400">Principal: {formatCurrency(loan.principal_amount)}</span>
-                            <span className="font-bold text-red-400">Remaining: {formatCurrency(loan.remaining_balance)}</span>
-                        </div>
-                        {/* Utilization Bar */}
-                        <div className="w-full bg-slate-700 h-2 rounded-full mt-2 overflow-hidden">
-                            <div className="bg-red-500 h-2 rounded-full" style={{ width: `${Math.min(100, loan.principal_amount ? (loan.remaining_balance / loan.principal_amount) * 100 : 0)}%` }}></div>
-                        </div>
-                        <div className="flex justify-between items-end mt-2">
-                            <div className="flex justify-between items-start">
-                                <p className="text-xs text-gray-500">
-                                    {(() => {
-                                        if (!loan.term_months) return '';
-
-                                        // 1. Calculate Payments based on TIME (Time Elapsed)
-                                        // This is more robust if the Remaining Balance includes future interest (common in some loans)
-                                        const start = new Date(loan.start_date);
-                                        const now = new Date();
-
-                                        // Standard difference in months
-                                        let monthsPassed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-
-                                        // Adjust for day of month (if we haven't reached the due date this month, don't count it yet)
-                                        // Assuming start_date day is the due day
-                                        if (now.getDate() < start.getDate()) {
-                                            monthsPassed--;
-                                        }
-
-                                        // Current Payment is the one we are working on (Completed + 1)
-                                        const currentPayment = Math.min(Math.max(1, monthsPassed + 1), loan.term_months);
-
-                                        return (
-                                            <span className="flex flex-col">
-                                                <span>Payment <strong className="text-white">{currentPayment}</strong> of {loan.term_months}</span>
-                                                <span className="text-[10px] opacity-70">({Math.max(0, loan.term_months - currentPayment)} left)</span>
-                                            </span>
-                                        );
-                                    })()}
-                                </p>
-                                {loan.monthly_payment ? (
-                                    <p className="text-xs text-blue-300 bg-blue-900/20 px-2 py-1 rounded">Pay: {formatCurrency(loan.monthly_payment)}</p>
-                                ) : (
-                                    <p className="text-xs text-orange-300 bg-orange-900/20 px-2 py-1 rounded" title="Estimated at 2% of balance">Est: {formatCurrency(loan.remaining_balance * 0.02)}</p>
-                                )}
-                            </div>
-                        </div>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={loans.map(l => l.id)} strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                        {loans.map(loan => (
+                            <SortableLoanItem key={loan.id} loan={loan} openLoanModal={openLoanModal} />
+                        ))}
                     </div>
-                ))}
-                {loans.length === 0 && <p className="text-gray-500 italic">No loans active.</p>}
-            </div>
+                    {loans.length === 0 && <p className="text-gray-500 italic">No loans active.</p>}
+                </SortableContext>
+            </DndContext>
 
             {/* --- MODAL --- */}
             {showLoanModal && (

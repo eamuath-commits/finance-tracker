@@ -143,7 +143,14 @@ def update_loan(loan_id: str, loan_update: schemas.LoanUpdate, db: Session = Dep
     updated_loan = crud.update_loan(db, loan_id, loan_update)
     if not updated_loan:
         raise HTTPException(status_code=404, detail="Loan not found")
+    if not updated_loan:
+        raise HTTPException(status_code=404, detail="Loan not found")
     return updated_loan
+
+@app.put("/loans/reorder")
+def reorder_loans(ordered_ids: List[str], db: Session = Depends(get_db)):
+    crud.reorder_loans(db, ordered_ids)
+    return {"status": "success"}
 
 # --- Obligation Endpoints ---
 @app.post("/obligations/", response_model=schemas.Obligation)

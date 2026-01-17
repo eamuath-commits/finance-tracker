@@ -65,6 +65,7 @@ class Loan(Base):
     term_months = Column(Integer, nullable=False)
     remaining_balance = Column(Float, nullable=False)
     monthly_payment = Column(Float, nullable=True) # Explicit monthly payment amount
+    display_order = Column(Integer, default=0) # For UI ordering
 
 class MonthlyObligation(Base):
     __tablename__ = "obligations"

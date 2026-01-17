@@ -123,7 +123,13 @@ def create_loan(db: Session, loan: schemas.LoanCreate):
     return db_loan
 
 def get_loans(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.Loan).offset(skip).limit(limit).all()
+    return db.query(models.Loan).order_by(models.Loan.display_order.asc(), models.Loan.name.asc()).offset(skip).limit(limit).all()
+
+def reorder_loans(db: Session, ordered_ids: list[str]):
+    for index, loan_id in enumerate(ordered_ids):
+        # We can optimize this by doing bulk updates if needed, but for <50 loans loop is fine
+        db.query(models.Loan).filter(models.Loan.id == loan_id).update({"display_order": index})
+    db.commit()
 
 def update_loan(db: Session, loan_id: str, loan_update: schemas.LoanUpdate):
     db_loan = db.query(models.Loan).filter(models.Loan.id == loan_id).first()
