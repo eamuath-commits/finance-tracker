@@ -16,136 +16,34 @@ const SortableLoanItem = ({ loan, openLoanModal, deleteLoan }) => {
     };
 
     // --- PROGRESS LOGIC ---
+    // --- PROGRESS LOGIC ---
     const start = new Date(loan.start_date);
     const now = new Date();
 
     let monthsPassed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-    // If we have a custom due day (e.g. 27), check if we passed it this month
-    const dueDay = loan.due_day || 27; // Default to 27th if not set
-    if (now.getDate() < dueDay) {
-        monthsPassed--;
-    }
+    const dueDay = loan.due_day || 27;
+    if (now.getDate() < dueDay) monthsPassed--;
 
-    const currentPayment = Math.min(Math.max(1, monthsPassed + 1), loan.term_months);
-    // Calculate percentage based on TIME (Payments Made vs Total Payments)
-    const progressPercent = Math.min(100, Math.max(0, (monthsPassed / loan.term_months) * 100));
+    // Simple Adjustments for Payments Made
+    let paymentsMade = monthsPassed;
+    if (start.getDate() > dueDay) paymentsMade -= 1;
+    if (now.getDate() < dueDay) paymentsMade -= 1;
 
-    // --- SOLVER FOR EFFECTIVE RATE ---
-    const solveEffectiveMonthlyRate = (P, N, PMT) => {
-        let r = 0.004; // Initial guess (approx 4.8% APR)
-        for (let i = 0; i < 20; i++) {
-            const numerator = (PMT / r) * (1 - Math.pow(1 + r, -N)) - P;
-            const derivative = (PMT / r) * (N * Math.pow(1 + r, -N - 1)) - (PMT / (r * r)) * (1 - Math.pow(1 + r, -N));
-            const nextR = r - (numerator / derivative);
-            if (Math.abs(nextR - r) < 0.0000001) return nextR;
-            r = nextR;
-        }
-        return r;
-    };
+    paymentsMade = Math.max(0, paymentsMade);
+    const currentPayment = Math.min(Math.max(1, paymentsMade + 1), loan.term_months);
 
-    let effectiveMonthlyRate = 0;
-    if (loan.monthly_payment && loan.term_months && loan.principal_amount) {
-        effectiveMonthlyRate = solveEffectiveMonthlyRate(loan.principal_amount, loan.term_months, loan.monthly_payment);
-    } else {
-        effectiveMonthlyRate = (parseFloat(loan.interest_rate || 0) / 100) / 12;
-    }
+    const progressPercent = loan.term_months > 0 ? Math.min(100, Math.max(0, (paymentsMade / loan.term_months) * 100)) : 0;
 
-    // DYNAMIC BALANCE CALCULATION (Using Effective Rate)
-    let remainingPrincipal = loan.principal_amount;
+    // --- REMOVED COMPLEX CALCS PER USER REQUEST ---
+    // Using linear amortization as a temporary placeholder
+    // Remaining = Principal - (Principal / Term * PaymentsMade)
+    const principalPaid = loan.term_months > 0 ? (loan.principal_amount / loan.term_months) * paymentsMade : 0;
+    const remainingPrincipal = Math.max(0, loan.principal_amount - principalPaid);
 
-    if (loan.term_months > 0) {
-        // LOGIC: Calculate 'Potential' payments based on calendar months
-        const yearDiff = now.getFullYear() - start.getFullYear();
-        const monthDiff = now.getMonth() - start.getMonth();
-        let totalMonthsPassed = (yearDiff * 12) + monthDiff;
-
-        const dueDay = loan.due_day || 27;
-
-        // Adjustment 1
-        if (start.getDate() > dueDay) {
-            totalMonthsPassed--;
-        }
-
-        // Adjustment 2
-        if (now.getDate() < dueDay) {
-            totalMonthsPassed--;
-        }
-
-        // Final Payments Made Logic
-        let pMade = totalMonthsPassed;
-        if (start.getDate() > dueDay) pMade -= 1;
-        if (now.getDate() >= dueDay) pMade += 1;
-
-        // Wait, I am re-implementing the logic from Step 5583, but checking if I got it right.
-        // Step 5583 code:
-        // let pMade = totalMonthsPassed;
-        // if (start.getDate() > dueDay) pMade -= 1;
-        // if (now.getDate() >= dueDay) pMade += 1;
-        //
-        // Wait, totalMonthsPassed ALREADY applied Adj 1 and Adj 2 inside the if blocks in previous Step 5583??
-        // Let's check Step 5583 again.
-        // It had: 
-        // if (start > due) totalMonthsPassed--
-        // if (now < due) totalMonthsPassed--
-        // AND THEN:
-        // let pMade = totalMonthsPassed;
-        // if (start > due) pMade -= 1;   <-- Double subtraction?
-        // if (now >= due) pMade += 1;
-        //
-        // NO. I see what happened.
-        // My previous Replace in 5583 had comments explaining logic, but the actual code block I *intended* to replace might have been mixed.
-        // Let's look at the result in 5620 (Line 90-137).
-        // It does:
-        // 92: if (start > due) totalMonthsPassed--;
-        // 97: if (now < due) totalMonthsPassed--;
-        // 150: let pMade = totalMonthsPassed;
-        // 151: if (start > due) pMade -= 1;  <-- This IS duplicate subtraction.
-        // 152: if (now >= due) pMade +=1;
-
-        // This means my "Fix" in 5583 might have over-corrected or been buggy.
-        // If start > due, we subtracted twice.
-        // Let's fix this NOW while restoring.
-
-        // CORRECT LOGIC:
-        // 1. Calculate raw calendar diff.
-        // 2. Adjust for start/current relative to due day.
-
-        // Let's stick to the SIMPLE logic that worked:
-        // Payments = (Diff years * 12 + Diff months).
-        // If Start > Due: -1 (First month skipped).
-        // If Now < Due: -1 (Current month not paid).
-        // That's it.
-
-        // So:
-        const rawDiff = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-        let pm = rawDiff;
-        if (start.getDate() > dueDay) pm -= 1;
-        if (now.getDate() < dueDay) pm -= 1;
-
-        const paymentsMade = Math.max(0, pm);
-
-        // Okay, I will use this cleaner logic.
-
-        if (paymentsMade >= loan.term_months) {
-            remainingPrincipal = 0;
-        } else if (effectiveMonthlyRate > 0) {
-            const N = loan.term_months;
-            const k = paymentsMade;
-            const r = effectiveMonthlyRate;
-
-            const numerator = Math.pow(1 + r, N) - Math.pow(1 + r, k);
-            const denominator = Math.pow(1 + r, N) - 1;
-            remainingPrincipal = loan.principal_amount * (numerator / denominator);
-        } else {
-            const principalPaid = (loan.principal_amount / loan.term_months) * paymentsMade;
-            remainingPrincipal = Math.max(0, loan.principal_amount - principalPaid);
-        }
-    }
-
-    const remainingMonths = Math.max(0, loan.term_months - currentPayment);
-    const totalOutstanding = loan.monthly_payment ? (loan.monthly_payment * remainingMonths) : remainingPrincipal;
-    const threeMonthsProfit = remainingPrincipal * effectiveMonthlyRate * 3;
-    const settlementEstimate = remainingPrincipal + threeMonthsProfit;
+    // Total Outstanding & Estimates
+    // Just showing standard Principal remaining for now to avoid the 700k error.
+    const totalOutstanding = remainingPrincipal;
+    const settlementEstimate = remainingPrincipal; // Placeholder
 
     return (
         <div ref={setNodeRef} style={style} className="bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-700 group relative hover:border-blue-500/50 transition-colors">
