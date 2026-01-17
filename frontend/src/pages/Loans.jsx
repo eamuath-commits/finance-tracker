@@ -111,8 +111,10 @@ const Loans = () => {
                         </div>
                         <div className="flex justify-between items-end mt-2">
                             <p className="text-xs text-gray-500">{loan.term_months} months term</p>
-                            {loan.monthly_payment && (
+                            {loan.monthly_payment ? (
                                 <p className="text-xs text-blue-300 bg-blue-900/20 px-2 py-1 rounded">Pay: {formatCurrency(loan.monthly_payment)}/mo</p>
+                            ) : (
+                                <p className="text-xs text-orange-300 bg-orange-900/20 px-2 py-1 rounded" title="Estimated at 2% of balance">Est. {formatCurrency(loan.remaining_balance * 0.02)}/mo</p>
                             )}
                         </div>
                     </div>
