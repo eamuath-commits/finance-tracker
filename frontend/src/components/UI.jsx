@@ -22,13 +22,26 @@ export const formatCurrency = (value) => {
     );
 };
 
-export const Card = ({ title, value, subtext, color = "blue" }) => (
-    <div className={`bg-slate-800 p-6 rounded-xl shadow-lg border-l-4 border-${color}-500`}>
-        <h3 className="text-gray-400 text-sm font-medium uppercase">{title}</h3>
-        <p className="text-2xl font-bold mt-2 text-white">{value}</p>
-        {subtext && <p className="text-xs text-gray-500 mt-1">{subtext}</p>}
-    </div>
-);
+export const Card = ({ title, value, subtext, color = "blue", children, className = "" }) => {
+    // If children are provided, it's a layout card
+    if (children) {
+        return (
+            <div className={`bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700 ${className}`}>
+                {title && <h3 className="text-gray-400 text-sm font-medium uppercase mb-4">{title}</h3>}
+                {children}
+            </div>
+        );
+    }
+
+    // Otherwise, it's a Stat Card
+    return (
+        <div className={`bg-slate-800 p-6 rounded-xl shadow-lg border-l-4 border-${color}-500 ${className}`}>
+            <h3 className="text-gray-400 text-sm font-medium uppercase">{title}</h3>
+            <p className="text-2xl font-bold mt-2 text-white">{value}</p>
+            {subtext && <p className="text-xs text-gray-500 mt-1">{subtext}</p>}
+        </div>
+    );
+};
 
 export const SectionHeader = ({ title, onAdd }) => (
     <div className="flex justify-between items-center mt-8 mb-4">
