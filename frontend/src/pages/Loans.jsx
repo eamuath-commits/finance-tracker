@@ -29,6 +29,16 @@ const SortableLoanItem = ({ loan, openLoanModal }) => {
     // Calculate percentage based on TIME (Payments Made vs Total Payments)
     const progressPercent = Math.min(100, Math.max(0, (currentPayment / loan.term_months) * 100));
 
+    // DYNAMIC BALANCE CALCULATION (Amortization)
+    // We assume straight-line principal reduction for display purposes
+    const principalPaid = (loan.principal_amount / loan.term_months) * currentPayment;
+    const calculatedRemaining = Math.max(0, loan.principal_amount - principalPaid);
+
+    // SAMA Rule: Settlement = Remaining Principal + 3 Months of Future Profit
+    // We assume the entered Interest Rate is the Annual Reducing Balance Rate. 
+    // If user entered Flat Rate, this might be slightly off, but it's an estimate.
+    const threeMonthsProfit = calculatedRemaining * (loan.interest_rate / 100 / 12) * 3;
+    const settlementEstimate = calculatedRemaining + threeMonthsProfit;
 
     return (
         <div ref={setNodeRef} style={style} className="bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-700 group relative hover:border-blue-500/50 transition-colors">
@@ -47,7 +57,7 @@ const SortableLoanItem = ({ loan, openLoanModal }) => {
             </div>
             <div className="mt-3 flex justify-between text-sm">
                 <span className="text-gray-400">Principal: {formatCurrency(loan.principal_amount)}</span>
-                <span className="font-bold text-slate-200">Remaining: {formatCurrency(loan.remaining_balance)}</span>
+                <span className="font-bold text-slate-200">Remaining: {formatCurrency(calculatedRemaining)}</span>
             </div>
 
             {/* Progress Bar (Blue - Based on Payments Made) */}
@@ -66,7 +76,7 @@ const SortableLoanItem = ({ loan, openLoanModal }) => {
                     {loan.monthly_payment ? (
                         <p className="text-xs text-blue-300 bg-blue-900/20 px-2 py-1 rounded">Pay: {formatCurrency(loan.monthly_payment)}</p>
                     ) : (
-                        <p className="text-xs text-orange-300 bg-orange-900/20 px-2 py-1 rounded" title="Estimated at 2% of balance">Est: {formatCurrency(loan.remaining_balance * 0.02)}</p>
+                        <p className="text-xs text-orange-300 bg-orange-900/20 px-2 py-1 rounded" title="Estimated at 2% of balance">Est: {formatCurrency(calculatedRemaining * 0.02)}</p>
                     )}
                 </div>
             </div>
@@ -74,7 +84,7 @@ const SortableLoanItem = ({ loan, openLoanModal }) => {
             {/* Early Settlement Estimate (Based on SAMA Rule: 3 Months Future Profit) */}
             <div className="mt-2 text-center">
                 <p className="text-[10px] text-gray-500 bg-slate-900/30 py-1 rounded">
-                    Payoff Estimate: <strong className="text-emerald-400">{formatCurrency(loan.remaining_balance + (loan.remaining_balance * (loan.interest_rate / 100 / 12) * 3))}</strong>
+                    Payoff Estimate: <strong className="text-emerald-400">{formatCurrency(settlementEstimate)}</strong>
                 </p>
             </div>
         </div>
