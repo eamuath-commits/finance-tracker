@@ -10,7 +10,7 @@ const Sidebar = () => {
         { path: '/obligations', label: 'Obligations', icon: CreditCard },
         { path: '/loans', label: 'Loans', icon: FileBarChart /* Reusing icon or pick better one */ },
         { path: '/reports', label: 'Reports', icon: FileBarChart },
-        { path: '/debt-strategy', label: 'Debt Strategy', icon: TrendingDown },
+        { path: '/planning', label: 'Planning', icon: TrendingDown },
     ];
 
     return (

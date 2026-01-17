@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date
 from models import AccountType
 
 class AccountBase(BaseModel):
@@ -161,6 +161,30 @@ class RawMessageBase(BaseModel):
     timestamp: datetime
 
 class RawMessage(RawMessageBase):
+    id: str
+    class Config:
+        orm_mode = True
+
+class SavingsGoalBase(BaseModel):
+    name: str
+    target_amount: float
+    current_amount: Optional[float] = 0.0
+    target_date: Optional[date] = None
+    icon: Optional[str] = None
+    color: Optional[str] = None
+
+class SavingsGoalCreate(SavingsGoalBase):
+    pass
+
+class SavingsGoalUpdate(BaseModel):
+    name: Optional[str] = None
+    target_amount: Optional[float] = None
+    current_amount: Optional[float] = None
+    target_date: Optional[date] = None
+    icon: Optional[str] = None
+    color: Optional[str] = None
+
+class SavingsGoal(SavingsGoalBase):
     id: str
     class Config:
         orm_mode = True

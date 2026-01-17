@@ -315,3 +315,41 @@ def update_payment(db: Session, payment_id: int, update_data: schemas.PaymentUpd
 
 def get_payments(db: Session, obligation_id: str):
     return db.query(models.Payment).filter(models.Payment.obligation_id == obligation_id).order_by(models.Payment.payment_date.desc()).all()
+
+def create_goal(db: Session, goal: schemas.SavingsGoalCreate):
+    db_goal = models.SavingsGoal(
+        name=goal.name,
+        target_amount=goal.target_amount,
+        current_amount=goal.current_amount,
+        target_date=goal.target_date,
+        icon=goal.icon,
+        color=goal.color
+    )
+    db.add(db_goal)
+    db.commit()
+    db.refresh(db_goal)
+    return db_goal
+
+def get_goals(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.SavingsGoal).offset(skip).limit(limit).all()
+
+def update_goal(db: Session, goal_id: str, goal_update: schemas.SavingsGoalUpdate):
+    db_goal = db.query(models.SavingsGoal).filter(models.SavingsGoal.id == goal_id).first()
+    if not db_goal:
+        return None
+    
+    update_data = goal_update.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_goal, key, value)
+        
+    db.add(db_goal)
+    db.commit()
+    db.refresh(db_goal)
+    return db_goal
+
+def delete_goal(db: Session, goal_id: str):
+    db_goal = db.query(models.SavingsGoal).filter(models.SavingsGoal.id == goal_id).first()
+    if db_goal:
+        db.delete(db_goal)
+        db.commit()
+    return db_goal

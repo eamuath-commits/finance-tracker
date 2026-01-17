@@ -108,3 +108,14 @@ class RawMessage(Base):
     timestamp = Column(DateTime, default=datetime.now)
     status = Column(Enum(MessageStatus), default=MessageStatus.PENDING)
     error_log = Column(Text, nullable=True) # To store why it failed
+
+class SavingsGoal(Base):
+    __tablename__ = "savings_goals"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False)
+    target_amount = Column(Float, nullable=False)
+    current_amount = Column(Float, default=0.0)
+    target_date = Column(Date, nullable=True)
+    icon = Column(String, nullable=True) # e.g. "Plane", "Car"
+    color = Column(String, nullable=True) # Hex color

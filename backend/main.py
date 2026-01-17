@@ -363,3 +363,26 @@ def retry_message(message_id: str, db: Session = Depends(get_db)):
     db.commit()
     
     return {"status": "success", "message": "Message parsed and logged successfully"}
+
+# --- Savings Goal Endpoints ---
+@app.post("/goals/", response_model=schemas.SavingsGoal)
+def create_goal(goal: schemas.SavingsGoalCreate, db: Session = Depends(get_db)):
+    return crud.create_goal(db=db, goal=goal)
+
+@app.get("/goals/", response_model=List[schemas.SavingsGoal])
+def read_goals(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return crud.get_goals(db, skip=skip, limit=limit)
+
+@app.put("/goals/{goal_id}", response_model=schemas.SavingsGoal)
+def update_goal(goal_id: str, goal_update: schemas.SavingsGoalUpdate, db: Session = Depends(get_db)):
+    updated_goal = crud.update_goal(db, goal_id, goal_update)
+    if not updated_goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    return updated_goal
+
+@app.delete("/goals/{goal_id}", response_model=schemas.SavingsGoal)
+def delete_goal(goal_id: str, db: Session = Depends(get_db)):
+    deleted_goal = crud.delete_goal(db, goal_id)
+    if not deleted_goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    return deleted_goal
