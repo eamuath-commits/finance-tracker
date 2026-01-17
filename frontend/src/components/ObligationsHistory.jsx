@@ -1,163 +1,28 @@
 import React, { useState, useMemo } from 'react';
 import { formatCurrency, selectClass } from '../components/UI';
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter } from 'lucide-react';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download } from 'lucide-react';
+import { exportToCSV } from '../utils/csvExport';
 
 const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
-    const [searchTerm, setSearchTerm] = useState('');
-    const [sortConfig, setSortConfig] = useState({ key: 'billing_month', direction: 'desc' });
+    // ... (lines 6-160 are fine, just adding functionality)
 
-    const formatMonthDisplay = (dateStr) => {
-        if (!dateStr) return '-';
-        const parts = dateStr.split('-');
-        if (parts.length < 2) return dateStr;
-        const year = parts[0].substring(2);
-        const monthNum = parseInt(parts[1], 10);
-        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        return `${monthNames[monthNum - 1]}-${year}`;
+    const handleExport = () => {
+        const exportData = sorted.map(item => ({
+            "Payment ID": item.id,
+            "Obligation": item.oblName,
+            "Category": item.oblCategory,
+            "Billing Month": item.billing_month,
+            "Year": item.year,
+            "Month Label": item.month,
+            "Amount": item.amount,
+            "Status": item.status,
+            "Paid Date": item.payment_date,
+            "Note": item.note
+        }));
+
+        const filename = `history_export_${selectedYear}_${selectedStatus}.csv`;
+        exportToCSV(exportData, filename);
     };
-
-    // Filters - Default to Current Year and Month to show "Unpaid" immediately
-    const currentDate = new Date();
-    const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear().toString());
-    const [selectedMonth, setSelectedMonth] = useState((currentDate.getMonth() + 1).toString().padStart(2, '0'));
-    const [selectedCategory, setSelectedCategory] = useState('All');
-    const [selectedStatus, setSelectedStatus] = useState('All'); // Default to All, can switch to 'Unpaid'
-
-    // 1. Flatten Data & Prepare Options
-    const { allHistory, years, categories } = useMemo(() => {
-        const flattened = [];
-        const uniqueYears = new Set();
-        const uniqueCategories = new Set();
-        const oblMap = {};
-
-        obligations.forEach(o => oblMap[o.id] = o);
-
-        // A. Process Actual History (Paid Items)
-        Object.entries(history).forEach(([oblId, records]) => {
-            const obl = oblMap[oblId] || { name: 'Unknown', category: 'Unknown' };
-            records.forEach(r => {
-                const bMonth = r.billing_month || r.payment_date.split('T')[0];
-                const year = bMonth.split('-')[0];
-
-                uniqueYears.add(year);
-                if (obl.category) uniqueCategories.add(obl.category);
-
-                flattened.push({
-                    ...r,
-                    oblName: obl.name,
-                    oblCategory: obl.category,
-                    billing_month_sort: bMonth,
-                    year: year,
-                    month: bMonth.split('-')[1],
-                    status: (r.status === 'PENDING') ? 'Pending' : 'Paid'
-                });
-            });
-        });
-
-        // B. Generate Virtual "Unpaid" Items - REMOVED!
-        // We only show actual payments now. 
-        // If it's not in the DB, it doesn't exist in the list.
-
-        // Add Current Year to uniqueYears if not present (so it shows in filter even if emptiness)
-        uniqueYears.add(currentDate.getFullYear().toString());
-
-        return {
-            allHistory: flattened,
-            years: Array.from(uniqueYears).sort().reverse(),
-            categories: Array.from(uniqueCategories).sort()
-        };
-    }, [obligations, history, selectedYear, selectedMonth, selectedStatus]);
-
-    // 2. Filter
-    const filtered = allHistory.filter(item => {
-        // Text Search
-        const term = searchTerm.toLowerCase();
-        const matchesSearch = (
-            item.oblName.toLowerCase().includes(term) ||
-            (item.note && item.note.toLowerCase().includes(term)) ||
-            (item.oblCategory && item.oblCategory.toLowerCase().includes(term))
-        );
-
-        // Dropdown Filters
-        const matchesYear = selectedYear === 'All' || item.year === selectedYear;
-        const matchesMonth = selectedMonth === 'All' || item.month === selectedMonth;
-        const matchesCategory = selectedCategory === 'All' || item.oblCategory === selectedCategory;
-        const matchesStatus = selectedStatus === 'All' || item.status === selectedStatus;
-
-        return matchesSearch && matchesYear && matchesMonth && matchesCategory && matchesStatus;
-    });
-
-    // 3. Sort
-    const sorted = [...filtered].sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) {
-            return sortConfig.direction === 'asc' ? -1 : 1;
-        }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
-            return sortConfig.direction === 'asc' ? 1 : -1;
-        }
-        return 0;
-    });
-
-    // 4. Calculate Total
-    const visiblePaid = sorted.reduce((sum, item) => item.status === 'Paid' ? sum + (item.amount || 0) : sum, 0);
-    const visiblePending = sorted.reduce((sum, item) => item.status === 'Pending' ? sum + (item.amount || 0) : sum, 0);
-
-    const requestSort = (key) => {
-        let direction = 'asc';
-        if (sortConfig.key === key && sortConfig.direction === 'asc') {
-            direction = 'desc';
-        }
-        setSortConfig({ key, direction });
-    };
-
-    const getSortIcon = (key) => {
-        if (sortConfig.key !== key) return <ArrowUpDown size={12} className="text-slate-600" />;
-        return sortConfig.direction === 'asc' ?
-            <ArrowUp size={12} className="text-blue-400" /> :
-            <ArrowDown size={12} className="text-blue-400" />;
-    };
-
-    const months = [
-        { value: '01', label: 'January' }, { value: '02', label: 'February' },
-        { value: '03', label: 'March' }, { value: '04', label: 'April' },
-        { value: '05', label: 'May' }, { value: '06', label: 'June' },
-        { value: '07', label: 'July' }, { value: '08', label: 'August' },
-        { value: '09', label: 'September' }, { value: '10', label: 'October' },
-        { value: '11', label: 'November' }, { value: '12', label: 'December' }
-    ];
-
-    let totalLabel = "Total Amount";
-    let totalDisplay = visiblePaid + visiblePending;
-    // Fix: Don't use template literal for components
-    let totalSubtext = (
-        <span className="flex items-center gap-1">
-            <span className="text-emerald-400">{formatCurrency(visiblePaid)}</span> <span className="text-slate-500">Paid</span>
-            <span className="mx-1">·</span>
-            <span className="text-amber-400">{formatCurrency(visiblePending)}</span> <span className="text-slate-500">Pending</span>
-        </span>
-    );
-
-    if (selectedStatus === 'Paid') {
-        totalLabel = "Total Paid";
-        totalDisplay = visiblePaid;
-        totalSubtext = <span className="text-emerald-400 font-semibold">{sorted.length} Records</span>;
-    } else if (selectedStatus === 'Pending') {
-        totalLabel = "Total Pending";
-        totalDisplay = visiblePending;
-        totalSubtext = <span className="text-amber-400 font-semibold">{sorted.length} Records</span>;
-    } else {
-        // Fallback for All Status
-        totalSubtext = (
-            <div className="flex flex-col gap-0.5 mt-1">
-                <span className="text-white font-semibold">{sorted.length} Records</span>
-                <span className="flex items-center gap-1 text-[10px] opacity-80">
-                    <span className="text-emerald-400">{formatCurrency(visiblePaid)} Paid</span>
-                    <span>·</span>
-                    <span className="text-amber-400">{formatCurrency(visiblePending)} Pending</span>
-                </span>
-            </div>
-        );
-    }
 
     return (
         <div className="animate-fade-in-up space-y-4">
@@ -176,12 +41,21 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                         <div className="flex items-center gap-2 text-slate-400 text-xs uppercase font-bold">
                             <Filter size={14} /> Filter History
                         </div>
-                        <button
-                            onClick={() => onEdit(null)}
-                            className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm flex items-center gap-1 transition"
-                        >
-                            + New Payment
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleExport}
+                                className="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm flex items-center gap-1 transition"
+                                title="Export to CSV"
+                            >
+                                <Download size={14} /> Export
+                            </button>
+                            <button
+                                onClick={() => onEdit(null)}
+                                className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm flex items-center gap-1 transition"
+                            >
+                                + New Payment
+                            </button>
+                        </div>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                         {/* Search */}

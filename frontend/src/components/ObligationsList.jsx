@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { CheckCircle, History, Pencil, Trash2, Banknote, Home, Zap, Utensils, Car, Shield, Smartphone, Landmark, CreditCard, Clock, Box, GripVertical } from 'lucide-react';
+import { CheckCircle, History, Pencil, Trash2, Banknote, Home, Zap, Utensils, Car, Shield, Smartphone, Landmark, CreditCard, Clock, Box, GripVertical, Download } from 'lucide-react';
 import { formatCurrency, EditIcon } from '../components/UI';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { exportToCSV } from '../utils/csvExport';
 
 const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObligationModal, openPaymentModal, handleQuickPay, handleDeleteHistory, CATEGORY_ICONS, dragHandleProps }) => {
     const prevMonth = getMonthStatus(obl, monthOffset - 1);
@@ -199,6 +200,32 @@ const ObligationsList = ({
         return acc;
     }, {});
 
+    const handleExportSnapshot = () => {
+        const snapshotData = obligations.map(obl => {
+            const status = getMonthStatus(obl, monthOffset); // Get status for CURRENT VIEWED MONTH
+
+            let statusLabel = "Unpaid";
+            if (status.isPaid) statusLabel = "Paid";
+            else if (status.status === 'PENDING') statusLabel = "Pending";
+
+            return {
+                "Obligation": obl.name,
+                "Category": obl.category,
+                "Target Month": status.billingDateStr,
+                "Due Day": obl.due_day,
+                "Budget Amount": obl.amount,
+                "Paid Amount": status.amount || 0,
+                "Status": statusLabel,
+                "Payment ID": status.paymentId || ""
+            };
+        });
+
+        const date = new Date();
+        date.setMonth(date.getMonth() + monthOffset);
+        const monthStr = date.toISOString().slice(0, 7); // YYYY-MM
+        exportToCSV(snapshotData, `obligations_snapshot_${monthStr}.csv`);
+    };
+
     const getCategoryStats = (items) => {
         let prevPaid = 0;
         let currentBudget = 0;
@@ -303,7 +330,16 @@ const ObligationsList = ({
                         <Landmark size={24} />
                     </div>
                     <div>
-                        <h2 className="text-lg font-bold text-white">Monthly Overview</h2>
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-lg font-bold text-white">Monthly Overview</h2>
+                            <button
+                                onClick={handleExportSnapshot}
+                                className="text-slate-400 hover:text-white transition p-1 bg-slate-800 rounded hover:bg-slate-700"
+                                title="Export Snapshot to CSV"
+                            >
+                                <Download size={14} />
+                            </button>
+                        </div>
                         <div className="flex items-center gap-2 text-xs">
                             <span className="text-slate-400">{obligations.length} Active Obligations</span>
                         </div>
