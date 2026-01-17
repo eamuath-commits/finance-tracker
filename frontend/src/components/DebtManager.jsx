@@ -4,7 +4,7 @@ import { formatCurrency, Card } from '../components/UI';
 import { TrendingDown, Target, ArrowRight } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8000`;
 
 const DebtManager = () => {
     const [debts, setDebts] = useState([]);
