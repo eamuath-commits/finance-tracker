@@ -25,10 +25,10 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
         e.stopPropagation();
 
         // Smart Default Logic:
-        // 1. If user typed "0" or cleared it -> Use PREVIOUS month's amount (if available)
-        // 2. Else -> Use what they typed.
+        // 1. If user typed nothing (NaN) -> Use PREVIOUS month's amount (if available) or Default.
+        // 2. If user typed 0 -> Respect it (allow explicit 0).
         let val = parseFloat(payAmount);
-        if (isNaN(val) || val === 0) {
+        if (isNaN(val)) {
             if (prevMonth.amount !== null && prevMonth.amount > 0) val = prevMonth.amount;
             else if (obl.amount) val = obl.amount;
         }
@@ -43,7 +43,7 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
             e.stopPropagation();
 
             let val = parseFloat(payAmount);
-            if (isNaN(val) || val === 0) {
+            if (isNaN(val)) {
                 if (prevMonth.amount !== null && prevMonth.amount > 0) val = prevMonth.amount;
                 else if (obl.amount) val = obl.amount;
             }
