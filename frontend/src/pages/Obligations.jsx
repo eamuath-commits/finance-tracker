@@ -18,7 +18,14 @@ const Obligations = () => {
     };
 
     // Month Navigation State
-    const [monthOffset, setMonthOffset] = useState(0);
+    const [monthOffset, setMonthOffset] = useState(() => {
+        const saved = localStorage.getItem('obligationsMonthOffset');
+        return saved ? parseInt(saved, 10) : 0;
+    });
+
+    useEffect(() => {
+        localStorage.setItem('obligationsMonthOffset', monthOffset);
+    }, [monthOffset]);
 
     // Calculate current view Date Label
     const currentDateView = (() => {
