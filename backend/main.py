@@ -183,8 +183,8 @@ def update_loan(loan_id: str, loan_update: schemas.LoanUpdate, db: Session = Dep
     return updated_loan
 
 @app.put("/loans/reorder")
-def reorder_loans(ordered_ids: List[str] = Body(...), db: Session = Depends(get_db)):
-    crud.reorder_loans(db, ordered_ids)
+def reorder_loans(payload: schemas.ReorderSchema, db: Session = Depends(get_db)):
+    crud.reorder_loans(db, payload.ordered_ids)
     return {"status": "success"}
 
 @app.delete("/loans/{loan_id}", response_model=schemas.Loan)
@@ -206,15 +206,13 @@ def read_obligations(skip: int = 0, limit: int = 100, db: Session = Depends(get_
 @app.put("/obligations/{obligation_id}", response_model=schemas.Obligation)
 def update_obligation(obligation_id: str, obligation_update: schemas.ObligationUpdate, db: Session = Depends(get_db)):
     updated_obj = crud.update_obligation(db, obligation_id, obligation_update)
-    # Remove duplicate call if present in original target, but here we just replace the block.
-    # Wait, the target content has duplicates. I'll clean it up.
     if not updated_obj:
         raise HTTPException(status_code=404, detail="Obligation not found")
     return updated_obj
 
 @app.put("/obligations/reorder")
-def reorder_obligations(ordered_ids: List[str] = Body(...), db: Session = Depends(get_db)):
-    crud.reorder_obligations(db, ordered_ids)
+def reorder_obligations(payload: schemas.ReorderSchema, db: Session = Depends(get_db)):
+    crud.reorder_obligations(db, payload.ordered_ids)
     return {"status": "success"}
 
 @app.delete("/obligations/{obligation_id}", response_model=schemas.Obligation)

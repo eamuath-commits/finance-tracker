@@ -341,7 +341,7 @@ const Obligations = () => {
 
         try {
             const ids = newOrderedObligations.map(o => o.id);
-            await axios.put(`${API_URL}/obligations/reorder`, ids);
+            await axios.put(`${API_URL}/obligations/reorder`, { ordered_ids: ids });
         } catch (err) {
             console.error("Reorder failed", err);
             // Optionally revert fetchObligations() here

@@ -223,7 +223,7 @@ const Loans = () => {
 
                 // Save Order
                 const ids = newOrder.map(l => l.id);
-                axios.put(`${API_URL}/loans/reorder`, ids).catch(err => console.error("Reorder failed", err));
+                axios.put(`${API_URL}/loans/reorder`, { ordered_ids: ids }).catch(err => console.error("Reorder failed", err));
 
                 return newOrder;
             });

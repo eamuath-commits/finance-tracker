@@ -152,6 +152,9 @@ class Payment(PaymentBase):
     class Config:
         orm_mode = True
 
+class ReorderSchema(BaseModel):
+    ordered_ids: List[str]
+
 class RawMessageBase(BaseModel):
     sender: Optional[str] = None
     body: str
