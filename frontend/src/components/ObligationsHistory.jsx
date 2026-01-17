@@ -49,7 +49,7 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                     billing_month_sort: bMonth,
                     year: year,
                     month: bMonth.split('-')[1],
-                    status: (r.status === 'PAID' || r.status === 'PENDING') ? (r.status === 'PAID' ? 'Paid' : 'Unpaid') : 'Paid' // Normalize to 'Paid'/'Unpaid' for frontend filters
+                    status: (r.status === 'PENDING') ? 'Pending' : 'Paid'
                 });
             });
         });
@@ -100,7 +100,7 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
 
     // 4. Calculate Total
     const visiblePaid = sorted.reduce((sum, item) => item.status === 'Paid' ? sum + (item.amount || 0) : sum, 0);
-    const visibleUnpaid = sorted.reduce((sum, item) => item.status === 'Unpaid' ? sum + (item.amount || 0) : sum, 0);
+    const visiblePending = sorted.reduce((sum, item) => item.status === 'Pending' ? sum + (item.amount || 0) : sum, 0);
 
     const requestSort = (key) => {
         let direction = 'asc';
@@ -127,33 +127,33 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
     ];
 
     let totalLabel = "Total Amount";
-    let totalDisplay = visiblePaid + visibleUnpaid;
+    let totalDisplay = visiblePaid + visiblePending;
     // Fix: Don't use template literal for components
     let totalSubtext = (
         <span className="flex items-center gap-1">
-            <span className="text-white">{formatCurrency(visiblePaid)}</span> <span className="text-slate-500">Paid</span>
+            <span className="text-emerald-400">{formatCurrency(visiblePaid)}</span> <span className="text-slate-500">Paid</span>
             <span className="mx-1">·</span>
-            <span className="text-white">{formatCurrency(visibleUnpaid)}</span> <span className="text-slate-500">Pending</span>
+            <span className="text-amber-400">{formatCurrency(visiblePending)}</span> <span className="text-slate-500">Pending</span>
         </span>
     );
 
     if (selectedStatus === 'Paid') {
         totalLabel = "Total Paid";
         totalDisplay = visiblePaid;
-        totalSubtext = <span className="text-white font-semibold">{sorted.length} Records</span>;
-    } else if (selectedStatus === 'Unpaid') {
+        totalSubtext = <span className="text-emerald-400 font-semibold">{sorted.length} Records</span>;
+    } else if (selectedStatus === 'Pending') {
         totalLabel = "Total Pending";
-        totalDisplay = visibleUnpaid;
-        totalSubtext = <span className="text-white font-semibold">{sorted.length} Records</span>;
+        totalDisplay = visiblePending;
+        totalSubtext = <span className="text-amber-400 font-semibold">{sorted.length} Records</span>;
     } else {
-        // Fallback for All Status to show count + breakdown
+        // Fallback for All Status
         totalSubtext = (
             <div className="flex flex-col gap-0.5 mt-1">
                 <span className="text-white font-semibold">{sorted.length} Records</span>
                 <span className="flex items-center gap-1 text-[10px] opacity-80">
-                    <span>{formatCurrency(visiblePaid)} Paid</span>
+                    <span className="text-emerald-400">{formatCurrency(visiblePaid)} Paid</span>
                     <span>·</span>
-                    <span>{formatCurrency(visibleUnpaid)} Pending</span>
+                    <span className="text-amber-400">{formatCurrency(visiblePending)} Pending</span>
                 </span>
             </div>
         );
@@ -224,7 +224,7 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                         >
                             <option value="All">All Status</option>
                             <option value="Paid">Paid</option>
-                            <option value="Unpaid">Unpaid</option>
+                            <option value="Pending">Pending</option>
                         </select>
 
                         {/* Category Filter */}
@@ -275,9 +275,9 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
 
                                     <td className="px-6 py-3">
                                         {item.status === 'Paid' ? (
-                                            <span className="bg-green-500/20 text-green-400 text-[10px] px-2 py-1 rounded border border-green-500/30 font-bold uppercase tracking-wider">Paid</span>
+                                            <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded border border-emerald-500/30 font-bold uppercase tracking-wider">Paid</span>
                                         ) : (
-                                            <span className="bg-red-500/20 text-red-400 text-[10px] px-2 py-1 rounded border border-red-500/30 font-bold uppercase tracking-wider">Unpaid</span>
+                                            <span className="bg-amber-500/20 text-amber-400 text-[10px] px-2 py-1 rounded border border-amber-500/30 font-bold uppercase tracking-wider">Pending</span>
                                         )}
                                     </td>
 
