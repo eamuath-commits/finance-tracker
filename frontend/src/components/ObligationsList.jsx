@@ -214,7 +214,8 @@ const ObligationsList = ({
                 "Target Month": status.billingDateStr,
                 "Due Day": obl.due_day,
                 "Budget Amount": obl.amount,
-                "Paid Amount": status.amount || 0,
+                "Paid Amount": status.isPaid ? (status.amount || 0) : 0,
+                "Pending Amount": status.status === 'PENDING' ? (status.amount || 0) : 0,
                 "Status": statusLabel,
                 "Payment ID": status.paymentId || ""
             };

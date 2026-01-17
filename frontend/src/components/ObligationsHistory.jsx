@@ -163,7 +163,8 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
             "Billing Month": item.billing_month,
             "Year": item.year,
             "Month Label": item.month,
-            "Amount": item.amount,
+            "Paid Amount": item.status === 'Paid' ? (item.amount || 0) : 0,
+            "Pending Amount": item.status === 'Pending' ? (item.amount || 0) : 0,
             "Status": item.status,
             "Paid Date": item.payment_date,
             "Note": item.note
