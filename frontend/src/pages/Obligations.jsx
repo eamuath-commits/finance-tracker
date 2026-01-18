@@ -5,6 +5,7 @@ import { Calendar, Trash2, LayoutGrid, List, Receipt } from 'lucide-react';
 import ObligationsOverview from '../components/ObligationsOverview';
 import ObligationsList from '../components/ObligationsList';
 import ObligationsHistory from '../components/ObligationsHistory';
+import PaymentModal from '../components/PaymentModal';
 
 const Obligations = () => {
     const [obligations, setObligations] = useState([]);
@@ -45,6 +46,11 @@ const Obligations = () => {
 
     const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_day: '', category: '' });
     const [paymentForm, setPaymentForm] = useState({ id: null, amount: '', note: '', billing_month: new Date().toISOString().split('T')[0] });
+
+    const currentPaymentObligation = React.useMemo(() =>
+        obligations.find(o => o.id === paymentForm.id),
+        [obligations, paymentForm.id]
+    );
 
     const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
@@ -216,23 +222,20 @@ const Obligations = () => {
         setShowPaymentModal(true);
     };
 
-    const submitPayment = async (e) => {
-        e.preventDefault();
-        if (!paymentForm.id) return;
+    const handleProcessPayment = async (data) => {
         try {
             const payload = {
                 payment_date: new Date().toISOString(),
-                amount: parseFloat(paymentForm.amount || 0),
-                billing_month: paymentForm.billing_month,
-                note: paymentForm.note,
-                status: paymentForm.status
+                amount: parseFloat(data.amount || 0),
+                billing_month: data.billing_month,
+                note: data.note,
+                status: data.status
             };
 
-            if (paymentForm.historyId) {
-                // Using legacy endpoint to route correctly in backend (or update logic to use /payments)
-                // Backend still has the PUT /history route hooked up to update_payment
-                await axios.put(`${API_URL}/obligations/history/${paymentForm.historyId}`, payload);
-            } else {
+            if (data.id) { // Editing existing payment (Legacy History Update)
+                await axios.put(`${API_URL}/obligations/history/${data.id}`, payload);
+            } else { // Creating new payment
+                // paymentForm.id holds the Obligation ID
                 await axios.post(`${API_URL}/obligations/${paymentForm.id}/pay`, payload);
             }
             setShowPaymentModal(false);
@@ -466,96 +469,47 @@ const Obligations = () => {
 
             {/* --- MODALS --- */}
 
-            {/* Payment Modal */}
-            {showPaymentModal && (
-                <Modal title={paymentForm.id ? `Pay: ${paymentForm.name}` : "Log New Payment"} onClose={() => setShowPaymentModal(false)}>
-                    <form onSubmit={submitPayment} className="space-y-4">
-
-                        {/* If ID is missing, show Dropdown to select Obligation */}
-                        {!paymentForm.id ? (
-                            <div className="bg-slate-700/50 p-3 rounded mb-4 border border-slate-600">
-                                <label className="text-white text-xs uppercase font-bold mb-1 block">Select Obligation</label>
-                                <select
-                                    className={selectClass}
-                                    onChange={(e) => {
-                                        const selectedObl = obligations.find(o => o.id === e.target.value);
-                                        if (selectedObl) {
-                                            setPaymentForm(prev => ({
-                                                ...prev,
-                                                id: selectedObl.id,
-                                                name: selectedObl.name,
-                                                amount: selectedObl.amount || ''
-                                            }));
-                                        }
-                                    }}
-                                    defaultValue=""
-                                >
-                                    <option value="" disabled>-- Choose Obligation --</option>
-                                    {obligations.sort((a, b) => a.name.localeCompare(b.name)).map(obl => (
-                                        <option key={obl.id} value={obl.id}>{obl.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        ) : (
-                            // Helper text or mini-summary could go here
-                            null
-                        )}
-
-                        <div className="bg-blue-900/20 p-3 rounded border border-blue-900/50 mb-4">
-                            <p className="text-sm text-blue-200">Select Month</p>
-                        </div>
-                        <div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <select
-                                    className={`${selectClass} text-sm w-full`}
-                                    value={parseInt(paymentForm.billing_month.split('-')[1]) - 1}
-                                    onChange={e => {
-                                        const parts = paymentForm.billing_month.split('-');
-                                        const newMonth = (parseInt(e.target.value) + 1).toString().padStart(2, '0');
-                                        setPaymentForm({ ...paymentForm, billing_month: `${parts[0]}-${newMonth}-01` });
-                                    }}
-                                >
-                                    {months.map((m, idx) => <option key={idx} value={idx}>{m}</option>)}
-                                </select>
-                                <select
-                                    className={`${selectClass} text-sm w-full`}
-                                    value={parseInt(paymentForm.billing_month.split('-')[0])}
-                                    onChange={e => {
-                                        const parts = paymentForm.billing_month.split('-');
-                                        setPaymentForm({ ...paymentForm, billing_month: `${e.target.value}-${parts[1]}-01` });
-                                    }}
-                                >
-                                    {years.map(y => <option key={y} value={y}>{y}</option>)}
-                                </select>
-                            </div>
-                        </div>
-                        <div>
-                            <input type="number" step="0.01" placeholder="Amount" className={inputClass} value={paymentForm.amount} onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
-                            {/* If amount is empty, maybe show a hint if obligation has a default? */}
-                        </div>
-                        <div>
-                            <input type="text" placeholder="Note" className={inputClass} value={paymentForm.note} onChange={e => setPaymentForm({ ...paymentForm, note: e.target.value })} />
-                            <div className="mt-2">
-                                <label className="text-white text-xs uppercase font-bold mb-1 block">Status</label>
-                                <select
-                                    className={`${selectClass} w-full`}
-                                    value={paymentForm.status}
-                                    onChange={e => setPaymentForm({ ...paymentForm, status: e.target.value })}
-                                >
-                                    <option value="PAID">PAID</option>
-                                    <option value="PENDING">UNPAID</option>
-                                </select>
-                            </div>
-                        </div>
-                        <button
-                            type="submit"
-                            disabled={!paymentForm.id}
-                            className={`w-full p-3 rounded font-bold shadow-lg mt-4 ${!paymentForm.id ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500 text-white'}`}
+            {/* Payment Modal Logic */}
+            {/* Case 1: No Obligation Selected (Global "Log Payment") -> Show Selection Modal */}
+            {showPaymentModal && !paymentForm.id && (
+                <Modal title="Log New Payment" onClose={() => setShowPaymentModal(false)}>
+                    <div className="bg-slate-700/50 p-3 rounded mb-4 border border-slate-600">
+                        <label className="text-white text-xs uppercase font-bold mb-1 block">Select Obligation</label>
+                        <select
+                            className={selectClass}
+                            onChange={(e) => {
+                                const selectedObl = obligations.find(o => o.id === e.target.value);
+                                if (selectedObl) {
+                                    setPaymentForm(prev => ({
+                                        ...prev,
+                                        id: selectedObl.id,
+                                        name: selectedObl.name,
+                                        amount: selectedObl.amount || ''
+                                    }));
+                                }
+                            }}
+                            defaultValue=""
                         >
-                            Confirm
-                        </button>
-                    </form>
+                            <option value="" disabled>-- Choose Obligation --</option>
+                            {obligations.sort((a, b) => a.name.localeCompare(b.name)).map(obl => (
+                                <option key={obl.id} value={obl.id}>{obl.name}</option>
+                            ))}
+                        </select>
+                    </div>
                 </Modal>
+            )}
+
+            {/* Case 2: Obligation Selected -> Show Payment Form (Reuse Component) */}
+            {showPaymentModal && paymentForm.id && currentPaymentObligation && (
+                <PaymentModal
+                    isOpen={showPaymentModal}
+                    onClose={() => setShowPaymentModal(false)}
+                    obligation={currentPaymentObligation}
+                    initialDate={paymentForm.billing_month}
+                    initialAmount={paymentForm.amount}
+                    existingPayment={paymentForm.id ? paymentForm : null}
+                    onSave={handleProcessPayment}
+                />
             )}
 
             {/* Obligation Edit/Add Modal */}
