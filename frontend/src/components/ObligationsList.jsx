@@ -14,6 +14,7 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
     // Initial value for input: Prioritize Current Month (if saved/pending) -> Prev Month -> Empty
     const initialAmount = currMonth.amount !== null ? currMonth.amount : (prevMonth.amount !== null ? prevMonth.amount : "");
     const [payAmount, setPayAmount] = React.useState(initialAmount);
+    const [isEditing, setIsEditing] = React.useState(false);
 
     // Update local state if the underlying data changes significantly (e.g. month navigation)
     React.useEffect(() => {
@@ -121,15 +122,26 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
                     ) : (
                         <div className="text-center w-full relative">
                             <div className="flex items-center justify-center gap-1 mb-1 relative">
-                                <input
-                                    type="number"
-                                    className="bg-slate-900 border border-slate-600 rounded text-center text-white text-xs py-0.5 w-20 font-mono focus:border-blue-500 outline-none transition"
-                                    placeholder={initialAmount !== "" ? Number(initialAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ""}
-                                    value={payAmount}
-                                    onChange={(e) => setPayAmount(e.target.value)}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onKeyDown={handleKeyDown}
-                                />
+                                {isEditing ? (
+                                    <input
+                                        autoFocus
+                                        type="number"
+                                        className="bg-slate-900 border border-slate-600 rounded text-center text-white text-xs py-0.5 w-20 font-mono focus:border-blue-500 outline-none transition"
+                                        placeholder={initialAmount !== "" ? Number(initialAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
+                                        value={payAmount}
+                                        onChange={(e) => setPayAmount(e.target.value)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onKeyDown={handleKeyDown}
+                                        onBlur={() => setIsEditing(false)}
+                                    />
+                                ) : (
+                                    <div
+                                        onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
+                                        className="bg-slate-900 border border-slate-700/50 hover:border-slate-500 rounded text-center text-white text-xs py-0.5 w-20 font-mono cursor-text transition h-[26px] flex items-center justify-center"
+                                    >
+                                        {payAmount ? formatCurrency(payAmount) : <span className="text-slate-600 italic text-[10px]">Set amount</span>}
+                                    </div>
+                                )}
                                 <button onClick={() => openObligationModal(obl)} className="text-gray-600 hover:text-white"><Pencil size={10} /></button>
                             </div>
                             <button

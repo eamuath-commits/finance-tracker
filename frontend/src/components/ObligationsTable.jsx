@@ -29,6 +29,7 @@ const TableRow = ({ obl, getMonthStatus, monthOffset, openPaymentModal, handleQu
     // Determines initial input value
     const initialAmount = currMonth.amount !== null ? currMonth.amount : (prevMonth.amount !== null ? prevMonth.amount : "");
     const [payAmount, setPayAmount] = useState(initialAmount);
+    const [isEditing, setIsEditing] = useState(false);
 
     // Sync state on navigation
     React.useEffect(() => {
@@ -97,14 +98,25 @@ const TableRow = ({ obl, getMonthStatus, monthOffset, openPaymentModal, handleQu
                     </div>
                 ) : (
                     <div className="flex items-center justify-end gap-2">
-                        <input
-                            type="number"
-                            className="bg-slate-900 border border-slate-600 rounded text-right text-white text-sm py-1 px-2 w-24 font-mono focus:border-blue-500 outline-none transition"
-                            placeholder={initialAmount !== "" ? Number(initialAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ""}
-                            value={payAmount}
-                            onChange={(e) => setPayAmount(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                        />
+                        {isEditing ? (
+                            <input
+                                autoFocus
+                                type="number"
+                                className="bg-slate-900 border border-slate-600 rounded text-right text-white text-sm py-1 px-2 w-24 font-mono focus:border-blue-500 outline-none transition"
+                                placeholder={initialAmount !== "" ? Number(initialAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
+                                value={payAmount}
+                                onChange={(e) => setPayAmount(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                onBlur={() => setIsEditing(false)}
+                            />
+                        ) : (
+                            <div
+                                onClick={() => setIsEditing(true)}
+                                className="bg-slate-900 border border-slate-700/50 hover:border-slate-500 rounded text-right text-white text-sm py-1 px-2 w-24 font-mono cursor-text transition flex items-center justify-end"
+                            >
+                                {payAmount ? formatCurrency(payAmount) : <span className="text-slate-600 text-xs italic">Set amount</span>}
+                            </div>
+                        )}
                         <button
                             onClick={handlePay}
                             className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-1.5 px-3 rounded shadow-sm transition"
