@@ -4,6 +4,7 @@ import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
 
 import Obligations from './pages/Obligations';
+import ObligationsNew from './pages/ObligationsNew'; // New Import
 
 import Reports from './pages/Reports';
 import Planning from './pages/Planning';
@@ -22,6 +23,7 @@ function App() {
                     <Route path="transactions" element={<Transactions />} />
                     <Route path="loans" element={<Loans />} />
                     <Route path="obligations" element={<Obligations />} />
+                    <Route path="obligations-new" element={<ObligationsNew />} /> {/* New Route */}
                     <Route path="reports" element={<Reports />} />
                     <Route path="planning" element={<Planning />} />
                 </Route>
