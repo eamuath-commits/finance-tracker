@@ -4,6 +4,7 @@ import { Modal, formatCurrency, inputClass, selectClass } from '../components/UI
 import { Calendar, Trash2, LayoutGrid, List, Receipt } from 'lucide-react';
 import ObligationsOverview from '../components/ObligationsOverview';
 import ObligationsList from '../components/ObligationsList';
+import ObligationsTable from '../components/ObligationsTable';
 import ObligationsHistory from '../components/ObligationsHistory';
 import PaymentModal from '../components/PaymentModal';
 
@@ -409,6 +410,12 @@ const Obligations = () => {
                     <List size={16} /> Manager
                 </button>
                 <button
+                    onClick={() => setViewMode('manager_new')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition ${viewMode === 'manager_new' ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                >
+                    <List size={16} /> Manager (Table)
+                </button>
+                <button
                     onClick={() => setViewMode('history')}
                     className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition ${viewMode === 'history' ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
                 >
@@ -445,6 +452,27 @@ const Obligations = () => {
                         handleDeleteHistory={handleDeleteHistory}
                         monthOffset={monthOffset}
                         onReorder={handleReorder}
+                    />
+                </div>
+            )}
+
+            {viewMode === 'manager_new' && (
+                <div className="animate-fade-in-up">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-bold text-white">Compact Manager</h2>
+                        <button
+                            onClick={() => openObligationModal(null)}
+                            className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded shadow flex items-center gap-2 text-sm"
+                        >
+                            + Add New Obligation
+                        </button>
+                    </div>
+                    <ObligationsTable
+                        obligations={obligations}
+                        getMonthStatus={getMonthStatus}
+                        monthOffset={monthOffset}
+                        openPaymentModal={openPaymentModal}
+                        handleQuickPay={handleQuickPay}
                     />
                 </div>
             )}
