@@ -130,6 +130,12 @@ class RawMessage(Base):
     status = Column(Enum(MessageStatus), default=MessageStatus.PENDING)
     error_log = Column(Text, nullable=True) # To store why it failed
 
+class Category(Base):
+    __tablename__ = "categories"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False, unique=True)
+
 class SavingsGoal(Base):
     __tablename__ = "savings_goals"
 

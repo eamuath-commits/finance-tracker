@@ -507,3 +507,27 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
         executed_transfers.append(item)
         
     return {"status": "success", "transfers_count": len(executed_transfers)}
+
+# --- Category Endpoints ---
+
+@app.post("/categories", response_model=schemas.Category)
+def create_category(category: schemas.CategoryCreate, db: Session = Depends(get_db)):
+    return crud.create_category(db, category)
+
+@app.get("/categories", response_model=List[schemas.Category])
+def get_categories(db: Session = Depends(get_db)):
+    return crud.get_categories(db)
+
+@app.put("/categories/{category_id}", response_model=schemas.Category)
+def update_category(category_id: str, payload: schemas.CategoryUpdate, db: Session = Depends(get_db)):
+    updated = crud.update_category_name(db, category_id, payload.name)
+    if not updated:
+         raise HTTPException(status_code=404, detail="Category not found")
+    return updated
+
+@app.delete("/categories/{category_id}")
+def delete_category(category_id: str, db: Session = Depends(get_db)):
+    success = crud.delete_category(db, category_id)
+    if not success:
+         raise HTTPException(status_code=404, detail="Category not found")
+    return {"message": "Category deleted"}

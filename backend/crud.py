@@ -494,3 +494,69 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
             ))
         
     return schemas.AllocationPreviewResponse(total_amount=total, allocations=result_list)
+
+# --- Category Management ---
+
+def create_category(db: Session, category: schemas.CategoryCreate):
+    # Check case-insensitive
+    existing = db.query(models.Category).filter(models.Category.name.ilike(category.name)).first()
+    if existing:
+        return existing
+        
+    db_cat = models.Category(name=category.name)
+    db.add(db_cat)
+    db.commit()
+    db.refresh(db_cat)
+    return db_cat
+
+def get_categories(db: Session):
+    return db.query(models.Category).order_by(models.Category.name).all()
+
+def update_category_name(db: Session, category_id: str, new_name: str):
+    cat = db.query(models.Category).filter(models.Category.id == category_id).first()
+    if not cat:
+        return None
+    
+    old_name = cat.name
+    # Update Category Table
+    cat.name = new_name
+    db.add(cat)
+    
+    # 1. Update Obligations
+    db.query(models.MonthlyObligation).filter(models.MonthlyObligation.category == old_name).update(
+        {"category": new_name}, synchronize_session=False
+    )
+    
+    # 2. Update Allocation Rules
+    db.query(models.AllocationRule).filter(
+        models.AllocationRule.rule_type == models.AllocationRuleType.CATEGORY,
+        models.AllocationRule.identifier == old_name
+    ).update(
+        {"identifier": new_name}, synchronize_session=False
+    )
+    
+    db.commit()
+    db.refresh(cat)
+    return cat
+
+def delete_category(db: Session, category_id: str):
+    cat = db.query(models.Category).filter(models.Category.id == category_id).first()
+    if not cat:
+        return None
+        
+    old_name = cat.name
+    
+    # 1. Clear Obligations (Set to NULL)
+    db.query(models.MonthlyObligation).filter(models.MonthlyObligation.category == old_name).update(
+        {"category": None}, synchronize_session=False
+    )
+    
+    # 2. Delete related Rules
+    db.query(models.AllocationRule).filter(
+        models.AllocationRule.rule_type == models.AllocationRuleType.CATEGORY,
+        models.AllocationRule.identifier == old_name
+    ).delete(synchronize_session=False)
+
+    db.delete(cat)
+    db.commit()
+    return True
