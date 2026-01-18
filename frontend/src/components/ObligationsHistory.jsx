@@ -97,7 +97,7 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
 
     // 4. Calculate Total
     const visiblePaid = sorted.reduce((sum, item) => item.status === 'Paid' ? sum + (item.amount || 0) : sum, 0);
-    const visiblePending = sorted.reduce((sum, item) => item.status === 'Pending' ? sum + (item.amount || 0) : sum, 0);
+    const visibleBudget = sorted.filter(p => p.status === 'BUDGET').reduce((sum, p) => sum + (p.amount || 0), 0);
 
     const requestSort = (key) => {
         let direction = 'asc';
