@@ -447,3 +447,60 @@ def delete_goal(goal_id: str, db: Session = Depends(get_db)):
     if not deleted_goal:
         raise HTTPException(status_code=404, detail="Goal not found")
     return deleted_goal
+
+# --- Allocation Rules ---
+
+@app.post("/allocation/rules", response_model=schemas.AllocationRule)
+def create_allocation_rule(rule: schemas.AllocationRuleCreate, db: Session = Depends(get_db)):
+    return crud.create_allocation_rule(db, rule)
+
+@app.get("/allocation/rules", response_model=List[schemas.AllocationRule])
+def get_allocation_rules(db: Session = Depends(get_db)):
+    return crud.get_allocation_rules(db)
+
+@app.delete("/allocation/rules/{rule_id}")
+def delete_allocation_rule(rule_id: str, db: Session = Depends(get_db)):
+    success = crud.delete_allocation_rule(db, rule_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    return {"message": "Rule deleted"}
+
+@app.post("/allocation/preview", response_model=schemas.AllocationPreviewResponse)
+def preview_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depends(get_db)):
+    return crud.calculate_allocation_preview(db, req.source_account_id, req.month_offset)
+
+@app.post("/allocation/execute")
+def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depends(get_db)):
+    preview = crud.calculate_allocation_preview(db, req.source_account_id, req.month_offset)
+    
+    source_acc = crud.get_account(db, req.source_account_id)
+    if not source_acc:
+        raise HTTPException(status_code=404, detail="Source account not found")
+
+    executed_transfers = []
+    
+    for item in preview.allocations:
+        if item.amount <= 0:
+            continue
+            
+        t_out = schemas.TransactionCreate(
+            account_id=source_acc.id,
+            amount=-item.amount, 
+            merchant=f"Transfer to {item.target_account_name}",
+            category="Transfer",
+            timestamp=datetime.now()
+        )
+        crud.create_transaction(db, t_out)
+        
+        t_in = schemas.TransactionCreate(
+            account_id=item.target_account_id,
+            amount=item.amount,
+            merchant=f"Transfer from {source_acc.name}",
+            category="Transfer",
+            timestamp=datetime.now()
+        )
+        crud.create_transaction(db, t_in)
+        
+        executed_transfers.append(item)
+        
+    return {"status": "success", "transfers_count": len(executed_transfers)}

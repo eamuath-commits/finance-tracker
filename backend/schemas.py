@@ -188,3 +188,32 @@ class SavingsGoal(SavingsGoalBase):
     id: str
     class Config:
         orm_mode = True
+
+class AllocationRuleBase(BaseModel):
+    rule_type: str # "CATEGORY" or "LOAN"
+    identifier: str
+    target_account_id: str
+
+class AllocationRuleCreate(AllocationRuleBase):
+    pass
+
+class AllocationRule(AllocationRuleBase):
+    id: str
+    class Config:
+        orm_mode = True
+
+class AllocationPreviewItem(BaseModel):
+    rule_type: str
+    identifier: str
+    name: str 
+    amount: float
+    target_account_id: str
+    target_account_name: str
+
+class AllocationPreviewResponse(BaseModel):
+    total_amount: float
+    allocations: List[AllocationPreviewItem]
+
+class AllocationExecuteRequest(BaseModel):
+    source_account_id: str
+    month_offset: Optional[int] = 0

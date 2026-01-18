@@ -1,11 +1,12 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Wallet, CreditCard, Receipt, FileBarChart, Settings, TrendingDown } from 'lucide-react';
+import { LayoutDashboard, Wallet, CreditCard, Receipt, FileBarChart, Settings, TrendingDown, Layers } from 'lucide-react';
 
 const Sidebar = () => {
     const navItems = [
         { path: '/', label: 'Overview', icon: LayoutDashboard },
         { path: '/accounts', label: 'Accounts', icon: Wallet },
+        { path: '/allocation', label: 'Allocation', icon: Layers },
         { path: '/transactions', label: 'Transactions', icon: Receipt },
         { path: '/obligations', label: 'Obligations', icon: CreditCard },
         { path: '/loans', label: 'Loans', icon: FileBarChart /* Reusing icon or pick better one */ },

@@ -8,6 +8,7 @@ import Obligations from './pages/Obligations';
 import Reports from './pages/Reports';
 import Planning from './pages/Planning';
 import Transactions from './pages/Transactions';
+import Allocation from './pages/Allocation';
 
 import Accounts from './pages/Accounts';
 import Loans from './pages/Loans';
@@ -19,6 +20,7 @@ function App() {
                 <Route path="/" element={<MainLayout />}>
                     <Route index element={<Dashboard />} />
                     <Route path="accounts" element={<Accounts />} />
+                    <Route path="allocation" element={<Allocation />} />
                     <Route path="transactions" element={<Transactions />} />
                     <Route path="loans" element={<Loans />} />
                     <Route path="obligations" element={<Obligations />} />

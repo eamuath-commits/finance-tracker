@@ -99,6 +99,20 @@ class Payment(Base):
 
     obligation = relationship("MonthlyObligation")
 
+class AllocationRuleType(enum.Enum):
+    CATEGORY = "CATEGORY"
+    LOAN = "LOAN"
+
+class AllocationRule(Base):
+    __tablename__ = "allocation_rules"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    rule_type = Column(Enum(AllocationRuleType), nullable=False)
+    identifier = Column(String, nullable=False, unique=True) # Category Name or Loan ID
+    target_account_id = Column(String, ForeignKey("accounts.id"), nullable=False)
+    
+    target_account = relationship("Account")
+
 class MessageStatus(enum.Enum):
     PENDING = "PENDING"
     PARSED = "PARSED"
