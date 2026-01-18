@@ -822,14 +822,17 @@ const Accounts = () => {
                                     </div>
                                     <p className="text-[10px] text-gray-500 mt-1">Using local icons (Focus: AJB & Other).</p>
                                 </div>
-                                {accountForm.bank_logo_url && (
+                                {(accountForm.bank_logo_url || accountForm.bank_name) && (
                                     <div className="mt-6">
                                         <img
-                                            key={accountForm.bank_logo_url}
-                                            src={accountForm.bank_logo_url}
+                                            key={accountForm.bank_logo_url || accountForm.bank_name}
+                                            src={(accountForm.bank_logo_url && accountForm.bank_logo_url.startsWith('/')) ? accountForm.bank_logo_url : getLocalLogo(accountForm.bank_name)}
                                             alt="Logo"
                                             className="w-10 h-10 rounded-xl bg-slate-800 p-1 object-contain border border-slate-600 shadow-sm"
-                                            onError={(e) => e.target.style.display = 'none'}
+                                            onError={(e) => {
+                                                e.target.onerror = null;
+                                                e.target.src = '/banks/bank2.png';
+                                            }}
                                         />
                                     </div>
                                 )}
