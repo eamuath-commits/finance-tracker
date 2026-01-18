@@ -55,10 +55,7 @@ const AccountCard = ({ acc, onEdit = null }) => {
                                 src={acc.bank_logo_url}
                                 alt={acc.bank_name}
                                 className="h-full w-full object-contain rounded-full bg-white/90 p-0.5 shadow-sm"
-                                onError={(e) => {
-                                    e.target.onerror = null;
-                                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(acc.bank_name || 'BK')}&background=fff&color=000&size=128`;
-                                }}
+                                onError={(e) => e.target.style.display = 'none'}
                             />
                         ) : (
                             isCreditCard ? (
@@ -777,47 +774,33 @@ const Accounts = () => {
                         <div className="space-y-4">
                             {/* Bank Name & Logo */}
                             <div className="flex gap-2 items-start">
-                                <div className="flex-1 space-y-3">
+                                <div className="flex-1">
                                     <div>
                                         <label className="text-xs text-gray-400 mb-1 block">Bank Name <span className="text-red-400">*</span></label>
                                         <input
                                             type="text"
-                                            placeholder="e.g. AlRajhi Bank"
+                                            placeholder="e.g. AlJazira (AJB) or SNB"
                                             required
                                             className={inputClass}
                                             value={accountForm.bank_name || ''}
                                             onChange={e => setAccountForm({ ...accountForm, bank_name: e.target.value })}
                                             onBlur={(e) => {
-                                                // Guess Website and Icon if new
-                                                if (e.target.value && !accountForm.bank_website) {
-                                                    const cleanName = e.target.value.toLowerCase().replace(" bank", "").replace(/\s+/g, '');
-                                                    const website = `${cleanName}.com`;
+                                                if (e.target.value) {
+                                                    const n = e.target.value.toLowerCase();
+                                                    let logo = null;
+                                                    if (n.includes('jazira') || n.includes('ajb')) logo = '/banks/ajb.jpg';
+                                                    else logo = '/banks/bank2.png'; // Default to the second image for any other bank
+
                                                     setAccountForm(prev => ({
                                                         ...prev,
-                                                        bank_website: website,
-                                                        bank_logo_url: `https://logo.clearbit.com/${website}`
+                                                        bank_logo_url: logo,
+                                                        bank_website: '' // Clear website legacy
                                                     }));
                                                 }
                                             }}
                                         />
                                     </div>
-
-                                    {/* Helper Website Field */}
-                                    <div>
-                                        <label className="text-xs text-gray-400 mb-1 block">Bank Website <span className="text-gray-500 text-[10px]">(Fix this if icon is wrong)</span></label>
-                                        <input
-                                            type="text"
-                                            placeholder="e.g. alrajhibank.com"
-                                            className={`${inputClass} text-xs py-1.5`}
-                                            value={accountForm.bank_website || ''}
-                                            onChange={e => setAccountForm({ ...accountForm, bank_website: e.target.value })}
-                                            onBlur={(e) => {
-                                                if (e.target.value) {
-                                                    setAccountForm(prev => ({ ...prev, bank_logo_url: `https://logo.clearbit.com/${e.target.value}` }));
-                                                }
-                                            }}
-                                        />
-                                    </div>
+                                    <p className="text-[10px] text-gray-500 mt-1">Using local icons (Focus: AJB & Other).</p>
                                 </div>
                                 {accountForm.bank_logo_url && (
                                     <div className="mt-6">
@@ -826,10 +809,7 @@ const Accounts = () => {
                                             src={accountForm.bank_logo_url}
                                             alt="Logo"
                                             className="w-10 h-10 rounded-xl bg-slate-800 p-1 object-contain border border-slate-600 shadow-sm"
-                                            onError={(e) => {
-                                                e.target.onerror = null;
-                                                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(accountForm.bank_name || 'BK')}&background=0f172a&color=cbd5e1&size=128`;
-                                            }}
+                                            onError={(e) => e.target.style.display = 'none'}
                                         />
                                     </div>
                                 )}
