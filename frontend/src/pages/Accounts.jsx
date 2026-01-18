@@ -164,7 +164,6 @@ const OverviewAccountRow = ({ acc, allTransactions }) => {
                     </div>
                 </div>
                 {/* Logo Image */}
-                {/* Logo Image */}
                 <div className="flex flex-col items-end">
                     {acc.account_type === 'Credit Card' ? (
                         <img src="/visa-logo.png" alt="Visa" className="w-12 h-auto object-contain" />
