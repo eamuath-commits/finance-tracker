@@ -424,7 +424,7 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     rules = get_allocation_rules(db)
 
     # 4. Aggregate
-    allocations = {} # TargetAccountID -> { amount, acc_name, details }
+    allocations = {} # TargetAccountID -> { amount, acc_name, details, current_balance }
 
     for p in payments:
         obl = p.obligation
@@ -451,6 +451,7 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
                     allocations[tid] = {
                         "target_account_id": tid,
                         "target_account_name": t_acc.name,
+                        "current_balance": t_acc.current_balance,
                         "amount": 0,
                         "details": []
                     }
@@ -463,19 +464,33 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     result_list = []
     total = 0
     for tid, data in allocations.items():
-        total += data["amount"]
-        # Summary name
-        details_txt = ", ".join(data["details"])
-        if len(details_txt) > 60:
-            details_txt = details_txt[:60] + "..."
-            
-        result_list.append(schemas.AllocationPreviewItem(
-            rule_type="AGGREGATE",
-            identifier="aggregate",
-            name=details_txt, 
-            amount=data["amount"],
-            target_account_id=tid,
-            target_account_name=data["target_account_name"]
-        ))
+        required_amount = data["amount"]
+        existing_balance = data["current_balance"]
+        
+        transfer_amount = required_amount
+        
+        # Smart Top-up: Deduct existing balance
+        if existing_balance > 0:
+            transfer_amount = max(0, required_amount - existing_balance)
+            if transfer_amount < required_amount:
+                # Add note about coverage. Diff is what was covered.
+                covered = required_amount - transfer_amount
+                data["details"].append(f"(Used {covered:,.0f} from balance)")
+
+        if transfer_amount > 0:
+            total += transfer_amount
+            # Summary name
+            details_txt = ", ".join(data["details"])
+            if len(details_txt) > 100:
+                details_txt = details_txt[:100] + "..."
+                
+            result_list.append(schemas.AllocationPreviewItem(
+                rule_type="AGGREGATE",
+                identifier="aggregate",
+                name=details_txt, 
+                amount=transfer_amount,
+                target_account_id=tid,
+                target_account_name=data["target_account_name"]
+            ))
         
     return schemas.AllocationPreviewResponse(total_amount=total, allocations=result_list)
