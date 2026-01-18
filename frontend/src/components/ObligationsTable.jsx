@@ -100,7 +100,7 @@ const TableRow = ({ obl, getMonthStatus, monthOffset, openPaymentModal, handleQu
                         <input
                             type="number"
                             className="bg-slate-900 border border-slate-600 rounded text-right text-white text-sm py-1 px-2 w-24 font-mono focus:border-blue-500 outline-none transition"
-                            placeholder={initialAmount}
+                            placeholder={initialAmount !== "" ? Number(initialAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ""}
                             value={payAmount}
                             onChange={(e) => setPayAmount(e.target.value)}
                             onKeyDown={handleKeyDown}

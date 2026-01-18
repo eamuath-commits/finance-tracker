@@ -124,7 +124,7 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
                                 <input
                                     type="number"
                                     className="bg-slate-900 border border-slate-600 rounded text-center text-white text-xs py-0.5 w-20 font-mono focus:border-blue-500 outline-none transition"
-                                    placeholder={initialAmount}
+                                    placeholder={initialAmount !== "" ? Number(initialAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ""}
                                     value={payAmount}
                                     onChange={(e) => setPayAmount(e.target.value)}
                                     onClick={(e) => e.stopPropagation()}

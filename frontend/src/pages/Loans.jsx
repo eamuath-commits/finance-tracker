@@ -342,14 +342,14 @@ const Loans = () => {
                                             <span className="text-[10px] text-emerald-400 bg-emerald-900/20 px-1.5 py-0.5 rounded cursor-pointer hover:bg-emerald-900/40"
                                                 onClick={() => setLoanForm({ ...loanForm, monthly_payment: '' })} title="Click to use auto-calculated"
                                             >
-                                                Auto: {autoPayment.toFixed(2)}
+                                                Auto: {formatCurrency(autoPayment)}
                                             </span>
                                         )}
                                     </div>
                                     <div className="relative">
                                         <input
                                             type="number"
-                                            placeholder={autoPayment > 0 ? `Auto: ${autoPayment.toFixed(2)}` : "Enter exact monthly payment"}
+                                            placeholder={autoPayment > 0 ? `Auto: ${Number(autoPayment).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "Enter exact monthly payment"}
                                             step="0.01"
                                             className={`${inputClass} mt-0`}
                                             value={loanForm.monthly_payment}
