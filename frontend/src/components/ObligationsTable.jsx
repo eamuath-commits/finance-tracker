@@ -53,8 +53,8 @@ const TableRow = ({ obl, getMonthStatus, monthOffset, openPaymentModal, handleQu
                 if (prevMonth.amount !== null && prevMonth.amount > 0) val = prevMonth.amount;
                 // Removed obl.amount fallback
             }
-            // Quick Pay as Pending
-            handleQuickPay(obl.id, val, currMonth.billingDateStr, "PENDING");
+            // Quick Pay as BUDGET
+            handleQuickPay(obl.id, val, currMonth.billingDateStr, "BUDGET");
         }
     };
 

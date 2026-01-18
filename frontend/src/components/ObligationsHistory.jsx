@@ -129,7 +129,7 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
         <span className="flex items-center gap-1">
             <span className="text-emerald-400">{formatCurrency(visiblePaid)}</span> <span className="text-slate-500">Paid</span>
             <span className="mx-1">·</span>
-            <span className="text-amber-400">{formatCurrency(visiblePending)}</span> <span className="text-slate-500">Pending</span>
+            <span className="text-blue-400">{formatCurrency(visibleBudget)}</span> <span className="text-slate-500">Budget</span>
         </span>
     );
 
@@ -137,10 +137,10 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
         totalLabel = "Total Paid";
         totalDisplay = visiblePaid;
         totalSubtext = <span className="text-emerald-400 font-semibold">{sorted.length} Records</span>;
-    } else if (selectedStatus === 'Pending') {
-        totalLabel = "Total Pending";
-        totalDisplay = visiblePending;
-        totalSubtext = <span className="text-amber-400 font-semibold">{sorted.length} Records</span>;
+    } else if (selectedStatus === 'BUDGET') {
+        totalLabel = "Total Budgeted";
+        totalDisplay = visibleBudget;
+        totalSubtext = <span className="text-blue-400 font-semibold">{sorted.length} Records</span>;
     } else {
         // Fallback for All Status
         totalSubtext = (
@@ -164,7 +164,8 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
             "Year": item.year,
             "Month Label": item.month,
             "Paid Amount": item.status === 'Paid' ? (item.amount || 0) : 0,
-            "Pending Amount": item.status === 'Pending' ? (item.amount || 0) : 0,
+            "Paid Amount": item.status === 'Paid' ? (item.amount || 0) : 0,
+            "Budget Amount": item.status === 'BUDGET' ? (item.amount || 0) : 0,
             "Status": item.status,
             "Paid Date": item.payment_date,
             "Note": item.note
@@ -248,7 +249,7 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                         >
                             <option value="All">All Status</option>
                             <option value="Paid">Paid</option>
-                            <option value="Pending">Pending</option>
+                            <option value="BUDGET">Budget</option>
                         </select>
 
                         {/* Category Filter */}

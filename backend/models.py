@@ -81,7 +81,7 @@ class MonthlyObligation(Base):
 
 class PaymentStatus(enum.Enum):
     PAID = "PAID"
-    PENDING = "PENDING"
+    BUDGET = "BUDGET"
     # Status Enum Definition
 
 class Payment(Base):

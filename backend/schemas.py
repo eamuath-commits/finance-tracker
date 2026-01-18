@@ -133,7 +133,7 @@ class PaymentBase(BaseModel):
     billing_month: Optional[datetime] = None
     amount: float
     note: Optional[str] = None
-    status: str = "PAID" # "PAID" or "PENDING"
+    status: str = "PAID" # "PAID" or "BUDGET"
 
 class PaymentCreate(PaymentBase):
     pass

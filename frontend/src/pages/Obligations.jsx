@@ -254,7 +254,7 @@ const Obligations = () => {
                 payment_date: new Date().toISOString(),
                 amount: parseFloat(amount),
                 billing_month: billingMonth,
-                note: status === "PENDING" ? "Draft Amount" : "Quick Pay",
+                note: status === "BUDGET" ? "Budgeted Amount" : "Quick Pay",
                 status: status
             };
             // Always use the /pay endpoint (which now handles upserts)

@@ -49,8 +49,8 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
                 // Removed obl.amount fallback
             }
 
-            // Pass "PENDING" to save as draft (not paid)
-            handleQuickPay(obl.id, val, currMonth.billingDateStr, "PENDING");
+            // Pass "BUDGET" to save as budget/planned amount (not paid)
+            handleQuickPay(obl.id, val, currMonth.billingDateStr, "BUDGET");
         }
     };
 
@@ -205,12 +205,19 @@ const ObligationsList = ({
             const status = getMonthStatus(obl, monthOffset); // Get status for CURRENT VIEWED MONTH
             const prevStatus = getMonthStatus(obl, monthOffset - 1); // Get status for PREVIOUS MONTH for dynamic budget
 
-            // Dynamic Budget: Use Previous Month's Actual if available, else 0 (since default amount is deprecated)
-            const budgetAmount = (prevStatus.amount && prevStatus.amount > 0) ? prevStatus.amount : 0;
+            // Dynamic Budget Logic:
+            // 1. If we have a stored "BUDGET" record for this month, use that value.
+            // 2. Else, fallback to Previous Month's Actual Payment (Smart Default).
+            let budgetAmount = 0;
+            if (status.status === 'BUDGET' && status.amount) {
+                budgetAmount = status.amount;
+            } else if (prevStatus.amount && prevStatus.amount > 0) {
+                budgetAmount = prevStatus.amount;
+            }
 
             let statusLabel = "Unpaid";
             if (status.isPaid) statusLabel = "Paid";
-            else if (status.status === 'PENDING') statusLabel = "Pending";
+            else if (status.status === 'BUDGET') statusLabel = "Budget";
 
             return {
                 "Obligation": obl.name,
@@ -219,7 +226,6 @@ const ObligationsList = ({
                 "Due Day": obl.due_day,
                 "Budget Amount": budgetAmount,
                 "Paid Amount": status.isPaid ? (status.amount || 0) : 0,
-                "Pending Amount": status.status === 'PENDING' ? (status.amount || 0) : 0,
                 "Status": statusLabel,
                 "Payment ID": status.paymentId || ""
             };
