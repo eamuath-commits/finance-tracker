@@ -477,6 +477,9 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
     if not source_acc:
         raise HTTPException(status_code=404, detail="Source account not found")
 
+    if source_acc.current_balance < preview.total_amount:
+         raise HTTPException(status_code=400, detail=f"Insufficient funds in source account. Required: {preview.total_amount}, Available: {source_acc.current_balance}")
+
     executed_transfers = []
     
     for item in preview.allocations:
