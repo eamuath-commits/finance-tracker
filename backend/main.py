@@ -148,6 +148,13 @@ def update_account(account_id: str, account_update: schemas.AccountUpdate, db: S
         raise HTTPException(status_code=404, detail="Account not found")
     return updated_account
 
+@app.delete("/accounts/{account_id}")
+def delete_account(account_id: str, db: Session = Depends(get_db)):
+    deleted_account = crud.delete_account(db, account_id)
+    if not deleted_account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return {"message": "Account deleted successfully"}
+
 @app.post("/accounts/{account_id}/aliases", response_model=schemas.AccountAlias)
 def create_alias(account_id: str, alias: schemas.AccountAliasCreate, db: Session = Depends(get_db)):
     # Verify account exists

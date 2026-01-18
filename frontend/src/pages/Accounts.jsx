@@ -69,7 +69,7 @@ const AccountCard = ({ acc, onEdit = null }) => {
                         {/* Bank Logo */}
                         <div className="h-8 w-8 pt-0.5">
                             <img
-                                src={acc.bank_logo_url || getLocalLogo(acc.bank_name)}
+                                src={(acc.bank_logo_url && acc.bank_logo_url.startsWith('/')) ? acc.bank_logo_url : getLocalLogo(acc.bank_name)}
                                 alt={acc.bank_name}
                                 className="h-full w-full object-contain rounded-full bg-white/95 p-0.5 shadow-sm"
                                 onError={(e) => {
@@ -380,6 +380,16 @@ const Accounts = () => {
                 fetchData();
             } catch (err) { alert('Error deleting transaction'); }
         }
+    };
+
+    const handleDeleteAccount = async () => {
+        if (!editingId || !confirm('Are you sure you want to delete this account? This action cannot be undone.')) return;
+        try {
+            await axios.delete(`${API_URL}/accounts/${editingId}`);
+            setShowAccountModal(false);
+            setEditingId(null);
+            fetchData();
+        } catch (err) { alert('Error deleting account'); }
     };
 
     const handleSaveAccount = async (e) => {
@@ -858,7 +868,20 @@ const Accounts = () => {
                             </div>
                         )}
 
-                        <button type="submit" className="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700 font-medium">Save Account</button>
+                        <div className="flex justify-between items-center mt-6 gap-3">
+                            {editingId && (
+                                <button
+                                    type="button"
+                                    onClick={handleDeleteAccount}
+                                    className="text-red-400 hover:text-red-300 text-xs flex items-center gap-1 px-3 py-2 hover:bg-red-500/10 rounded-lg transition border border-transparent hover:border-red-500/30"
+                                >
+                                    <Trash2 size={14} /> Delete
+                                </button>
+                            )}
+                            <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-medium flex-1 shadow-md border border-green-500 transition">
+                                Save Account
+                            </button>
+                        </div>
                     </form>
 
                     {/* Linked Aliases Section (Only when editing) */}

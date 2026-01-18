@@ -41,6 +41,13 @@ def create_account_alias(db: Session, account_id: str, alias: schemas.AccountAli
     db.refresh(db_alias)
     return db_alias
 
+def delete_account(db: Session, account_id: str):
+    db_account = db.query(models.Account).filter(models.Account.id == account_id).first()
+    if db_account:
+        db.delete(db_account)
+        db.commit()
+    return db_account
+
 def delete_account_alias(db: Session, alias_id: int):
     db_alias = db.query(models.AccountAlias).filter(models.AccountAlias.id == alias_id).first()
     if db_alias:
