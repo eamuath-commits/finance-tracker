@@ -3,7 +3,7 @@ import axios from 'axios';
 import { Layers, ArrowRight, CheckCircle, AlertCircle, Save, Trash2, RefreshCw } from 'lucide-react';
 import { SectionHeader } from '../components/UI';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
 const Allocation = () => {
     const [activeTab, setActiveTab] = useState('manager'); // 'manager' or 'distributor'
