@@ -50,7 +50,7 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                     billing_month_sort: bMonth,
                     year: year,
                     month: bMonth.split('-')[1],
-                    status: (r.status === 'PENDING') ? 'Pending' : 'Paid'
+                    status: (r.status === 'BUDGET') ? 'BUDGET' : 'Paid'
                 });
             });
         });
