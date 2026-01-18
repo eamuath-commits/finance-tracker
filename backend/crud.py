@@ -258,12 +258,13 @@ def create_payment(db: Session, obligation_id: str, payment: schemas.PaymentCrea
             existing.note = payment.note
             existing.status = status_enum
             
-            # Auto-update expected amount if PAID
-            if status_enum == models.PaymentStatus.PAID:
-                obligation = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
-                if obligation:
-                    obligation.amount = payment.amount
-                    db.add(obligation)
+            # Auto-update expected amount if PAID --> DEPRECATED/REMOVED
+            # if status_enum == models.PaymentStatus.PAID:
+            #     obligation = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
+            #     if obligation:
+            #         # obligation.amount = payment.amount
+            #         # db.add(obligation)
+            #         pass
             
             db.commit()
             db.refresh(existing)
