@@ -788,7 +788,7 @@ const Accounts = () => {
                                                 if (e.target.value) {
                                                     const n = e.target.value.toLowerCase();
                                                     let logo = null;
-                                                    if (n.includes('jazira') || n.includes('ajb')) logo = '/banks/ajb.jpg';
+                                                    if (n.includes('jazira') || n.includes('ajb')) logo = '/banks/ajb.png';
                                                     else logo = '/banks/bank2.png'; // Default to the second image for any other bank
 
                                                     setAccountForm(prev => ({
