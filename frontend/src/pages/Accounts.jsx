@@ -56,16 +56,28 @@ const AccountCard = ({ acc, onEdit = null }) => {
                         <span className="font-semibold tracking-wide text-sm opacity-90">{acc.name}</span>
                     </div>
                     {/* Logo (Bank or Network) */}
-                    <div className="h-8 w-8 flex justify-end">
-                        <img
-                            src={acc.bank_logo_url || getLocalLogo(acc.bank_name)}
-                            alt={acc.bank_name}
-                            className="h-full w-full object-contain rounded-full bg-white/90 p-0.5 shadow-sm"
-                            onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.src = '/banks/bank2.png';
-                            }}
-                        />
+                    {/* Logos: Network & Bank */}
+                    <div className="flex flex-col items-end gap-1">
+                        {/* Network Logo */}
+                        <div className="h-5 opacity-90">
+                            {isCreditCard ? (
+                                <img src="/visa-logo.png" alt="Visa" className="h-full object-contain" />
+                            ) : (
+                                <img src="/mada-logo.png" alt="Mada" className="h-full object-contain" style={{ filter: 'invert(1) hue-rotate(180deg)' }} />
+                            )}
+                        </div>
+                        {/* Bank Logo */}
+                        <div className="h-8 w-8 pt-0.5">
+                            <img
+                                src={acc.bank_logo_url || getLocalLogo(acc.bank_name)}
+                                alt={acc.bank_name}
+                                className="h-full w-full object-contain rounded-full bg-white/95 p-0.5 shadow-sm"
+                                onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src = '/banks/bank2.png';
+                                }}
+                            />
+                        </div>
                     </div>
                 </div>
 
