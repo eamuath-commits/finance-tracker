@@ -11,27 +11,27 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
     const currMonth = getMonthStatus(obl, monthOffset);
 
     // Initial value for input: Prioritize Prev Month Amount -> Obligation Default -> Empty
-    // Initial value for input: Prioritize Current Month (if saved/pending) -> Prev Month -> Obligation Default -> Empty
-    const initialAmount = currMonth.amount !== null ? currMonth.amount : (prevMonth.amount !== null ? prevMonth.amount : (obl.amount || ""));
+    // Initial value for input: Prioritize Current Month (if saved/pending) -> Prev Month -> Empty
+    const initialAmount = currMonth.amount !== null ? currMonth.amount : (prevMonth.amount !== null ? prevMonth.amount : "");
     const [payAmount, setPayAmount] = React.useState(initialAmount);
 
     // Update local state if the underlying data changes significantly (e.g. month navigation)
     React.useEffect(() => {
-        const newVal = currMonth.amount !== null ? currMonth.amount : (prevMonth.amount !== null ? prevMonth.amount : (obl.amount || ""));
+        const newVal = currMonth.amount !== null ? currMonth.amount : (prevMonth.amount !== null ? prevMonth.amount : "");
         setPayAmount(newVal);
-    }, [currMonth.amount, prevMonth.amount, obl.amount, monthOffset]);
+    }, [currMonth.amount, prevMonth.amount, monthOffset]);
 
     const handlePay = (e) => {
         e.preventDefault();
         e.stopPropagation();
 
         // Smart Default Logic:
-        // 1. If user typed nothing (NaN) -> Use PREVIOUS month's amount (if available) or Default.
+        // 1. If user typed nothing (NaN) -> Use PREVIOUS month's amount (if available)
         // 2. If user typed 0 -> Respect it (allow explicit 0).
         let val = parseFloat(payAmount);
         if (isNaN(val)) {
             if (prevMonth.amount !== null && prevMonth.amount > 0) val = prevMonth.amount;
-            else if (obl.amount) val = obl.amount;
+            // Removed obl.amount fallback
         }
 
         openPaymentModal(obl, currMonth.billingDateStr, val);
@@ -46,7 +46,7 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
             let val = parseFloat(payAmount);
             if (isNaN(val)) {
                 if (prevMonth.amount !== null && prevMonth.amount > 0) val = prevMonth.amount;
-                else if (obl.amount) val = obl.amount;
+                // Removed obl.amount fallback
             }
 
             // Pass "PENDING" to save as draft (not paid)
@@ -205,8 +205,8 @@ const ObligationsList = ({
             const status = getMonthStatus(obl, monthOffset); // Get status for CURRENT VIEWED MONTH
             const prevStatus = getMonthStatus(obl, monthOffset - 1); // Get status for PREVIOUS MONTH for dynamic budget
 
-            // Dynamic Budget: Use Previous Month's Actual if available, else Fallback to Default
-            const budgetAmount = (prevStatus.amount && prevStatus.amount > 0) ? prevStatus.amount : (obl.amount || 0);
+            // Dynamic Budget: Use Previous Month's Actual if available, else 0 (since default amount is deprecated)
+            const budgetAmount = (prevStatus.amount && prevStatus.amount > 0) ? prevStatus.amount : 0;
 
             let statusLabel = "Unpaid";
             if (status.isPaid) statusLabel = "Paid";

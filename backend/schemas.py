@@ -107,16 +107,14 @@ class Loan(LoanBase):
 
 class ObligationBase(BaseModel):
     name: str
-    amount: Optional[float] = None
     due_day: int
-    category: Optional[str] = None
+    category: str = "Other"
 
 class ObligationCreate(ObligationBase):
     pass
 
-class ObligationUpdate(BaseModel):
+class ObligationUpdate(ObligationBase):
     name: Optional[str] = None
-    amount: Optional[float] = None
     due_day: Optional[int] = None
     category: Optional[str] = None
 

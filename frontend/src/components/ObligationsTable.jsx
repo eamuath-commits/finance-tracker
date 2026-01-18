@@ -27,20 +27,20 @@ const TableRow = ({ obl, getMonthStatus, monthOffset, openPaymentModal, handleQu
     const currMonth = getMonthStatus(obl, monthOffset);
 
     // Determines initial input value
-    const initialAmount = currMonth.amount !== null ? currMonth.amount : (prevMonth.amount !== null ? prevMonth.amount : (obl.amount || ""));
+    const initialAmount = currMonth.amount !== null ? currMonth.amount : (prevMonth.amount !== null ? prevMonth.amount : "");
     const [payAmount, setPayAmount] = useState(initialAmount);
 
     // Sync state on navigation
     React.useEffect(() => {
-        const newVal = currMonth.amount !== null ? currMonth.amount : (prevMonth.amount !== null ? prevMonth.amount : (obl.amount || ""));
+        const newVal = currMonth.amount !== null ? currMonth.amount : (prevMonth.amount !== null ? prevMonth.amount : "");
         setPayAmount(newVal);
-    }, [currMonth.amount, prevMonth.amount, obl.amount, monthOffset]);
+    }, [currMonth.amount, prevMonth.amount, monthOffset]);
 
     const handlePay = () => {
         let val = parseFloat(payAmount);
         if (isNaN(val)) { // Smart Default Fallback
             if (prevMonth.amount !== null && prevMonth.amount > 0) val = prevMonth.amount;
-            else if (obl.amount) val = obl.amount;
+            // Removed obl.amount fallback
         }
         openPaymentModal(obl, currMonth.billingDateStr, val);
     };
@@ -51,7 +51,7 @@ const TableRow = ({ obl, getMonthStatus, monthOffset, openPaymentModal, handleQu
             let val = parseFloat(payAmount);
             if (isNaN(val)) {
                 if (prevMonth.amount !== null && prevMonth.amount > 0) val = prevMonth.amount;
-                else if (obl.amount) val = obl.amount;
+                // Removed obl.amount fallback
             }
             // Quick Pay as Pending
             handleQuickPay(obl.id, val, currMonth.billingDateStr, "PENDING");

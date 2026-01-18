@@ -154,7 +154,6 @@ const Obligations = () => {
         e.preventDefault();
         const payload = {
             name: obligationForm.name,
-            amount: obligationForm.amount ? parseFloat(obligationForm.amount) : null, // Send null if empty
             category: obligationForm.category,
             due_day: parseInt(obligationForm.due_day || 1)
         };
@@ -167,7 +166,7 @@ const Obligations = () => {
             }
             setShowObligationModal(false);
             setEditingId(null);
-            setObligationForm({ name: '', amount: '', due_day: '', category: '' });
+            setObligationForm({ name: '', due_day: '', category: '' });
             fetchObligations();
         } catch (err) { alert('Error saving obligation'); }
     };
@@ -545,7 +544,7 @@ const Obligations = () => {
                 <Modal title={editingId ? "Edit Obligation" : "Add Obligation"} onClose={() => setShowObligationModal(false)}>
                     <form onSubmit={handleSaveObligation} className="space-y-4">
                         <input type="text" placeholder="Name" required className={inputClass} value={obligationForm.name} onChange={e => setObligationForm({ ...obligationForm, name: e.target.value })} />
-                        <input type="number" placeholder="Default Amount (Optional)" step="0.01" className={inputClass} value={obligationForm.amount} onChange={e => setObligationForm({ ...obligationForm, amount: e.target.value })} />
+                        {/* Amount removed per refactor */}
                         <input type="number" placeholder="Due Day (1-31)" min="1" max="31" required className={inputClass} value={obligationForm.due_day} onChange={e => setObligationForm({ ...obligationForm, due_day: e.target.value })} />
                         <select className={selectClass} value={obligationForm.category} onChange={e => setObligationForm({ ...obligationForm, category: e.target.value })}>
                             <option value="">Select Category...</option>

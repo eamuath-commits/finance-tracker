@@ -155,7 +155,6 @@ def delete_loan(db: Session, loan_id: str):
 def create_obligation(db: Session, obligation: schemas.ObligationCreate):
     db_obj = models.MonthlyObligation(
         name=obligation.name,
-        amount=obligation.amount,
         due_day=obligation.due_day,
         category=obligation.category
     )
