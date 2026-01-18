@@ -164,29 +164,13 @@ const OverviewAccountRow = ({ acc, allTransactions }) => {
                     </div>
                 </div>
                 {/* Logo Image */}
-                {/* Logos: Network & Bank */}
-                <div className="flex flex-col items-end gap-1">
-                    {/* Network Logo */}
-                    <div className="h-5 opacity-90">
-                        {acc.account_type === 'Credit Card' ? (
-                            <img src="/visa-logo.png" alt="Visa" className="h-full object-contain" />
-                        ) : (
-                            <img src="/mada-logo.png" alt="Mada" className="h-full object-contain" style={{ filter: 'invert(1) hue-rotate(180deg)' }} />
-                        )}
-                    </div>
-                    {/* Bank Logo */}
-                    <div className="h-8 w-8 pt-0.5">
-                        <img
-                            key={acc.bank_name}
-                            src={getLocalLogo(acc.bank_name)}
-                            alt={acc.bank_name}
-                            className="h-full w-full object-contain rounded-full bg-white/90 p-0.5 shadow-sm"
-                            onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.src = '/banks/bank2.png';
-                            }}
-                        />
-                    </div>
+                {/* Logo Image */}
+                <div className="flex flex-col items-end">
+                    {acc.account_type === 'Credit Card' ? (
+                        <img src="/visa-logo.png" alt="Visa" className="w-12 h-auto object-contain" />
+                    ) : (
+                        <img src="/mada-logo.png" alt="Mada" className="w-12 h-auto object-contain" style={{ filter: 'invert(1) hue-rotate(180deg)' }} />
+                    )}
                 </div>
             </div>
 
