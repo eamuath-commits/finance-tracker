@@ -217,3 +217,17 @@ class AllocationPreviewResponse(BaseModel):
 class AllocationExecuteRequest(BaseModel):
     source_account_id: str
     month_offset: Optional[int] = 0
+
+class CategoryBase(BaseModel):
+    name: str
+
+class CategoryCreate(CategoryBase):
+    pass
+
+class Category(CategoryBase):
+    id: str
+    class Config:
+        from_attributes = True
+
+class CategoryUpdate(BaseModel):
+    name: str
