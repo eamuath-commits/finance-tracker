@@ -55,7 +55,10 @@ const AccountCard = ({ acc, onEdit = null }) => {
                                 src={acc.bank_logo_url}
                                 alt={acc.bank_name}
                                 className="h-full w-full object-contain rounded-full bg-white/90 p-0.5 shadow-sm"
-                                onError={(e) => e.target.style.display = 'none'}
+                                onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(acc.bank_name || 'BK')}&background=fff&color=000&size=128`;
+                                }}
                             />
                         ) : (
                             isCreditCard ? (
@@ -783,8 +786,8 @@ const Accounts = () => {
                                         value={accountForm.bank_name || ''}
                                         onChange={e => setAccountForm({ ...accountForm, bank_name: e.target.value })}
                                         onBlur={(e) => {
-                                            // Auto-fetch icon logic
-                                            if (e.target.value && !accountForm.bank_logo_url) {
+                                            // Always update icon based on name (allows correction)
+                                            if (e.target.value) {
                                                 const cleanName = e.target.value.toLowerCase().replace(" bank", "").replace(/\s+/g, '');
                                                 const logoUrl = `https://logo.clearbit.com/${cleanName}.com`;
                                                 setAccountForm(prev => ({ ...prev, bank_logo_url: logoUrl }));
@@ -796,10 +799,14 @@ const Accounts = () => {
                                 {accountForm.bank_logo_url && (
                                     <div className="mt-6">
                                         <img
+                                            key={accountForm.bank_logo_url}
                                             src={accountForm.bank_logo_url}
                                             alt="Logo"
-                                            className="w-10 h-10 rounded-xl bg-white p-1 object-contain border border-slate-600 shadow-sm"
-                                            onError={(e) => e.target.style.display = 'none'}
+                                            className="w-10 h-10 rounded-xl bg-slate-800 p-1 object-contain border border-slate-600 shadow-sm"
+                                            onError={(e) => {
+                                                e.target.onerror = null;
+                                                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(accountForm.bank_name || 'BK')}&background=0f172a&color=cbd5e1&size=128`;
+                                            }}
                                         />
                                     </div>
                                 )}
