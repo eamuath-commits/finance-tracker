@@ -19,6 +19,8 @@ class Account(Base):
     name = Column(String, nullable=False)
     account_type = Column(Enum(AccountType), nullable=False)
     first_4_digits = Column(String, nullable=True) # Optional for verification
+    bank_name = Column(String, nullable=True) # User requested mandatory for new, but keep nullable for legacy/migration safety
+    bank_logo_url = Column(String, nullable=True)
     last_4_digits = Column(String, unique=True, index=True) # Critical for SMS matching
     current_balance = Column(Float, default=0.0)
     credit_limit = Column(Float, nullable=True) 
@@ -82,7 +84,6 @@ class MonthlyObligation(Base):
 class PaymentStatus(enum.Enum):
     PAID = "PAID"
     BUDGET = "BUDGET"
-    PENDING = "PENDING" # Legacy support to prevent crash until migration
     # Status Enum Definition
 
 class Payment(Base):

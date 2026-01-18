@@ -48,12 +48,21 @@ const AccountCard = ({ acc, onEdit = null }) => {
                         </div>
                         <span className="font-semibold tracking-wide text-sm opacity-90">{acc.name}</span>
                     </div>
-                    {/* Logo (Mada/Visa) */}
-                    <div className="h-6">
-                        {isCreditCard ? (
-                            <img src="/visa-logo.png" alt="Visa" className="h-full object-contain" />
+                    {/* Logo (Bank or Network) */}
+                    <div className="h-8 w-8 flex justify-end">
+                        {acc.bank_logo_url ? (
+                            <img
+                                src={acc.bank_logo_url}
+                                alt={acc.bank_name}
+                                className="h-full w-full object-contain rounded-full bg-white/90 p-0.5 shadow-sm"
+                                onError={(e) => e.target.style.display = 'none'}
+                            />
                         ) : (
-                            <img src="/mada-logo.png" alt="Mada" className="h-full object-contain" style={{ filter: 'invert(1) hue-rotate(180deg)' }} />
+                            isCreditCard ? (
+                                <img src="/visa-logo.png" alt="Visa" className="h-full object-contain" />
+                            ) : (
+                                <img src="/mada-logo.png" alt="Mada" className="h-full object-contain" style={{ filter: 'invert(1) hue-rotate(180deg)' }} />
+                            )
                         )}
                     </div>
                 </div>
@@ -377,7 +386,7 @@ const Accounts = () => {
             }
             setShowAccountModal(false);
             setEditingId(null);
-            setAccountForm({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '', credit_limit: '', aliases: [] });
+            setAccountForm({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '', credit_limit: '', aliases: [], bank_name: '', bank_logo_url: '' });
             fetchData();
         } catch (err) { alert('Error saving account'); }
     };
@@ -391,11 +400,13 @@ const Accounts = () => {
                 last_4_digits: acc.last_4_digits,
                 current_balance: acc.current_balance,
                 credit_limit: acc.credit_limit || '',
-                aliases: acc.aliases || []
+                aliases: acc.aliases || [],
+                bank_name: acc.bank_name || '',
+                bank_logo_url: acc.bank_logo_url || ''
             });
         } else {
             setEditingId(null);
-            setAccountForm({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '', credit_limit: '', aliases: [] });
+            setAccountForm({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '', credit_limit: '', aliases: [], bank_name: '', bank_logo_url: '' });
         }
         setShowAccountModal(true);
     };
@@ -759,14 +770,58 @@ const Accounts = () => {
             {showAccountModal && (
                 <Modal title={editingId ? "Edit Account" : "Add New Account"} onClose={() => setShowAccountModal(false)}>
                     <form onSubmit={handleSaveAccount} className="space-y-4">
-                        <input type="text" placeholder="Account Name (e.g. Chase)" required className={inputClass} value={accountForm.name} onChange={e => setAccountForm({ ...accountForm, name: e.target.value })} />
-                        <select className={selectClass} value={accountForm.account_type} onChange={e => setAccountForm({ ...accountForm, account_type: e.target.value })}>
-                            <option value="Checking">Checking</option>
-                            <option value="Savings">Savings</option>
-                            <option value="Credit Card">Credit Card</option>
-                        </select>
-                        <input type="text" placeholder="Last 4 Digits" required className={inputClass} value={accountForm.last_4_digits} onChange={e => setAccountForm({ ...accountForm, last_4_digits: e.target.value })} />
-                        <input type="number" step="0.01" placeholder="Current Balance" required className={inputClass} value={accountForm.current_balance} onChange={e => setAccountForm({ ...accountForm, current_balance: e.target.value })} />
+                        <div className="space-y-4">
+                            {/* Bank Name & Logo */}
+                            <div className="flex gap-2 items-start">
+                                <div className="flex-1">
+                                    <label className="text-xs text-gray-400 mb-1 block">Bank Name <span className="text-red-400">*</span></label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. AlRajhi Bank"
+                                        required
+                                        className={inputClass}
+                                        value={accountForm.bank_name || ''}
+                                        onChange={e => setAccountForm({ ...accountForm, bank_name: e.target.value })}
+                                        onBlur={(e) => {
+                                            // Auto-fetch icon logic
+                                            if (e.target.value && !accountForm.bank_logo_url) {
+                                                const cleanName = e.target.value.toLowerCase().replace(" bank", "").replace(/\s+/g, '');
+                                                const logoUrl = `https://logo.clearbit.com/${cleanName}.com`;
+                                                setAccountForm(prev => ({ ...prev, bank_logo_url: logoUrl }));
+                                            }
+                                        }}
+                                    />
+                                    <p className="text-[10px] text-gray-500 mt-1">Icon will be auto-fetched.</p>
+                                </div>
+                                {accountForm.bank_logo_url && (
+                                    <div className="mt-6">
+                                        <img
+                                            src={accountForm.bank_logo_url}
+                                            alt="Logo"
+                                            className="w-10 h-10 rounded-xl bg-white p-1 object-contain border border-slate-600 shadow-sm"
+                                            onError={(e) => e.target.style.display = 'none'}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Account Details */}
+                            <div>
+                                <label className="text-xs text-gray-400 mb-1 block">Account Label</label>
+                                <input type="text" placeholder="e.g. Salary Account" required className={inputClass} value={accountForm.name} onChange={e => setAccountForm({ ...accountForm, name: e.target.value })} />
+                            </div>
+
+                            <select className={selectClass} value={accountForm.account_type} onChange={e => setAccountForm({ ...accountForm, account_type: e.target.value })}>
+                                <option value="Checking">Checking</option>
+                                <option value="Savings">Savings</option>
+                                <option value="Credit Card">Credit Card</option>
+                            </select>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <input type="text" placeholder="Last 4 Digits" required className={inputClass} value={accountForm.last_4_digits} onChange={e => setAccountForm({ ...accountForm, last_4_digits: e.target.value })} />
+                                <input type="number" step="0.01" placeholder="Current Balance" required className={inputClass} value={accountForm.current_balance} onChange={e => setAccountForm({ ...accountForm, current_balance: e.target.value })} />
+                            </div>
+                        </div>
 
                         {/* Credit Limit Input (Only for Credit Cards) */}
                         {accountForm.account_type === 'Credit Card' && (

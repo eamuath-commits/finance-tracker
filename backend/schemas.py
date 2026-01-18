@@ -8,11 +8,11 @@ class AccountBase(BaseModel):
     account_type: AccountType
     last_4_digits: str
     current_balance: float
-    last_4_digits: str
-    current_balance: float
     credit_limit: Optional[float] = None
     interest_rate: Optional[float] = None
     minimum_payment: Optional[float] = None
+    bank_name: Optional[str] = None
+    bank_logo_url: Optional[str] = None
 
 class AccountCreate(AccountBase):
     pass
@@ -22,11 +22,11 @@ class AccountUpdate(BaseModel):
     account_type: Optional[AccountType] = None
     last_4_digits: Optional[str] = None
     current_balance: Optional[float] = None
-    last_4_digits: Optional[str] = None
-    current_balance: Optional[float] = None
     credit_limit: Optional[float] = None
     interest_rate: Optional[float] = None
     minimum_payment: Optional[float] = None
+    bank_name: Optional[str] = None
+    bank_logo_url: Optional[str] = None
 
 class AccountAliasBase(BaseModel):
     alias_name: str
