@@ -2,11 +2,12 @@ import os
 import sqlalchemy
 from sqlalchemy import create_engine, text
 
-# Try localhost first if env var not set to something accessible
+# Trust the environment variable if set (which it is in Docker)
+# Only fallback to localhost if explicitly needed or env var missing
 db_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/finance_db")
-if "db:5432" in db_url:
-    print("Warning: DATABASE_URL points to 'db' container. Switching to 'localhost' for local migration script.")
-    db_url = db_url.replace("db:5432", "localhost:5432")
+
+# Remove the force-switch to localhost, because we ARE running inside the container now
+# if "db:5432" in db_url: ... (removed)
 
 print(f"Connecting to: {db_url}")
 engine = create_engine(db_url)

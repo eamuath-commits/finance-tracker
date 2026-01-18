@@ -209,7 +209,7 @@ const ObligationsList = ({
             // 1. If we have a stored "BUDGET" record for this month, use that value.
             // 2. Else, fallback to Previous Month's Actual Payment (Smart Default).
             let budgetAmount = 0;
-            if (status.status === 'BUDGET' && status.amount) {
+            if ((status.status === 'BUDGET' || status.status === 'PENDING') && status.amount) {
                 budgetAmount = status.amount;
             } else if (prevStatus.amount && prevStatus.amount > 0) {
                 budgetAmount = prevStatus.amount;
@@ -217,7 +217,7 @@ const ObligationsList = ({
 
             let statusLabel = "Unpaid";
             if (status.isPaid) statusLabel = "Paid";
-            else if (status.status === 'BUDGET') statusLabel = "Budget";
+            else if (status.status === 'BUDGET' || status.status === 'PENDING') statusLabel = "Budget";
 
             return {
                 "Obligation": obl.name,
