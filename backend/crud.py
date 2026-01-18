@@ -414,10 +414,10 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     
     target_billing_month = date(year, month, 1)
 
-    # 2. Fetch Budgeted Payments for that month
+    # 2. Fetch Budgeted/Pending Payments for that month
     payments = db.query(models.Payment).join(models.MonthlyObligation).filter(
         models.Payment.billing_month == target_billing_month,
-        models.Payment.status == models.PaymentStatus.BUDGET
+        models.Payment.status.in_([models.PaymentStatus.BUDGET, models.PaymentStatus.PENDING])
     ).all()
 
     # 3. Fetch Rules
