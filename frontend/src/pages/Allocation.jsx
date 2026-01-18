@@ -27,31 +27,29 @@ const Allocation = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            // Fetch Accounts, Loans, Obligations (Core Data)
-            const [accRes, loanRes, oblRes] = await Promise.all([
-                axios.get(`${API_URL}/accounts/`),
+            // Fetch Accounts separately to ensure they load
+            try {
+                const accRes = await axios.get(`${API_URL}/accounts/`);
+                setAccounts(accRes.data);
+            } catch (err) {
+                console.error("Failed to fetch accounts", err);
+            }
+
+            // Fetch other data
+            const [loanRes, ruleRes, oblRes] = await Promise.all([
                 axios.get(`${API_URL}/loans/`),
+                axios.get(`${API_URL}/allocation/rules`),
                 axios.get(`${API_URL}/obligations/`)
             ]);
 
-            setAccounts(accRes.data);
             setLoans(loanRes.data);
+            setRules(ruleRes.data);
 
             // Extract unique categories from obligations
             const uniqueCats = [...new Set(oblRes.data.map(o => o.category).filter(c => c && c !== 'Loan'))];
             setCategories(uniqueCats);
-
-            // Fetch Rules (Separate try-catch to allow loading if endpoint missing/failed)
-            try {
-                const ruleRes = await axios.get(`${API_URL}/allocation/rules`);
-                setRules(ruleRes.data);
-            } catch (ruleErr) {
-                console.warn("Could not load allocation rules (Backend might need restart):", ruleErr);
-                setRules([]);
-            }
-
         } catch (error) {
-            console.error("Error fetching data:", error);
+            console.error("Error fetching allocation data:", error);
         } finally {
             setLoading(false);
         }
