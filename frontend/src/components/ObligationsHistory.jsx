@@ -97,7 +97,7 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
 
     // 4. Calculate Total
     const visiblePaid = sorted.reduce((sum, item) => item.status === 'Paid' ? sum + (item.amount || 0) : sum, 0);
-    const visibleBudget = sorted.filter(p => p.status === 'BUDGET' || p.status === 'PENDING').reduce((sum, p) => sum + (p.amount || 0), 0);
+    const visibleBudget = sorted.filter(p => p.status === 'BUDGET').reduce((sum, p) => sum + (p.amount || 0), 0);
 
     const requestSort = (key) => {
         let direction = 'asc';
@@ -124,7 +124,7 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
     ];
 
     let totalLabel = "Total Amount";
-    let totalDisplay = visiblePaid + visiblePending;
+    let totalDisplay = visiblePaid + visibleBudget;
     let totalSubtext = (
         <span className="flex items-center gap-1">
             <span className="text-emerald-400">{formatCurrency(visiblePaid)}</span> <span className="text-slate-500">Paid</span>
@@ -149,7 +149,7 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                 <span className="flex items-center gap-1 text-[10px] opacity-80">
                     <span className="text-emerald-400">{formatCurrency(visiblePaid)} Paid</span>
                     <span>·</span>
-                    <span className="text-amber-400">{formatCurrency(visiblePending)} Pending</span>
+                    <span className="text-blue-400">{formatCurrency(visibleBudget)} Budget</span>
                 </span>
             </div>
         );
