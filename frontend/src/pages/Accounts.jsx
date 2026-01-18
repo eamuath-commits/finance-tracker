@@ -405,11 +405,12 @@ const Accounts = () => {
                 credit_limit: acc.credit_limit || '',
                 aliases: acc.aliases || [],
                 bank_name: acc.bank_name || '',
-                bank_logo_url: acc.bank_logo_url || ''
+                bank_logo_url: acc.bank_logo_url || '',
+                bank_website: acc.bank_logo_url ? acc.bank_logo_url.replace('https://logo.clearbit.com/', '') : ''
             });
         } else {
             setEditingId(null);
-            setAccountForm({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '', credit_limit: '', aliases: [], bank_name: '', bank_logo_url: '' });
+            setAccountForm({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '', credit_limit: '', aliases: [], bank_name: '', bank_logo_url: '', bank_website: '' });
         }
         setShowAccountModal(true);
     };
@@ -776,25 +777,47 @@ const Accounts = () => {
                         <div className="space-y-4">
                             {/* Bank Name & Logo */}
                             <div className="flex gap-2 items-start">
-                                <div className="flex-1">
-                                    <label className="text-xs text-gray-400 mb-1 block">Bank Name <span className="text-red-400">*</span></label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. AlRajhi Bank"
-                                        required
-                                        className={inputClass}
-                                        value={accountForm.bank_name || ''}
-                                        onChange={e => setAccountForm({ ...accountForm, bank_name: e.target.value })}
-                                        onBlur={(e) => {
-                                            // Always update icon based on name (allows correction)
-                                            if (e.target.value) {
-                                                const cleanName = e.target.value.toLowerCase().replace(" bank", "").replace(/\s+/g, '');
-                                                const logoUrl = `https://logo.clearbit.com/${cleanName}.com`;
-                                                setAccountForm(prev => ({ ...prev, bank_logo_url: logoUrl }));
-                                            }
-                                        }}
-                                    />
-                                    <p className="text-[10px] text-gray-500 mt-1">Icon will be auto-fetched.</p>
+                                <div className="flex-1 space-y-3">
+                                    <div>
+                                        <label className="text-xs text-gray-400 mb-1 block">Bank Name <span className="text-red-400">*</span></label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. AlRajhi Bank"
+                                            required
+                                            className={inputClass}
+                                            value={accountForm.bank_name || ''}
+                                            onChange={e => setAccountForm({ ...accountForm, bank_name: e.target.value })}
+                                            onBlur={(e) => {
+                                                // Guess Website and Icon if new
+                                                if (e.target.value && !accountForm.bank_website) {
+                                                    const cleanName = e.target.value.toLowerCase().replace(" bank", "").replace(/\s+/g, '');
+                                                    const website = `${cleanName}.com`;
+                                                    setAccountForm(prev => ({
+                                                        ...prev,
+                                                        bank_website: website,
+                                                        bank_logo_url: `https://logo.clearbit.com/${website}`
+                                                    }));
+                                                }
+                                            }}
+                                        />
+                                    </div>
+
+                                    {/* Helper Website Field */}
+                                    <div>
+                                        <label className="text-xs text-gray-400 mb-1 block">Bank Website <span className="text-gray-500 text-[10px]">(Fix this if icon is wrong)</span></label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. alrajhibank.com"
+                                            className={`${inputClass} text-xs py-1.5`}
+                                            value={accountForm.bank_website || ''}
+                                            onChange={e => setAccountForm({ ...accountForm, bank_website: e.target.value })}
+                                            onBlur={(e) => {
+                                                if (e.target.value) {
+                                                    setAccountForm(prev => ({ ...prev, bank_logo_url: `https://logo.clearbit.com/${e.target.value}` }));
+                                                }
+                                            }}
+                                        />
+                                    </div>
                                 </div>
                                 {accountForm.bank_logo_url && (
                                     <div className="mt-6">
