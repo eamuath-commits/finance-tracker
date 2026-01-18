@@ -24,6 +24,13 @@ const getAccountTheme = (type) => {
     }
 };
 
+const getLocalLogo = (name) => {
+    if (!name) return '/banks/bank2.png';
+    const n = name.toLowerCase();
+    if (n.includes('jazira') || n.includes('ajb')) return '/banks/ajb.png';
+    return '/banks/bank2.png'; // Default for any unknown bank
+};
+
 const AccountCard = ({ acc, onEdit = null }) => {
     const theme = getAccountTheme(acc.account_type);
     const isCreditCard = acc.account_type === 'Credit Card';
@@ -50,20 +57,15 @@ const AccountCard = ({ acc, onEdit = null }) => {
                     </div>
                     {/* Logo (Bank or Network) */}
                     <div className="h-8 w-8 flex justify-end">
-                        {acc.bank_logo_url ? (
-                            <img
-                                src={acc.bank_logo_url}
-                                alt={acc.bank_name}
-                                className="h-full w-full object-contain rounded-full bg-white/90 p-0.5 shadow-sm"
-                                onError={(e) => e.target.style.display = 'none'}
-                            />
-                        ) : (
-                            isCreditCard ? (
-                                <img src="/visa-logo.png" alt="Visa" className="h-full object-contain" />
-                            ) : (
-                                <img src="/mada-logo.png" alt="Mada" className="h-full object-contain" style={{ filter: 'invert(1) hue-rotate(180deg)' }} />
-                            )
-                        )}
+                        <img
+                            src={acc.bank_logo_url || getLocalLogo(acc.bank_name)}
+                            alt={acc.bank_name}
+                            className="h-full w-full object-contain rounded-full bg-white/90 p-0.5 shadow-sm"
+                            onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = '/banks/bank2.png';
+                            }}
+                        />
                     </div>
                 </div>
 
@@ -786,11 +788,7 @@ const Accounts = () => {
                                             onChange={e => setAccountForm({ ...accountForm, bank_name: e.target.value })}
                                             onBlur={(e) => {
                                                 if (e.target.value) {
-                                                    const n = e.target.value.toLowerCase();
-                                                    let logo = null;
-                                                    if (n.includes('jazira') || n.includes('ajb')) logo = '/banks/ajb.png';
-                                                    else logo = '/banks/bank2.png'; // Default to the second image for any other bank
-
+                                                    const logo = getLocalLogo(e.target.value);
                                                     setAccountForm(prev => ({
                                                         ...prev,
                                                         bank_logo_url: logo,
