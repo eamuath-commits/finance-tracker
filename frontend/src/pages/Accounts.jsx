@@ -69,7 +69,8 @@ const AccountCard = ({ acc, onEdit = null }) => {
                         {/* Bank Logo */}
                         <div className="h-8 w-8 pt-0.5">
                             <img
-                                src={(acc.bank_logo_url && acc.bank_logo_url.startsWith('/')) ? acc.bank_logo_url : getLocalLogo(acc.bank_name)}
+                                key={acc.bank_name}
+                                src={getLocalLogo(acc.bank_name)}
                                 alt={acc.bank_name}
                                 className="h-full w-full object-contain rounded-full bg-white/95 p-0.5 shadow-sm"
                                 onError={(e) => {
