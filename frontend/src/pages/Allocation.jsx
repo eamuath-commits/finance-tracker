@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Layers, ArrowRight, CheckCircle, AlertCircle, Save, Trash2, RefreshCw } from 'lucide-react';
-import SectionHeader from '../components/SectionHeader';
+import { SectionHeader } from '../components/UI';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -140,8 +140,8 @@ const Allocation = () => {
                     <button
                         onClick={() => setActiveTab('manager')}
                         className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'manager'
-                                ? 'bg-blue-600 text-white shadow-sm'
-                                : 'text-gray-400 hover:text-white'
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-gray-400 hover:text-white'
                             }`}
                     >
                         Rules Manager
@@ -149,8 +149,8 @@ const Allocation = () => {
                     <button
                         onClick={() => setActiveTab('distributor')}
                         className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'distributor'
-                                ? 'bg-emerald-600 text-white shadow-sm'
-                                : 'text-gray-400 hover:text-white'
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'text-gray-400 hover:text-white'
                             }`}
                     >
                         Payday Distributor
