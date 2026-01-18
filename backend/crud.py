@@ -378,3 +378,104 @@ def delete_goal(db: Session, goal_id: str):
         db.delete(db_goal)
         db.commit()
     return db_goal
+
+# --- Allocation Rules ---
+
+def create_allocation_rule(db: Session, rule: schemas.AllocationRuleCreate):
+    db_rule = models.AllocationRule(**rule.dict())
+    db.add(db_rule)
+    db.commit()
+    db.refresh(db_rule)
+    return db_rule
+
+def get_allocation_rules(db: Session):
+    return db.query(models.AllocationRule).all()
+
+def delete_allocation_rule(db: Session, rule_id: str):
+    db_rule = db.query(models.AllocationRule).filter(models.AllocationRule.id == rule_id).first()
+    if db_rule:
+        db.delete(db_rule)
+        db.commit()
+    return True
+
+from datetime import date
+
+def calculate_allocation_preview(db: Session, source_account_id: str, month_offset: int = 0):
+    # 1. Determine target month/year
+    today = date.today()
+    year = today.year
+    month = today.month + month_offset
+    while month > 12:
+        month -= 12
+        year += 1
+    while month < 1:
+        month += 12
+        year -= 1
+    
+    target_billing_month = date(year, month, 1)
+
+    # 2. Fetch Budgeted Payments for that month
+    payments = db.query(models.Payment).join(models.MonthlyObligation).filter(
+        models.Payment.billing_month == target_billing_month,
+        models.Payment.status == models.PaymentStatus.BUDGET
+    ).all()
+
+    # 3. Fetch Rules
+    rules = get_allocation_rules(db)
+
+    # 4. Aggregate
+    allocations = {} # TargetAccountID -> { amount, acc_name, details }
+
+    for p in payments:
+        obl = p.obligation
+        matched_rule = None
+        
+        # Priority 1: Match Name (LOAN type)
+        for r in rules:
+            if r.rule_type == models.AllocationRuleType.LOAN and r.identifier.lower() == obl.name.lower():
+                matched_rule = r
+                break
+        
+        # Priority 2: Match Category (CATEGORY type)
+        if not matched_rule and obl.category:
+            for r in rules:
+                if r.rule_type == models.AllocationRuleType.CATEGORY and r.identifier.lower() == obl.category.lower():
+                    matched_rule = r
+                    break
+        
+        if matched_rule:
+            tid = matched_rule.target_account_id
+            if tid not in allocations:
+                t_acc = db.query(models.Account).filter(models.Account.id == tid).first()
+                if t_acc:
+                    allocations[tid] = {
+                        "target_account_id": tid,
+                        "target_account_name": t_acc.name,
+                        "amount": 0,
+                        "details": []
+                    }
+            
+            if tid in allocations:
+                allocations[tid]["amount"] += p.amount
+                allocations[tid]["details"].append(obl.name)
+
+    # Format Response
+    result_list = []
+    total = 0
+    for tid, data in allocations.items():
+        total += data["amount"]
+        # Summary name
+        details_txt = ", ".join(data["details"])
+        if len(details_txt) > 60:
+            details_txt = details_txt[:60] + "..."
+            
+        result_list.append(schemas.AllocationPreviewItem(
+            rule_type="AGGREGATE",
+            identifier="aggregate",
+            name=details_txt, 
+            amount=data["amount"],
+            target_account_id=tid,
+            target_account_name=data["target_account_name"]
+        ))
+        
+    return schemas.AllocationPreviewResponse(total_amount=total, allocations=result_list)
