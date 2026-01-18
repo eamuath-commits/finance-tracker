@@ -209,7 +209,7 @@ const ObligationsList = ({
             // 1. If we have a stored "BUDGET" record for this month, use that value.
             // 2. Else, fallback to Previous Month's Actual Payment (Smart Default).
             let budgetAmount = 0;
-            if ((status.status === 'BUDGET' || status.status === 'PENDING') && status.amount) {
+            if (status.status === 'BUDGET' && status.amount) {
                 budgetAmount = status.amount;
             } else if (prevStatus.amount && prevStatus.amount > 0) {
                 budgetAmount = prevStatus.amount;
@@ -217,7 +217,7 @@ const ObligationsList = ({
 
             let statusLabel = "Unpaid";
             if (status.isPaid) statusLabel = "Paid";
-            else if (status.status === 'BUDGET' || status.status === 'PENDING') statusLabel = "Budget";
+            else if (status.status === 'BUDGET') statusLabel = "Budget";
 
             return {
                 "Obligation": obl.name,
@@ -245,12 +245,18 @@ const ObligationsList = ({
         items.forEach(obl => {
             const prev = getMonthStatus(obl, monthOffset - 1);
             const curr = getMonthStatus(obl, monthOffset);
+
             if (prev.amount) {
                 prevPaid += prev.amount;
-                // Budget is based on Prev Month's actuals
+            }
+
+            // Budget Calculation:
+            // 1. If Current Month has a set Budget (Status=BUDGET), use that.
+            // 2. Fallback to Previous Month's Payment.
+            if (curr.status === 'BUDGET' && curr.amount) {
+                currentBudget += curr.amount;
+            } else if (prev.amount) {
                 currentBudget += prev.amount;
-            } else if (obl.amount) {
-                // Fallback for budget
             }
 
             if (curr.isPaid && curr.amount) currentPaid += curr.amount;
@@ -265,7 +271,12 @@ const ObligationsList = ({
         const curr = getMonthStatus(obl, monthOffset);
 
         let budget = 0;
-        if (prev.amount) budget = prev.amount;
+        // Priority: Current Month defined budget > Previous Month actuals
+        if (curr.status === 'BUDGET' && curr.amount) {
+            budget = curr.amount;
+        } else if (prev.amount) {
+            budget = prev.amount;
+        }
 
         let paid = 0;
         if (curr.isPaid && curr.amount) paid = curr.amount;
