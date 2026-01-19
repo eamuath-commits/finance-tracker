@@ -467,16 +467,25 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     # Format Response
     result_list = []
     total = 0
+    # Fetch Source Balance to track depletion
+    source_acc = db.query(models.Account).filter(models.Account.id == source_account_id).first()
+    running_balance = source_acc.current_balance if source_acc else 0
+
     for tid, data in allocations.items():
         required_amount = data["amount"]
-        existing_balance = data["current_balance"]
         
-        transfer_amount = required_amount
+        # Cap transfer at available source balance
+        transfer_amount = min(required_amount, running_balance)
+        gap = required_amount - transfer_amount
 
-        # Smart Top-up REMOVED: Logic previously deducted existing_balance here. 
-        # Now we always transfer the full specific amount from the Income Account.
+        # Update running balance
+        running_balance = max(0, running_balance - transfer_amount)
 
-        if transfer_amount > 0:
+        # Add note if there is a gap covered by destination
+        if gap > 0:
+            data["details"].append(f"(Source Limit: {transfer_amount:,.0f}, Dest covers {gap:,.0f})")
+
+        if transfer_amount > 0 or gap > 0:
             total += transfer_amount
             # Summary name
             details_txt = ", ".join(data["details"])
@@ -492,9 +501,10 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
                 target_account_name=data["target_account_name"]
             ))
         else:
-            # Entirely covered by balance
-            details_txt = ", ".join(data["details"])
-            fulfilled_items.append(f"Target: {data['target_account_name']} - Items: {details_txt} (Covered by {existing_balance:,.0f} balance)")
+            # Entirely covered by balance (This case matches 'fulfilled' only if required was 0? 
+            # With new logic, if required > 0 and transfer is 0, it goes to IF block above with gap.
+            # So this ELSE is mostly dead unless required was 0 initially which shouldn't happen in this loop)
+            pass
         
     return schemas.AllocationPreviewResponse(
         total_amount=total, 
