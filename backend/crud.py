@@ -467,6 +467,7 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     # Format Response
     result_list = []
     total = 0
+    total_required = 0
     # Fetch Source Balance to track depletion
     source_acc = db.query(models.Account).filter(models.Account.id == source_account_id).first()
     running_balance = source_acc.current_balance if source_acc else 0
@@ -475,6 +476,7 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
         # Deduplicate details to show unique categories
         data["details"] = sorted(list(set(data["details"])))
         required_amount = data["amount"]
+        total_required += required_amount
         
         # Cap transfer at available source balance
         transfer_amount = min(required_amount, running_balance)
@@ -510,6 +512,7 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
         
     return schemas.AllocationPreviewResponse(
         total_amount=total, 
+        total_required=total_required,
         allocations=result_list,
         skipped_items=skipped_items,
         fulfilled_items=fulfilled_items
