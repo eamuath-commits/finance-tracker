@@ -91,34 +91,48 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg_text = update.message.text
     
     logger.info(f"Received message from {user_id}: {msg_text[:20]}...")
+    await update.message.reply_text("⏳ Processing...")
 
-    # Optional: Security Check (Uncomment if needed)
-    # if ALLOWED_USERS and user_id not in ALLOWED_USERS.split(','):
-    #     await update.message.reply_text("⛔ Unauthorized user.")
-    #     return
+    db = database.SessionLocal()
+    raw_msg = models.RawMessage(
+        sender=f"Telegram-{user_id}",
+        body=msg_text,
+        status=models.MessageStatus.PENDING,
+        timestamp=datetime.now()
+    )
+    db.add(raw_msg)
+    db.commit()
+    db.refresh(raw_msg)
 
     # 1. AI Parse
-    await update.message.reply_text("⏳ Processing...")
     result = await parse_with_ai(msg_text)
 
     if "error" in result:
          await update.message.reply_text(f"❌ AI Error: {result['error']}")
+         raw_msg.status = models.MessageStatus.FAILED
+         raw_msg.error_log = result['error']
+         db.commit()
+         db.close()
          return
 
     if not result.get("is_transaction"):
         await update.message.reply_text("ℹ️ Not a transaction message. Ignored.")
+        raw_msg.status = models.MessageStatus.FAILED # Or IGNORED if enum supports it, usually FAILED or just leave as is? Let's say FAILED for now or add IGNORED status later.
+        raw_msg.error_log = "AI determined not a transaction"
+        db.commit()
+        db.close()
         return
 
     # 2. Save to DB
     try:
-        db = database.SessionLocal()
-        
         # Determine Account (Fuzzy match or default)
-        # Ideally, we match 'account_last4' to DB accounts.
-        # For now, default to first account if not found.
         account = db.query(models.Account).first()
         if not account:
              await update.message.reply_text("❌ No accounts found in DB to attach transaction.")
+             raw_msg.status = models.MessageStatus.FAILED
+             raw_msg.error_log = "No accounts found"
+             db.commit()
+             db.close()
              return
 
         # Prepare Schema
@@ -127,12 +141,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             amount=result['amount'],
             merchant=result['merchant'] or "Unknown",
             category=result.get('category') or "Uncategorized",
-            timestamp=datetime.now(), # Or use parsed date
+            timestamp=datetime.now(), 
             raw_sms_content=msg_text
         )
 
         # Use CRUD to create (handles balance updates)
         crud.create_transaction(db=db, transaction=tx_data)
+        
+        # Update Raw Message Status
+        raw_msg.status = models.MessageStatus.PARSED
+        db.commit()
         
         db.close()
         
@@ -142,6 +160,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Amount: {result['amount']} {result['currency']}\n"
             f"Category: {result['category']}"
         )
+
 
     except Exception as e:
         logger.error(f"DB Error: {e}")
