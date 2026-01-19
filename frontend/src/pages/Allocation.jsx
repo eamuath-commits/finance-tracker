@@ -271,7 +271,7 @@ const Allocation = () => {
 
             {/* --- TAB 2: DISTRIBUTOR --- */}
             {activeTab === 'distributor' && (
-                <div className="bg-slate-800 p-8 rounded-xl border border-slate-700 shadow-xl max-w-3xl mx-auto">
+                <div className={previewData ? "w-full animate-fade-in" : "bg-slate-800 p-8 rounded-xl border border-slate-700 shadow-xl max-w-3xl mx-auto transition-all"}>
                     {!previewData && !distributionResult && (
                         <div className="space-y-8">
                             <div className="text-center space-y-2">
