@@ -59,25 +59,12 @@ const AccountCard = ({ acc, onEdit = null }) => {
                     {/* Logos: Network & Bank */}
                     <div className="flex flex-col items-end gap-1">
                         {/* Network Logo */}
-                        <div className="h-5 opacity-90">
+                        <div className="h-8 opacity-90">
                             {isCreditCard ? (
                                 <img src="/visa-logo.png" alt="Visa" className="h-full object-contain" />
                             ) : (
                                 <img src="/mada-logo.png" alt="Mada" className="h-full object-contain" style={{ filter: 'invert(1) hue-rotate(180deg)' }} />
                             )}
-                        </div>
-                        {/* Bank Logo */}
-                        <div className="h-8 w-8 pt-0.5">
-                            <img
-                                key={acc.bank_name}
-                                src={getLocalLogo(acc.bank_name)}
-                                alt={acc.bank_name}
-                                className="h-full w-full object-contain rounded-full bg-white/95 p-0.5 shadow-sm"
-                                onError={(e) => {
-                                    e.target.onerror = null;
-                                    e.target.src = '/banks/bank2.png';
-                                }}
-                            />
                         </div>
                     </div>
                 </div>
@@ -849,6 +836,19 @@ const Accounts = () => {
                                         />
                                     </div>
                                 )}
+                            </div>
+
+                            <div className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg border border-slate-600 my-4">
+                                <input
+                                    type="checkbox"
+                                    id="isIncome"
+                                    checked={accountForm.is_income || false}
+                                    onChange={e => setAccountForm({ ...accountForm, is_income: e.target.checked })}
+                                    className="w-5 h-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500 bg-slate-700 cursor-pointer"
+                                />
+                                <label htmlFor="isIncome" className="text-sm font-medium text-gray-300 select-none cursor-pointer">
+                                    Mark as Income Account (Salary/Deposit)
+                                </label>
                             </div>
 
                             {/* Account Details */}
