@@ -88,9 +88,9 @@ const Allocation = () => {
     // Auto-select Source Account when accounts load
     useEffect(() => {
         if (accounts.length > 0 && !sourceAccountId) {
-            // Prefer 'Checking' or just first account
-            const defaultAcc = accounts.find(a => a.account_type === 'Checking') || accounts[0];
-            if (defaultAcc) setSourceAccountId(defaultAcc.id);
+            // Find first income account
+            const incomeAcc = accounts.find(a => a.is_income);
+            if (incomeAcc) setSourceAccountId(incomeAcc.id);
         }
     }, [accounts]);
 
@@ -311,7 +311,7 @@ const Allocation = () => {
                                     sourceAccountId,
                                     setSourceAccountId,
                                     "Select Source Account",
-                                    null
+                                    acc => acc.is_income
                                 )}
                             </div>
 
