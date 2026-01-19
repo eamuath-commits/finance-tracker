@@ -494,7 +494,7 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
                 
             result_list.append(schemas.AllocationPreviewItem(
                 rule_type="AGGREGATE",
-                identifier="aggregate",
+                identifier=f"aggregate_{tid}",
                 name=details_txt, 
                 amount=transfer_amount,
                 target_account_id=tid,
