@@ -21,6 +21,7 @@ const Allocation = () => {
     const [distributionResult, setDistributionResult] = useState(null);
 
     const [editableAmounts, setEditableAmounts] = useState({});
+    const [surplusTargetId, setSurplusTargetId] = useState('');
 
     useEffect(() => {
         fetchData();
@@ -460,6 +461,116 @@ const Allocation = () => {
                                         </div>
                                     );
                                 })}
+
+                                {/* SURPLUS CARD */}
+                                {(() => {
+                                    const sourceBalance = accounts.find(a => a.id === sourceAccountId)?.current_balance || 0;
+                                    const currentSurplus = Math.max(0, sourceBalance - currentDistributingTotal);
+
+                                    if (currentSurplus < 0.01) return null;
+
+                                    return (
+                                        <div className="relative flex flex-col gap-4 p-5 rounded-2xl border border-emerald-500/30 bg-emerald-900/10 transition-all hover:shadow-lg hover:border-emerald-500/50">
+                                            {/* Header */}
+                                            <div className="flex justify-between items-start gap-4">
+                                                <div>
+                                                    <h3 className="font-bold text-lg text-white leading-snug">Zero-Based Surplus</h3>
+                                                    <span className="inline-block mt-1.5 text-[10px] font-bold text-emerald-400 bg-emerald-900/50 px-2 py-0.5 rounded border border-emerald-500/30 uppercase tracking-wider">
+                                                        Savings Opportunity
+                                                    </span>
+                                                </div>
+                                                <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                                                    <ArrowRight size={16} />
+                                                </div>
+                                            </div>
+
+                                            {/* Description */}
+                                            <p className="text-xs text-emerald-200/70 leading-relaxed">
+                                                You have <b>{formatCurrency(currentSurplus)}</b> remaining after all obligations.
+                                                Transfer this to savings to reach zero-balance.
+                                            </p>
+
+                                            {/* Target Selector */}
+                                            <div className="mt-auto pt-2 space-y-3">
+                                                <div className="bg-slate-900/50 rounded-xl p-3 border border-slate-700/50">
+                                                    <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold block mb-2">Transfer To</span>
+                                                    {renderAccountSelect(
+                                                        surplusTargetId,
+                                                        setSurplusTargetId,
+                                                        "Select Savings Account",
+                                                        acc => acc.account_type === 'SAVINGS' || acc.account_type === 'INVESTMENT'
+                                                    )}
+                                                </div>
+
+                                                <button
+                                                    onClick={() => handleExecute(surplusTargetId, currentSurplus)}
+                                                    disabled={!surplusTargetId || distributing}
+                                                    className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${!surplusTargetId
+                                                            ? 'bg-slate-700 text-gray-400 cursor-not-allowed'
+                                                            : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/20'
+                                                        }`}
+                                                >
+                                                    {distributing ? <RefreshCw className="animate-spin w-4 h-4" /> : 'Confirm Transfer'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* SURPLUS CARD */}
+                                {(() => {
+                                    const sourceBalance = accounts.find(a => a.id === sourceAccountId)?.current_balance || 0;
+                                    const currentSurplus = Math.max(0, sourceBalance - currentDistributingTotal);
+
+                                    if (currentSurplus < 0.01) return null;
+
+                                    return (
+                                        <div className="relative flex flex-col gap-4 p-5 rounded-2xl border border-emerald-500/30 bg-emerald-900/10 transition-all hover:shadow-lg hover:border-emerald-500/50">
+                                            {/* Header */}
+                                            <div className="flex justify-between items-start gap-4">
+                                                <div>
+                                                    <h3 className="font-bold text-lg text-white leading-snug">Zero-Based Surplus</h3>
+                                                    <span className="inline-block mt-1.5 text-[10px] font-bold text-emerald-400 bg-emerald-900/50 px-2 py-0.5 rounded border border-emerald-500/30 uppercase tracking-wider">
+                                                        Savings Opportunity
+                                                    </span>
+                                                </div>
+                                                <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                                                    <ArrowRight size={16} />
+                                                </div>
+                                            </div>
+
+                                            {/* Description */}
+                                            <p className="text-xs text-emerald-200/70 leading-relaxed">
+                                                You have <b>{formatCurrency(currentSurplus)}</b> remaining after all obligations.
+                                                Transfer this to savings to reach zero-balance.
+                                            </p>
+
+                                            {/* Target Selector */}
+                                            <div className="mt-auto pt-2 space-y-3">
+                                                <div className="bg-slate-900/50 rounded-xl p-3 border border-slate-700/50">
+                                                    <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold block mb-2">Transfer To</span>
+                                                    {renderAccountSelect(
+                                                        surplusTargetId,
+                                                        setSurplusTargetId,
+                                                        "Select Savings Account",
+                                                        acc => acc.account_type === 'SAVINGS' || acc.account_type === 'INVESTMENT'
+                                                    )}
+                                                </div>
+
+                                                <button
+                                                    onClick={() => handleExecute(surplusTargetId, currentSurplus)}
+                                                    disabled={!surplusTargetId || distributing}
+                                                    className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${!surplusTargetId
+                                                        ? 'bg-slate-700 text-gray-400 cursor-not-allowed'
+                                                        : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/20'
+                                                        }`}
+                                                >
+                                                    {distributing ? <RefreshCw className="animate-spin w-4 h-4" /> : 'Confirm Transfer'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                                 {previewData.allocations.length === 0 && (
                                     <div className="col-span-full text-center py-12 text-gray-500">
                                         <p className="text-lg font-medium">No transfers needed.</p>

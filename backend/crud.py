@@ -513,6 +513,7 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     return schemas.AllocationPreviewResponse(
         total_amount=total, 
         total_required=total_required,
+        surplus=running_balance,
         allocations=result_list,
         skipped_items=skipped_items,
         fulfilled_items=fulfilled_items
