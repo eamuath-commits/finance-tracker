@@ -486,6 +486,10 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
         if item.amount <= 0:
             continue
             
+        # Filter if specific target requested
+        if req.target_account_id and item.target_account_id != req.target_account_id:
+            continue
+            
         t_out = schemas.TransactionCreate(
             account_id=source_acc.id,
             amount=-item.amount, 

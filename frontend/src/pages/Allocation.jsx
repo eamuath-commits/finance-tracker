@@ -104,19 +104,33 @@ const Allocation = () => {
         }
     };
 
-    const handleExecute = async () => {
-        if (!confirm("Are you sure you want to execute these transfers? This matches your Budgeted obligations.")) return;
+    const handleExecute = async (targetAccountId) => {
+        if (!confirm("Execute this transfer?")) return;
 
         setDistributing(true);
         try {
             const res = await axios.post(`${API_URL}/allocation/execute`, {
                 source_account_id: sourceAccountId,
-                month_offset: monthOffset
+                month_offset: monthOffset,
+                target_account_id: targetAccountId
             });
-            setDistributionResult(res.data);
-            setPreviewData(null);
-            // Refresh accounts to show new balances?
-            // Maybe just show success message.
+
+            // Update Preview Data locally by removing the executed item
+            if (previewData) {
+                const remaining = previewData.allocations.filter(item => item.target_account_id !== targetAccountId);
+                const newTotal = remaining.reduce((sum, item) => sum + item.amount, 0);
+
+                if (remaining.length === 0) {
+                    setDistributionResult(res.data);
+                    setPreviewData(null);
+                } else {
+                    setPreviewData({
+                        ...previewData,
+                        total_amount: newTotal,
+                        allocations: remaining
+                    });
+                }
+            }
         } catch (error) {
             console.error("Execution failed:", error);
             alert("Transfer execution failed.");
@@ -274,13 +288,20 @@ const Allocation = () => {
                             <div className="space-y-3">
                                 {previewData.allocations.map((item, idx) => (
                                     <div key={idx} className="flex items-center justify-between p-4 bg-slate-900 rounded-lg border-l-4 border-emerald-500">
-                                        <div>
+                                        <div className="flex-1">
                                             <p className="text-emerald-400 font-bold text-lg">{item.amount.toLocaleString()}</p>
                                             <p className="text-xs text-gray-500 uppercase tracking-wider">To: {item.target_account_name}</p>
                                         </div>
-                                        <div className="text-right">
+                                        <div className="text-right flex-1 pr-4">
                                             <p className="text-gray-300 font-medium text-sm">{item.name}</p>
                                         </div>
+                                        <button
+                                            onClick={() => handleExecute(item.target_account_id)}
+                                            disabled={distributing}
+                                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold rounded-lg shadow-md transition-all active:scale-95"
+                                        >
+                                            Transfer
+                                        </button>
                                     </div>
                                 ))}
                                 {previewData.allocations.length === 0 && (
@@ -297,14 +318,6 @@ const Allocation = () => {
                                 >
                                     Back
                                 </button>
-                                <button
-                                    onClick={handleExecute}
-                                    disabled={previewData.allocations.length === 0 || distributing}
-                                    className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg shadow-lg flex items-center justify-center gap-2 transition-all"
-                                >
-                                    {distributing ? 'Processing...' : 'Confirm & Execute'}
-                                    <CheckCircle size={18} />
-                                </button>
                             </div>
                         </div>
                     )}
@@ -317,7 +330,7 @@ const Allocation = () => {
                             <div>
                                 <h2 className="text-3xl font-bold text-white mb-2">Success!</h2>
                                 <p className="text-gray-300">
-                                    Successfully executed <strong>{distributionResult.transfers_count}</strong> transfers.
+                                    Transfers executed successfully.
                                 </p>
                                 <p className="text-sm text-gray-500 mt-2">Your account balances have been updated.</p>
                             </div>

@@ -217,6 +217,7 @@ class AllocationPreviewResponse(BaseModel):
 class AllocationExecuteRequest(BaseModel):
     source_account_id: str
     month_offset: Optional[int] = 0
+    target_account_id: Optional[str] = None
 
 class CategoryBase(BaseModel):
     name: str
