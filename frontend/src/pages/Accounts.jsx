@@ -59,13 +59,15 @@ const AccountCard = ({ acc, onEdit = null }) => {
                     {/* Logos: Network & Bank */}
                     <div className="flex flex-col items-end gap-1">
                         {/* Network Logo */}
-                        <div className="h-14">
-                            {isCreditCard ? (
-                                <img src="/visa-logo.png" alt="Visa" className="h-full object-contain" />
-                            ) : (
-                                <img src="/mada-logo.png" alt="Mada" className="h-full object-contain" style={{ filter: 'invert(1) hue-rotate(180deg)' }} />
-                            )}
-                        </div>
+                        {(acc.account_type === 'Credit Card' || acc.account_type === 'Checking') && (
+                            <div className="h-14">
+                                {acc.account_type === 'Credit Card' ? (
+                                    <img src="/visa-logo.png" alt="Visa" className="h-full object-contain" />
+                                ) : (
+                                    <img src="/mada-logo.png" alt="Mada" className="h-full object-contain" style={{ filter: 'invert(1) hue-rotate(180deg)' }} />
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 
