@@ -79,13 +79,11 @@ const AccountCard = ({ acc, onEdit = null }) => {
                     </button>
                 )}
 
-                {/* Middle (Chip & Aliases) */}
-                <div className="flex justify-between items-center my-1">
-                    <ChipIcon className="w-8 h-8 text-yellow-500/80 opacity-80" style={{ transform: 'rotate(90deg)' }} />
-
+                {/* Middle (Aliases) */}
+                <div className="flex justify-end items-center my-2">
                     {/* Aliases Chips */}
                     {acc.aliases && acc.aliases.length > 0 && (
-                        <div className="flex gap-1 flex-wrap justify-end max-w-[60%]">
+                        <div className="flex gap-1 flex-wrap justify-end max-w-full">
                             {acc.aliases.map(a => (
                                 <span key={a.id} className="text-[10px] bg-black/30 px-1.5 py-0.5 rounded-full border border-white/5 backdrop-blur-sm text-gray-300">
                                     {a.alias_name}
