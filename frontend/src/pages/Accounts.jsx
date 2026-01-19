@@ -255,7 +255,7 @@ const Accounts = () => {
     // Account Modal State
     const [showAccountModal, setShowAccountModal] = useState(false);
     const [editingId, setEditingId] = useState(null);
-    const [accountForm, setAccountForm] = useState({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '', credit_limit: '', aliases: [] });
+    const [accountForm, setAccountForm] = useState({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '', credit_limit: '', aliases: [], is_income: false });
 
     // Transaction Modal State
     const [showTxModal, setShowTxModal] = useState(false);
@@ -411,7 +411,7 @@ const Accounts = () => {
             }
             setShowAccountModal(false);
             setEditingId(null);
-            setAccountForm({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '', credit_limit: '', aliases: [], bank_name: '', bank_logo_url: '' });
+            setAccountForm({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '', credit_limit: '', aliases: [], bank_name: '', bank_logo_url: '', is_income: false });
             fetchData();
         } catch (err) { alert('Error saving account'); }
     };
@@ -428,11 +428,12 @@ const Accounts = () => {
                 aliases: acc.aliases || [],
                 bank_name: acc.bank_name || '',
                 bank_logo_url: acc.bank_logo_url || '',
-                bank_website: acc.bank_logo_url ? acc.bank_logo_url.replace('https://logo.clearbit.com/', '') : ''
+                bank_website: acc.bank_logo_url ? acc.bank_logo_url.replace('https://logo.clearbit.com/', '') : '',
+                is_income: acc.is_income || false
             });
         } else {
             setEditingId(null);
-            setAccountForm({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '', credit_limit: '', aliases: [], bank_name: '', bank_logo_url: '', bank_website: '' });
+            setAccountForm({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '', credit_limit: '', aliases: [], bank_name: '', bank_logo_url: '', bank_website: '', is_income: false });
         }
         setShowAccountModal(true);
     };

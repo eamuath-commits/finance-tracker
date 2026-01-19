@@ -159,14 +159,14 @@ const Allocation = () => {
         }
     };
 
-    const renderAccountSelect = (currentValue, onChange, placeholder = "Select Target Account") => (
+    const renderAccountSelect = (currentValue, onChange, placeholder = "Select Target Account", filterFn = null) => (
         <select
             value={currentValue || ''}
             onChange={(e) => onChange(e.target.value)}
             className="bg-slate-700 text-white text-sm rounded-lg px-3 py-2 border border-slate-600 focus:ring-2 focus:ring-blue-500 outline-none w-full md:w-64"
         >
             <option value="">{placeholder}</option>
-            {accounts.map(acc => (
+            {accounts.filter(acc => filterFn ? filterFn(acc) : true).map(acc => (
                 <option key={acc.id} value={acc.id}>{acc.name} ({acc.account_type})</option>
             ))}
         </select>
@@ -284,7 +284,12 @@ const Allocation = () => {
 
                             <div className="space-y-4 bg-slate-900/50 p-6 rounded-xl border border-slate-700/50">
                                 <label className="block text-sm font-medium text-gray-400 mb-1">Source Account (Income)</label>
-                                {renderAccountSelect(sourceAccountId, setSourceAccountId, "Select Account with Income")}
+                                {renderAccountSelect(
+                                    sourceAccountId,
+                                    setSourceAccountId,
+                                    "Select Account with Income",
+                                    (acc) => acc.is_income
+                                )}
                             </div>
 
                             <button

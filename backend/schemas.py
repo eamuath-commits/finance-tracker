@@ -13,6 +13,7 @@ class AccountBase(BaseModel):
     minimum_payment: Optional[float] = None
     bank_name: Optional[str] = None
     bank_logo_url: Optional[str] = None
+    is_income: Optional[bool] = False
 
 class AccountCreate(AccountBase):
     pass
@@ -27,6 +28,7 @@ class AccountUpdate(BaseModel):
     minimum_payment: Optional[float] = None
     bank_name: Optional[str] = None
     bank_logo_url: Optional[str] = None
+    is_income: Optional[bool] = None
 
 class AccountAliasBase(BaseModel):
     alias_name: str

@@ -108,6 +108,15 @@ def run_migrations(engine):
                     conn.execute(text("ALTER TABLE obligations ADD COLUMN display_order INTEGER DEFAULT 0"))
                     conn.commit()
 
+        # Check accounts table for is_income
+        if 'accounts' in inspector.get_table_names():
+            a_columns = [col['name'] for col in inspector.get_columns('accounts')]
+            if 'is_income' not in a_columns:
+                print("Migrating: Adding is_income to accounts")
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE accounts ADD COLUMN is_income BOOLEAN DEFAULT FALSE"))
+                    conn.commit()
+
     except Exception as e:
         print(f"Migration failed: {e}")
 

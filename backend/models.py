@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Date, Enum, Text
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Date, Enum, Text, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
@@ -26,6 +26,7 @@ class Account(Base):
     credit_limit = Column(Float, nullable=True) 
     interest_rate = Column(Float, nullable=True) # APR for Credit Cards
     minimum_payment = Column(Float, nullable=True) # Minimum monthly payment
+    is_income = Column(Boolean, default=False)
     
     transactions = relationship("Transaction", back_populates="account")
     aliases = relationship("AccountAlias", back_populates="account", cascade="all, delete-orphan")
