@@ -41,13 +41,13 @@ class AccountAlias(AccountAliasBase):
     id: int
     account_id: str
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class Account(AccountBase):
     id: str
     aliases: List[AccountAlias] = []
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class TransactionBase(BaseModel):
     amount: float
@@ -74,7 +74,7 @@ class Transaction(TransactionBase):
     timestamp: datetime
     balance_after_transaction: Optional[float] = None
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class LoanBase(BaseModel):
     name: str
@@ -105,7 +105,7 @@ class Loan(LoanBase):
     due_day: Optional[int] = None
     display_order: int = 0
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class ObligationBase(BaseModel):
     name: str
@@ -123,7 +123,7 @@ class ObligationUpdate(ObligationBase):
 class Obligation(ObligationBase):
     id: str
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class SMSPayload(BaseModel):
     body: str
@@ -150,7 +150,7 @@ class PaymentUpdate(BaseModel):
 class Payment(PaymentBase):
     obligation_id: str
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class ReorderSchema(BaseModel):
     ordered_ids: List[str]
@@ -165,7 +165,7 @@ class RawMessageBase(BaseModel):
 class RawMessage(RawMessageBase):
     id: str
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class SavingsGoalBase(BaseModel):
     name: str
@@ -189,7 +189,7 @@ class SavingsGoalUpdate(BaseModel):
 class SavingsGoal(SavingsGoalBase):
     id: str
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class AllocationRuleBase(BaseModel):
     rule_type: str # "CATEGORY" or "LOAN"
@@ -202,7 +202,7 @@ class AllocationRuleCreate(AllocationRuleBase):
 class AllocationRule(AllocationRuleBase):
     id: str
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class AllocationPreviewItem(BaseModel):
     rule_type: str

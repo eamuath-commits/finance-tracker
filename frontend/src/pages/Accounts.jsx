@@ -49,31 +49,36 @@ const AccountCard = ({ acc, onEdit = null }) => {
 
                 {/* Header */}
                 <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2">
-                        <div className="p-1.5 bg-white/10 rounded-lg backdrop-blur-md">
-                            {theme.icon}
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-white/10 rounded-xl backdrop-blur-md shadow-inner border border-white/5">
+                            {/* Bank Logo if valid, else Theme Icon */}
+                            {(acc.bank_logo_url || acc.bank_name) ? (
+                                <img
+                                    src={acc.bank_logo_url || getLocalLogo(acc.bank_name)}
+                                    alt={acc.bank_name}
+                                    className="w-8 h-8 object-contain drop-shadow-sm"
+                                    onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }}
+                                />
+                            ) : null}
+                            <div className={`${(acc.bank_logo_url || acc.bank_name) ? 'hidden' : 'block'}`}>
+                                {theme.icon}
+                            </div>
                         </div>
-                        <span className="font-semibold tracking-wide text-sm opacity-90">{acc.name}</span>
+                        <div className="flex flex-col">
+                            {acc.bank_name && <span className="text-[10px] uppercase tracking-wider opacity-75 leading-tight">{acc.bank_name}</span>}
+                            <span className="font-bold tracking-wide text-base">{acc.name}</span>
+                        </div>
                     </div>
-                    {/* Logo (Bank or Network) */}
-                    {/* Logos: Network & Bank */}
+
+                    {/* Network Logo (Visa/Mada) */}
                     <div className="flex flex-col items-end gap-1">
-                        {/* Network Logo */}
                         {(() => {
-                            const hasAliases = Array.isArray(acc.aliases) && acc.aliases.length > 0;
-                            const showLogo = isCreditCard || hasAliases;
+                            const showVisa = isCreditCard;
+                            const showMada = !isCreditCard; // Assume everything else is Mada/Debit for now in SA context
 
-                            if (!showLogo) return null;
-
-                            return (
-                                <div className="h-16">
-                                    {isCreditCard ? (
-                                        <img src="/visa-logo.png" alt="Visa" className="h-full object-contain" />
-                                    ) : (
-                                        <img src="/mada-logo.png" alt="Mada" className="h-full object-contain" style={{ filter: 'invert(1) hue-rotate(180deg)' }} />
-                                    )}
-                                </div>
-                            );
+                            if (showVisa) return <img src="/visa-logo.png" alt="Visa" className="h-10 object-contain drop-shadow-md" />;
+                            if (showMada) return <img src="/mada-logo.png" alt="Mada" className="h-8 object-contain drop-shadow-md" style={{ filter: 'brightness(0) invert(1)' }} />;
+                            return null;
                         })()}
                     </div>
                 </div>
@@ -817,20 +822,25 @@ const Accounts = () => {
                                     </div>
                                     <p className="text-[10px] text-gray-500 mt-1">Using local icons (Focus: AJB & Other).</p>
                                 </div>
-                                {(accountForm.bank_logo_url || accountForm.bank_name) && (
-                                    <div className="mt-6">
+                                <div className="mt-5 flex flex-col items-center gap-2">
+                                    {(accountForm.bank_logo_url || accountForm.bank_name) && (
                                         <img
-                                            key={accountForm.bank_logo_url || accountForm.bank_name}
-                                            src={(accountForm.bank_logo_url && accountForm.bank_logo_url.startsWith('/')) ? accountForm.bank_logo_url : getLocalLogo(accountForm.bank_name)}
+                                            src={(accountForm.bank_logo_url && accountForm.bank_logo_url.startsWith('/')) ? accountForm.bank_logo_url : (accountForm.bank_logo_url || getLocalLogo(accountForm.bank_name))}
                                             alt="Logo"
                                             className="w-10 h-10 rounded-xl bg-slate-800 p-1 object-contain border border-slate-600 shadow-sm"
-                                            onError={(e) => {
-                                                e.target.onerror = null;
-                                                e.target.src = '/banks/bank2.png';
-                                            }}
+                                            onError={(e) => { e.target.src = '/banks/bank2.png'; }}
                                         />
-                                    </div>
-                                )}
+                                    )}
+                                    {/* Tiny Input for Custom URL */}
+                                    <input
+                                        type="text"
+                                        placeholder="Logo URL"
+                                        className="w-20 text-[10px] bg-slate-800 border border-slate-600 rounded px-1 py-0.5 text-gray-400 focus:w-48 transition-all"
+                                        value={accountForm.bank_logo_url || ''}
+                                        onChange={e => setAccountForm({ ...accountForm, bank_logo_url: e.target.value })}
+                                        title="Paste a custom logo URL here"
+                                    />
+                                </div>
                             </div>
 
                             <div className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg border border-slate-600 my-4">

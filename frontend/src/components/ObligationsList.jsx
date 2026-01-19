@@ -55,6 +55,26 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
         }
     };
 
+    // Brand Logic
+    const getBrandInfo = (name) => {
+        const n = name.toLowerCase();
+        if (n.includes('netflix')) return { domain: 'netflix.com', color: '#E50914' };
+        if (n.includes('spotify')) return { domain: 'spotify.com', color: '#1DB954' };
+        if (n.includes('youtube')) return { domain: 'youtube.com', color: '#FF0000' };
+        if (n.includes('osn')) return { domain: 'osn.com', color: '#2d2d2d' };
+        if (n.includes('stc')) return { domain: 'stc.com.sa', color: '#4F008C' };
+        if (n.includes('mobily')) return { domain: 'mobily.com.sa', color: '#0099D6' };
+        if (n.includes('zain')) return { domain: 'zain.com', color: '#000000' };
+        if (n.includes('amazon')) return { domain: 'amazon.sa', color: '#FF9900' };
+        if (n.includes('apple')) return { domain: 'apple.com', color: '#999999' };
+        if (n.includes('microsoft')) return { domain: 'microsoft.com', color: '#00A4EF' };
+        if (n.includes('adobe')) return { domain: 'adobe.com', color: '#FF0000' };
+        if (n.includes('chatgpt') || n.includes('openai')) return { domain: 'openai.com', color: '#10A37F' };
+        return null;
+    };
+
+    const brand = getBrandInfo(obl.name);
+
     return (
         <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition group relative">
             <div className="bg-slate-900/40 px-3 py-2 border-b border-slate-700 flex justify-between items-center pl-8"> {/* Added pl-8 for drag handle */}
@@ -63,10 +83,20 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
                     <GripVertical size={14} className="text-gray-400" />
                 </div>
 
-                <div className="flex items-center gap-2">
-                    {/* Icon next to name */}
-                    <div className="text-slate-400 opacity-70 scale-75">
-                        {CATEGORY_ICONS[obl.category] || <Box size={20} />}
+                <div className="flex items-center gap-3">
+                    {/* Icon: Method 1 (Brand Logo), Method 2 (Category Icon) */}
+                    <div className="flex-shrink-0">
+                        {brand ? (
+                            <img
+                                src={`https://logo.clearbit.com/${brand.domain}`}
+                                alt={obl.name}
+                                className="w-6 h-6 rounded-full object-cover border border-white/10 shadow-sm"
+                                onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }}
+                            />
+                        ) : null}
+                        <div className={`text-slate-400 opacity-70 scale-75 ${brand ? 'hidden' : 'block'}`}>
+                            {CATEGORY_ICONS[obl.category] || <Box size={24} />}
+                        </div>
                     </div>
                     <h3 className="text-sm font-bold text-white truncate max-w-[150px]">{obl.name}</h3>
                     <span className="text-[10px] text-gray-500">Day: {obl.due_day}</span>
