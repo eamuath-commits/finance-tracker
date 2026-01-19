@@ -11,6 +11,8 @@ from datetime import datetime
 
 # Import local backend modules
 import database
+from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters, TypeHandler
+import database
 import models
 import crud
 import schemas
@@ -187,7 +189,13 @@ if __name__ == '__main__':
 
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     
+    async def debug_log_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        logger.info(f"raw_update: {update.to_dict()}")
+
     # Handlers
+    # Add debug handler FIRST to catch everything
+    app.add_handler(TypeHandler(Update, debug_log_update), group=-1)
+
     start_handler = MessageHandler(filters.COMMAND & filters.Regex(r"^/start"), lambda u, c: u.message.reply_text("👋 Hello! I am your SMS Finance Agent. Forward me a bank SMS!"))
     
     # Catch ALL non-command updates to debug why forwards are missed
