@@ -85,13 +85,29 @@ const Allocation = () => {
         }
     };
 
-    const handleRunPreview = async () => {
-        // Clear previous edits on new run
-        setEditableAmounts({});
-        if (!sourceAccountId) {
-            alert("Please select a source account");
-            return;
+    // Auto-select Source Account when accounts load
+    useEffect(() => {
+        if (accounts.length > 0 && !sourceAccountId) {
+            // Prefer 'Checking' or just first account
+            const defaultAcc = accounts.find(a => a.account_type === 'Checking') || accounts[0];
+            if (defaultAcc) setSourceAccountId(defaultAcc.id);
         }
+    }, [accounts]);
+
+    // Auto-Run Preview when Source or Tab changes
+    useEffect(() => {
+        if (activeTab === 'distributor' && sourceAccountId) {
+            handleRunPreview();
+        }
+    }, [activeTab, sourceAccountId]);
+
+    const handleRunPreview = async () => {
+        // Clear previous edits on new run ONLY if switching accounts significantly, 
+        // but for now let's keep edits if possible? No, safer to reset if source changes context.
+        // Actually user might just be toggling source.
+        setEditableAmounts({});
+        if (!sourceAccountId) return;
+
         setDistributing(true);
         try {
             const res = await axios.post(`${API_URL}/allocation/preview`, {
@@ -102,7 +118,6 @@ const Allocation = () => {
             setDistributionResult(null);
         } catch (error) {
             console.error("Preview failed:", error);
-            alert("Failed to generate preview");
         } finally {
             setDistributing(false);
         }
@@ -139,17 +154,19 @@ const Allocation = () => {
                 if (remaining.length === 0) {
                     setDistributionResult(res.data);
                     setPreviewData(null);
+                    // Refresh Account Balances
+                    const accRes = await axios.get(`${API_URL}/accounts/`);
+                    setAccounts(accRes.data);
                 } else {
                     setPreviewData({
                         ...previewData,
                         total_amount: newTotal,
                         allocations: remaining
                     });
+                    // Refresh Account Balances quietly
+                    const accRes = await axios.get(`${API_URL}/accounts/`);
+                    setAccounts(accRes.data);
                 }
-
-                // Refresh Account Balances
-                const accRes = await axios.get(`${API_URL}/accounts/`);
-                setAccounts(accRes.data);
             }
         } catch (error) {
             console.error("Execution failed:", error);
@@ -159,11 +176,11 @@ const Allocation = () => {
         }
     };
 
-    const renderAccountSelect = (currentValue, onChange, placeholder = "Select Target Account", filterFn = null) => (
+    const renderAccountSelect = (currentValue, onChange, placeholder = "Select Account", filterFn = null) => (
         <select
             value={currentValue || ''}
             onChange={(e) => onChange(e.target.value)}
-            className="bg-slate-700 text-white text-sm rounded-lg px-3 py-2 border border-slate-600 focus:ring-2 focus:ring-blue-500 outline-none w-full md:w-64"
+            className="bg-slate-700 text-white text-sm rounded-lg px-3 py-2 border border-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none w-full"
         >
             <option value="">{placeholder}</option>
             {accounts.filter(acc => filterFn ? filterFn(acc) : true).map(acc => (
@@ -271,53 +288,47 @@ const Allocation = () => {
 
             {/* --- TAB 2: DISTRIBUTOR --- */}
             {activeTab === 'distributor' && (
-                <div className={previewData ? "w-full animate-fade-in" : "bg-slate-800 p-8 rounded-xl border border-slate-700 shadow-xl max-w-3xl mx-auto transition-all"}>
-                    {!previewData && !distributionResult && (
-                        <div className="space-y-8">
-                            <div className="text-center space-y-2">
-                                <RefreshCw className="w-12 h-12 text-emerald-500 mx-auto animate-pulse" />
-                                <h2 className="text-2xl font-bold text-white">Run Payday Routine</h2>
-                                <p className="text-gray-400 max-w-md mx-auto">
-                                    Select the account where your income was deposited. We will calculate transfers based on your <strong>Budgeted</strong> obligations for this month.
-                                </p>
-                            </div>
+                <div className="w-full space-y-6 animate-fade-in">
 
-                            <div className="space-y-4 bg-slate-900/50 p-6 rounded-xl border border-slate-700/50">
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Source Account (Income)</label>
+                    {/* Dashboard Header & Controls */}
+                    <div className="flex flex-col md:flex-row justify-between items-center bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg gap-4">
+                        <div>
+                            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                                <RefreshCw className={`w-6 h-6 text-emerald-500 ${distributing ? 'animate-spin' : ''}`} />
+                                Payday Distributor
+                            </h2>
+                            <p className="text-gray-400 text-sm mt-1">
+                                {previewData ? (
+                                    <>To Distribute: <span className="text-emerald-400 font-bold">{formatCurrency((previewData?.total_amount || 0))}</span></>
+                                ) : "Calculating transfers..."}
+                            </p>
+                        </div>
+
+                        <div className="flex items-center gap-4 w-full md:w-auto">
+                            <div className="w-full md:w-64">
+                                <label className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1 block">Source Income Account</label>
                                 {renderAccountSelect(
                                     sourceAccountId,
                                     setSourceAccountId,
-                                    "Select Account with Income",
-                                    (acc) => acc.is_income
+                                    "Select Source Account",
+                                    null
                                 )}
                             </div>
 
-                            <button
-                                onClick={handleRunPreview}
-                                disabled={distributing || !sourceAccountId}
-                                className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl shadow-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2"
-                            >
-                                {distributing ? 'Analyzing...' : 'Analyze & Preview Transfers'}
-                                {!distributing && <ArrowRight size={20} />}
-                            </button>
+                            {/* Bal Display */}
+                            {sourceAccountId && (
+                                <div className="text-right hidden sm:block">
+                                    <span className="text-xs text-gray-500 block uppercase font-bold tracking-wider">Available</span>
+                                    <span className={`text-xl font-mono font-bold ${(accounts.find(a => a.id === sourceAccountId)?.current_balance || 0) < (previewData?.total_amount || 0) ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                        {formatCurrency(accounts.find(a => a.id === sourceAccountId)?.current_balance || 0)}
+                                    </span>
+                                </div>
+                            )}
                         </div>
-                    )}
+                    </div>
 
                     {previewData && (
-                        <div className="space-y-6 animate-fade-in">
-                            <div className="text-center">
-                                <h2 className="text-2xl font-bold text-white">Proposed Transfers</h2>
-                                <p className="text-gray-400">Total to Distribute: <span className="text-emerald-400 font-bold text-lg">{previewData.total_amount.toLocaleString()}</span></p>
-                                {sourceAccountId && (
-                                    <p className="text-gray-400 mt-1">
-                                        Source Balance: <span className={`${(accounts.find(a => a.id === sourceAccountId)?.current_balance || 0) < previewData.total_amount ? 'text-amber-400' : 'text-emerald-400'} font-bold`}>
-                                            {(accounts.find(a => a.id === sourceAccountId)?.current_balance || 0).toLocaleString()}
-                                        </span>
-                                    </p>
-                                )}
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                                 {previewData.allocations.map((item, idx) => {
                                     const sourceBalance = accounts.find(a => a.id === sourceAccountId)?.current_balance || 0;
                                     const targetAcc = accounts.find(a => a.id === item.target_account_id);
@@ -417,57 +428,58 @@ const Allocation = () => {
                             </div>
 
                             {/* Transparency Logs */}
-                            {(previewData.fulfilled_items?.length > 0) && (
-                                <div className="mt-8 bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
-                                    <h3 className="text-blue-400 font-bold mb-2 text-sm uppercase tracking-wider flex items-center gap-2">
-                                        <CheckCircle size={16} /> Covered by Existing Balance
-                                    </h3>
-                                    <ul className="text-sm text-gray-400 space-y-1">
-                                        {previewData.fulfilled_items.map((item, i) => (
-                                            <li key={i}>{item}</li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-
-                            {(previewData.skipped_items?.length > 0) && (
-                                <div className="mt-4 bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-                                    <h3 className="text-gray-400 font-bold mb-2 text-sm uppercase tracking-wider flex items-center gap-2">
-                                        <AlertCircle size={16} /> Unallocated Items (No Rule Matched)
-                                    </h3>
-                                    <ul className="text-sm text-gray-500 space-y-1">
-                                        {previewData.skipped_items.map((item, i) => (
-                                            <li key={i}>{item}</li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
+                    {(previewData.fulfilled_items?.length > 0) && (
+                        <div className="mt-8 bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+                            <h3 className="text-blue-400 font-bold mb-2 text-sm uppercase tracking-wider flex items-center gap-2">
+                                <CheckCircle size={16} /> Covered by Existing Balance
+                            </h3>
+                            <ul className="text-sm text-gray-400 space-y-1">
+                                {previewData.fulfilled_items.map((item, i) => (
+                                    <li key={i}>{item}</li>
+                                ))}
+                            </ul>
                         </div>
                     )}
 
-                    {distributionResult && (
-                        <div className="text-center space-y-6 animate-fade-in py-8">
-                            <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto">
-                                <CheckCircle className="w-10 h-10 text-emerald-500" />
-                            </div>
-                            <div>
-                                <h2 className="text-3xl font-bold text-white mb-2">Success!</h2>
-                                <p className="text-gray-300">
-                                    Transfers executed successfully.
-                                </p>
-                                <p className="text-sm text-gray-500 mt-2">Your account balances have been updated.</p>
-                            </div>
-                            <button
-                                onClick={() => { setDistributionResult(null); setSourceAccountId(''); }}
-                                className="px-8 py-3 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg transition-colors"
-                            >
-                                Done
-                            </button>
+                    {(previewData.skipped_items?.length > 0) && (
+                        <div className="mt-4 bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+                            <h3 className="text-gray-400 font-bold mb-2 text-sm uppercase tracking-wider flex items-center gap-2">
+                                <AlertCircle size={16} /> Unallocated Items (No Rule Matched)
+                            </h3>
+                            <ul className="text-sm text-gray-500 space-y-1">
+                                {previewData.skipped_items.map((item, i) => (
+                                    <li key={i}>{item}</li>
+                                ))}
+                            </ul>
                         </div>
                     )}
                 </div>
             )}
+
+            {distributionResult && (
+                <div className="text-center space-y-6 animate-fade-in py-8">
+                    <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto">
+                        <CheckCircle className="w-10 h-10 text-emerald-500" />
+                    </div>
+                    <div>
+                        <h2 className="text-3xl font-bold text-white mb-2">Success!</h2>
+                        <p className="text-gray-300">
+                            Transfers executed successfully.
+                        </p>
+                        <p className="text-sm text-gray-500 mt-2">Your account balances have been updated.</p>
+                    </div>
+                    <button
+                        onClick={() => { setDistributionResult(null); setSourceAccountId(''); }}
+                        className="px-8 py-3 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg transition-colors"
+                    >
+                        Done
+                    </button>
+                </div>
+            )}
         </div>
+    )
+}
+        </div >
     );
 };
 
