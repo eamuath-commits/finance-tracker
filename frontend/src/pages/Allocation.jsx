@@ -189,6 +189,11 @@ const Allocation = () => {
         </select>
     );
 
+    // Calculate dynamic total based on edits
+    const currentDistributingTotal = previewData ? previewData.allocations.reduce((sum, item) => {
+        return sum + (editableAmounts[item.identifier] !== undefined ? editableAmounts[item.identifier] : item.amount);
+    }, 0) : 0;
+
     return (
         <div className="space-y-8 animate-fade-in pb-20">
             {/* Header & Tabs */}
@@ -300,10 +305,10 @@ const Allocation = () => {
                             <div className="text-sm mt-1 flex flex-col sm:flex-row gap-2 sm:gap-6">
                                 {previewData ? (
                                     <>
-                                        <span className="text-gray-400">Total Obligation: <span className="text-white font-bold">{formatCurrency(previewData.total_required || previewData.total_amount)}</span></span>
-                                        <span className="text-gray-400">Distributing: <span className="text-emerald-400 font-bold">{formatCurrency(previewData.total_amount)}</span></span>
-                                        {((previewData.total_required || previewData.total_amount) - previewData.total_amount) > 0.01 && (
-                                            <span className="text-amber-500 font-bold">Uncovered Gap: {formatCurrency((previewData.total_required || previewData.total_amount) - previewData.total_amount)}</span>
+                                        <span className="text-gray-400">Total Obligation: <span className="text-white font-bold">{formatCurrency(previewData.total_required || currentDistributingTotal)}</span></span>
+                                        <span className="text-gray-400">Distributing: <span className="text-emerald-400 font-bold">{formatCurrency(currentDistributingTotal)}</span></span>
+                                        {((previewData.total_required || currentDistributingTotal) - currentDistributingTotal) > 0.01 && (
+                                            <span className="text-amber-500 font-bold">Uncovered Gap: {formatCurrency((previewData.total_required || currentDistributingTotal) - currentDistributingTotal)}</span>
                                         )}
                                     </>
                                 ) : (
@@ -328,7 +333,7 @@ const Allocation = () => {
                                 <div className="text-right hidden sm:block">
                                     {(() => {
                                         const bal = accounts.find(a => a.id === sourceAccountId)?.current_balance || 0;
-                                        const dist = previewData?.total_amount || 0;
+                                        const dist = currentDistributingTotal;
                                         const remaining = bal - dist;
                                         return (
                                             <>
