@@ -328,7 +328,8 @@ const Allocation = () => {
                     </div>
 
                     {previewData && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                        <>
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                                 {previewData.allocations.map((item, idx) => {
                                     const sourceBalance = accounts.find(a => a.id === sourceAccountId)?.current_balance || 0;
                                     const targetAcc = accounts.find(a => a.id === item.target_account_id);
@@ -418,67 +419,58 @@ const Allocation = () => {
                                 )}
                             </div>
 
-                            <div className="flex gap-4 pt-4">
-                                <button
-                                    onClick={() => setPreviewData(null)}
-                                    className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg transition-colors"
-                                >
-                                    Back
-                                </button>
-                            </div>
-
                             {/* Transparency Logs */}
-                    {(previewData.fulfilled_items?.length > 0) && (
-                        <div className="mt-8 bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
-                            <h3 className="text-blue-400 font-bold mb-2 text-sm uppercase tracking-wider flex items-center gap-2">
-                                <CheckCircle size={16} /> Covered by Existing Balance
-                            </h3>
-                            <ul className="text-sm text-gray-400 space-y-1">
-                                {previewData.fulfilled_items.map((item, i) => (
-                                    <li key={i}>{item}</li>
-                                ))}
-                            </ul>
-                        </div>
+                            {(previewData.fulfilled_items?.length > 0) && (
+                                <div className="mt-8 bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+                                    <h3 className="text-blue-400 font-bold mb-2 text-sm uppercase tracking-wider flex items-center gap-2">
+                                        <CheckCircle size={16} /> Covered by Existing Balance
+                                    </h3>
+                                    <ul className="text-sm text-gray-400 space-y-1">
+                                        {previewData.fulfilled_items.map((item, i) => (
+                                            <li key={i}>{item}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {(previewData.skipped_items?.length > 0) && (
+                                <div className="mt-4 bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+                                    <h3 className="text-gray-400 font-bold mb-2 text-sm uppercase tracking-wider flex items-center gap-2">
+                                        <AlertCircle size={16} /> Unallocated Items (No Rule Matched)
+                                    </h3>
+                                    <ul className="text-sm text-gray-500 space-y-1">
+                                        {previewData.skipped_items.map((item, i) => (
+                                            <li key={i}>{item}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </>
                     )}
 
-                    {(previewData.skipped_items?.length > 0) && (
-                        <div className="mt-4 bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-                            <h3 className="text-gray-400 font-bold mb-2 text-sm uppercase tracking-wider flex items-center gap-2">
-                                <AlertCircle size={16} /> Unallocated Items (No Rule Matched)
-                            </h3>
-                            <ul className="text-sm text-gray-500 space-y-1">
-                                {previewData.skipped_items.map((item, i) => (
-                                    <li key={i}>{item}</li>
-                                ))}
-                            </ul>
+                    {distributionResult && (
+                        <div className="text-center space-y-6 animate-fade-in py-8">
+                            <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto">
+                                <CheckCircle className="w-10 h-10 text-emerald-500" />
+                            </div>
+                            <div>
+                                <h2 className="text-3xl font-bold text-white mb-2">Success!</h2>
+                                <p className="text-gray-300">
+                                    Transfers executed successfully.
+                                </p>
+                                <p className="text-sm text-gray-500 mt-2">Your account balances have been updated.</p>
+                            </div>
+                            <button
+                                onClick={() => { setDistributionResult(null); setSourceAccountId(''); }}
+                                className="px-8 py-3 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg transition-colors"
+                            >
+                                Done
+                            </button>
                         </div>
                     )}
                 </div>
-            )}
-
-            {distributionResult && (
-                <div className="text-center space-y-6 animate-fade-in py-8">
-                    <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto">
-                        <CheckCircle className="w-10 h-10 text-emerald-500" />
-                    </div>
-                    <div>
-                        <h2 className="text-3xl font-bold text-white mb-2">Success!</h2>
-                        <p className="text-gray-300">
-                            Transfers executed successfully.
-                        </p>
-                        <p className="text-sm text-gray-500 mt-2">Your account balances have been updated.</p>
-                    </div>
-                    <button
-                        onClick={() => { setDistributionResult(null); setSourceAccountId(''); }}
-                        className="px-8 py-3 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg transition-colors"
-                    >
-                        Done
-                    </button>
-                </div>
-            )}
-        </div>
-    )
-}
+            )
+            }
         </div >
     );
 };
