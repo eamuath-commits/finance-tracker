@@ -31,6 +31,25 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - ./backend:/app
 
+  sms-agent:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+      - db
+      - backend
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/finance_db
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - ALLOWED_TELEGRAM_USERS=${ALLOWED_TELEGRAM_USERS}
+      - TZ=Asia/Riyadh
+    command: [ "python", "sms_agent.py" ]
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./backend:/app
+
   frontend:
     build:
       context: ./frontend
