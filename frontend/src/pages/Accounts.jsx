@@ -53,7 +53,7 @@ const AccountCard = ({ acc, onEdit = null }) => {
                         <div className="p-1.5 bg-white/10 rounded-lg backdrop-blur-md">
                             {theme.icon}
                         </div>
-                        <span className="font-semibold tracking-wide text-xs opacity-90">{acc.name}</span>
+                        <span className="font-semibold tracking-wide text-sm opacity-90">{acc.name}</span>
                     </div>
                     {/* Logo (Bank or Network) */}
                     {/* Logos: Network & Bank */}
@@ -87,7 +87,7 @@ const AccountCard = ({ acc, onEdit = null }) => {
                     {acc.aliases && acc.aliases.length > 0 && (
                         <div className="flex gap-1 flex-wrap justify-end max-w-[60%]">
                             {acc.aliases.map(a => (
-                                <span key={a.id} className="text-[9px] bg-black/30 px-1.5 py-0.5 rounded-full border border-white/5 backdrop-blur-sm text-gray-300">
+                                <span key={a.id} className="text-[10px] bg-black/30 px-1.5 py-0.5 rounded-full border border-white/5 backdrop-blur-sm text-gray-300">
                                     {a.alias_name}
                                 </span>
                             ))}
@@ -99,19 +99,19 @@ const AccountCard = ({ acc, onEdit = null }) => {
                 <div>
                     <div className="flex justify-between items-end mb-1">
                         <div>
-                            <p className="text-[9px] uppercase tracking-wider opacity-70 mb-0.5">Current Balance</p>
-                            <p className="text-xl font-bold tracking-tight text-white drop-shadow-sm">{formatCurrency(acc.current_balance)}</p>
+                            <p className="text-[10px] uppercase tracking-wider opacity-70 mb-0.5">Current Balance</p>
+                            <p className="text-2xl font-bold tracking-tight text-white drop-shadow-sm">{formatCurrency(acc.current_balance)}</p>
                         </div>
                         <div className="text-right">
-                            <p className="text-[9px] uppercase tracking-wider opacity-70 mb-0.5">{acc.account_type}</p>
-                            <p className="font-mono text-xs tracking-widest opacity-90">•••• {acc.last_4_digits}</p>
+                            <p className="text-[10px] uppercase tracking-wider opacity-70 mb-0.5">{acc.account_type}</p>
+                            <p className="font-mono text-sm tracking-widest opacity-90">•••• {acc.last_4_digits}</p>
                         </div>
                     </div>
 
                     {/* Utilization Bar */}
                     {hasLimit && (
                         <div className="mt-2">
-                            <div className="flex justify-between text-[9px] opacity-70 mb-0.5">
+                            <div className="flex justify-between text-[10px] opacity-70 mb-0.5">
                                 <span>Credit Limit: {formatCurrency(acc.credit_limit)}</span>
                                 <span>{utilPercent.toFixed(0)}% Used</span>
                             </div>
