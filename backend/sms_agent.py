@@ -50,6 +50,12 @@ async def parse_with_ai(text: str):
     
     SMS: "{text}"
     
+    Rules:
+    1. Ignore "Forwarded message" headers.
+    2. Look for keywords like "Purchase", "PoS", "Transfer", "Deposit", "Withdrawal", "Payment".
+    3. Merchant is often after "At", "By", "To", or "Store".
+    4. If it looks like a card usage (e.g. "mada", "Visa", "MasterCard"), it IS a transaction.
+    
     Output JSON format:
     {{
       "is_transaction": boolean,
