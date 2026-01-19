@@ -59,7 +59,7 @@ const AccountCard = ({ acc, onEdit = null }) => {
                     {/* Logos: Network & Bank */}
                     <div className="flex flex-col items-end gap-1">
                         {/* Network Logo */}
-                        <div className="h-10">
+                        <div className="h-14">
                             {isCreditCard ? (
                                 <img src="/visa-logo.png" alt="Visa" className="h-full object-contain" />
                             ) : (
