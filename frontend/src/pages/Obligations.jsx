@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Modal, formatCurrency, inputClass, selectClass, SectionHeader } from '../components/UI';
-import { Calendar, Trash2, LayoutGrid, List, Receipt, Tag, Plus, Edit2 } from 'lucide-react';
+import { Calendar, Trash2, LayoutGrid, List, Receipt, Tag, Plus, Edit2, ArrowLeft } from 'lucide-react';
 import ObligationsOverview from '../components/ObligationsOverview';
 import ObligationsList from '../components/ObligationsList';
 import ObligationsTable from '../components/ObligationsTable';
