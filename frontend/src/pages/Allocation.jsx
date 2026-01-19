@@ -317,85 +317,109 @@ const Allocation = () => {
                                 )}
                             </div>
 
-                            <div className="space-y-4">
-                                {previewData.allocations.map((item, idx) => {
-                                    const sourceBalance = accounts.find(a => a.id === sourceAccountId)?.current_balance || 0;
-                                    const targetAcc = accounts.find(a => a.id === item.target_account_id);
+                            <div className="bg-slate-900/30 border border-slate-700/50 rounded-xl overflow-hidden">
+                                {/* Table Header (Desktop) */}
+                                <div className="hidden md:grid grid-cols-12 gap-4 p-4 text-xs font-semibold text-gray-500 uppercase tracking-wider bg-slate-800/80 border-b border-slate-700">
+                                    <div className="col-span-1 text-center">#</div>
+                                    <div className="col-span-5">Description</div>
+                                    <div className="col-span-3">Target Account</div>
+                                    <div className="col-span-3 text-right pr-4">Amount / Action</div>
+                                </div>
 
-                                    // Determine amount to use (edited or default)
-                                    const currentAmount = editableAmounts[item.identifier] !== undefined
-                                        ? editableAmounts[item.identifier]
-                                        : item.amount;
+                                <div className="divide-y divide-slate-700/50">
+                                    {previewData.allocations.map((item, idx) => {
+                                        const sourceBalance = accounts.find(a => a.id === sourceAccountId)?.current_balance || 0;
+                                        const targetAcc = accounts.find(a => a.id === item.target_account_id);
 
-                                    const shortage = Math.max(0, currentAmount - sourceBalance);
-                                    const willTransfer = Math.max(0, currentAmount - shortage);
+                                        // Determine amount to use (edited or default)
+                                        const currentAmount = editableAmounts[item.identifier] !== undefined
+                                            ? editableAmounts[item.identifier]
+                                            : item.amount;
 
-                                    return (
-                                        <div key={idx} className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-lg border transition-all ${shortage > 0 ? 'bg-amber-900/10 border-amber-500/50' : 'bg-slate-900/50 border-slate-700/50'}`}>
-                                            {/* Left: Identity */}
-                                            <div className="flex items-center gap-3 min-w-[200px]">
-                                                <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold shrink-0">
-                                                    {idx + 1}
+                                        const shortage = Math.max(0, currentAmount - sourceBalance);
+                                        const willTransfer = Math.max(0, currentAmount - shortage);
+                                        const isPartial = shortage > 0;
+
+                                        return (
+                                            <div key={idx} className={`grid grid-cols-1 md:grid-cols-12 gap-4 p-4 items-center transition-colors hover:bg-slate-800/30 ${isPartial ? 'bg-amber-900/5' : ''}`}>
+
+                                                {/* Index */}
+                                                <div className="col-span-1 hidden md:flex justify-center">
+                                                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs text-gray-400 font-mono">
+                                                        {idx + 1}
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="font-medium text-gray-200">{item.name}</p>
-                                                    <span className="text-xs text-gray-500 bg-slate-800 px-2 py-0.5 rounded-full">{item.rule_type}</span>
-                                                </div>
-                                            </div>
 
-                                            {/* Middle: Target Info */}
-                                            <div className="flex items-center gap-3 bg-slate-800/50 px-4 py-2 rounded-lg border border-slate-700/50">
-                                                <div className="text-right">
-                                                    <p className="text-xs text-gray-400">Target Account</p>
-                                                    <p className="text-sm font-medium text-gray-200">{item.target_account_name}</p>
-                                                    {targetAcc && (
-                                                        <p className="text-xs text-emerald-400/80">Bal: {targetAcc.current_balance.toLocaleString()}</p>
+                                                {/* Description */}
+                                                <div className="col-span-1 md:col-span-5">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="md:hidden w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-xs text-gray-400 font-mono shrink-0">
+                                                            {idx + 1}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-medium text-gray-200 text-sm leading-tight">{item.name}</p>
+                                                            <span className="inline-block mt-1 text-[10px] text-gray-500 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700">
+                                                                {item.rule_type}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Target Info */}
+                                                <div className="col-span-1 md:col-span-3">
+                                                    <div className="flex items-center gap-2 text-sm text-gray-300">
+                                                        <ArrowRight className="text-gray-600 shrink-0" size={14} />
+                                                        <div className="min-w-0">
+                                                            <p className="truncate font-medium">{item.target_account_name}</p>
+                                                            {targetAcc && (
+                                                                <p className="text-[10px] text-emerald-500/70">
+                                                                    Cur: {targetAcc.current_balance.toLocaleString()}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Action & Amount */}
+                                                <div className="col-span-1 md:col-span-3 flex flex-col items-end gap-2">
+                                                    <div className="flex items-center gap-2 w-full justify-end">
+                                                        <div className="relative w-28">
+                                                            <input
+                                                                type="number"
+                                                                value={currentAmount}
+                                                                onChange={(e) => {
+                                                                    const val = parseFloat(e.target.value) || 0;
+                                                                    setEditableAmounts(prev => ({
+                                                                        ...prev,
+                                                                        [item.identifier]: val
+                                                                    }));
+                                                                }}
+                                                                className={`w-full bg-slate-900 text-white text-right font-mono text-sm py-1.5 pl-2 pr-6 rounded border focus:ring-1 outline-none ${isPartial ? 'border-amber-500/50 focus:border-amber-500' : 'border-slate-600 focus:border-emerald-500'}`}
+                                                            />
+                                                        </div>
+                                                        <button
+                                                            onClick={() => handleExecute(item.target_account_id, currentAmount)}
+                                                            disabled={distributing || willTransfer <= 0}
+                                                            className={`px-3 py-1.5 h-full ${isPartial ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'} text-white text-xs font-bold rounded shadow-sm transition-all active:scale-95 disabled:opacity-50 min-w-[70px]`}
+                                                        >
+                                                            {isPartial ? 'Partial' : 'Pay'}
+                                                        </button>
+                                                    </div>
+                                                    {isPartial && (
+                                                        <p className="text-[10px] text-amber-500 font-medium flex items-center gap-1">
+                                                            ⚠️ Shortage: {shortage.toLocaleString()}
+                                                        </p>
                                                     )}
                                                 </div>
-                                                <ArrowRight className="text-gray-600" size={16} />
                                             </div>
-
-                                            {/* Right: Action & Amount */}
-                                            <div className="flex items-center gap-3 w-full md:w-auto">
-                                                <div className="relative">
-                                                    <input
-                                                        type="number"
-                                                        value={currentAmount}
-                                                        onChange={(e) => {
-                                                            const val = parseFloat(e.target.value) || 0;
-                                                            setEditableAmounts(prev => ({
-                                                                ...prev,
-                                                                [item.identifier]: val
-                                                            }));
-                                                        }}
-                                                        className={`w-32 bg-slate-800 text-white text-right font-mono text-sm py-2 pl-3 pr-8 rounded-lg border focus:ring-2 outline-none ${shortage > 0 ? 'border-amber-500 focus:ring-amber-500' : 'border-slate-600 focus:ring-emerald-500'}`}
-                                                    />
-                                                    <span className="absolute right-3 top-2.5 text-gray-500 text-xs">SAR</span>
-                                                </div>
-
-                                                <button
-                                                    onClick={() => handleExecute(item.target_account_id, currentAmount)}
-                                                    disabled={distributing || willTransfer <= 0}
-                                                    className={`px-4 py-2 ${shortage > 0 ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'} text-white text-sm font-bold rounded-lg shadow-md transition-all active:scale-95 disabled:opacity-50 min-w-[100px]`}
-                                                >
-                                                    {shortage > 0 ? 'Partial' : 'Transfer'}
-                                                </button>
-                                            </div>
-
-                                            {/* Shortage Warning Line */}
-                                            {shortage > 0 && (
-                                                <div className="w-full md:w-auto md:absolute md:bottom-2 md:right-36">
-                                                    <p className="text-xs text-amber-500 font-medium">⚠️ Shortage: {shortage.toLocaleString()}</p>
-                                                </div>
-                                            )}
+                                        );
+                                    })}
+                                    {previewData.allocations.length === 0 && (
+                                        <div className="text-center py-8 text-gray-500 text-sm">
+                                            No transfers needed based on current rules.
                                         </div>
-                                    );
-                                })}
-                                {previewData.allocations.length === 0 && (
-                                    <div className="text-center py-8 text-gray-500">
-                                        No transfers needed based on current rules and budget.
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
 
                             <div className="flex gap-4 pt-4">
