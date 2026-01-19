@@ -396,7 +396,19 @@ const Allocation = () => {
                                                         }}
                                                         className={`w-full bg-slate-900 text-white text-right font-mono text-lg py-3 pl-3 pr-10 rounded-xl border focus:ring-2 outline-none transition-all ${isPartial ? 'border-amber-500/50 focus:border-amber-500' : 'border-slate-600 focus:border-emerald-500'}`}
                                                     />
-                                                    <span className="absolute right-4 top-3.5 text-gray-500 text-lg">﷼</span>
+                                                    <span
+                                                        className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 bg-gray-500 pointer-events-none"
+                                                        style={{
+                                                            maskImage: 'url(/riyal-symbol.png)',
+                                                            WebkitMaskImage: 'url(/riyal-symbol.png)',
+                                                            maskSize: 'contain',
+                                                            WebkitMaskSize: 'contain',
+                                                            maskRepeat: 'no-repeat',
+                                                            WebkitMaskRepeat: 'no-repeat',
+                                                            maskPosition: 'center',
+                                                            WebkitMaskPosition: 'center'
+                                                        }}
+                                                    />
                                                 </div>
 
                                                 <button
