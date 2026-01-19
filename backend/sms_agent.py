@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 # Configure Gemini AI
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    model = genai.GenerativeModel('gemini-flash-latest')
 else:
     logger.warning("GEMINI_API_KEY not found. AI parsing will fail.")
     model = None
