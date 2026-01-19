@@ -423,8 +423,9 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     # 3. Fetch Rules
     rules = get_allocation_rules(db)
 
-    # 4. Aggregate
-    allocations = {} # TargetAccountID -> { amount, acc_name, details, current_balance }
+    # 4. Generate Separated Transfers (No Aggregation)
+    result_list = []
+    total = 0
 
     for p in payments:
         obl = p.obligation
@@ -445,53 +446,21 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
         
         if matched_rule:
             tid = matched_rule.target_account_id
-            if tid not in allocations:
-                t_acc = db.query(models.Account).filter(models.Account.id == tid).first()
-                if t_acc:
-                    allocations[tid] = {
-                        "target_account_id": tid,
-                        "target_account_name": t_acc.name,
-                        "current_balance": t_acc.current_balance,
-                        "amount": 0,
-                        "details": []
-                    }
+            t_acc = db.query(models.Account).filter(models.Account.id == tid).first()
             
-            if tid in allocations:
-                allocations[tid]["amount"] += p.amount
-                allocations[tid]["details"].append(obl.name)
-
-    # Format Response
-    result_list = []
-    total = 0
-    for tid, data in allocations.items():
-        required_amount = data["amount"]
-        existing_balance = data["current_balance"]
-        
-        transfer_amount = required_amount
-        
-        # Smart Top-up: Deduct existing balance
-        if existing_balance > 0:
-            transfer_amount = max(0, required_amount - existing_balance)
-            if transfer_amount < required_amount:
-                # Add note about coverage. Diff is what was covered.
-                covered = required_amount - transfer_amount
-                data["details"].append(f"(Used {covered:,.0f} from balance)")
-
-        if transfer_amount > 0:
-            total += transfer_amount
-            # Summary name
-            details_txt = ", ".join(data["details"])
-            if len(details_txt) > 500:
-                details_txt = details_txt[:500] + "..."
+            if t_acc:
+                # Direct Transfer for this item
+                amount = p.amount
+                total += amount
                 
-            result_list.append(schemas.AllocationPreviewItem(
-                rule_type="AGGREGATE",
-                identifier="aggregate",
-                name=details_txt, 
-                amount=transfer_amount,
-                target_account_id=tid,
-                target_account_name=data["target_account_name"]
-            ))
+                result_list.append(schemas.AllocationPreviewItem(
+                    rule_type=matched_rule.rule_type,
+                    identifier=matched_rule.identifier,
+                    name=obl.name, 
+                    amount=amount,
+                    target_account_id=tid,
+                    target_account_name=t_acc.name
+                ))
         
     return schemas.AllocationPreviewResponse(total_amount=total, allocations=result_list)
 
