@@ -481,8 +481,8 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
             total += transfer_amount
             # Summary name
             details_txt = ", ".join(data["details"])
-            if len(details_txt) > 100:
-                details_txt = details_txt[:100] + "..."
+            if len(details_txt) > 500:
+                details_txt = details_txt[:500] + "..."
                 
             result_list.append(schemas.AllocationPreviewItem(
                 rule_type="AGGREGATE",
