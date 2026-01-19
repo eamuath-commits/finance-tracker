@@ -333,82 +333,67 @@ const Allocation = () => {
                                         const isPartial = shortage > 0;
 
                                         return (
-                                            <div key={idx} className={`grid grid-cols-1 md:grid-cols-12 gap-4 p-4 items-center transition-colors hover:bg-slate-800/30 ${isPartial ? 'bg-amber-900/5' : ''}`}>
+                                            <div key={idx} className={`flex flex-col sm:flex-row sm:items-center gap-4 p-4 transition-colors hover:bg-slate-800/30 ${isPartial ? 'bg-amber-900/5' : ''}`}>
 
-                                                {/* Index */}
-                                                <div className="col-span-1 hidden md:flex justify-center">
-                                                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs text-gray-400 font-mono">
+                                                {/* Start: Index & Info */}
+                                                <div className="flex items-start sm:items-center gap-4 flex-1 min-w-0">
+                                                    {/* Index Circle */}
+                                                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs text-emerald-500 font-bold shrink-0 mt-1 sm:mt-0">
                                                         {idx + 1}
                                                     </div>
-                                                </div>
 
-                                                {/* Description */}
-                                                <div className="col-span-1 md:col-span-5">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="md:hidden w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-xs text-gray-400 font-mono shrink-0">
-                                                            {idx + 1}
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-medium text-gray-200 text-sm leading-tight">{item.name}</p>
-                                                            <span className="inline-block mt-1 text-[10px] text-gray-500 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700">
+                                                    {/* Main Content */}
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-2 mb-0.5">
+                                                            <p className="font-semibold text-gray-200 text-sm truncate">{item.name}</p>
+                                                            <span className="text-[10px] text-gray-500 bg-slate-800 border border-slate-700 px-1.5 rounded uppercase tracking-wider hidden sm:inline-block">
                                                                 {item.rule_type}
                                                             </span>
                                                         </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Target Info */}
-                                                <div className="col-span-1 md:col-span-3">
-                                                    <div className="flex items-center gap-2 text-sm text-gray-300">
-                                                        <ArrowRight className="text-gray-600 shrink-0" size={14} />
-                                                        <div className="min-w-0">
-                                                            <p className="truncate font-medium">{item.target_account_name}</p>
+                                                        <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                                                            <span>To:</span>
+                                                            <span className="text-gray-300 font-medium">{item.target_account_name}</span>
                                                             {targetAcc && (
-                                                                <p className="text-[10px] text-emerald-500/70">
-                                                                    Cur: {targetAcc.current_balance.toLocaleString()}
-                                                                </p>
+                                                                <span className="text-emerald-500/80 hidden sm:inline">
+                                                                    (Bal: {targetAcc.current_balance.toLocaleString()})
+                                                                </span>
                                                             )}
                                                         </div>
                                                     </div>
                                                 </div>
 
-                                                {/* Action & Amount */}
-                                                <div className="col-span-1 md:col-span-3 flex flex-col items-end gap-2">
-                                                    <div className="flex items-center gap-2 w-full justify-end">
-                                                        <div className="relative w-28">
-                                                            <input
-                                                                type="number"
-                                                                value={currentAmount}
-                                                                onChange={(e) => {
-                                                                    const val = parseFloat(e.target.value) || 0;
-                                                                    setEditableAmounts(prev => ({
-                                                                        ...prev,
-                                                                        [item.identifier]: val
-                                                                    }));
-                                                                }}
-                                                                className={`w-full bg-slate-900 text-white text-right font-mono text-sm py-1.5 pl-2 pr-6 rounded border focus:ring-1 outline-none ${isPartial ? 'border-amber-500/50 focus:border-amber-500' : 'border-slate-600 focus:border-emerald-500'}`}
-                                                            />
-                                                        </div>
-                                                        <button
-                                                            onClick={() => handleExecute(item.target_account_id, currentAmount)}
-                                                            disabled={distributing || willTransfer <= 0}
-                                                            className={`px-3 py-1.5 h-full ${isPartial ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'} text-white text-xs font-bold rounded shadow-sm transition-all active:scale-95 disabled:opacity-50 min-w-[70px]`}
-                                                        >
-                                                            {isPartial ? 'Partial' : 'Pay'}
-                                                        </button>
+                                                {/* End: Action & Amount */}
+                                                <div className="flex items-center justify-end gap-3 pl-12 sm:pl-0">
+                                                    <div className="relative w-32">
+                                                        <input
+                                                            type="number"
+                                                            value={currentAmount}
+                                                            onChange={(e) => {
+                                                                const val = parseFloat(e.target.value) || 0;
+                                                                setEditableAmounts(prev => ({
+                                                                    ...prev,
+                                                                    [item.identifier]: val
+                                                                }));
+                                                            }}
+                                                            className={`w-full bg-slate-900 text-white text-right font-mono text-sm py-2 pl-3 pr-8 rounded-lg border focus:ring-1 outline-none ${isPartial ? 'border-amber-500/50 focus:border-amber-500' : 'border-slate-600 focus:border-emerald-500'}`}
+                                                        />
+                                                        <span className="absolute right-3 top-2.5 text-gray-500 text-xs">SAR</span>
                                                     </div>
-                                                    {isPartial && (
-                                                        <p className="text-[10px] text-amber-500 font-medium flex items-center gap-1">
-                                                            ⚠️ Shortage: {shortage.toLocaleString()}
-                                                        </p>
-                                                    )}
+
+                                                    <button
+                                                        onClick={() => handleExecute(item.target_account_id, currentAmount)}
+                                                        disabled={distributing || willTransfer <= 0}
+                                                        className={`px-4 py-2 ${isPartial ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'} text-white text-sm font-bold rounded-lg shadow-md transition-all active:scale-95 disabled:opacity-50 min-w-[80px]`}
+                                                    >
+                                                        {isPartial ? 'Partial' : 'Pay'}
+                                                    </button>
                                                 </div>
                                             </div>
                                         );
                                     })}
                                     {previewData.allocations.length === 0 && (
                                         <div className="text-center py-8 text-gray-500 text-sm">
-                                            No transfers needed based on current rules.
+                                            No transfers needed.
                                         </div>
                                     )}
                                 </div>
