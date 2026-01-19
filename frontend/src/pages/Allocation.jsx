@@ -318,14 +318,6 @@ const Allocation = () => {
                             </div>
 
                             <div className="bg-slate-900/30 border border-slate-700/50 rounded-xl overflow-hidden">
-                                {/* Table Header (Desktop) */}
-                                <div className="hidden md:grid grid-cols-12 gap-4 p-4 text-xs font-semibold text-gray-500 uppercase tracking-wider bg-slate-800/80 border-b border-slate-700">
-                                    <div className="col-span-1 text-center">#</div>
-                                    <div className="col-span-5">Description</div>
-                                    <div className="col-span-3">Target Account</div>
-                                    <div className="col-span-3 text-right pr-4">Amount / Action</div>
-                                </div>
-
                                 <div className="divide-y divide-slate-700/50">
                                     {previewData.allocations.map((item, idx) => {
                                         const sourceBalance = accounts.find(a => a.id === sourceAccountId)?.current_balance || 0;
