@@ -312,34 +312,77 @@ const Allocation = () => {
                                 )}
                             </div>
 
-                            <div className="space-y-3">
+                            <div className="space-y-4">
                                 {previewData.allocations.map((item, idx) => {
                                     const sourceBalance = accounts.find(a => a.id === sourceAccountId)?.current_balance || 0;
-                                    const shortage = Math.max(0, item.amount - sourceBalance);
-                                    const willTransfer = Math.max(0, item.amount - shortage);
+                                    const targetAcc = accounts.find(a => a.id === item.target_account_id);
+
+                                    // Determine amount to use (edited or default)
+                                    const currentAmount = editableAmounts[item.identifier] !== undefined
+                                        ? editableAmounts[item.identifier]
+                                        : item.amount;
+
+                                    const shortage = Math.max(0, currentAmount - sourceBalance);
+                                    const willTransfer = Math.max(0, currentAmount - shortage);
 
                                     return (
-                                        <div key={idx} className={`flex items-center justify-between p-4 bg-slate-900 rounded-lg border-l-4 ${shortage > 0 ? 'border-amber-500' : 'border-emerald-500'}`}>
-                                            <div className="flex-1">
-                                                <p className={`${shortage > 0 ? 'text-amber-400' : 'text-emerald-400'} font-bold text-lg`}>
-                                                    {item.amount.toLocaleString()}
-                                                    {shortage > 0 && <span className="text-xs text-amber-500 ml-2">(Shortage: {shortage.toLocaleString()})</span>}
-                                                </p>
-                                                <p className="text-xs text-gray-500 uppercase tracking-wider">To: {item.target_account_name}</p>
-                                                {shortage > 0 && (
-                                                    <p className="text-xs text-amber-400 font-medium mt-1">⚠️ Will transfer {willTransfer.toLocaleString()} (Available Balance)</p>
-                                                )}
+                                        <div key={idx} className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-lg border transition-all ${shortage > 0 ? 'bg-amber-900/10 border-amber-500/50' : 'bg-slate-900/50 border-slate-700/50'}`}>
+                                            {/* Left: Identity */}
+                                            <div className="flex items-center gap-3 min-w-[200px]">
+                                                <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold shrink-0">
+                                                    {idx + 1}
+                                                </div>
+                                                <div>
+                                                    <p className="font-medium text-gray-200">{item.name}</p>
+                                                    <span className="text-xs text-gray-500 bg-slate-800 px-2 py-0.5 rounded-full">{item.rule_type}</span>
+                                                </div>
                                             </div>
-                                            <div className="text-right flex-1 pr-4">
-                                                <p className="text-gray-300 font-medium text-sm">{item.name}</p>
+
+                                            {/* Middle: Target Info */}
+                                            <div className="flex items-center gap-3 bg-slate-800/50 px-4 py-2 rounded-lg border border-slate-700/50">
+                                                <div className="text-right">
+                                                    <p className="text-xs text-gray-400">Target Account</p>
+                                                    <p className="text-sm font-medium text-gray-200">{item.target_account_name}</p>
+                                                    {targetAcc && (
+                                                        <p className="text-xs text-emerald-400/80">Bal: {targetAcc.current_balance.toLocaleString()}</p>
+                                                    )}
+                                                </div>
+                                                <ArrowRight className="text-gray-600" size={16} />
                                             </div>
-                                            <button
-                                                onClick={() => handleExecute(item.target_account_id)}
-                                                disabled={distributing || willTransfer <= 0}
-                                                className={`px-4 py-2 ${shortage > 0 ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'} text-white text-sm font-bold rounded-lg shadow-md transition-all active:scale-95 disabled:opacity-50`}
-                                            >
-                                                {shortage > 0 ? 'Transfer Partial' : 'Transfer'}
-                                            </button>
+
+                                            {/* Right: Action & Amount */}
+                                            <div className="flex items-center gap-3 w-full md:w-auto">
+                                                <div className="relative">
+                                                    <input
+                                                        type="number"
+                                                        value={currentAmount}
+                                                        onChange={(e) => {
+                                                            const val = parseFloat(e.target.value) || 0;
+                                                            setEditableAmounts(prev => ({
+                                                                ...prev,
+                                                                [item.identifier]: val
+                                                            }));
+                                                        }}
+                                                        className={`w-32 bg-slate-800 text-white text-right font-mono text-sm py-2 pl-3 pr-8 rounded-lg border focus:ring-2 outline-none ${shortage > 0 ? 'border-amber-500 focus:ring-amber-500' : 'border-slate-600 focus:ring-emerald-500'}`}
+                                                    />
+                                                    <span className="absolute right-3 top-2.5 text-gray-500 text-xs">SAR</span>
+                                                </div>
+
+                                                <button
+                                                    onClick={() => handleExecute(item.target_account_id, currentAmount)}
+                                                    disabled={distributing || willTransfer <= 0}
+                                                    className={`px-4 py-2 ${shortage > 0 ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'} text-white text-sm font-bold rounded-lg shadow-md transition-all active:scale-95 disabled:opacity-50 min-w-[100px]`}
+                                                >
+                                                    {shortage > 0 ? 'Partial' : 'Transfer'}
+                                                </button>
+                                            </div>
+
+                                            {/* Shortage Warning Line */}
+                                            {shortage > 0 && (
+                                                <div className="w-full md:w-auto md:absolute md:bottom-2 md:right-36">
+                                                    <p className="text-xs text-amber-500 font-medium">⚠️ Shortage: {shortage.toLocaleString()}</p>
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}
