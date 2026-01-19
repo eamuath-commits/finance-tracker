@@ -141,6 +141,10 @@ const Allocation = () => {
                         allocations: remaining
                     });
                 }
+
+                // Refresh Account Balances
+                const accRes = await axios.get(`${API_URL}/accounts/`);
+                setAccounts(accRes.data);
             }
         } catch (error) {
             console.error("Execution failed:", error);
@@ -294,27 +298,46 @@ const Allocation = () => {
                             <div className="text-center">
                                 <h2 className="text-2xl font-bold text-white">Proposed Transfers</h2>
                                 <p className="text-gray-400">Total to Distribute: <span className="text-emerald-400 font-bold text-lg">{previewData.total_amount.toLocaleString()}</span></p>
+                                {sourceAccountId && (
+                                    <p className="text-gray-400 mt-1">
+                                        Source Balance: <span className={`${(accounts.find(a => a.id === sourceAccountId)?.current_balance || 0) < previewData.total_amount ? 'text-amber-400' : 'text-emerald-400'} font-bold`}>
+                                            {(accounts.find(a => a.id === sourceAccountId)?.current_balance || 0).toLocaleString()}
+                                        </span>
+                                    </p>
+                                )}
                             </div>
 
                             <div className="space-y-3">
-                                {previewData.allocations.map((item, idx) => (
-                                    <div key={idx} className="flex items-center justify-between p-4 bg-slate-900 rounded-lg border-l-4 border-emerald-500">
-                                        <div className="flex-1">
-                                            <p className="text-emerald-400 font-bold text-lg">{item.amount.toLocaleString()}</p>
-                                            <p className="text-xs text-gray-500 uppercase tracking-wider">To: {item.target_account_name}</p>
+                                {previewData.allocations.map((item, idx) => {
+                                    const sourceBalance = accounts.find(a => a.id === sourceAccountId)?.current_balance || 0;
+                                    const shortage = Math.max(0, item.amount - sourceBalance);
+                                    const willTransfer = Math.max(0, item.amount - shortage);
+
+                                    return (
+                                        <div key={idx} className={`flex items-center justify-between p-4 bg-slate-900 rounded-lg border-l-4 ${shortage > 0 ? 'border-amber-500' : 'border-emerald-500'}`}>
+                                            <div className="flex-1">
+                                                <p className={`${shortage > 0 ? 'text-amber-400' : 'text-emerald-400'} font-bold text-lg`}>
+                                                    {item.amount.toLocaleString()}
+                                                    {shortage > 0 && <span className="text-xs text-amber-500 ml-2">(Shortage: {shortage.toLocaleString()})</span>}
+                                                </p>
+                                                <p className="text-xs text-gray-500 uppercase tracking-wider">To: {item.target_account_name}</p>
+                                                {shortage > 0 && (
+                                                    <p className="text-xs text-amber-400 font-medium mt-1">⚠️ Will transfer {willTransfer.toLocaleString()} (Available Balance)</p>
+                                                )}
+                                            </div>
+                                            <div className="text-right flex-1 pr-4">
+                                                <p className="text-gray-300 font-medium text-sm">{item.name}</p>
+                                            </div>
+                                            <button
+                                                onClick={() => handleExecute(item.target_account_id)}
+                                                disabled={distributing || willTransfer <= 0}
+                                                className={`px-4 py-2 ${shortage > 0 ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'} text-white text-sm font-bold rounded-lg shadow-md transition-all active:scale-95 disabled:opacity-50`}
+                                            >
+                                                {shortage > 0 ? 'Transfer Partial' : 'Transfer'}
+                                            </button>
                                         </div>
-                                        <div className="text-right flex-1 pr-4">
-                                            <p className="text-gray-300 font-medium text-sm">{item.name}</p>
-                                        </div>
-                                        <button
-                                            onClick={() => handleExecute(item.target_account_id)}
-                                            disabled={distributing}
-                                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold rounded-lg shadow-md transition-all active:scale-95"
-                                        >
-                                            Transfer
-                                        </button>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                                 {previewData.allocations.length === 0 && (
                                     <div className="text-center py-8 text-gray-500">
                                         No transfers needed based on current rules and budget.
