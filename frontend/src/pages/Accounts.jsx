@@ -484,10 +484,21 @@ const Accounts = () => {
                     <SectionHeader title="Account Summary" />
 
                     {/* List of Account Rows */}
-                    <div className="flex flex-col gap-4 mb-8">
+                    {/* List of Account Cards (Grid) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                         {sortedAccounts.map(acc => (
-                            <OverviewAccountRow key={acc.id} acc={acc} allTransactions={transactions} />
+                            <AccountCard key={acc.id} acc={acc} onEdit={openAccountModal} />
                         ))}
+                        {/* Add New Card Button */}
+                        <button
+                            onClick={() => openAccountModal(null)}
+                            className="w-full aspect-[1.586/1] rounded-2xl border-2 border-dashed border-slate-700 hover:border-blue-500/50 hover:bg-slate-800/50 transition-all group flex flex-col items-center justify-center gap-3"
+                        >
+                            <div className="p-4 bg-slate-800 rounded-full group-hover:bg-blue-600 group-hover:text-white transition-colors text-slate-400">
+                                <Plus size={24} />
+                            </div>
+                            <span className="text-sm font-medium text-slate-400 group-hover:text-white">Add Account</span>
+                        </button>
                     </div>
                 </div>
             )}
