@@ -460,7 +460,7 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
             
             if tid in allocations:
                 allocations[tid]["amount"] += p.amount
-                allocations[tid]["details"].append(obl.name)
+                allocations[tid]["details"].append(obl.category if obl.category else obl.name)
         else:
             skipped_items.append(f"{obl.name} (No Rule)")
 
@@ -472,6 +472,8 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     running_balance = source_acc.current_balance if source_acc else 0
 
     for tid, data in allocations.items():
+        # Deduplicate details to show unique categories
+        data["details"] = sorted(list(set(data["details"])))
         required_amount = data["amount"]
         
         # Cap transfer at available source balance
