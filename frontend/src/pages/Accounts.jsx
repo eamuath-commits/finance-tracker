@@ -38,7 +38,7 @@ const AccountCard = ({ acc, onEdit = null }) => {
     const utilPercent = hasLimit ? Math.min(100, (Math.abs(acc.current_balance) / acc.credit_limit) * 100) : 0;
 
     return (
-        <div className={`relative w-full aspect-[1.586/1] rounded-2xl p-6 shadow-2xl bg-gradient-to-br ${theme.gradient} text-white overflow-hidden group hover:scale-[1.02] transition-all duration-300 border border-white/10`}>
+        <div className={`relative w-full aspect-[1.586/1] rounded-xl p-5 shadow-lg bg-gradient-to-br ${theme.gradient} text-white overflow-hidden group hover:scale-[1.02] transition-all duration-300 border border-white/10`}>
 
             {/* Background Decor */}
             <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white/5 blur-3xl"></div>
@@ -50,16 +50,16 @@ const AccountCard = ({ acc, onEdit = null }) => {
                 {/* Header */}
                 <div className="flex justify-between items-start">
                     <div className="flex items-center gap-2">
-                        <div className="p-2 bg-white/10 rounded-lg backdrop-blur-md">
+                        <div className="p-1.5 bg-white/10 rounded-lg backdrop-blur-md">
                             {theme.icon}
                         </div>
-                        <span className="font-semibold tracking-wide text-sm opacity-90">{acc.name}</span>
+                        <span className="font-semibold tracking-wide text-xs opacity-90">{acc.name}</span>
                     </div>
                     {/* Logo (Bank or Network) */}
                     {/* Logos: Network & Bank */}
                     <div className="flex flex-col items-end gap-1">
                         {/* Network Logo */}
-                        <div className="h-8 opacity-90">
+                        <div className="h-6 opacity-90">
                             {isCreditCard ? (
                                 <img src="/visa-logo.png" alt="Visa" className="h-full object-contain" />
                             ) : (
@@ -73,21 +73,21 @@ const AccountCard = ({ acc, onEdit = null }) => {
                 {onEdit && (
                     <button
                         onClick={() => onEdit(acc)}
-                        className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-md transition opacity-0 group-hover:opacity-100"
+                        className="absolute top-3 right-3 p-1.5 bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-md transition opacity-0 group-hover:opacity-100"
                     >
-                        <Edit3 size={16} />
+                        <Edit3 size={14} />
                     </button>
                 )}
 
                 {/* Middle (Chip & Aliases) */}
-                <div className="flex justify-between items-center my-2 mt-4">
+                <div className="flex justify-between items-center my-1">
                     <ChipIcon className="w-8 h-8 text-yellow-500/80 opacity-80" style={{ transform: 'rotate(90deg)' }} />
 
                     {/* Aliases Chips */}
                     {acc.aliases && acc.aliases.length > 0 && (
                         <div className="flex gap-1 flex-wrap justify-end max-w-[60%]">
                             {acc.aliases.map(a => (
-                                <span key={a.id} className="text-[10px] bg-black/30 px-2 py-0.5 rounded-full border border-white/5 backdrop-blur-sm text-gray-300">
+                                <span key={a.id} className="text-[9px] bg-black/30 px-1.5 py-0.5 rounded-full border border-white/5 backdrop-blur-sm text-gray-300">
                                     {a.alias_name}
                                 </span>
                             ))}
@@ -99,23 +99,23 @@ const AccountCard = ({ acc, onEdit = null }) => {
                 <div>
                     <div className="flex justify-between items-end mb-1">
                         <div>
-                            <p className="text-[10px] uppercase tracking-wider opacity-70 mb-0.5">Current Balance</p>
-                            <p className="text-2xl font-bold tracking-tight text-white drop-shadow-sm">{formatCurrency(acc.current_balance)}</p>
+                            <p className="text-[9px] uppercase tracking-wider opacity-70 mb-0.5">Current Balance</p>
+                            <p className="text-xl font-bold tracking-tight text-white drop-shadow-sm">{formatCurrency(acc.current_balance)}</p>
                         </div>
                         <div className="text-right">
-                            <p className="text-[10px] uppercase tracking-wider opacity-70 mb-0.5">{acc.account_type}</p>
-                            <p className="font-mono text-sm tracking-widest opacity-90">•••• {acc.last_4_digits}</p>
+                            <p className="text-[9px] uppercase tracking-wider opacity-70 mb-0.5">{acc.account_type}</p>
+                            <p className="font-mono text-xs tracking-widest opacity-90">•••• {acc.last_4_digits}</p>
                         </div>
                     </div>
 
                     {/* Utilization Bar */}
                     {hasLimit && (
-                        <div className="mt-3">
-                            <div className="flex justify-between text-[10px] opacity-70 mb-1">
+                        <div className="mt-2">
+                            <div className="flex justify-between text-[9px] opacity-70 mb-0.5">
                                 <span>Credit Limit: {formatCurrency(acc.credit_limit)}</span>
                                 <span>{utilPercent.toFixed(0)}% Used</span>
                             </div>
-                            <div className="w-full bg-black/30 h-1.5 rounded-full overflow-hidden backdrop-blur-sm">
+                            <div className="w-full bg-black/30 h-1 rounded-full overflow-hidden backdrop-blur-sm">
                                 <div
                                     className={`h-full rounded-full shadow-sm transition-all duration-1000 ${utilPercent > 90 ? 'bg-red-400' : utilPercent > 50 ? 'bg-yellow-400' : 'bg-emerald-400'}`}
                                     style={{ width: `${utilPercent}%` }}
@@ -473,7 +473,7 @@ const Accounts = () => {
 
                     {/* List of Account Rows */}
                     {/* List of Account Cards (Grid) */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
                         {sortedAccounts.map(acc => (
                             <AccountCard key={acc.id} acc={acc} onEdit={openAccountModal} />
                         ))}
