@@ -472,14 +472,9 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
         existing_balance = data["current_balance"]
         
         transfer_amount = required_amount
-        
-        # Smart Top-up: Deduct existing balance
-        if existing_balance > 0:
-            transfer_amount = max(0, required_amount - existing_balance)
-            if transfer_amount < required_amount:
-                # Add note about coverage. Diff is what was covered.
-                covered = required_amount - transfer_amount
-                data["details"].append(f"(Used {covered:,.0f} from balance)")
+
+        # Smart Top-up REMOVED: Logic previously deducted existing_balance here. 
+        # Now we always transfer the full specific amount from the Income Account.
 
         if transfer_amount > 0:
             total += transfer_amount
