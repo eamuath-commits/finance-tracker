@@ -213,6 +213,8 @@ class AllocationPreviewItem(BaseModel):
 class AllocationPreviewResponse(BaseModel):
     total_amount: float
     allocations: List[AllocationPreviewItem]
+    skipped_items: List[str] = []
+    fulfilled_items: List[str] = []
 
 class AllocationExecuteRequest(BaseModel):
     source_account_id: str

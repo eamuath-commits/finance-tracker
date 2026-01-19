@@ -425,6 +425,8 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
 
     # 4. Aggregate
     allocations = {} # TargetAccountID -> { amount, acc_name, details, current_balance }
+    skipped_items = []
+    fulfilled_items = []
 
     for p in payments:
         obl = p.obligation
@@ -459,6 +461,8 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
             if tid in allocations:
                 allocations[tid]["amount"] += p.amount
                 allocations[tid]["details"].append(obl.name)
+        else:
+            skipped_items.append(f"{obl.name} (No Rule)")
 
     # Format Response
     result_list = []
@@ -492,8 +496,17 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
                 target_account_id=tid,
                 target_account_name=data["target_account_name"]
             ))
+        else:
+            # Entirely covered by balance
+            details_txt = ", ".join(data["details"])
+            fulfilled_items.append(f"Target: {data['target_account_name']} - Items: {details_txt} (Covered by {existing_balance:,.0f} balance)")
         
-    return schemas.AllocationPreviewResponse(total_amount=total, allocations=result_list)
+    return schemas.AllocationPreviewResponse(
+        total_amount=total, 
+        allocations=result_list,
+        skipped_items=skipped_items,
+        fulfilled_items=fulfilled_items
+    )
 
 # --- Category Management ---
 

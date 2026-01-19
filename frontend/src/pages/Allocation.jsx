@@ -353,6 +353,33 @@ const Allocation = () => {
                                     Back
                                 </button>
                             </div>
+
+                            {/* Transparency Logs */}
+                            {(previewData.fulfilled_items?.length > 0) && (
+                                <div className="mt-8 bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+                                    <h3 className="text-blue-400 font-bold mb-2 text-sm uppercase tracking-wider flex items-center gap-2">
+                                        <CheckCircle size={16} /> Covered by Existing Balance
+                                    </h3>
+                                    <ul className="text-sm text-gray-400 space-y-1">
+                                        {previewData.fulfilled_items.map((item, i) => (
+                                            <li key={i}>{item}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {(previewData.skipped_items?.length > 0) && (
+                                <div className="mt-4 bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+                                    <h3 className="text-gray-400 font-bold mb-2 text-sm uppercase tracking-wider flex items-center gap-2">
+                                        <AlertCircle size={16} /> Unallocated Items (No Rule Matched)
+                                    </h3>
+                                    <ul className="text-sm text-gray-500 space-y-1">
+                                        {previewData.skipped_items.map((item, i) => (
+                                            <li key={i}>{item}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
                         </div>
                     )}
 
