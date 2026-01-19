@@ -141,6 +141,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Database Error: {e}")
 
 if __name__ == '__main__':
+    # Fix for asyncio loop in some environments
+    import nest_asyncio
+    try:
+        nest_asyncio.apply()
+    except:
+        pass
+
     if not TELEGRAM_BOT_TOKEN:
         print("Error: TELEGRAM_BOT_TOKEN is missing in .env")
         exit(1)
@@ -148,8 +155,21 @@ if __name__ == '__main__':
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     
     # Handlers
+    start_handler = MessageHandler(filters.COMMAND & filters.Regex(r"^/start"), lambda u, c: u.message.reply_text("👋 Hello! I am your SMS Finance Agent. Forward me a bank SMS!"))
     echo_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message)
+    
+    app.add_handler(start_handler)
     app.add_handler(echo_handler)
     
+    # Verify Bot Identity
+    print("⏳ verifying token...")
+    async def print_bot_info():
+         bot = await app.bot.get_me()
+         print(f"✅ Bot Connected: @{bot.username} (ID: {bot.id})")
+         print("👉 Please make sure you are messaging THIS bot.")
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(print_bot_info())
+
     print("🤖 SMS Agent is polling Telegram...")
     app.run_polling()
