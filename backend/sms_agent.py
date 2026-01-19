@@ -88,8 +88,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Handles incoming Telegram messages.
     """
     user_id = str(update.effective_user.id)
-    msg_text = update.message.text
     
+    # Extract text from Message (text) or Caption (if photo/media) or effective_message
+    msg_text = update.message.text or update.message.caption
+    
+    if not msg_text:
+        logger.info(f"Received non-text message from {user_id}: {update.message}")
+        await update.message.reply_text("⚠️ Message received but contained no text/caption. Is it an image?")
+        return
+
     logger.info(f"Received message from {user_id}: {msg_text[:20]}...")
     await update.message.reply_text("⏳ Processing...")
 
@@ -182,7 +189,10 @@ if __name__ == '__main__':
     
     # Handlers
     start_handler = MessageHandler(filters.COMMAND & filters.Regex(r"^/start"), lambda u, c: u.message.reply_text("👋 Hello! I am your SMS Finance Agent. Forward me a bank SMS!"))
-    echo_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message)
+    
+    # Catch ALL non-command updates to debug why forwards are missed
+    # We will filter for text inside the handler
+    echo_handler = MessageHandler(~filters.COMMAND, handle_message)
     
     app.add_handler(start_handler)
     app.add_handler(echo_handler)
