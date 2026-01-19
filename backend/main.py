@@ -488,13 +488,18 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
             continue
 
         # Check for sufficient funds
-        transfer_amount = item.amount
+        # Use override amount if provided for this specific target
+        requested_amount = item.amount
+        if req.override_amount is not None and req.target_account_id:
+             requested_amount = req.override_amount
+
+        transfer_amount = requested_amount
         shortage = 0.0
         
         if source_acc.current_balance < transfer_amount:
             # Partial Transfer Logic
             transfer_amount = max(0, source_acc.current_balance)
-            shortage = item.amount - transfer_amount
+            shortage = requested_amount - transfer_amount
             
             if transfer_amount <= 0:
                 # Skip if source is empty
@@ -521,7 +526,7 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
         # Track execution details
         executed_transfers.append({
             "target": item.target_account_name,
-            "requested": item.amount,
+            "requested": requested_amount,
             "transferred": transfer_amount,
             "shortage": shortage
         })
