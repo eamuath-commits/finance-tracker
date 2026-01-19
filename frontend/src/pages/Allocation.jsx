@@ -382,9 +382,15 @@ const Allocation = () => {
                                             </div>
 
                                             {/* Logic Notes (Gaps/Limits) */}
-                                            {currentAmount > willTransfer && (
-                                                <div className="text-xs text-amber-500 bg-amber-500/10 px-3 py-2 rounded-lg border border-amber-500/20">
-                                                    ⚠️ Source Limited. Destination covers gap of <b>{(currentAmount - willTransfer).toLocaleString()}</b>.
+                                            {((item.required_amount || 0) - item.amount) > 0.01 && (
+                                                <div className="mb-4 flex items-start gap-2 bg-amber-500/10 p-2.5 rounded-lg border border-amber-500/20">
+                                                    <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xs font-bold text-amber-500 uppercase tracking-wider">Source Limit Reached</span>
+                                                        <span className="text-xs text-amber-400/80">
+                                                            Coverage Gap: <span className="text-amber-400 font-bold">{formatCurrency((item.required_amount || 0) - item.amount)}</span>
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             )}
 
@@ -402,7 +408,10 @@ const Allocation = () => {
                                                                 [item.identifier]: val
                                                             }));
                                                         }}
-                                                        className={`w-full bg-slate-900 text-white text-right font-mono text-lg py-3 pl-3 pr-10 rounded-xl border focus:ring-2 outline-none transition-all ${isPartial ? 'border-amber-500/50 focus:border-amber-500' : 'border-slate-600 focus:border-emerald-500'}`}
+                                                        className={`w-full bg-slate-900 text-right font-mono text-lg py-3 pl-3 pr-10 rounded-xl border focus:ring-2 outline-none transition-all 
+                                                            ${((item.required_amount || 0) - item.amount) > 0.01
+                                                                ? 'text-amber-500 border-amber-500/50 focus:border-amber-500 ring-amber-500/20'
+                                                                : 'text-white border-slate-600 focus:border-emerald-500'}`}
                                                     />
                                                     <span
                                                         className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 bg-gray-500 pointer-events-none"

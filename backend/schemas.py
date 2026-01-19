@@ -209,6 +209,7 @@ class AllocationPreviewItem(BaseModel):
     identifier: str
     name: str 
     amount: float
+    required_amount: float = 0.0
     target_account_id: str
     target_account_name: str
 

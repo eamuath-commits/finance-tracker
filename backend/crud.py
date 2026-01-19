@@ -485,9 +485,8 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
         # Update running balance
         running_balance = max(0, running_balance - transfer_amount)
 
-        # Add note if there is a gap covered by destination
-        if gap > 0:
-            data["details"].append(f"(Source Limit: {transfer_amount:,.0f}, Dest covers {gap:,.0f})")
+        # Update running balance
+        running_balance = max(0, running_balance - transfer_amount)
 
         if transfer_amount > 0 or gap > 0:
             total += transfer_amount
@@ -501,6 +500,7 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
                 identifier=f"aggregate_{tid}",
                 name=details_txt, 
                 amount=transfer_amount,
+                required_amount=required_amount,
                 target_account_id=tid,
                 target_account_name=data["target_account_name"]
             ))
