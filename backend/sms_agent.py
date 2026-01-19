@@ -55,6 +55,7 @@ async def parse_with_ai(text: str):
     2. Look for keywords like "Purchase", "PoS", "Transfer", "Deposit", "Withdrawal", "Payment".
     3. Merchant is often after "At", "By", "To", or "Store".
     4. If it looks like a card usage (e.g. "mada", "Visa", "MasterCard"), it IS a transaction.
+    5. "Amount:" or "SAR" or currency symbols clearly indicate the transaction amount.
     
     Output JSON format:
     {{
