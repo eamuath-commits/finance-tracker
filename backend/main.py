@@ -477,9 +477,6 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
     if not source_acc:
         raise HTTPException(status_code=404, detail="Source account not found")
 
-    if source_acc.current_balance < preview.total_amount:
-         raise HTTPException(status_code=400, detail=f"Insufficient funds in source account. Required: {preview.total_amount}, Available: {source_acc.current_balance}")
-
     executed_transfers = []
     
     for item in preview.allocations:
@@ -489,10 +486,23 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
         # Filter if specific target requested
         if req.target_account_id and item.target_account_id != req.target_account_id:
             continue
+
+        # Check for sufficient funds
+        transfer_amount = item.amount
+        shortage = 0.0
+        
+        if source_acc.current_balance < transfer_amount:
+            # Partial Transfer Logic
+            transfer_amount = max(0, source_acc.current_balance)
+            shortage = item.amount - transfer_amount
             
+            if transfer_amount <= 0:
+                # Skip if source is empty
+                continue
+
         t_out = schemas.TransactionCreate(
             account_id=source_acc.id,
-            amount=-item.amount, 
+            amount=-transfer_amount, 
             merchant=f"Transfer to {item.target_account_name}",
             category="Transfer",
             timestamp=datetime.now()
@@ -501,16 +511,26 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
         
         t_in = schemas.TransactionCreate(
             account_id=item.target_account_id,
-            amount=item.amount,
+            amount=transfer_amount,
             merchant=f"Transfer from {source_acc.name}",
             category="Transfer",
             timestamp=datetime.now()
         )
         crud.create_transaction(db, t_in)
         
-        executed_transfers.append(item)
+        # Track execution details
+        executed_transfers.append({
+            "target": item.target_account_name,
+            "requested": item.amount,
+            "transferred": transfer_amount,
+            "shortage": shortage
+        })
         
-    return {"status": "success", "transfers_count": len(executed_transfers)}
+    return {
+        "status": "success", 
+        "transfers_count": len(executed_transfers),
+        "details": executed_transfers
+    }
 
 # --- Category Endpoints ---
 

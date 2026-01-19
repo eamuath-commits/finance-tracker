@@ -115,6 +115,17 @@ const Allocation = () => {
                 target_account_id: targetAccountId
             });
 
+            // Check for partial transfers/shortages
+            if (res.data.details && res.data.details.length > 0) {
+                const partials = res.data.details.filter(d => d.shortage > 0);
+                if (partials.length > 0) {
+                    const msg = partials.map(p =>
+                        `Partial Transfer to ${p.target}: Transferred ${p.transferred.toLocaleString()} (Shortage: ${p.shortage.toLocaleString()})`
+                    ).join('\n');
+                    alert(`⚠️ Source Account Shortage Detected:\n\n${msg}\n\nTransferred available balance.`);
+                }
+            }
+
             // Update Preview Data locally by removing the executed item
             if (previewData) {
                 const remaining = previewData.allocations.filter(item => item.target_account_id !== targetAccountId);
