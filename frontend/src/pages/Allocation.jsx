@@ -26,9 +26,64 @@ const Allocation = () => {
         fetchData();
     }, []);
 
-    // ... fetchData ...
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            // Fetch Accounts separately to ensure they load
+            try {
+                const accRes = await axios.get(`${API_URL}/accounts/`);
+                setAccounts(accRes.data);
+            } catch (err) {
+                console.error("Failed to fetch accounts", err);
+            }
 
-    // ... handleSaveRule ...
+            // Fetch other data
+            const [loanRes, ruleRes, oblRes] = await Promise.all([
+                axios.get(`${API_URL}/loans/`),
+                axios.get(`${API_URL}/allocation/rules`),
+                axios.get(`${API_URL}/obligations/`)
+            ]);
+
+            setLoans(loanRes.data);
+            setRules(ruleRes.data);
+
+            // Extract unique categories from obligations
+            const uniqueCats = [...new Set(oblRes.data.map(o => o.category).filter(c => c && c !== 'Loan'))];
+            setCategories(uniqueCats);
+        } catch (error) {
+            console.error("Error fetching allocation data:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSaveRule = async (type, identifier, targetAccountId) => {
+        try {
+            // Check if rule exists
+            const existing = rules.find(r => r.identifier === identifier && r.rule_type === type);
+            if (existing) {
+                // Delete first (since identifier is unique)
+                await axios.delete(`${API_URL}/allocation/rules/${existing.id}`);
+            }
+
+            if (targetAccountId) {
+                // Create new
+                const payload = {
+                    rule_type: type,
+                    identifier: identifier,
+                    target_account_id: targetAccountId
+                };
+                await axios.post(`${API_URL}/allocation/rules`, payload);
+            }
+
+            // Refresh rules
+            const res = await axios.get(`${API_URL}/allocation/rules`);
+            setRules(res.data);
+        } catch (error) {
+            console.error("Error saving rule:", error);
+            alert("Failed to save rule");
+        }
+    };
 
     const handleRunPreview = async () => {
         // Clear previous edits on new run
