@@ -66,7 +66,7 @@ const AccountCard = ({ acc, onEdit = null }) => {
                             if (!showLogo) return null;
 
                             return (
-                                <div className="h-14">
+                                <div className="h-16">
                                     {isCreditCard ? (
                                         <img src="/visa-logo.png" alt="Visa" className="h-full object-contain" />
                                     ) : (
