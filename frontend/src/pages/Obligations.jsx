@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Modal, formatCurrency, inputClass, selectClass } from '../components/UI';
+import { Modal, formatCurrency, inputClass, selectClass, SectionHeader } from '../components/UI';
 import { Calendar, Trash2, LayoutGrid, List, Receipt, Tag, Plus, Edit2 } from 'lucide-react';
 import ObligationsOverview from '../components/ObligationsOverview';
 import ObligationsList from '../components/ObligationsList';
 import ObligationsTable from '../components/ObligationsTable';
 import ObligationsHistory from '../components/ObligationsHistory';
 import PaymentModal from '../components/PaymentModal';
-import SectionHeader from '../components/SectionHeader';
+// Removed SectionHeader standalone import
 
 const Obligations = () => {
     // --- Global State ---
@@ -329,8 +329,8 @@ const Obligations = () => {
                     <button
                         onClick={() => setActiveTab('obligations')}
                         className={`flex items-center gap-2 px-6 py-2 rounded-md font-medium transition-all ${activeTab === 'obligations'
-                                ? 'bg-blue-600 text-white shadow-sm'
-                                : 'text-gray-400 hover:text-white'
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-gray-400 hover:text-white'
                             }`}
                     >
                         <List size={18} />
@@ -339,8 +339,8 @@ const Obligations = () => {
                     <button
                         onClick={() => setActiveTab('categories')}
                         className={`flex items-center gap-2 px-6 py-2 rounded-md font-medium transition-all ${activeTab === 'categories'
-                                ? 'bg-purple-600 text-white shadow-sm'
-                                : 'text-gray-400 hover:text-white'
+                            ? 'bg-purple-600 text-white shadow-sm'
+                            : 'text-gray-400 hover:text-white'
                             }`}
                     >
                         <Tag size={18} />
