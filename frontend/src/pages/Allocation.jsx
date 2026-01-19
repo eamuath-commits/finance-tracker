@@ -326,10 +326,25 @@ const Allocation = () => {
                             {/* Bal Display */}
                             {sourceAccountId && (
                                 <div className="text-right hidden sm:block">
-                                    <span className="text-xs text-gray-500 block uppercase font-bold tracking-wider">Available</span>
-                                    <span className={`text-xl font-mono font-bold ${(accounts.find(a => a.id === sourceAccountId)?.current_balance || 0) < (previewData?.total_amount || 0) ? 'text-amber-400' : 'text-emerald-400'}`}>
-                                        {formatCurrency(accounts.find(a => a.id === sourceAccountId)?.current_balance || 0)}
-                                    </span>
+                                    {(() => {
+                                        const bal = accounts.find(a => a.id === sourceAccountId)?.current_balance || 0;
+                                        const dist = previewData?.total_amount || 0;
+                                        const remaining = bal - dist;
+                                        return (
+                                            <>
+                                                <div className="flex items-center justify-end gap-2 text-xs text-gray-500 mb-0.5">
+                                                    <span className="uppercase font-bold tracking-wider">Available</span>
+                                                    <span className="font-mono text-gray-400">{formatCurrency(bal)}</span>
+                                                </div>
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Remaining</span>
+                                                    <span className={`font-mono font-bold text-xl ${remaining < -0.01 ? 'text-red-400' : Math.abs(remaining) < 0.01 ? 'text-emerald-400' : 'text-slate-200'}`}>
+                                                        {formatCurrency(remaining)}
+                                                    </span>
+                                                </div>
+                                            </>
+                                        );
+                                    })()}
                                 </div>
                             )}
                         </div>
