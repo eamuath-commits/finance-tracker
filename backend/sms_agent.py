@@ -69,7 +69,8 @@ async def parse_with_ai(text: str):
     1. **Identify Type**: Is this a Purchase, Transfer (In/Out), Bill Payment, Cash Withdrawal, Deposit, or Decline/Failed transaction?
     2. **Merchant/Counterparty**: 
        - For Purchases: Store Name (e.g. "Starbucks", "Uber").
-       - For Transfers: Recipient Name or Account (e.g. "Ahmed", "Account 1234").
+       - For Transfers: Recipient Name or Account (e.g. "Ahmed", "Account 7772"). 
+       - If message says "To: 1234", "1234" is the Recipient.
        - For Government/Bills: Entity Name (e.g. "STC", "MOI").
     3. **Internal Transfers**: If it says "Internal Transfer" or transfer between your own accounts, set merchant to "Self" or "Internal".
     4. **Declines**: If the message says "Declined", "Failed", or "Insufficient Funds", set `status` to "failed".
@@ -311,6 +312,20 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
          if dest_acc:
              merchant_raw = f"{dest_acc.name} Account"
              clean_merchant = dest_acc.name # For logo lookup
+
+    # Optimization: If AI identified a destination account Last 4, check if it matches a known account
+    # This fixes cases where AI extracts "MUATH" (sender) instead of "7772" (recipient)
+    dest_last4 = result.get('destination_account_last4')
+    if dest_last4:
+         # Clean digits only just in case
+         clean_last4 = "".join(filter(str.isdigit, str(dest_last4)))[-4:]
+         if len(clean_last4) == 4:
+             dest_acc = crud.get_account_by_last_4(db, clean_last4)
+             if dest_acc:
+                 # Found the destination account! Use it as the Merchant/Counterparty
+                 merchant_raw = f"{dest_acc.name} Account"
+                 clean_merchant = dest_acc.name
+                 category = "Transfer" # Ensure category is correct
 
     if not clean_merchant or clean_merchant == "null":
         clean_merchant = merchant_raw
