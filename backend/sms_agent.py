@@ -306,13 +306,17 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
     # Determine Transaction Type
     tx_type_str = result.get('transaction_type', 'debit').lower()
     tx_type = models.TransactionType.CREDIT if tx_type_str == 'credit' else models.TransactionType.DEBIT
+    
+    # FIX: Explicitly convert Enum to string value for Pydantic/SQLAlchemy compatibility
+    # The DB expects a string 'debit'/'credit', but the Pydantic model might be passing the Enum object which psycopg2 rejects.
+    tx_type_value = tx_type.value
 
     tx_data = schemas.TransactionCreate(
         account_id=source_account.id,
         amount=result['amount'],
         merchant=clean_merchant,
         category=category,
-        type=tx_type,
+        type=tx_type_value,
         timestamp=datetime.now(), 
         raw_sms_content=msg_text
     )
@@ -336,7 +340,7 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
                  amount=result['amount'], 
                  merchant=f"Transfer from {source_account.name}",
                  category="Transfer", 
-                 type=models.TransactionType.CREDIT,
+                 type=models.TransactionType.CREDIT.value,
                  timestamp=datetime.now(),
                  raw_sms_content=f"Auto-credit from transfer: {msg_text}"
              )
@@ -402,7 +406,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         logger.error(f"Callback Error: {e}")
-        await query.edit_text(f"❌ System Error: {e}")
+        if query and query.message:
+            await query.edit_message_text(f"❌ System Error: {e}")
+        else:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"❌ System Error: {e}")
 
 
 if __name__ == '__main__':
