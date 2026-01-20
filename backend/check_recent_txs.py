@@ -10,6 +10,6 @@ print(f"{'ID':<10} {'Date':<20} {'Amount':<10} {'Merchant':<25}")
 print("-" * 80)
 for tx in txs:
     short_id = str(tx.id)[:8]
-    print(f"{short_id:<10} {str(tx.timestamp):<20} {tx.amount:<10} {tx.merchant:<25}")
+    print(f"{short_id:<10} {tx.timestamp.strftime('%Y-%m-%d %H:%M:%S'):<20} {tx.amount:<10} {tx.merchant:<25}")
 
 db.close()

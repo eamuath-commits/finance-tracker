@@ -491,7 +491,7 @@ const Transactions = () => {
                                                         )}
                                                         <div>
                                                             {new Date(tx.timestamp).toLocaleDateString()}
-                                                            <div className="text-xs text-slate-600">{new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                                            <div className="text-xs text-slate-600">{new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</div>
                                                         </div>
                                                     </div>
                                                 </td>
