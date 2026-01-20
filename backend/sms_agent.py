@@ -410,7 +410,6 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
         category=category,
         type=tx_type_value,
         timestamp=tx_timestamp,
-        timestamp=tx_timestamp,
         raw_sms_content=msg_text,
         status=tx_status 
     )
