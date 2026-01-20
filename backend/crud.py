@@ -97,7 +97,7 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate):
         amount=transaction.amount,
         merchant=transaction.merchant,
         raw_sms_content=transaction.raw_sms_content,
-        timestamp=datetime.utcnow(),
+        timestamp=transaction.timestamp,
         category=transaction.category,
         type=transaction.type,
         balance_after_transaction=new_balance if account else None
