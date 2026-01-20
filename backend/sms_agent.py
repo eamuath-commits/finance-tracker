@@ -452,7 +452,9 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
         logger.error(f"Failed to create main transaction: {e}")
         return f"Error creating transaction: {str(e)}"
 
-    reply_message = f"✅ Transaction Added\nAmount: {result['amount']}\nMerchant: {merchant_raw}\nCategory: {category}\nDate: {tx_timestamp.strftime('%Y-%m-%d %H:%M')}"
+    status_icon = "⏳" if tx_status == "pending" else "✅"
+    status_text = "Pending (Waiting for Confirmation)" if tx_status == "pending" else "Added"
+    reply_message = f"{status_icon} Transaction {status_text}\nAmount: {result['amount']}\nMerchant: {merchant_raw}\nCategory: {category}\nDate: {tx_timestamp.strftime('%Y-%m-%d %H:%M')}"
 
     # Handle Internal Transfer (Credit Leg)
     # dest_account already resolved above
