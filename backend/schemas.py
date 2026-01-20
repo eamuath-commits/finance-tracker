@@ -55,10 +55,11 @@ class TransactionBase(BaseModel):
     category: Optional[str] = None
     raw_sms_content: Optional[str] = None
     timestamp: Optional[datetime] = None
+    logo_url: Optional[str] = None
 
 class TransactionCreate(TransactionBase):
-    account_id: str # Needs to be linked manually if not via SMS
-    # For SMS parsing, we might not have account_id immediately
+    account_id: str
+    # ...
 
 class TransactionUpdate(BaseModel):
     account_id: Optional[str] = None
@@ -66,6 +67,7 @@ class TransactionUpdate(BaseModel):
     merchant: Optional[str] = None
     category: Optional[str] = None
     timestamp: Optional[datetime] = None
+    logo_url: Optional[str] = None
 
 
 class Transaction(TransactionBase):
@@ -73,6 +75,7 @@ class Transaction(TransactionBase):
     account_id: str
     timestamp: datetime
     balance_after_transaction: Optional[float] = None
+    logo_url: Optional[str] = None
     class Config:
         from_attributes = True
 

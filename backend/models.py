@@ -52,6 +52,7 @@ class Transaction(Base):
     category = Column(String, nullable=True)
     raw_sms_content = Column(Text, nullable=True)
     balance_after_transaction = Column(Float, nullable=True)
+    logo_url = Column(String, nullable=True)
     
     account = relationship("Account", back_populates="transactions")
 
