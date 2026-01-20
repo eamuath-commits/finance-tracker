@@ -340,21 +340,32 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
     )
 
     # Handle Internal Transfer (Credit Leg)
+    # 1. Try explicit AI extraction
     dest_last4 = result.get('destination_account_last4')
+    dest_account = None
+    
     if dest_last4:
          dest_account = crud.get_account_by_last_4(db, str(dest_last4))
-         if dest_account and dest_account.id != source_account.id:
-             credit_tx = schemas.TransactionCreate(
-                 account_id=dest_account.id,
-                 amount=result['amount'], 
-                 merchant=f"Transfer from {source_account.name}",
-                 category="Transfer", 
-                 type=models.TransactionType.CREDIT.value,
-                 timestamp=datetime.now(),
-                 raw_sms_content=f"Auto-credit from transfer: {msg_text}"
-             )
-             crud.create_transaction(db=db, transaction=credit_tx)
-             reply_message += f"\n\n🔀 **Linked Transfer**\nCredited: {dest_account.name}"
+    
+    # 2. Fallback: If we resolved the merchant to an account earlier
+    if not dest_account and 'dest_acc' in locals() and dest_acc:
+        dest_account = dest_acc
+
+    if dest_account and dest_account.id != source_account.id:
+         credit_tx = schemas.TransactionCreate(
+             account_id=dest_account.id,
+             amount=result['amount'], 
+             merchant=f"Transfer from {source_account.name}",
+             category="Transfer", 
+             type=models.TransactionType.CREDIT.value,
+             timestamp=datetime.now(),
+             raw_sms_content=f"Auto-credit from transfer: {msg_text}"
+         )
+         try:
+            crud.create_transaction(db=db, transaction=credit_tx)
+            reply_message += f"\n\n🔀 **Linked Transfer**\nCredited: {dest_account.name}"
+         except Exception as e:
+            logger.error(f"Failed to create credit leg: {e}")
 
     try:
         # Edit if it's a callback query message, else reply
