@@ -321,8 +321,13 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
     # This covers cases where AI extracts "Daily Expense" but user wants "Daily Expense Account"
     # We check if clean_merchant matches any existing account name
     known_account = crud.get_account_by_name(db, clean_merchant)
-    if known_account and not merchant_raw.endswith(" Account"):
+    # Only append " Account" if it is a Transfer (to distinguish internal transfer vs external merchant)
+    if known_account and not merchant_raw.endswith(" Account") and category == "Transfer":
         merchant_raw = f"{known_account.name} Account"
+    
+    # NEW: If AI returned "Account" suffix for a non-transfer (e.g. "STC Account" for a Bill), strip it
+    if category != "Transfer" and merchant_raw.endswith(" Account"):
+        merchant_raw = merchant_raw[:-8]
 
     # Determine Transaction Type
     tx_type_str = result.get('transaction_type', 'debit').lower()

@@ -475,7 +475,7 @@ const Transactions = () => {
                                                 </td>
                                                 <td className="px-6 py-4 text-sm font-medium text-white">
                                                     <div className="flex items-center gap-3">
-                                                        <BrandLogo name={tx.merchant} size="w-8 h-8" />
+                                                        <BrandLogo name={tx.merchant} size="w-8 h-8" category={tx.category} />
                                                         <div>
                                                             {/* Removed FROM/TO display as per user request */}
                                                             {tx.merchant}

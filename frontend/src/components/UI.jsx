@@ -78,7 +78,7 @@ export const EditIcon = ({ onClick }) => (
 export const inputClass = "w-full p-2 border border-slate-600 rounded bg-slate-700 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500";
 export const selectClass = "w-full p-2 border border-slate-600 rounded bg-slate-700 text-white focus:outline-none focus:border-blue-500";
 
-export const BrandLogo = ({ name, size = "w-8 h-8", className = "" }) => {
+export const BrandLogo = ({ name, size = "w-8 h-8", className = "", category }) => {
     const [imgSrc, setImgSrc] = React.useState(null);
     const [hasError, setHasError] = React.useState(false);
 
@@ -136,8 +136,10 @@ export const BrandLogo = ({ name, size = "w-8 h-8", className = "" }) => {
     const domain = React.useMemo(() => getDomain(name), [name]);
 
     React.useEffect(() => {
-        // Special Case for Transfers
-        if (name && (name.toLowerCase().includes('transfer') || name.toLowerCase().includes('account'))) {
+        // Special Case for Transfers: Category match OR heuristic (if no category)
+        const isTransfer = category === 'Transfer' || (!category && name && (name.toLowerCase().includes('transfer') || name.toLowerCase().includes('account')));
+
+        if (isTransfer) {
             setHasError(true); // Force fallback immediately
             return;
         }
@@ -161,7 +163,9 @@ export const BrandLogo = ({ name, size = "w-8 h-8", className = "" }) => {
 
     if (!name || hasError || !domain) {
         // Special Icon for Transfers
-        if (name && (name.toLowerCase().includes('transfer') || name.toLowerCase().includes('account'))) {
+        const isTransfer = category === 'Transfer' || (!category && name && (name.toLowerCase().includes('transfer') || name.toLowerCase().includes('account')));
+
+        if (isTransfer) {
             return (
                 <div className={`${size} rounded-full bg-slate-700 text-blue-400 flex items-center justify-center border border-slate-600 ${className}`}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
