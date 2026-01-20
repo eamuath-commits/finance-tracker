@@ -87,20 +87,41 @@ async def parse_with_ai(text: str):
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Handles incoming Telegram messages.
+    Handles incoming Telegram messages (Private, Group, or Channel).
     """
-    user_id = str(update.effective_user.id)
-    
-    # Extract text from Message (text) or Caption (if photo/media) or effective_message
-    msg_text = update.message.text or update.message.caption
+    # Channel posts might not have an effective_user
+    if update.effective_user:
+        user_id = str(update.effective_user.id)
+    else:
+        user_id = f"Channel_{update.effective_chat.id}"
+
+    # Use effective_message which works for both Message and ChannelPost
+    message = update.effective_message
+    if not message:
+        logger.warning(f"Received update with no effective message: {update.update_id}")
+        return
+
+    # Extract text from Message (text) or Caption (if photo/media)
+    msg_text = message.text or message.caption
     
     if not msg_text:
-        logger.info(f"Received non-text message from {user_id}: {update.message}")
-        await update.message.reply_text("⚠️ Message received but contained no text/caption. Is it an image?")
+        logger.info(f"Received non-text message inside {user_id}: {message}")
+        # Only reply if it's not a channel (to avoid spamming channels if they post pure images)
+        # But for debugging we reply.
+        try:
+            await message.reply_text("⚠️ Message received but contained no text/caption. Is it an image?")
+        except Exception as e:
+            logger.error(f"Could not reply to non-text message: {e}")
         return
 
     logger.info(f"Received message from {user_id}: {msg_text[:20]}...")
-    await update.message.reply_text("⏳ Processing...")
+    
+    try:
+        await message.reply_text("⏳ Processing...")
+    except Exception as e:
+        logger.error(f"Could not send reply (likely channel restriction): {e}")
+        # Continue processing anyway, just logging issues replying
+
 
     db = database.SessionLocal()
     raw_msg = models.RawMessage(
@@ -117,7 +138,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     result = await parse_with_ai(msg_text)
 
     if "error" in result:
-         await update.message.reply_text(f"❌ AI Error: {result['error']}")
+         try: await message.reply_text(f"❌ AI Error: {result['error']}")
+         except: pass
          raw_msg.status = models.MessageStatus.FAILED
          raw_msg.error_log = result['error']
          db.commit()
@@ -125,8 +147,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
          return
 
     if not result.get("is_transaction"):
-        await update.message.reply_text("ℹ️ Not a transaction message. Ignored.")
-        raw_msg.status = models.MessageStatus.FAILED # Or IGNORED if enum supports it, usually FAILED or just leave as is? Let's say FAILED for now or add IGNORED status later.
+        try: await message.reply_text("ℹ️ Not a transaction message. Ignored.")
+        except: pass
+        raw_msg.status = models.MessageStatus.FAILED 
         raw_msg.error_log = "AI determined not a transaction"
         db.commit()
         db.close()
@@ -137,7 +160,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Determine Account (Fuzzy match or default)
         account = db.query(models.Account).first()
         if not account:
-             await update.message.reply_text("❌ No accounts found in DB to attach transaction.")
+             try: await message.reply_text("❌ No accounts found in DB to attach transaction.")
+             except: pass
              raw_msg.status = models.MessageStatus.FAILED
              raw_msg.error_log = "No accounts found"
              db.commit()
@@ -163,17 +187,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         db.close()
         
-        await update.message.reply_text(
-            f"✅ **Saved!**\n"
-            f"Merchant: {result['merchant']}\n"
-            f"Amount: {result['amount']} {result['currency']}\n"
-            f"Category: {result['category']}"
-        )
-
+        try:
+            await message.reply_text(
+                f"✅ **Saved!**\n"
+                f"Merchant: {result['merchant']}\n"
+                f"Amount: {result['amount']} {result['currency']}\n"
+                f"Category: {result['category']}"
+            )
+        except Exception as e:
+             logger.error(f"Could not send success reply: {e}")
 
     except Exception as e:
         logger.error(f"DB Error: {e}")
-        await update.message.reply_text(f"❌ Database Error: {e}")
+        try: await message.reply_text(f"❌ Database Error: {e}")
+        except: pass
 
 if __name__ == '__main__':
     # Fix for asyncio loop in some environments
