@@ -176,20 +176,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         db = database.SessionLocal()
         
-        # DEDUPLICATION CHECK
-        # Check if this exact message body from this sender was already processed/pending
-        # This prevents loops if Telegram resends distinct updates for same message or bot restarts
-        existing_msg = db.query(models.RawMessage).filter(
-            models.RawMessage.sender == f"Telegram-{user_id}",
-            models.RawMessage.body == msg_text,
-            models.RawMessage.status.in_([models.MessageStatus.PARSED, models.MessageStatus.PENDING])
-        ).first()
-
-        if existing_msg:
-             logger.info(f"Skipping duplicate message from {user_id} (ID: {existing_msg.id})")
-             await message.reply_text("ℹ️ Skipped duplicate message.")
-             db.close()
-             return
+        # DEDUPLICATION CHECK - DISABLED PER USER REQUEST (to allow testing)
+        # existing_msg = db.query(models.RawMessage).filter(
+        #     models.RawMessage.sender == f"Telegram-{user_id}",
+        #     models.RawMessage.body == msg_text,
+        #     models.RawMessage.status.in_([models.MessageStatus.PARSED, models.MessageStatus.PENDING])
+        # ).first()
+        #
+        # if existing_msg:
+        #      logger.info(f"Skipping duplicate message from {user_id} (ID: {existing_msg.id})")
+        #      await message.reply_text("ℹ️ Skipped duplicate message.")
+        #      db.close()
+        #      return
 
         raw_msg = models.RawMessage(
             sender=f"Telegram-{user_id}",
