@@ -12,7 +12,6 @@ from database import engine, get_db
 from sms_parser import parser
 import analysis
 import analysis_schema
-import ai_parser
 
 # --- Migration Logic ---
 def run_migrations(engine):
@@ -334,43 +333,28 @@ async def receive_sms(request: Request, db: Session = Depends(get_db)):
     
     print(f"Extract SMS Body: {body}")
 
-    # 2. Parse (AI)
-    parsed_data = await ai_parser.parse_with_ai(body)
+    # 2. Parse (Regex)
+    parsed_data = parser.parse(body)
     
-    if "error" in parsed_data:
+    if not parsed_data:
         raw_msg.status = models.MessageStatus.FAILED
-        raw_msg.error_log = parsed_data['error']
+        raw_msg.error_log = "No pattern matched"
         db.commit()
-        return {"status": "error", "reason": parsed_data['error']}
-
-    if not parsed_data.get("is_transaction"):
-        raw_msg.status = models.MessageStatus.FAILED
-        raw_msg.error_log = "AI determined not a transaction"
-        db.commit()
-        return {"status": "ignored", "reason": "Not a transaction"}
+        return {"status": "ignored", "reason": "No pattern matched"}
     
+    last_4 = parsed_data["last_4"]
     amount = parsed_data["amount"]
-    merchant = parsed_data["merchant"] or "Unknown"
-    category = parsed_data.get("category") or "Uncategorized"
+    merchant = parsed_data["merchant"]
 
-    # 3. Find Account (Default to first for now if no last4)
-    # Ideally match last4
-    last_4 = parsed_data.get("account_last4")
-    account = None
-    if last_4:
-        account = crud.get_account_by_last_4(db, last_4=last_4)
-    
-    if not account:
-        # Fallback to first account
-        account = db.query(models.Account).first()
-        
+    # 3. Find Account
+    account = crud.get_account_by_last_4(db, last_4=last_4)
     if not account:
         raw_msg.status = models.MessageStatus.FAILED
-        raw_msg.error_log = "No accounts found in DB"
+        raw_msg.error_log = f"Account with last 4 digits {last_4} not found"
         db.commit()
         return {
             "status": "warning", 
-            "reason": "No accounts found",
+            "reason": f"Account with last 4 digits {last_4} not found",
             "parsed": parsed_data
         }
 
@@ -379,13 +363,14 @@ async def receive_sms(request: Request, db: Session = Depends(get_db)):
         account_id=account.id,
         amount=amount,
         merchant=merchant,
-        category=category,
-        raw_sms_content=body,
-        timestamp=datetime.now()
+        raw_sms_content=body
     )
-    # Use parsed timestamp if available and reliable? 
-    # AI returns YYYY-MM-DD, we need datetime. Let's stick to received time for now or parse it.
-    
+    # Use parsed timestamp if available
+    if parsed_data.get("timestamp"):
+        transaction_data.timestamp = parsed_data["timestamp"]
+    else:
+        transaction_data.timestamp = datetime.now()
+
     crud.create_transaction(db, transaction_data)
 
     # 5. Update Status
@@ -394,7 +379,7 @@ async def receive_sms(request: Request, db: Session = Depends(get_db)):
 
     return {
         "status": "success",
-        "message": f"Logged {amount} at {merchant}"
+        "message": f"Logged {amount} at {merchant} for account {account.name}"
     }
 
     return {
