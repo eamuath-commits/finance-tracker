@@ -17,6 +17,10 @@ def get_account_by_last_4(db: Session, last_4: str):
         
     return None
 
+def get_account_by_name(db: Session, name: str):
+    # Try case-insensitive matching if possible, otherwise exact
+    return db.query(models.Account).filter(models.Account.name == name).first()
+
 def create_account(db: Session, account: schemas.AccountCreate):
     db_account = models.Account(
         name=account.name,
