@@ -477,7 +477,7 @@ const Transactions = () => {
                                                     <div className="flex items-center gap-3">
                                                         <BrandLogo name={tx.merchant} size="w-8 h-8" />
                                                         <div>
-                                                            {isTransfer && <span className="text-xs text-blue-400 mr-2 uppercase font-bold tracking-wider">{isCredit ? 'FROM:' : 'TO:'}</span>}
+                                                            {/* Removed FROM/TO display as per user request */}
                                                             {tx.merchant}
                                                         </div>
                                                     </div>
