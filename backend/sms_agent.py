@@ -48,31 +48,36 @@ async def parse_with_ai(text: str):
         return {"error": "AI_NOT_CONFIGURED"}
 
     prompt = f"""
-    You are a financial transaction parser. Extract data from this SMS into JSON.
-    
+    You are a generic financial expert. Your job is to extract FULL details from banking SMS messages.
+
     SMS: "{text}"
-    
-    Rules:
-    1. Ignore "Forwarded message" headers.
-    2. Look for keywords like "Purchase", "PoS", "Transfer", "Deposit", "Withdrawal", "Payment".
-    3. Merchant is often after "At", "By", "To", or "Store".
-    4. If it looks like a card usage (e.g. "mada", "Visa", "MasterCard"), it IS a transaction.
-    5. "Amount:" or "SAR" or currency symbols clearly indicate the transaction amount.
-    
-    Output JSON format:
+
+    **Extraction Rules:**
+    1. **Identify Type**: Is this a Purchase, Transfer (In/Out), Bill Payment, Cash Withdrawal, Deposit, or Decline/Failed transaction?
+    2. **Merchant/Counterparty**: 
+       - For Purchases: Store Name (e.g. "Starbucks", "Uber").
+       - For Transfers: Recipient Name or Account (e.g. "Ahmed", "Account 1234").
+       - For Government/Bills: Entity Name (e.g. "STC", "MOI").
+    3. **Internal Transfers**: If it says "Internal Transfer" or transfer between your own accounts, set merchant to "Self" or "Internal".
+    4. **Declines**: If the message says "Declined", "Failed", or "Insufficient Funds", set `status` to "failed".
+    5. **Amount**: Extract the numerical amount. Ignore currency symbols in the number, but capture the currency code separately.
+
+    **Output JSON Schema:**
     {{
-      "is_transaction": boolean,
-      "merchant": string (or null),
-      "amount": float (or null),
-      "currency": string (e.g. "SAR"),
-      "date": "YYYY-MM-DD" (use today {datetime.today().strftime('%Y-%m-%d')} if not specified),
-      "category": string (guess from: Food, Transport, Utilities, Shopping, Transfer, Income, Subscription, Other),
-      "transaction_type": "debit" or "credit",
-      "account_last4": string (or null)
+      "is_financial_event": boolean, (True for ANY money related message, including declines)
+      "is_transaction": boolean, (True ONLY if money actually moved. False for Declines or purely informational msgs)
+      "transaction_type": "debit" | "credit",
+      "sub_type": "purchase" | "transfer" | "payment" | "withdrawal" | "deposit" | "internal_transfer" | "decline",
+      "merchant": string (The entity paid OR the person sent to/received from),
+      "amount": number,
+      "currency": string,
+      "date": "YYYY-MM-DD",
+      "category": string (Best guess: Food, Transport, Bills, Transfer, Income, etc.),
+      "account_last4": string,
+      "status": "success" | "failed"
     }}
-    
-    If it is NOT a financial transaction, set is_transaction to false.
-    Respond ONLY with raw JSON.
+
+    Respond ONLY with valid JSON.
     """
 
     try:
@@ -146,16 +151,32 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
          db.close()
          return
 
-    if not result.get("is_transaction"):
-        try: await message.reply_text("ℹ️ Not a transaction message. Ignored.")
+    if not result.get("is_financial_event"):
+        try: await message.reply_text("ℹ️ Not a financial event. Ignored.")
         except: pass
         raw_msg.status = models.MessageStatus.FAILED 
-        raw_msg.error_log = "AI determined not a transaction"
+        raw_msg.error_log = "AI determined not a financial event"
         db.commit()
         db.close()
         return
 
-    # 2. Save to DB
+    # Check for Declines
+    if result.get("status") == "failed":
+        try: 
+            await message.reply_text(
+                f"🚫 **Transaction Declined**\n"
+                f"Merchant: {result.get('merchant')}\n"
+                f"Reason: Failed/Insufficient Funds"
+            )
+        except: pass
+        # Log as parsed but don't add to Ledger
+        raw_msg.status = models.MessageStatus.PARSED # We successfully parsed it as a decline
+        raw_msg.error_log = "Transaction Declined (Not added to ledger)"
+        db.commit()
+        db.close()
+        return
+
+    # 2. Save to DB (Only Success Transactions)
     try:
         # Determine Account (Fuzzy match or default)
         account = db.query(models.Account).first()
@@ -169,11 +190,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
              return
 
         # Prepare Schema
+        # Use sub_type for category if category is generic, or append it
+        category = result.get('category') or "Uncategorized"
+        if result.get('sub_type') == 'internal_transfer':
+            category = "Transfer"
+        
         tx_data = schemas.TransactionCreate(
             account_id=account.id,
             amount=result['amount'],
             merchant=result['merchant'] or "Unknown",
-            category=result.get('category') or "Uncategorized",
+            category=category,
             timestamp=datetime.now(), 
             raw_sms_content=msg_text
         )
@@ -190,9 +216,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             await message.reply_text(
                 f"✅ **Saved!**\n"
+                f"Type: {result.get('sub_type', 'transaction').title()}\n"
                 f"Merchant: {result['merchant']}\n"
-                f"Amount: {result['amount']} {result['currency']}\n"
-                f"Category: {result['category']}"
+                f"Amount: {result['amount']} {result.get('currency', '')}\n"
+                f"Category: {category}"
             )
         except Exception as e:
              logger.error(f"Could not send success reply: {e}")
