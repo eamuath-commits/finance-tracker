@@ -48,6 +48,7 @@ ai_logger.addHandler(file_handler)
 async def parse_with_ai(text: str):
     """
     Sends SMS text to Gemini AI and expects a JSON response.
+    Retries on 429 errors.
     """
     if not model:
         return {"error": "AI_NOT_CONFIGURED"}
@@ -96,19 +97,34 @@ async def parse_with_ai(text: str):
     Respond ONLY with valid JSON.
     """
 
-    try:
-        response = model.generate_content(prompt)
-        # Cleanup code blocks if AI wraps in ```json ... ```
-        clean_text = response.text.replace("```json", "").replace("```", "").strip()
-        data = json.loads(clean_text)
-        
-        # Log to file
-        ai_logger.info(f"INPUT: {text} || OUTPUT: {json.dumps(data)}")
-        
-        return data
-    except Exception as e:
-        logger.error(f"AI Parse Error: {e}")
-        return {"error": str(e)}
+    MAX_RETRIES = 3
+    base_delay = 2
+    
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            # We use async generation if available, but the library might be sync. 
+            # model.generate_content is synchronous blocking IO usually.
+            # Ideally run in executor, but for now simple call.
+            response = await asyncio.to_thread(model.generate_content, prompt)
+            
+            # Cleanup code blocks if AI wraps in ```json ... ```
+            clean_text = response.text.replace("```json", "").replace("```", "").strip()
+            data = json.loads(clean_text)
+            
+            # Log to file
+            ai_logger.info(f"INPUT: {text} || OUTPUT: {json.dumps(data)}")
+            
+            return data
+            
+        except Exception as e:
+            error_str = str(e)
+            if "429" in error_str and attempt < MAX_RETRIES:
+                delay = base_delay * (2 ** attempt) # 2s, 4s, 8s
+                logger.warning(f"AI 429 Rate Limit. Retrying in {delay}s... (Attempt {attempt+1}/{MAX_RETRIES})")
+                await asyncio.sleep(delay)
+            else:
+                logger.error(f"AI Parse Error: {e}")
+                return {"error": str(e)}
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -256,11 +272,16 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
     if not clean_merchant or clean_merchant == "null":
         clean_merchant = result.get('merchant') or "Unknown"
 
+    # Determine Transaction Type
+    tx_type_str = result.get('transaction_type', 'debit').lower()
+    tx_type = models.TransactionType.CREDIT if tx_type_str == 'credit' else models.TransactionType.DEBIT
+
     tx_data = schemas.TransactionCreate(
         account_id=source_account.id,
         amount=result['amount'],
         merchant=clean_merchant,
         category=category,
+        type=tx_type,
         timestamp=datetime.now(), 
         raw_sms_content=msg_text
     )
@@ -283,7 +304,8 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
                  account_id=dest_account.id,
                  amount=result['amount'], 
                  merchant=f"Transfer from {source_account.name}",
-                 category="Deposit", 
+                 category="Transfer", 
+                 type=models.TransactionType.CREDIT,
                  timestamp=datetime.now(),
                  raw_sms_content=f"Auto-credit from transfer: {msg_text}"
              )

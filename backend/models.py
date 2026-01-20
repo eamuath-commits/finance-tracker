@@ -41,6 +41,10 @@ class AccountAlias(Base):
 
     account = relationship("Account", back_populates="aliases")
 
+class TransactionType(enum.Enum):
+    DEBIT = "debit"
+    CREDIT = "credit"
+
 class Transaction(Base):
     __tablename__ = "transactions"
 
@@ -50,6 +54,7 @@ class Transaction(Base):
     merchant = Column(String)
     timestamp = Column(DateTime, default=datetime.now)
     category = Column(String, nullable=True)
+    type = Column(Enum(TransactionType), default=TransactionType.DEBIT, nullable=False)
     raw_sms_content = Column(Text, nullable=True)
     balance_after_transaction = Column(Float, nullable=True)
     logo_url = Column(String, nullable=True)

@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, date
-from models import AccountType
+from models import AccountType, TransactionType
 
 class AccountBase(BaseModel):
     name: str
@@ -53,6 +53,7 @@ class TransactionBase(BaseModel):
     amount: float
     merchant: str
     category: Optional[str] = None
+    type: Optional[TransactionType] = TransactionType.DEBIT
     raw_sms_content: Optional[str] = None
     timestamp: Optional[datetime] = None
     logo_url: Optional[str] = None
@@ -66,6 +67,7 @@ class TransactionUpdate(BaseModel):
     amount: Optional[float] = None
     merchant: Optional[str] = None
     category: Optional[str] = None
+    type: Optional[TransactionType] = None
     timestamp: Optional[datetime] = None
     logo_url: Optional[str] = None
 

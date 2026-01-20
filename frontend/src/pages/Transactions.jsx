@@ -34,6 +34,7 @@ const Transactions = () => {
         amount: '',
         merchant: '',
         category: '',
+        type: 'debit',
         timestamp: new Date().toISOString().split('T')[0] // YYYY-MM-DD
     });
 
@@ -117,6 +118,7 @@ const Transactions = () => {
             amount: '',
             merchant: '',
             category: '',
+            type: 'debit',
             timestamp: new Date().toISOString().split('T')[0]
         });
     };
@@ -135,7 +137,8 @@ const Transactions = () => {
             category: tx.category || '',
             merchant: tx.merchant,
             amount: tx.amount, // Optional: Usually disabled for editing to prevent balance mismatch
-            account_id: tx.account_id
+            account_id: tx.account_id,
+            type: tx.type || 'debit'
         });
         setShowEditModal(true);
     };
@@ -211,7 +214,7 @@ const Transactions = () => {
         const matchAccount = accountFilter ? tx.account_id === accountFilter : true;
 
         // Type Filter (Credit vs Debit vs Transfer)
-        const isCredit = CREDIT_CATEGORIES.includes(tx.category);
+        const isCredit = tx.type === 'credit' || (!tx.type && CREDIT_CATEGORIES.includes(tx.category));
         const isTransfer = tx.category === 'Transfer';
         let matchType = true;
         if (typeFilter === 'Credit') matchType = isCredit;
@@ -458,7 +461,7 @@ const Transactions = () => {
                                 </thead>
                                 <tbody className="bg-slate-800 divide-y divide-slate-700">
                                     {sortedTransactions.map(tx => {
-                                        const isCredit = CREDIT_CATEGORIES.includes(tx.category);
+                                        const isCredit = tx.type === 'credit' || (!tx.type && CREDIT_CATEGORIES.includes(tx.category));
                                         const isTransfer = tx.category === 'Transfer';
                                         return (
                                             <tr key={tx.id} className={`hover:bg-slate-700/50 transition-colors ${selectedIds.has(tx.id) ? 'bg-blue-900/10' : ''}`}>
@@ -543,15 +546,15 @@ const Transactions = () => {
                             <div className="flex gap-4 p-1 bg-slate-700 rounded-lg mb-4">
                                 <button
                                     type="button"
-                                    onClick={() => setForm(f => ({ ...f, category: '' }))}
-                                    className="flex-1 py-1.5 text-xs font-bold uppercase rounded-md bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 transition text-center"
+                                    onClick={() => setForm(f => ({ ...f, type: 'debit' }))}
+                                    className={`flex-1 py-1.5 text-xs font-bold uppercase rounded-md transition text-center ${form.type === 'debit' ? 'bg-red-500 text-white shadow' : 'text-red-300 hover:bg-red-500/20'}`}
                                 >
                                     Expense / Debit
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => setForm(f => ({ ...f, category: 'Income' }))}
-                                    className="flex-1 py-1.5 text-xs font-bold uppercase rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition text-center"
+                                    onClick={() => setForm(f => ({ ...f, type: 'credit' }))}
+                                    className={`flex-1 py-1.5 text-xs font-bold uppercase rounded-md transition text-center ${form.type === 'credit' ? 'bg-emerald-500 text-white shadow' : 'text-emerald-300 hover:bg-emerald-500/20'}`}
                                 >
                                     Income / Credit
                                 </button>
