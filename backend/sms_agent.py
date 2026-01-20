@@ -346,8 +346,11 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
                      tx_timestamp = datetime.combine(tx_timestamp.date(), time_part)
                  except:
                      pass # Keep just the date part if time fails 
-        except:
-             logger.warning(f"Could not parse date: {result['date']}, using now()")
+        except Exception as e:
+             logger.warning(f"Could not parse date: {result.get('date')}, error: {e}. AI response was: {json.dumps(result)}")
+             tx_timestamp = datetime.now()
+    else:
+        logger.info(f"No date returned by AI. Using now(). AI Output: {json.dumps(result)}")
 
     transaction = schemas.TransactionCreate(
         account_id=source_account.id,
