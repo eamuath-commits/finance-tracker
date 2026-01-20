@@ -300,6 +300,14 @@ def delete_transaction(transaction_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Transaction not found")
     return {"message": "Transaction deleted"}
 
+@app.post("/transactions/bulk-delete")
+def bulk_delete_transactions(payload: schemas.BulkDeleteRequest, db: Session = Depends(get_db)):
+    deleted_count = 0
+    for tx_id in payload.ids:
+        crud.delete_transaction(db, tx_id)
+        deleted_count += 1
+    return {"message": f"Deleted {deleted_count} transactions"}
+
 # --- Analysis Endpoints ---
 @app.get("/analysis/allocation", response_model=analysis_schema.AllocationResponse)
 def get_allocation_analysis(db: Session = Depends(get_db)):

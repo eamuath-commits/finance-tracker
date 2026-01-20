@@ -26,6 +26,7 @@ const Transactions = () => {
     const [showEditModal, setShowEditModal] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
     const [editingTx, setEditingTx] = useState(null);
+    const [selectedIds, setSelectedIds] = useState(new Set());
 
     // Form State
     const [form, setForm] = useState({
@@ -65,6 +66,7 @@ const Transactions = () => {
             ]);
             setTransactions(txRes.data);
             setAccounts(accRes.data);
+            setSelectedIds(new Set()); // Reset selection on refresh
         } catch (error) {
             console.error("Error fetching data", error);
         } finally {
@@ -136,6 +138,30 @@ const Transactions = () => {
             account_id: tx.account_id
         });
         setShowEditModal(true);
+    };
+
+    const toggleSelection = (id) => {
+        const newSet = new Set(selectedIds);
+        if (newSet.has(id)) {
+            newSet.delete(id);
+        } else {
+            newSet.add(id);
+        }
+        setSelectedIds(newSet);
+    };
+
+    const handleBulkDelete = async () => {
+        if (window.confirm(`Are you sure you want to delete ${selectedIds.size} transactions?`)) {
+            try {
+                await axios.post(`${API_URL}/transactions/bulk-delete`, {
+                    ids: Array.from(selectedIds)
+                });
+                fetchData();
+            } catch (err) {
+                console.error("Error deleting transactions", err);
+                alert('Error deleting transactions');
+            }
+        }
     };
 
     const handleSaveAdd = async (e) => {
@@ -237,10 +263,23 @@ const Transactions = () => {
             </div>
 
             {/* Filters Bar */}
-            {/* Filters Bar */}
-            {/* Filters Bar */}
             {viewMode === 'transactions' && (
                 <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg mb-6 space-y-4">
+                    {/* ... Search Row ... */}
+                    <div className="flex justify-between items-center bg-slate-800/50 p-2 rounded-lg border border-slate-700/50 mb-2">
+                        <div className="text-gray-400 text-sm pl-2">
+                            {selectedIds.size} selected
+                        </div>
+                        {selectedIds.size > 0 && (
+                            <button
+                                onClick={handleBulkDelete}
+                                className="bg-red-600/20 text-red-300 hover:bg-red-600/40 px-3 py-1 rounded-md text-sm border border-red-500/30 flex items-center gap-2 transition"
+                            >
+                                <Trash2 size={14} /> Delete Selected ({selectedIds.size})
+                            </button>
+                        )}
+                    </div>
+
                     {/* Search Row */}
                     <div className="relative">
                         <Search className="absolute left-3 top-3 text-gray-400" size={18} />
@@ -379,6 +418,20 @@ const Transactions = () => {
                             <table className="min-w-full divide-y divide-slate-700">
                                 <thead className="bg-slate-900">
                                     <tr>
+                                        <th className="px-6 py-4 text-left">
+                                            <input
+                                                type="checkbox"
+                                                className="rounded bg-slate-700 border-slate-600 text-blue-600 focus:ring-blue-500"
+                                                checked={sortedTransactions.length > 0 && selectedIds.size === sortedTransactions.length}
+                                                onChange={() => {
+                                                    if (selectedIds.size === sortedTransactions.length) {
+                                                        setSelectedIds(new Set());
+                                                    } else {
+                                                        setSelectedIds(new Set(sortedTransactions.map(t => t.id)));
+                                                    }
+                                                }}
+                                            />
+                                        </th>
                                         <th
                                             className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white"
                                             onClick={() => handleSort('merchant')}
@@ -408,7 +461,15 @@ const Transactions = () => {
                                         const isCredit = CREDIT_CATEGORIES.includes(tx.category);
                                         const isTransfer = tx.category === 'Transfer';
                                         return (
-                                            <tr key={tx.id} className="hover:bg-slate-700/50 transition-colors">
+                                            <tr key={tx.id} className={`hover:bg-slate-700/50 transition-colors ${selectedIds.has(tx.id) ? 'bg-blue-900/10' : ''}`}>
+                                                <td className="px-6 py-4">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="rounded bg-slate-700 border-slate-600 text-blue-600 focus:ring-blue-500"
+                                                        checked={selectedIds.has(tx.id)}
+                                                        onChange={() => toggleSelection(tx.id)}
+                                                    />
+                                                </td>
                                                 <td className="px-6 py-4 text-sm font-medium text-white">
                                                     {isTransfer && <span className="text-xs text-blue-400 mr-2 uppercase font-bold tracking-wider">{isCredit ? 'FROM:' : 'TO:'}</span>}
                                                     {tx.merchant}
@@ -457,7 +518,7 @@ const Transactions = () => {
                                     })}
                                     {sortedTransactions.length === 0 && (
                                         <tr>
-                                            <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                                            <td colSpan="8" className="px-6 py-12 text-center text-gray-500">
                                                 No transactions found matching your filters.
                                             </td>
                                         </tr>
