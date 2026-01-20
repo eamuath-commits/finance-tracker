@@ -3,15 +3,13 @@ import asyncio
 import json
 import logging
 import google.generativeai as genai
-from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters, CallbackQueryHandler, TypeHandler
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from datetime import datetime
 
 # Import local backend modules
-import database
-from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters, TypeHandler
 import database
 import models
 import crud
@@ -133,8 +131,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if not msg_text:
         logger.info(f"Received non-text message inside {user_id}: {message}")
-        # Only reply if it's not a channel (to avoid spamming channels if they post pure images)
-        # But for debugging we reply.
         try:
             await message.reply_text("⚠️ Message received but contained no text/caption. Is it an image?")
         except Exception as e:
@@ -147,8 +143,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await message.reply_text("⏳ Processing...")
     except Exception as e:
         logger.error(f"Could not send reply (likely channel restriction): {e}")
-        # Continue processing anyway, just logging issues replying
-
 
     db = database.SessionLocal()
     raw_msg = models.RawMessage(
@@ -191,8 +185,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"Reason: Failed/Insufficient Funds"
             )
         except: pass
-        # Log as parsed but don't add to Ledger
-        raw_msg.status = models.MessageStatus.PARSED # We successfully parsed it as a decline
+        raw_msg.status = models.MessageStatus.PARSED 
         raw_msg.error_log = "Transaction Declined (Not added to ledger)"
         db.commit()
         db.close()
@@ -201,7 +194,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 2. Save to DB (Only Success Transactions)
     try:
         # Determine Source Account
-        # Priority: Match on Last 4 Digits -> Fallback to First Account
         source_account = None
         source_last4 = result.get('source_account_last4')
         
@@ -209,95 +201,156 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             source_account = crud.get_account_by_last_4(db, str(source_last4))
         
         if not source_account:
-            # Fallback to first available account if specific digits not found
-            # (Warning: This might be risky if they have multiple accounts)
-            source_account = db.query(models.Account).first()
+            # INTERACTIVE FALLBACK
+            # Force user to select account if ambiguous
+            accounts = db.query(models.Account).order_by(models.Account.name).all()
+            
+            if not accounts:
+                await message.reply_text("❌ No accounts in database. Please add accounts in the Web UI first.")
+                raw_msg.status = models.MessageStatus.FAILED
+                raw_msg.error_log = "No accounts (Ambiguous)"
+                db.commit()
+                db.close()
+                return
 
-        if not source_account:
-             try: await message.reply_text("❌ No accounts found in DB to attach transaction.")
-             except: pass
-             raw_msg.status = models.MessageStatus.FAILED
-             raw_msg.error_log = "No accounts found"
-             db.commit()
-             db.close()
-             return
+            keyboard = []
+            for i, acc in enumerate(accounts):
+                # Callback data: act:{raw_msg_id}:{index}
+                # Using index to keep payload short
+                keyboard.append([InlineKeyboardButton(f"{acc.name} (...{acc.last_4_digits or '?'})", callback_data=f"act:{raw_msg.id}:{i}")])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await message.reply_text(
+                f"❓ **Ambiguous Account**\n"
+                f"I couldn't identify the source account for this {result.get('amount')} transaction.\n"
+                f"Please select the **Source Account**:",
+                reply_markup=reply_markup
+            )
+            
+            # We leave raw_msg as PENDING.
+            db.close()
+            return
 
-        # Prepare Schema (Source / Debit)
-        # Use sub_type for category if category is generic, or append it
-        category = result.get('category') or "Uncategorized"
-        if result.get('sub_type') == 'internal_transfer':
-            category = "Transfer"
-        
-        # Use Brand Name if available and not null, otherwise fallback to merchant
-        clean_merchant = result.get('brand_name')
-        if not clean_merchant or clean_merchant == "null":
-            clean_merchant = result.get('merchant') or "Unknown"
-
-        tx_data = schemas.TransactionCreate(
-            account_id=source_account.id,
-            amount=result['amount'],
-            merchant=clean_merchant,
-            category=category,
-            timestamp=datetime.now(), 
-            raw_sms_content=msg_text
-        )
-
-        # Create PRIMARY Transaction (Debit)
-        crud.create_transaction(db=db, transaction=tx_data)
-        
-        reply_message = (
-            f"✅ **Saved!**\n"
-            f"Type: {result.get('sub_type', 'transaction').title()}\n"
-            f"Merchant: {result['merchant']}\n"
-            f"Amount: {result['amount']} {result.get('currency', '')}\n"
-            f"Category: {category}"
-        )
-
-        # 3. Handle Internal Transfer (Credit Leg)
-        dest_last4 = result.get('destination_account_last4')
-        if dest_last4:
-             dest_account = crud.get_account_by_last_4(db, str(dest_last4))
-             if dest_account and dest_account.id != source_account.id:
-                 # It IS an internal transfer to a known account!
-                 # Create the Credit side
-                 
-                 credit_tx = schemas.TransactionCreate(
-                     account_id=dest_account.id,
-                     amount=result['amount'], # Positive amount
-                     merchant=f"Transfer from {source_account.name}",
-                     category="Income", # Or 'Transfer' if we handle signed logic? 
-                     # Wait, crud.create_transaction logic for 'Income' adds to balance. 
-                     # 'Transfer' might subtract unless we force it.
-                     # Let's use 'Deposit' or 'Income' to ensure addition.
-                     # Or we update crud to handle 'Transfer In'.
-                     # For now, let's stick to 'Deposit' to be safe on balance impact, 
-                     # but maybe label it Transfer in note if possible?
-                     # The category is used for logic.
-                     timestamp=datetime.now(),
-                     raw_sms_content=f"Auto-credit from transfer: {msg_text}"
-                 )
-                 # Force category to be one that Adds Balance
-                 credit_tx.category = "Deposit" 
-                 
-                 crud.create_transaction(db=db, transaction=credit_tx)
-                 reply_message += f"\n\n🔀 **Linked Transfer Detected**\nCredit to: {dest_account.name} (Matched {dest_last4})"
-
+        # Explicit Flow (Source Found)
+        await _create_transaction_logic(db, result, source_account, msg_text, message)
         
         # Update Raw Message Status
         raw_msg.status = models.MessageStatus.PARSED
         db.commit()
-        
         db.close()
-        
-        try:
-            await message.reply_text(reply_message)
-        except Exception as e:
-             logger.error(f"Could not send success reply: {e}")
 
     except Exception as e:
         logger.error(f"DB Error: {e}")
         try: await message.reply_text(f"❌ Database Error: {e}")
         except: pass
+        db.close()
+
+async def _create_transaction_logic(db, result, source_account, msg_text, reply_target):
+    # Prepare Schema
+    category = result.get('category') or "Uncategorized"
+    if result.get('sub_type') == 'internal_transfer':
+        category = "Transfer"
+    
+    clean_merchant = result.get('brand_name')
+    if not clean_merchant or clean_merchant == "null":
+        clean_merchant = result.get('merchant') or "Unknown"
+
+    tx_data = schemas.TransactionCreate(
+        account_id=source_account.id,
+        amount=result['amount'],
+        merchant=clean_merchant,
+        category=category,
+        timestamp=datetime.now(), 
+        raw_sms_content=msg_text
+    )
+
+    crud.create_transaction(db=db, transaction=tx_data)
+    
+    reply_message = (
+        f"✅ **Saved to {source_account.name}**\n"
+        f"Merchant: {result['merchant']}\n"
+        f"Amount: {result['amount']} {result.get('currency', '')}\n"
+        f"Category: {category}"
+    )
+
+    # Handle Internal Transfer (Credit Leg)
+    dest_last4 = result.get('destination_account_last4')
+    if dest_last4:
+         dest_account = crud.get_account_by_last_4(db, str(dest_last4))
+         if dest_account and dest_account.id != source_account.id:
+             credit_tx = schemas.TransactionCreate(
+                 account_id=dest_account.id,
+                 amount=result['amount'], 
+                 merchant=f"Transfer from {source_account.name}",
+                 category="Deposit", 
+                 timestamp=datetime.now(),
+                 raw_sms_content=f"Auto-credit from transfer: {msg_text}"
+             )
+             crud.create_transaction(db=db, transaction=credit_tx)
+             reply_message += f"\n\n🔀 **Linked Transfer**\nCredited: {dest_account.name}"
+
+    try:
+        # Edit if it's a callback query message, else reply
+        if hasattr(reply_target, 'edit_text'):
+             await reply_target.edit_text(reply_message)
+        else:
+             await reply_target.reply_text(reply_message)
+    except Exception as e:
+        logger.error(f"Reply error: {e}")
+
+
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handles category/account selection from buttons.
+    """
+    query = update.callback_query
+    await query.answer() # Acknowledge
+    
+    data = query.data
+    # data format: act:{raw_msg_id}:{acc_index}
+    
+    try:
+        if data.startswith("act:"):
+            _, raw_id, acc_idx_str = data.split(":")
+            acc_idx = int(acc_idx_str)
+            
+            db = database.SessionLocal()
+            raw_msg = db.query(models.RawMessage).filter(models.RawMessage.id == raw_id).first()
+            
+            if not raw_msg:
+                await query.edit_text("❌ Error: Message not found in DB.")
+                db.close()
+                return
+
+            # Fetch Accounts safely
+            accounts = db.query(models.Account).order_by(models.Account.name).all()
+            if acc_idx >= len(accounts):
+                 await query.edit_text("❌ Error: Account selection invalid.")
+                 db.close()
+                 return
+            
+            selected_account = accounts[acc_idx]
+            
+            # Re-parse AI (Safest way to get data back)
+            result = await parse_with_ai(raw_msg.body)
+            
+            if "error" in result:
+                 await query.edit_text(f"❌ AI Re-parse Error: {result['error']}")
+                 db.close()
+                 return
+
+            # Create Transaction with Selected Account
+            await _create_transaction_logic(db, result, selected_account, raw_msg.body, query.message)
+            
+            raw_msg.status = models.MessageStatus.PARSED
+            db.commit()
+            db.close()
+
+    except Exception as e:
+        logger.error(f"Callback Error: {e}")
+        await query.edit_text(f"❌ System Error: {e}")
+
 
 if __name__ == '__main__':
     # Fix for asyncio loop in some environments
@@ -317,24 +370,22 @@ if __name__ == '__main__':
         logger.info(f"raw_update: {update.to_dict()}")
 
     # Handlers
-    # Add debug handler FIRST to catch everything
     app.add_handler(TypeHandler(Update, debug_log_update), group=-1)
 
     start_handler = MessageHandler(filters.COMMAND & filters.Regex(r"^/start"), lambda u, c: u.message.reply_text("👋 Hello! I am your SMS Finance Agent. Forward me a bank SMS!"))
     
-    # Catch ALL non-command updates to debug why forwards are missed
-    # We will filter for text inside the handler
-    echo_handler = MessageHandler(~filters.COMMAND, handle_message)
+    msg_handler = MessageHandler(~filters.COMMAND, handle_message)
+    callback_handler = CallbackQueryHandler(handle_callback)
     
     app.add_handler(start_handler)
-    app.add_handler(echo_handler)
+    app.add_handler(msg_handler)
+    app.add_handler(callback_handler)
     
     # Verify Bot Identity
     print("⏳ verifying token...")
     async def print_bot_info():
          bot = await app.bot.get_me()
          print(f"✅ Bot Connected: @{bot.username} (ID: {bot.id})")
-         print("👉 Please make sure you are messaging THIS bot.")
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(print_bot_info())
