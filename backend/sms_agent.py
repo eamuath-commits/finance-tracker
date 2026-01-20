@@ -33,8 +33,8 @@ logger = logging.getLogger(__name__)
 # Configure Gemini AI
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    # Using 1.5-flash for better stability/limits vs 2.5/latest
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # Using gemini-2.0-flash as 1.5 is explicitly not available in this env
+    model = genai.GenerativeModel('gemini-2.0-flash')
 else:
     logger.warning("GEMINI_API_KEY not found. AI parsing will fail.")
     model = None
