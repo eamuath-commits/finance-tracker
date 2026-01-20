@@ -312,32 +312,53 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
     if not clean_merchant or clean_merchant == "null":
         clean_merchant = merchant_raw
 
+    # Ensure "Account" suffix if it's a known internal account name but missing the suffix
+    # This covers cases where AI extracts "Daily Expense" but user wants "Daily Expense Account"
+    # We check if clean_merchant matches any existing account name
+    known_account = crud.get_account_by_name(db, clean_merchant)
+    if known_account and not merchant_raw.endswith(" Account"):
+        merchant_raw = f"{known_account.name} Account"
+
     # Determine Transaction Type
     tx_type_str = result.get('transaction_type', 'debit').lower()
     tx_type = models.TransactionType.CREDIT if tx_type_str == 'credit' else models.TransactionType.DEBIT
     
     # FIX: Explicitly convert Enum to string value for Pydantic/SQLAlchemy compatibility
-    # The DB expects a string 'debit'/'credit', but the Pydantic model might be passing the Enum object which psycopg2 rejects.
     tx_type_value = tx_type.value
 
-    tx_data = schemas.TransactionCreate(
+    # Parse Date from AI result or use current time
+    tx_timestamp = datetime.now()
+    if 'date' in result and result['date']:
+        try:
+            # AI usually returns ISO format or YYYY-MM-DD
+            # We can use a lenient parser or try standard formats
+            from dateutil import parser
+            tx_timestamp = parser.parse(result['date'])
+            # If AI returns just date without time, maybe keep current time? 
+            # But usually SMS has time. Let's trust the parser.
+            if 'time' in result and result['time']:
+                 # If time is separate, combine them (simplified logic, usually AI gives full datetime if asked)
+                 pass 
+        except:
+             logger.warning(f"Could not parse date: {result['date']}, using now()")
+
+    transaction = schemas.TransactionCreate(
         account_id=source_account.id,
-        amount=result['amount'],
-        merchant=clean_merchant,
+        amount=result['amount'], 
+        merchant=merchant_raw,
         category=category,
         type=tx_type_value,
-        timestamp=datetime.now(), 
-        raw_sms_content=msg_text
+        timestamp=tx_timestamp,
+        raw_sms_content=msg_text 
     )
 
-    crud.create_transaction(db=db, transaction=tx_data)
-    
-    reply_message = (
-        f"✅ **Saved to {source_account.name}**\n"
-        f"Merchant: {result['merchant']}\n"
-        f"Amount: {result['amount']} {result.get('currency', '')}\n"
-        f"Category: {category}"
-    )
+    try:
+        crud.create_transaction(db=db, transaction=transaction)
+    except Exception as e:
+        logger.error(f"Failed to create main transaction: {e}")
+        return f"Error creating transaction: {str(e)}"
+
+    reply_message = f"✅ Transaction Added\nAmount: {result['amount']}\nMerchant: {merchant_raw}\nCategory: {category}\nDate: {tx_timestamp.strftime('%Y-%m-%d %H:%M')}"
 
     # Handle Internal Transfer (Credit Leg)
     # 1. Try explicit AI extraction
@@ -358,7 +379,7 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
              merchant=f"{source_account.name} Account",
              category="Transfer", 
              type=models.TransactionType.CREDIT.value,
-             timestamp=datetime.now(),
+             timestamp=tx_timestamp, # Use same timestamp
              raw_sms_content=f"Auto-credit from transfer: {msg_text}"
          )
          try:
