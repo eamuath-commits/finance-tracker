@@ -6,5 +6,5 @@ alembic
 pydantic
 python-dotenv
 python-telegram-bot
-google-generativeai
+google-generativeai>=0.7.0
 nest_asyncio
