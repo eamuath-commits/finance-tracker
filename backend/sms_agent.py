@@ -56,8 +56,12 @@ async def parse_with_ai(text: str):
     if not model:
         return {"error": "AI_NOT_CONFIGURED"}
 
+    today_date = datetime.now().strftime("%Y-%m-%d")
     prompt = f"""
     You are a generic financial expert. Your job is to extract FULL details from banking SMS messages.
+    
+    Context:
+    - Current Date: {today_date} (Use this to resolve ambiguous years, e.g. '26' -> '2026')
 
     SMS: "{text}"
 
