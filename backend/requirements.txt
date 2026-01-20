@@ -8,3 +8,4 @@ python-dotenv
 python-telegram-bot
 google-generativeai>=0.7.0
 nest_asyncio
+python-dateutil>=2.8.2
