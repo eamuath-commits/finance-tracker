@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'add_status_column'
-down_revision = 'add_logo_url'
+down_revision = 'add_type_col'
 branch_labels = None
 depends_on = None
 
