@@ -136,12 +136,18 @@ export const BrandLogo = ({ name, size = "w-8 h-8", className = "" }) => {
     const domain = React.useMemo(() => getDomain(name), [name]);
 
     React.useEffect(() => {
+        // Special Case for Transfers
+        if (name && (name.toLowerCase().includes('transfer') || name.toLowerCase().includes('account'))) {
+            setHasError(true); // Force fallback immediately
+            return;
+        }
+
         if (domain) {
             // Try Clearbit first
             setImgSrc(`https://logo.clearbit.com/${domain}`);
             setHasError(false);
         }
-    }, [domain]);
+    }, [domain, name]);
 
     const handleError = () => {
         // If Clearbit failed, try Google Favicon
@@ -154,6 +160,21 @@ export const BrandLogo = ({ name, size = "w-8 h-8", className = "" }) => {
     };
 
     if (!name || hasError || !domain) {
+        // Special Icon for Transfers
+        if (name && (name.toLowerCase().includes('transfer') || name.toLowerCase().includes('account'))) {
+            return (
+                <div className={`${size} rounded-full bg-slate-700 text-blue-400 flex items-center justify-center border border-slate-600 ${className}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M7 10v12" />
+                        <path d="M15 5.88 14 2H9l1 3.88" />
+                        <path d="M11 20h10" />
+                        <path d="M11 14h10" />
+                        <path d="m18 11 3 3-3 3" />
+                    </svg>
+                </div>
+            );
+        }
+
         // Text Fallback with generated color
         const colors = ['bg-red-900', 'bg-blue-900', 'bg-green-900', 'bg-yellow-900', 'bg-purple-900', 'bg-pink-900', 'bg-indigo-900'];
         const charCode = name ? name.charCodeAt(0) : 0;
