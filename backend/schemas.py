@@ -239,5 +239,8 @@ class Category(CategoryBase):
         from_attributes = True
 
 
+class CategoryUpdate(BaseModel):
+    name: str
+
 class BulkDeleteRequest(BaseModel):
     ids: List[str]
