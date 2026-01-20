@@ -160,16 +160,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Could not send reply (likely channel restriction): {e}")
 
-    db = database.SessionLocal()
-    raw_msg = models.RawMessage(
-        sender=f"Telegram-{user_id}",
-        body=msg_text,
-        status=models.MessageStatus.PENDING,
-        timestamp=datetime.now()
-    )
-    db.add(raw_msg)
-    db.commit()
-    db.refresh(raw_msg)
+    try:
+        db = database.SessionLocal()
+        raw_msg = models.RawMessage(
+            sender=f"Telegram-{user_id}",
+            body=msg_text,
+            status=models.MessageStatus.PENDING,
+            timestamp=datetime.now()
+        )
+        db.add(raw_msg)
+        db.commit()
+        db.refresh(raw_msg)
+    except Exception as e:
+        logger.error(f"CRITIAL DB ERROR during initial save: {e}", exc_info=True)
+        try: await message.reply_text("❌ System Error: Database Write Failed. Check logs.")
+        except: pass
+        if 'db' in locals(): db.close()
+        return
 
     # 1. AI Parse
     result = await parse_with_ai(msg_text)
