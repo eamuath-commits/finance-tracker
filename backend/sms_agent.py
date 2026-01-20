@@ -40,6 +40,13 @@ else:
     logger.warning("GEMINI_API_KEY not found. AI parsing will fail.")
     model = None
 
+# Configure AI Logger
+ai_logger = logging.getLogger("gemini_logger")
+ai_logger.setLevel(logging.INFO)
+file_handler = logging.FileHandler("gemini_responses.log")
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
+ai_logger.addHandler(file_handler)
+
 async def parse_with_ai(text: str):
     """
     Sends SMS text to Gemini AI and expects a JSON response.
@@ -85,6 +92,10 @@ async def parse_with_ai(text: str):
         # Cleanup code blocks if AI wraps in ```json ... ```
         clean_text = response.text.replace("```json", "").replace("```", "").strip()
         data = json.loads(clean_text)
+        
+        # Log to file
+        ai_logger.info(f"INPUT: {text} || OUTPUT: {json.dumps(data)}")
+        
         return data
     except Exception as e:
         logger.error(f"AI Parse Error: {e}")
