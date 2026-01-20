@@ -91,6 +91,7 @@ async def parse_with_ai(text: str):
       "amount": number,
       "currency": string,
       "date": "YYYY-MM-DD",
+      "time": "HH:MM", (24-hour format)
       "category": string (Best guess: Food, Transport, Bills, Transfer, Income, etc.),
       "source_account_last4": string,
       "destination_account_last4": stringOrNull,
@@ -334,11 +335,13 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
             # We can use a lenient parser or try standard formats
             from dateutil import parser
             tx_timestamp = parser.parse(result['date'])
-            # If AI returns just date without time, maybe keep current time? 
-            # But usually SMS has time. Let's trust the parser.
+            # Combine with time if available
             if 'time' in result and result['time']:
-                 # If time is separate, combine them (simplified logic, usually AI gives full datetime if asked)
-                 pass 
+                 try:
+                     time_part = parser.parse(result['time']).time()
+                     tx_timestamp = datetime.combine(tx_timestamp.date(), time_part)
+                 except:
+                     pass # Keep just the date part if time fails 
         except:
              logger.warning(f"Could not parse date: {result['date']}, using now()")
 
