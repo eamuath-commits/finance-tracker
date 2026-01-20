@@ -300,8 +300,17 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
         category = "Transfer"
     
     clean_merchant = result.get('brand_name')
+    merchant_raw = result.get('merchant') or "Unknown"
+
+    # Optimization: If merchant is numeric (e.g. '1505'), try to find the account name
+    if merchant_raw.isdigit() or (len(merchant_raw) < 6 and merchant_raw.isnumeric()):
+         dest_acc = crud.get_account_by_last_4(db, merchant_raw)
+         if dest_acc:
+             merchant_raw = f"Transfer to {dest_acc.name}"
+             clean_merchant = dest_acc.name # For logo lookup
+
     if not clean_merchant or clean_merchant == "null":
-        clean_merchant = result.get('merchant') or "Unknown"
+        clean_merchant = merchant_raw
 
     # Determine Transaction Type
     tx_type_str = result.get('transaction_type', 'debit').lower()
