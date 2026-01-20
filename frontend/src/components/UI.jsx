@@ -79,36 +79,99 @@ export const inputClass = "w-full p-2 border border-slate-600 rounded bg-slate-7
 export const selectClass = "w-full p-2 border border-slate-600 rounded bg-slate-700 text-white focus:outline-none focus:border-blue-500";
 
 export const BrandLogo = ({ name, size = "w-8 h-8", className = "" }) => {
-    const [error, setError] = React.useState(false);
+    const [imgSrc, setImgSrc] = React.useState(null);
+    const [hasError, setHasError] = React.useState(false);
 
-    if (!name || error) {
+    // Heuristic: Get Domain
+    const getDomain = (merchantName) => {
+        if (!merchantName) return null;
+        let cleanName = merchantName.toLowerCase().trim();
+        const noSpaces = cleanName.replace(/[^a-z0-9]/g, '');
+
+        // 1. Manual Overrides (Common Saudi/Regional Brands)
+        const manualMap = {
+            'stc': 'stc.com.sa',
+            'stc pay': 'stcpay.com.sa',
+            'stcpay': 'stcpay.com.sa',
+            'mobily': 'mobily.com.sa',
+            'mobile': 'mobily.com.sa',
+            'zain': 'sa.zain.com',
+            'jarir': 'jarir.com',
+            'jarir bookstore': 'jarir.com',
+            'alkahraba': 'se.com.sa',
+            'se': 'se.com.sa',
+            'urpay': 'urpay.com.sa',
+            'tamimi': 'tamimimarkets.com',
+            'tamimi markets': 'tamimimarkets.com',
+            'danube': 'danube.sa',
+            'panda': 'panda.com.sa',
+            'hyper panda': 'panda.com.sa',
+            'othaim': 'othaimmarkets.com',
+            'othaim markets': 'othaimmarkets.com',
+            'lulu': 'luluhypermarket.com',
+            'lulu hypermarket': 'luluhypermarket.com',
+            'noon': 'noon.com',
+            'amazon': 'amazon.sa',
+            'hungerstation': 'hungerstation.com',
+            'jahez': 'jahez.net',
+            'uber': 'uber.com',
+            'careem': 'careem.com',
+            'nahdi': 'nahdi.sa',
+            'al duka': 'al-dawaa.com.sa', // heuristic guess
+            'aldawaa': 'al-dawaa.com.sa',
+            'coop': 'coop.com',
+        };
+
+        if (manualMap[cleanName]) return manualMap[cleanName];
+
+        // Partial match check for manually mapped keys
+        for (const key of Object.keys(manualMap)) {
+            if (cleanName.includes(key)) return manualMap[key];
+        }
+
+        // 2. Default Heuristic
+        return `${noSpaces}.com`;
+    };
+
+    const domain = React.useMemo(() => getDomain(name), [name]);
+
+    React.useEffect(() => {
+        if (domain) {
+            // Try Clearbit first
+            setImgSrc(`https://logo.clearbit.com/${domain}`);
+            setHasError(false);
+        }
+    }, [domain]);
+
+    const handleError = () => {
+        // If Clearbit failed, try Google Favicon
+        if (imgSrc && imgSrc.includes('clearbit')) {
+            setImgSrc(`https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://${domain}&size=128`);
+        } else {
+            // If Google failed (or we were already on google), show text fallback
+            setHasError(true);
+        }
+    };
+
+    if (!name || hasError || !domain) {
+        // Text Fallback with generated color
+        const colors = ['bg-red-900', 'bg-blue-900', 'bg-green-900', 'bg-yellow-900', 'bg-purple-900', 'bg-pink-900', 'bg-indigo-900'];
+        const charCode = name ? name.charCodeAt(0) : 0;
+        const colorClass = colors[charCode % colors.length];
+
         return (
-            <div className={`${size} rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-gray-400 border border-slate-600 ${className}`}>
+            <div className={`${size} rounded-full ${colorClass} text-white flex items-center justify-center text-xs font-bold border border-white/10 ${className}`}>
                 {name ? name.charAt(0).toUpperCase() : '?'}
             </div>
         );
     }
 
-    // Heuristic: Remove spaces, special chars, append .com
-    // e.g. "Burger King" -> "burgerking.com"
-    // "STC Pay" -> "stcpay.com"
-    // Use a few common overrides for local context if needed, but keep it simple first
-    let cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '');
-    let domain = `${cleanName}.com`;
-
-    // Simple Overrides
-    if (cleanName === 'stc') domain = 'stc.com.sa';
-    if (cleanName === 'mobily') domain = 'mobily.com.sa';
-    if (cleanName === 'jarir') domain = 'jarir.com';
-    if (cleanName === 'alkahraba') domain = 'se.com.sa';
-    if (cleanName === 'urpay') domain = 'urpay.com.sa';
-
     return (
         <img
-            src={`https://logo.clearbit.com/${domain}`}
+            src={imgSrc}
             alt={name}
             className={`${size} rounded-full object-cover border border-white/10 shadow-sm bg-white ${className}`}
-            onError={() => setError(true)}
+            onError={handleError}
         />
     );
 };
