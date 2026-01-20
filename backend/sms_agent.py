@@ -306,7 +306,7 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
     if merchant_raw.isdigit() or (len(merchant_raw) < 6 and merchant_raw.isnumeric()):
          dest_acc = crud.get_account_by_last_4(db, merchant_raw)
          if dest_acc:
-             merchant_raw = f"Transfer to {dest_acc.name}"
+             merchant_raw = f"{dest_acc.name} Account"
              clean_merchant = dest_acc.name # For logo lookup
 
     if not clean_merchant or clean_merchant == "null":
@@ -355,7 +355,7 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
          credit_tx = schemas.TransactionCreate(
              account_id=dest_account.id,
              amount=result['amount'], 
-             merchant=f"Transfer from {source_account.name}",
+             merchant=f"{source_account.name} Account",
              category="Transfer", 
              type=models.TransactionType.CREDIT.value,
              timestamp=datetime.now(),
