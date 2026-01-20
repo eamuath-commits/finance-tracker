@@ -120,7 +120,12 @@ async def parse_with_ai(text: str):
         except Exception as e:
             error_str = str(e)
             if "429" in error_str and attempt < MAX_RETRIES:
-                delay = base_delay * (2 ** attempt) # 2s, 4s, 8s
+                # Stop retrying if we hit the hard daily quota (Resource Exhausted) vs rate limit
+                if "Quota exceeded" in error_str and "GenerateRequestsPerDay" in error_str:
+                     logger.error("AI Daily Quota Exceeded. Stopping retries to save resources.")
+                     return {"error": "Daily Quota Exceeded. Please try again tomorrow."}
+
+                delay = base_delay * (2 ** attempt) # 4s, 8s, 16s...
                 logger.warning(f"AI 429 Rate Limit. Retrying in {delay}s... (Attempt {attempt+1}/{MAX_RETRIES})")
                 await asyncio.sleep(delay)
             else:
@@ -163,6 +168,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         db = database.SessionLocal()
+        
+        # DEDUPLICATION CHECK
+        # Check if this exact message body from this sender was already processed/pending
+        # This prevents loops if Telegram resends distinct updates for same message or bot restarts
+        existing_msg = db.query(models.RawMessage).filter(
+            models.RawMessage.sender == f"Telegram-{user_id}",
+            models.RawMessage.body == msg_text,
+            models.RawMessage.status.in_([models.MessageStatus.PARSED, models.MessageStatus.PENDING])
+        ).first()
+
+        if existing_msg:
+             logger.info(f"Skipping duplicate message from {user_id} (ID: {existing_msg.id})")
+             await message.reply_text("ℹ️ Skipped duplicate message.")
+             db.close()
+             return
+
         raw_msg = models.RawMessage(
             sender=f"Telegram-{user_id}",
             body=msg_text,
