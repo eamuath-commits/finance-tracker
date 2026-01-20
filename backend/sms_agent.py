@@ -250,6 +250,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if source_last4:
             source_account = crud.get_account_by_last_4(db, str(source_last4))
+
+        # Smart Handling for Incoming Credits (Swap Source if Destination account is owned by user)
+        # E.g. SMS says "To: 7772", AI parses Dest=7772. If 7772 is ours, we should credit IT.
+        dest_last4 = result.get('destination_account_last4')
+        # Fallback: If AI put account number in merchant field (common in credits)
+        if not dest_last4 and result.get('merchant') and str(result.get('merchant')).isdigit():
+             dest_last4 = result.get('merchant')
+
+        if result.get('transaction_type') == 'credit' and dest_last4:
+             dest_last4 = str(dest_last4)
+             # Clean digits just in case
+             dest_last4 = "".join(filter(str.isdigit, dest_last4))[-4:]
+             if len(dest_last4) == 4:
+                 dest_acc_obj = crud.get_account_by_last_4(db, dest_last4)
+                 if dest_acc_obj:
+                     logger.info(f"Incoming Credit detected to own account {dest_acc_obj.name}. Swapping primary account.")
+                     source_account = dest_acc_obj
         
         if not source_account:
             # INTERACTIVE FALLBACK
@@ -380,6 +397,18 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
         raw_sms_content=msg_text 
     )
 
+    # Check for Duplicate Main Transaction (e.g. Dual SMS for same transfer)
+    duplicate = crud.find_potential_duplicate(
+        db, 
+        source_account.id, 
+        result['amount'], 
+        tx_type_value, 
+        tx_timestamp
+    )
+    if duplicate:
+        logger.info(f"Duplicate transaction detected (skipping): {duplicate.id}")
+        return f"Duplicate transaction ignored (ID: {duplicate.id})"
+
     try:
         crud.create_transaction(db=db, transaction=transaction)
     except Exception as e:
@@ -410,8 +439,20 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
              timestamp=tx_timestamp, # Use same timestamp
              raw_sms_content=f"Auto-credit from transfer: {msg_text}"
          )
-         try:
-            crud.create_transaction(db=db, transaction=credit_tx)
+         # Check for Duplicate Credit Leg
+         dup_credit = crud.find_potential_duplicate(
+             db,
+             dest_account.id,
+             result['amount'],
+             models.TransactionType.CREDIT.value,
+             tx_timestamp
+         )
+         if dup_credit:
+             logger.info("Credit leg already exists (skipping)")
+             reply_message += f"\n\n🔀 **Linked Transfer**\n(Already Exists: {dest_account.name})"
+         else:
+             try:
+                crud.create_transaction(db=db, transaction=credit_tx)
             reply_message += f"\n\n🔀 **Linked Transfer**\nCredited: {dest_account.name}"
          except Exception as e:
             logger.error(f"Failed to create credit leg: {e}")

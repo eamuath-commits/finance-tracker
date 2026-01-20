@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 import models
 import schemas
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 def get_account_by_last_4(db: Session, last_4: str):
     # 1. Try matching main account last_4
@@ -75,6 +75,19 @@ def update_account(db: Session, account_id: str, account_update: schemas.Account
     db.commit()
     db.refresh(db_account)
     return db_account
+
+def find_potential_duplicate(db: Session, account_id: str, amount: float, tx_type: str, timestamp: datetime):
+    # Window: +/- 10 minutes to account for SMS delivery lag or slight internal clock diffs
+    window_min = timestamp - timedelta(minutes=10)
+    window_max = timestamp + timedelta(minutes=10)
+    
+    return db.query(models.Transaction).filter(
+        models.Transaction.account_id == account_id,
+        models.Transaction.amount == amount, # Exact match expected for same-currency transfers
+        models.Transaction.type == tx_type,
+        models.Transaction.timestamp >= window_min,
+        models.Transaction.timestamp <= window_max
+    ).first()
 
 def create_transaction(db: Session, transaction: schemas.TransactionCreate):
     # Update Account Balance FIRST so we can record it
