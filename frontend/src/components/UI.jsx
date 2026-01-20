@@ -77,3 +77,38 @@ export const EditIcon = ({ onClick }) => (
 // Input styling helper
 export const inputClass = "w-full p-2 border border-slate-600 rounded bg-slate-700 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500";
 export const selectClass = "w-full p-2 border border-slate-600 rounded bg-slate-700 text-white focus:outline-none focus:border-blue-500";
+
+export const BrandLogo = ({ name, size = "w-8 h-8", className = "" }) => {
+    const [error, setError] = React.useState(false);
+
+    if (!name || error) {
+        return (
+            <div className={`${size} rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-gray-400 border border-slate-600 ${className}`}>
+                {name ? name.charAt(0).toUpperCase() : '?'}
+            </div>
+        );
+    }
+
+    // Heuristic: Remove spaces, special chars, append .com
+    // e.g. "Burger King" -> "burgerking.com"
+    // "STC Pay" -> "stcpay.com"
+    // Use a few common overrides for local context if needed, but keep it simple first
+    let cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    let domain = `${cleanName}.com`;
+
+    // Simple Overrides
+    if (cleanName === 'stc') domain = 'stc.com.sa';
+    if (cleanName === 'mobily') domain = 'mobily.com.sa';
+    if (cleanName === 'jarir') domain = 'jarir.com';
+    if (cleanName === 'alkahraba') domain = 'se.com.sa';
+    if (cleanName === 'urpay') domain = 'urpay.com.sa';
+
+    return (
+        <img
+            src={`https://logo.clearbit.com/${domain}`}
+            alt={name}
+            className={`${size} rounded-full object-cover border border-white/10 shadow-sm bg-white ${className}`}
+            onError={() => setError(true)}
+        />
+    );
+};

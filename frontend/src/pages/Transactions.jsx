@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Search, Plus, ArrowUpDown, Filter, Edit3, Trash2, MessageSquareText, User, RefreshCw, CheckCircle, MessageSquare } from 'lucide-react';
-import { Card, SectionHeader, Modal, inputClass, selectClass, formatCurrency } from '../components/UI';
+import { Card, SectionHeader, Modal, inputClass, selectClass, formatCurrency, BrandLogo } from '../components/UI';
 
 const Transactions = () => {
     const Categories = ['Food', 'Transport', 'Utilities', 'Entertainment', 'Shopping', 'Housing', 'Health', 'Income', 'Transfer', 'Subscription', 'Obligation', 'Credit Card Payment', 'Deposit', 'Refund'];
@@ -471,8 +471,13 @@ const Transactions = () => {
                                                     />
                                                 </td>
                                                 <td className="px-6 py-4 text-sm font-medium text-white">
-                                                    {isTransfer && <span className="text-xs text-blue-400 mr-2 uppercase font-bold tracking-wider">{isCredit ? 'FROM:' : 'TO:'}</span>}
-                                                    {tx.merchant}
+                                                    <div className="flex items-center gap-3">
+                                                        <BrandLogo name={tx.merchant} size="w-8 h-8" />
+                                                        <div>
+                                                            {isTransfer && <span className="text-xs text-blue-400 mr-2 uppercase font-bold tracking-wider">{isCredit ? 'FROM:' : 'TO:'}</span>}
+                                                            {tx.merchant}
+                                                        </div>
+                                                    </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-sm text-gray-400">
                                                     <div className="flex items-center gap-2">
