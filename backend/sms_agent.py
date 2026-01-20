@@ -68,6 +68,9 @@ async def parse_with_ai(text: str):
     3. **Internal Transfers**: If it says "Internal Transfer" or transfer between your own accounts, set merchant to "Self" or "Internal".
     4. **Declines**: If the message says "Declined", "Failed", or "Insufficient Funds", set `status` to "failed".
     5. **Amount**: Extract the numerical amount. Ignore currency symbols in the number, but capture the currency code separately.
+    6. **Accounts**:
+        - **Source Account**: Look for "From Account", "Account:", ending digits.
+        - **Destination Account**: Look for "To", "To Account", ending digits (Common in internal transfers).
 
     **Output JSON Schema:**
     {{
@@ -80,7 +83,8 @@ async def parse_with_ai(text: str):
       "currency": string,
       "date": "YYYY-MM-DD",
       "category": string (Best guess: Food, Transport, Bills, Transfer, Income, etc.),
-      "account_last4": string,
+      "source_account_last4": string,
+      "destination_account_last4": stringOrNull,
       "status": "success" | "failed"
     }}
 
@@ -189,9 +193,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 2. Save to DB (Only Success Transactions)
     try:
-        # Determine Account (Fuzzy match or default)
-        account = db.query(models.Account).first()
-        if not account:
+        # Determine Source Account
+        # Priority: Match on Last 4 Digits -> Fallback to First Account
+        source_account = None
+        source_last4 = result.get('source_account_last4')
+        
+        if source_last4:
+            source_account = crud.get_account_by_last_4(db, str(source_last4))
+        
+        if not source_account:
+            # Fallback to first available account if specific digits not found
+            # (Warning: This might be risky if they have multiple accounts)
+            source_account = db.query(models.Account).first()
+
+        if not source_account:
              try: await message.reply_text("❌ No accounts found in DB to attach transaction.")
              except: pass
              raw_msg.status = models.MessageStatus.FAILED
@@ -200,14 +215,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
              db.close()
              return
 
-        # Prepare Schema
+        # Prepare Schema (Source / Debit)
         # Use sub_type for category if category is generic, or append it
         category = result.get('category') or "Uncategorized"
         if result.get('sub_type') == 'internal_transfer':
             category = "Transfer"
         
         tx_data = schemas.TransactionCreate(
-            account_id=account.id,
+            account_id=source_account.id,
             amount=result['amount'],
             merchant=result['merchant'] or "Unknown",
             category=category,
@@ -215,8 +230,46 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             raw_sms_content=msg_text
         )
 
-        # Use CRUD to create (handles balance updates)
+        # Create PRIMARY Transaction (Debit)
         crud.create_transaction(db=db, transaction=tx_data)
+        
+        reply_message = (
+            f"✅ **Saved!**\n"
+            f"Type: {result.get('sub_type', 'transaction').title()}\n"
+            f"Merchant: {result['merchant']}\n"
+            f"Amount: {result['amount']} {result.get('currency', '')}\n"
+            f"Category: {category}"
+        )
+
+        # 3. Handle Internal Transfer (Credit Leg)
+        dest_last4 = result.get('destination_account_last4')
+        if dest_last4:
+             dest_account = crud.get_account_by_last_4(db, str(dest_last4))
+             if dest_account and dest_account.id != source_account.id:
+                 # It IS an internal transfer to a known account!
+                 # Create the Credit side
+                 
+                 credit_tx = schemas.TransactionCreate(
+                     account_id=dest_account.id,
+                     amount=result['amount'], # Positive amount
+                     merchant=f"Transfer from {source_account.name}",
+                     category="Income", # Or 'Transfer' if we handle signed logic? 
+                     # Wait, crud.create_transaction logic for 'Income' adds to balance. 
+                     # 'Transfer' might subtract unless we force it.
+                     # Let's use 'Deposit' or 'Income' to ensure addition.
+                     # Or we update crud to handle 'Transfer In'.
+                     # For now, let's stick to 'Deposit' to be safe on balance impact, 
+                     # but maybe label it Transfer in note if possible?
+                     # The category is used for logic.
+                     timestamp=datetime.now(),
+                     raw_sms_content=f"Auto-credit from transfer: {msg_text}"
+                 )
+                 # Force category to be one that Adds Balance
+                 credit_tx.category = "Deposit" 
+                 
+                 crud.create_transaction(db=db, transaction=credit_tx)
+                 reply_message += f"\n\n🔀 **Linked Transfer Detected**\nCredit to: {dest_account.name} (Matched {dest_last4})"
+
         
         # Update Raw Message Status
         raw_msg.status = models.MessageStatus.PARSED
@@ -225,13 +278,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.close()
         
         try:
-            await message.reply_text(
-                f"✅ **Saved!**\n"
-                f"Type: {result.get('sub_type', 'transaction').title()}\n"
-                f"Merchant: {result['merchant']}\n"
-                f"Amount: {result['amount']} {result.get('currency', '')}\n"
-                f"Category: {category}"
-            )
+            await message.reply_text(reply_message)
         except Exception as e:
              logger.error(f"Could not send success reply: {e}")
 
