@@ -71,6 +71,12 @@ async def parse_with_ai(text: str):
     6. **Accounts**:
         - **Source Account**: Look for "From Account", "Account:", ending digits.
         - **Destination Account**: Look for "To", "To Account", ending digits (Common in internal transfers).
+    7. **Brand Name (Strict)**: 
+        - Extract the clean BRAND NAME for the merchant.
+        - REMOVE location data, store IDs, terminal codes, and city names (e.g. "Starbucks Riyadh #123" -> "Starbucks").
+        - If the merchant is a person (Transfer), use their name.
+        - DO NOT guess. If you cannot extract a clean name, use null.
+        - DO NOT hallucinate. Only use text present in the SMS.
 
     **Output JSON Schema:**
     {{
@@ -78,7 +84,8 @@ async def parse_with_ai(text: str):
       "is_transaction": boolean, (True ONLY if money actually moved. False for Declines or purely informational msgs)
       "transaction_type": "debit" | "credit",
       "sub_type": "purchase" | "transfer" | "payment" | "withdrawal" | "deposit" | "internal_transfer" | "decline",
-      "merchant": string (The entity paid OR the person sent to/received from),
+      "merchant": string (The RAW merchant string found in the text),
+      "brand_name": string (The CLEAN brand name for logo fetching, e.g. "Uber", "Netflix"),
       "amount": number,
       "currency": string,
       "date": "YYYY-MM-DD",
@@ -221,10 +228,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if result.get('sub_type') == 'internal_transfer':
             category = "Transfer"
         
+        # Use Brand Name if available and not null, otherwise fallback to merchant
+        clean_merchant = result.get('brand_name')
+        if not clean_merchant or clean_merchant == "null":
+            clean_merchant = result.get('merchant') or "Unknown"
+
         tx_data = schemas.TransactionCreate(
             account_id=source_account.id,
             amount=result['amount'],
-            merchant=result['merchant'] or "Unknown",
+            merchant=clean_merchant,
             category=category,
             timestamp=datetime.now(), 
             raw_sms_content=msg_text
@@ -245,26 +257,30 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         dest_last4 = result.get('destination_account_last4')
         if dest_last4:
              dest_account = crud.get_account_by_last_4(db, str(dest_last4))
-             
-             if dest_account:
-                 if dest_account.id != source_account.id:
-                     # It IS an internal transfer to a known account!
-                     # Create the Credit side
-                     
-                     credit_tx = schemas.TransactionCreate(
-                         account_id=dest_account.id,
-                         amount=result['amount'], # Positive amount
-                         merchant=f"Transfer from {source_account.name}",
-                         category="Deposit", 
-                         timestamp=datetime.now(),
-                         raw_sms_content=f"Auto-credit from transfer: {msg_text}"
-                     )
-                     
-                     crud.create_transaction(db=db, transaction=credit_tx)
-                     reply_message += f"\n\n🔀 **Linked Transfer Detected**\nCredit to: {dest_account.name} (Matched {dest_last4})"
-             else:
-                 # Found a destination in SMS, but NOT in DB
-                 reply_message += f"\n\n⚠️ **Notice**: Detected transfer to '...{dest_last4}', but no account with these last 4 digits exists in your system. Credit side was NOT created."
+             if dest_account and dest_account.id != source_account.id:
+                 # It IS an internal transfer to a known account!
+                 # Create the Credit side
+                 
+                 credit_tx = schemas.TransactionCreate(
+                     account_id=dest_account.id,
+                     amount=result['amount'], # Positive amount
+                     merchant=f"Transfer from {source_account.name}",
+                     category="Income", # Or 'Transfer' if we handle signed logic? 
+                     # Wait, crud.create_transaction logic for 'Income' adds to balance. 
+                     # 'Transfer' might subtract unless we force it.
+                     # Let's use 'Deposit' or 'Income' to ensure addition.
+                     # Or we update crud to handle 'Transfer In'.
+                     # For now, let's stick to 'Deposit' to be safe on balance impact, 
+                     # but maybe label it Transfer in note if possible?
+                     # The category is used for logic.
+                     timestamp=datetime.now(),
+                     raw_sms_content=f"Auto-credit from transfer: {msg_text}"
+                 )
+                 # Force category to be one that Adds Balance
+                 credit_tx.category = "Deposit" 
+                 
+                 crud.create_transaction(db=db, transaction=credit_tx)
+                 reply_message += f"\n\n🔀 **Linked Transfer Detected**\nCredit to: {dest_account.name} (Matched {dest_last4})"
 
         
         # Update Raw Message Status
