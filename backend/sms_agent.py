@@ -482,10 +482,10 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
              reply_message += f"\n\n🔀 **Linked Transfer**\n(Already Exists: {dest_account.name})"
          else:
              try:
-                crud.create_transaction(db=db, transaction=credit_tx)
-            reply_message += f"\n\n🔀 **Linked Transfer**\nCredited: {dest_account.name}"
-         except Exception as e:
-            logger.error(f"Failed to create credit leg: {e}")
+                 crud.create_transaction(db=db, transaction=credit_tx)
+                 reply_message += f"\n\n🔀 **Linked Transfer**\nCredited: {dest_account.name}"
+             except Exception as e:
+                 logger.error(f"Failed to create credit leg: {e}")
 
     try:
         # Edit if it's a callback query message, else reply
