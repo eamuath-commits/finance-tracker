@@ -6,7 +6,7 @@ db = SessionLocal()
 print(f"{'Account Name':<20} | {'Last 4':<10} | {'Type':<10}")
 print("-" * 50)
 for acc in db.query(Account).all():
-    print(f"{acc.name:<20} | {str(acc.last_4_digits):<10} | {acc.type}")
+    print(f"{acc.name:<20} | {str(acc.last_4_digits):<10} | {acc.account_type.value}")
 
 print("\nAliases:")
 for alias in db.query(AccountAlias).all():
