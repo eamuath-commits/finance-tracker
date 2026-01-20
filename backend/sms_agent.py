@@ -33,8 +33,8 @@ logger = logging.getLogger(__name__)
 # Configure Gemini AI
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    # Allow model to be configured via ENV, default to 2.0-flash
-    model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    # Allow model to be configured via ENV, default to 2.0-flash-lite (better free quota)
+    model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-lite")
     logger.info(f"Using Gemini Model: {model_name}")
     model = genai.GenerativeModel(model_name)
 else:
