@@ -53,7 +53,8 @@ class TransactionBase(BaseModel):
     amount: float
     merchant: str
     category: Optional[str] = None
-    type: Optional[TransactionType] = TransactionType.DEBIT
+    # Changed from TransactionType to str to avoid Pydantic casting it back to Enum object which fails in DB
+    type: Optional[str] = "debit"
     raw_sms_content: Optional[str] = None
     timestamp: Optional[datetime] = None
     logo_url: Optional[str] = None
@@ -67,7 +68,7 @@ class TransactionUpdate(BaseModel):
     amount: Optional[float] = None
     merchant: Optional[str] = None
     category: Optional[str] = None
-    type: Optional[TransactionType] = None
+    type: Optional[str] = None
     timestamp: Optional[datetime] = None
     logo_url: Optional[str] = None
 
