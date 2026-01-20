@@ -33,7 +33,8 @@ logger = logging.getLogger(__name__)
 # Configure Gemini AI
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-flash-latest')
+    # Using 1.5-flash for better stability/limits vs 2.5/latest
+    model = genai.GenerativeModel('gemini-1.5-flash')
 else:
     logger.warning("GEMINI_API_KEY not found. AI parsing will fail.")
     model = None
@@ -97,8 +98,8 @@ async def parse_with_ai(text: str):
     Respond ONLY with valid JSON.
     """
 
-    MAX_RETRIES = 3
-    base_delay = 2
+    MAX_RETRIES = 5
+    base_delay = 4
     
     for attempt in range(MAX_RETRIES + 1):
         try:
