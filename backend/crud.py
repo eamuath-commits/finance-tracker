@@ -94,7 +94,7 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate):
     account = db.query(models.Account).filter(models.Account.id == transaction.account_id).first()
     new_balance = 0.0
     
-    if account:
+    if account and transaction.status == "completed":
         # Logic based on Transaction Type (Agent Driven)
         if transaction.type == models.TransactionType.CREDIT:
              account.current_balance += transaction.amount
@@ -113,13 +113,40 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate):
         timestamp=transaction.timestamp,
         category=transaction.category,
         type=transaction.type,
-        balance_after_transaction=new_balance if account else None
+        balance_after_transaction=new_balance if account and transaction.status == "completed" else None,
+        status=transaction.status
     )
     db.add(db_transaction)
 
     db.commit()
     db.refresh(db_transaction)
     return db_transaction
+
+def confirm_transaction(db: Session, transaction_id: str):
+    tx = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
+    if not tx or tx.status == "completed":
+        return tx
+    
+    tx.status = "completed"
+    
+    # Update Balance
+    account = db.query(models.Account).filter(models.Account.id == tx.account_id).first()
+    if account:
+        if tx.type == "credit":
+             account.current_balance += tx.amount
+        else:
+             # DEBIT
+             account.current_balance -= tx.amount
+        
+        # Update balance snapshot on the transaction too? 
+        # Usually snapshots are taken at creation. If we confirm later, the 'balance_after' is tricky.
+        # But 'current_balance' is the source of truth.
+        tx.balance_after_transaction = account.current_balance
+        db.add(account)
+    
+    db.commit()
+    db.refresh(tx)
+    return tx
 
 def create_loan(db: Session, loan: schemas.LoanCreate):
     # Initial remaining balance = principal

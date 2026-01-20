@@ -57,6 +57,7 @@ class TransactionBase(BaseModel):
     type: Optional[str] = "debit"
     raw_sms_content: Optional[str] = None
     timestamp: Optional[datetime] = None
+    status: Optional[str] = "completed"
     logo_url: Optional[str] = None
 
 class TransactionCreate(TransactionBase):

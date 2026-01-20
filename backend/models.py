@@ -58,6 +58,7 @@ class Transaction(Base):
     type = Column(String, default="debit", nullable=False)
     raw_sms_content = Column(Text, nullable=True)
     balance_after_transaction = Column(Float, nullable=True)
+    status = Column(String, default="completed", nullable=False)
     logo_url = Column(String, nullable=True)
     
     account = relationship("Account", back_populates="transactions")

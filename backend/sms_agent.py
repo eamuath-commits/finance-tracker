@@ -387,6 +387,22 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
     else:
         logger.info(f"No date returned by AI. Using now(). AI Output: {json.dumps(result)}")
 
+    # Resolve Destination Account Early to determine Status
+    dest_last4 = result.get('destination_account_last4')
+    dest_account = None
+    if dest_last4:
+         dest_account = crud.get_account_by_last_4(db, str(dest_last4))
+    
+    # Fallback: If we resolved the merchant to an account earlier
+    # Note: 'dest_acc' comes from merchant parsing logic earlier in the file
+    if not dest_account and 'dest_acc' in locals() and dest_acc:
+        dest_account = dest_acc
+
+    # Determine Status: Pending if Internal Transfer (Wait for confirmation SMS)
+    tx_status = "completed"
+    if dest_account and dest_account.id != source_account.id:
+         tx_status = "pending"
+
     transaction = schemas.TransactionCreate(
         account_id=source_account.id,
         amount=result['amount'], 
@@ -394,7 +410,9 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
         category=category,
         type=tx_type_value,
         timestamp=tx_timestamp,
-        raw_sms_content=msg_text 
+        timestamp=tx_timestamp,
+        raw_sms_content=msg_text,
+        status=tx_status 
     )
 
     # Check for Duplicate Main Transaction (e.g. Dual SMS for same transfer)
@@ -406,6 +424,26 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
         tx_timestamp
     )
     if duplicate:
+        if duplicate.status == "pending":
+             # Confirm this transaction
+             crud.confirm_transaction(db, duplicate.id)
+             msg_extras = f"Confirmed Pending Transaction (ID: {duplicate.id})"
+             
+             # Try to find and confirm the counterpart (Debit Leg) on the original source
+             real_source_last4 = result.get('source_account_last4')
+             if real_source_last4:
+                 real_source = crud.get_account_by_last_4(db, str(real_source_last4))
+                 if real_source:
+                     pending_debit = crud.find_potential_duplicate(
+                         db, real_source.id, result['amount'], "debit", tx_timestamp
+                     )
+                     if pending_debit and pending_debit.status == "pending":
+                          crud.confirm_transaction(db, pending_debit.id)
+                          msg_extras += f" & Linked Debit ({real_source.name})"
+
+             logger.info(f"Duplicate confirmed: {msg_extras}")
+             return f"Transaction Confirmed via Second SMS. {msg_extras}"
+        
         logger.info(f"Duplicate transaction detected (skipping): {duplicate.id}")
         return f"Duplicate transaction ignored (ID: {duplicate.id})"
 
@@ -418,16 +456,7 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
     reply_message = f"✅ Transaction Added\nAmount: {result['amount']}\nMerchant: {merchant_raw}\nCategory: {category}\nDate: {tx_timestamp.strftime('%Y-%m-%d %H:%M')}"
 
     # Handle Internal Transfer (Credit Leg)
-    # 1. Try explicit AI extraction
-    dest_last4 = result.get('destination_account_last4')
-    dest_account = None
-    
-    if dest_last4:
-         dest_account = crud.get_account_by_last_4(db, str(dest_last4))
-    
-    # 2. Fallback: If we resolved the merchant to an account earlier
-    if not dest_account and 'dest_acc' in locals() and dest_acc:
-        dest_account = dest_acc
+    # dest_account already resolved above
 
     if dest_account and dest_account.id != source_account.id:
          credit_tx = schemas.TransactionCreate(
@@ -437,7 +466,8 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
              category="Transfer", 
              type=models.TransactionType.CREDIT.value,
              timestamp=tx_timestamp, # Use same timestamp
-             raw_sms_content=f"Auto-credit from transfer: {msg_text}"
+             raw_sms_content=f"Auto-credit from transfer: {msg_text}",
+             status=tx_status
          )
          # Check for Duplicate Credit Leg
          dup_credit = crud.find_potential_duplicate(
