@@ -76,7 +76,7 @@ class TransactionUpdate(BaseModel):
 
 class Transaction(TransactionBase):
     id: str
-    account_id: str
+    account_id: Optional[str] = None
     timestamp: datetime
     balance_after_transaction: Optional[float] = None
     logo_url: Optional[str] = None
