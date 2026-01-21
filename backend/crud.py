@@ -91,12 +91,21 @@ def find_potential_duplicate(db: Session, account_id: str, amount: float, tx_typ
 
 def create_transaction(db: Session, transaction: schemas.TransactionCreate):
     # Update Account Balance FIRST so we can record it
-    account = db.query(models.Account).filter(models.Account.id == transaction.account_id).first()
+    account = None
+    if transaction.account_id:
+        account = db.query(models.Account).filter(models.Account.id == transaction.account_id).first()
+    
     new_balance = 0.0
     
     if account and transaction.status == "completed":
         # Logic based on Transaction Type (Agent Driven)
-        if transaction.type == models.TransactionType.CREDIT:
+        try:
+             # Try/Catch for Enum vs String comparison safety
+             is_credit = transaction.type == "credit" or transaction.type == models.TransactionType.CREDIT
+        except:
+             is_credit = str(transaction.type).lower() == "credit"
+
+        if is_credit:
              account.current_balance += transaction.amount
         else:
              # DEBIT
@@ -144,6 +153,32 @@ def confirm_transaction(db: Session, transaction_id: str):
         tx.balance_after_transaction = account.current_balance
         db.add(account)
     
+    db.commit()
+    db.refresh(tx)
+    return tx
+
+def assign_account_to_transaction(db: Session, transaction_id: str, account_id: str):
+    tx = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
+    account = db.query(models.Account).filter(models.Account.id == account_id).first()
+    
+    if not tx or not account:
+        raise ValueError("Transaction or Account not found")
+        
+    tx.account_id = account_id
+    
+    # If transaction should be completed now, update balance
+    if tx.status == "pending_action":
+        tx.status = "completed"
+        
+        is_credit = str(tx.type).lower() == "credit"
+        if is_credit:
+            account.current_balance += tx.amount
+        else:
+            account.current_balance -= tx.amount
+            
+        tx.balance_after_transaction = account.current_balance
+        db.add(account)
+        
     db.commit()
     db.refresh(tx)
     return tx
@@ -615,3 +650,17 @@ def delete_category(db: Session, category_id: str):
     db.delete(cat)
     db.commit()
     return True
+
+def create_training_example(db: Session, raw_text: str, parsed_json: str):
+    db_ex = models.TrainingExample(
+        raw_text=raw_text,
+        parsed_json=parsed_json
+    )
+    db.add(db_ex)
+    db.commit()
+    db.refresh(db_ex)
+    return db_ex
+
+def get_random_training_examples(db: Session, limit: int = 3):
+    # Fetch random examples using SQL random()
+    return db.query(models.TrainingExample).order_by(models.func.random()).limit(limit).all()

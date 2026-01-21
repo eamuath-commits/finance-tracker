@@ -61,7 +61,7 @@ class TransactionBase(BaseModel):
     logo_url: Optional[str] = None
 
 class TransactionCreate(TransactionBase):
-    account_id: str
+    account_id: Optional[str] = None
     # ...
 
 class TransactionUpdate(BaseModel):

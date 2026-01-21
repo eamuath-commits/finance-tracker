@@ -155,3 +155,11 @@ class SavingsGoal(Base):
     target_date = Column(Date, nullable=True)
     icon = Column(String, nullable=True) # e.g. "Plane", "Car"
     color = Column(String, nullable=True) # Hex color
+
+class TrainingExample(Base):
+    __tablename__ = "training_examples"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    raw_text = Column(String, nullable=False)
+    parsed_json = Column(Text, nullable=False) # JSON string
+    created_at = Column(DateTime, default=datetime.now)

@@ -48,7 +48,7 @@ file_handler = logging.FileHandler("gemini_responses.log")
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
 ai_logger.addHandler(file_handler)
 
-async def parse_with_ai(text: str):
+async def parse_with_ai(db: Session, text: str):
     """
     Sends SMS text to Gemini AI and expects a JSON response.
     Retries on 429 errors.
@@ -60,6 +60,14 @@ async def parse_with_ai(text: str):
     year_short = datetime.now().strftime("%y")
     current_year = datetime.now().year
 
+    # Fetch Training Examples (Memory)
+    examples = crud.get_random_training_examples(db, limit=3)
+    examples_text = ""
+    if examples:
+        examples_text = "**Examples (Learn from these successful parses):**\n"
+        for ex in examples:
+            examples_text += f"- Input: \"{ex.raw_text}\"\n  Output: {ex.parsed_json}\n\n"
+
     prompt = f"""
     You are a generic financial expert. Your job is to extract FULL details from banking SMS messages.
     
@@ -67,6 +75,8 @@ async def parse_with_ai(text: str):
     - Current Date: {today_date}
     - Current Year: {current_year} (Short: {year_short})
     - Location: Saudi Arabia (KSA). Most merchants are Saudi businesses. Allows for better guessing of truncated names.
+
+    {examples_text}
 
     **Date Parsing Rules (CRITICAL):**
     - Output standard ISO format: YYYY-MM-DD.
@@ -228,7 +238,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # 1. AI Parse
-    result = await parse_with_ai(msg_text)
+    result = await parse_with_ai(db, msg_text)
 
     if "error" in result:
          try: await message.reply_text(f"❌ AI Error: {result['error']}")
@@ -294,37 +304,54 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                      source_account = dest_acc_obj
         
         if not source_account:
-            # INTERACTIVE FALLBACK
-            # Force user to select account if ambiguous
-            accounts = db.query(models.Account).order_by(models.Account.name).all()
+            # INTERACTIVE FALLBACK (Now creates a PENDING_ACTION transaction)
             
+            # 1. Create the Transaction first as PENDING_ACTION
+            # Use explicit 'None' for source to trigger special logic inside _create_transaction_logic
+            pending_tx_result = await _create_transaction_logic(db, result, None, msg_text, message)
+            
+            # Extract the TX ID (assuming _create_transaction_logic returns something or we fetch it)
+            # Actually _create_transaction_logic returns a string message or creates it.
+            # We need to change _create_transaction_logic to Return the DB object if possible,
+            # OR we fetch the latest transaction created.
+            # BUT _create_transaction_logic inside sms_agent is designed to reply.
+            
+            # REFACTOR: _create_transaction_logic handles source_account=None
+            # If source_account is None, it creates tx with status='pending_action' and account_id=None
+            
+            # INTERACTIVE BUTTONS
+            accounts = db.query(models.Account).order_by(models.Account.name).all()
             if not accounts:
-                await message.reply_text("❌ No accounts in database. Please add accounts in the Web UI first.")
-                raw_msg.status = models.MessageStatus.FAILED
-                raw_msg.error_log = "No accounts (Ambiguous)"
-                db.commit()
+                await message.reply_text("❌ No accounts. Please add accounts first.")
                 db.close()
                 return
 
             keyboard = []
+            # We need the Transaction ID to update it.
+            # _create_transaction_logic now returns the TX object if successful.
+            if hasattr(pending_tx_result, 'id'):
+                 tx_id = pending_tx_result.id
+            else:
+                 # Fallback if logic failed to return object (shouldn't happen with update)
+                 db.close()
+                 return
+
             for i, acc in enumerate(accounts):
-                # Callback data: act:{raw_msg_id}:{index}
-                # Using index to keep payload short
-                keyboard.append([InlineKeyboardButton(f"{acc.name} (...{acc.last_4_digits or '?'})", callback_data=f"act:{raw_msg.id}:{i}")])
+                # Callback data: act:{tx_id}:{acc_id} (Use ID instead of index for safety)
+                # Max 64 bytes. UUID is 36. 'act:' is 4. acc_id (UUID) is 36. Too long (76).
+                # Use Index!
+                keyboard.append([InlineKeyboardButton(f"{acc.name}", callback_data=f"act:{tx_id}:{i}")])
             
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            title = "❓ **Unknown Account**"
-            details = f"Account ending in **{source_last4}** was not found in your database." if source_last4 else "I couldn't identify the source account."
-            
             await message.reply_text(
-                f"{title}\n"
-                f"{details}\n"
-                f"Please select the **Source Account**:",
+                f"❓ **Unknown Account**\n"
+                f"Logged as Pending. Select **Source Account** to complete:",
                 reply_markup=reply_markup
             )
             
-            # We leave raw_msg as PENDING.
+            # We mark raw_msg as PARSED because the Transaction IS created (just pending action)
+            raw_msg.status = models.MessageStatus.PARSED 
+            db.commit()
             db.close()
             return
 
@@ -438,13 +465,19 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
          tx_status = "pending"
          
          # Same-Bank Exception: If banks match, assume instant transfer and complete immediately
-         if (source_account.bank_name and dest_account.bank_name and 
+         if (source_account and dest_account and source_account.bank_name and dest_account.bank_name and 
              source_account.bank_name.strip().lower() == dest_account.bank_name.strip().lower()):
              tx_status = "completed"
              logger.info(f"Same-bank transfer detected ({source_account.bank_name}). Marking as completed immediately.")
+    
+    # Handle Null Source (Ambiguous)
+    acc_id = source_account.id if source_account else None
+    if not source_account:
+        tx_status = "pending_action"
 
     transaction = schemas.TransactionCreate(
-        account_id=source_account.id,
+    transaction = schemas.TransactionCreate(
+        account_id=acc_id,
         amount=result['amount'], 
         merchant=merchant_raw,
         category=category,
@@ -455,39 +488,55 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
     )
 
     # Check for Duplicate Main Transaction (e.g. Dual SMS for same transfer)
-    duplicate = crud.find_potential_duplicate(
-        db, 
-        source_account.id, 
-        result['amount'], 
-        tx_type_value, 
-        tx_timestamp
-    )
-    if duplicate:
-        if duplicate.status == "pending":
-             # Confirm this transaction
-             crud.confirm_transaction(db, duplicate.id)
-             msg_extras = f"Confirmed Pending Transaction (ID: {duplicate.id})"
-             
-             # Try to find and confirm the counterpart (Debit Leg) on the original source
-             real_source_last4 = result.get('source_account_last4')
-             if real_source_last4:
-                 real_source = crud.get_account_by_last_4(db, str(real_source_last4))
-                 if real_source:
-                     pending_debit = crud.find_potential_duplicate(
-                         db, real_source.id, result['amount'], "debit", tx_timestamp
-                     )
-                     if pending_debit and pending_debit.status == "pending":
-                          crud.confirm_transaction(db, pending_debit.id)
-                          msg_extras += f" & Linked Debit ({real_source.name})"
+    # Only if source is known. If unknown, we act as new.
+    if source_account:
+        duplicate = crud.find_potential_duplicate(
+            db, 
+            source_account.id, 
+            result['amount'], 
+            tx_type_value, 
+            tx_timestamp
+        )
+        if duplicate:
+            if duplicate.status == "pending":
+                # Confirm this transaction
+                crud.confirm_transaction(db, duplicate.id)
+                msg_extras = f"Confirmed Pending Transaction (ID: {duplicate.id})"
+                
+                # Try to find and confirm the counterpart (Debit Leg) on the original source
+                real_source_last4 = result.get('source_account_last4')
+                if real_source_last4:
+                    real_source = crud.get_account_by_last_4(db, str(real_source_last4))
+                    if real_source:
+                        pending_debit = crud.find_potential_duplicate(
+                            db, real_source.id, result['amount'], "debit", tx_timestamp
+                        )
+                        if pending_debit and pending_debit.status == "pending":
+                            crud.confirm_transaction(db, pending_debit.id)
+                            msg_extras += f" & Linked Debit ({real_source.name})"
 
-             logger.info(f"Duplicate confirmed: {msg_extras}")
-             return f"Transaction Confirmed via Second SMS. {msg_extras}"
-        
-        logger.info(f"Duplicate transaction detected (skipping): {duplicate.id}")
-        return f"Duplicate transaction ignored (ID: {duplicate.id})"
+                logger.info(f"Duplicate confirmed: {msg_extras}")
+                return f"Transaction Confirmed via Second SMS. {msg_extras}"
+            
+            logger.info(f"Duplicate transaction detected (skipping): {duplicate.id}")
+            return f"Duplicate transaction ignored (ID: {duplicate.id})"
 
     try:
-        crud.create_transaction(db=db, transaction=transaction)
+        new_tx = crud.create_transaction(db=db, transaction=transaction)
+        # Save Training Example (Memory)
+        try:
+             crud.create_training_example(db, msg_text, json.dumps(result))
+        except Exception as e_mem:
+             logger.error(f"Failed to save training example: {e_mem}")
+             
+        # Return the object for calling function usage
+        # If Pending Action (No Account), don't send normal Added message yet
+        if tx_status == "pending_action":
+            return new_tx
+
+    except Exception as e:
+        logger.error(f"Failed to create main transaction: {e}")
+        return f"Error creating transaction: {str(e)}"
     except Exception as e:
         logger.error(f"Failed to create main transaction: {e}")
         return f"Error creating transaction: {str(e)}"
@@ -546,21 +595,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer() # Acknowledge
     
     data = query.data
-    # data format: act:{raw_msg_id}:{acc_index}
+    # data format: act:{tx_id}:{acc_index}
     
     try:
         if data.startswith("act:"):
-            _, raw_id, acc_idx_str = data.split(":")
+            _, tx_id, acc_idx_str = data.split(":")
             acc_idx = int(acc_idx_str)
             
             db = database.SessionLocal()
-            raw_msg = db.query(models.RawMessage).filter(models.RawMessage.id == raw_id).first()
             
-            if not raw_msg:
-                await query.edit_text("❌ Error: Message not found in DB.")
-                db.close()
-                return
-
             # Fetch Accounts safely
             accounts = db.query(models.Account).order_by(models.Account.name).all()
             if acc_idx >= len(accounts):
@@ -570,19 +613,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             selected_account = accounts[acc_idx]
             
-            # Re-parse AI (Safest way to get data back)
-            result = await parse_with_ai(raw_msg.body)
-            
-            if "error" in result:
-                 await query.edit_text(f"❌ AI Re-parse Error: {result['error']}")
-                 db.close()
-                 return
+            # Assign Account to Transaction
+            try:
+                updated_tx = crud.assign_account_to_transaction(db, tx_id, selected_account.id)
+                await query.edit_text(f"✅ Assigned to **{selected_account.name}**. Balance Updated.")
+            except Exception as e:
+                await query.edit_text(f"❌ Error updating transaction: {e}")
 
-            # Create Transaction with Selected Account
-            await _create_transaction_logic(db, result, selected_account, raw_msg.body, query.message)
-            
-            raw_msg.status = models.MessageStatus.PARSED
-            db.commit()
             db.close()
 
     except Exception as e:
