@@ -264,7 +264,7 @@ const Accounts = () => {
     // Account Modal State
     const [showAccountModal, setShowAccountModal] = useState(false);
     const [editingId, setEditingId] = useState(null);
-    const [accountForm, setAccountForm] = useState({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '', credit_limit: '', aliases: [], is_income: false });
+    const [accountForm, setAccountForm] = useState({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '', credit_limit: '', aliases: [], is_income: false, notes: '' });
 
     // Transaction Modal State
     const [showTxModal, setShowTxModal] = useState(false);
@@ -273,7 +273,9 @@ const Accounts = () => {
         account_id: '',
         amount: '',
         merchant: '',
+        merchant: '',
         category: '',
+        notes: '',
         timestamp: new Date().toISOString().split('T')[0]
     });
 
@@ -344,7 +346,9 @@ const Accounts = () => {
                 account_id: tx.account_id,
                 amount: tx.amount,
                 merchant: tx.merchant,
+                merchant: tx.merchant,
                 category: tx.category || '',
+                notes: tx.notes || '',
                 timestamp: tx.timestamp ? new Date(tx.timestamp).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
             });
         } else {
@@ -354,6 +358,7 @@ const Accounts = () => {
                 amount: '',
                 merchant: '',
                 category: '',
+                notes: '',
                 timestamp: new Date().toISOString().split('T')[0]
             });
         }
@@ -369,6 +374,7 @@ const Accounts = () => {
                     category: txForm.category,
                     amount: parseFloat(txForm.amount),
                     account_id: txForm.account_id,
+                    notes: txForm.notes,
                     timestamp: new Date(txForm.timestamp).toISOString()
                 });
             } else {
@@ -438,11 +444,12 @@ const Accounts = () => {
                 bank_name: acc.bank_name || '',
                 bank_logo_url: acc.bank_logo_url || '',
                 bank_website: acc.bank_logo_url ? acc.bank_logo_url.replace('https://logo.clearbit.com/', '') : '',
-                is_income: acc.is_income || false
+                is_income: acc.is_income || false,
+                notes: acc.notes || ''
             });
         } else {
             setEditingId(null);
-            setAccountForm({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '', credit_limit: '', aliases: [], bank_name: '', bank_logo_url: '', bank_website: '', is_income: false });
+            setAccountForm({ name: '', account_type: 'Checking', last_4_digits: '', current_balance: '', credit_limit: '', aliases: [], bank_name: '', bank_logo_url: '', bank_website: '', is_income: false, notes: '' });
         }
         setShowAccountModal(true);
     };
@@ -804,6 +811,15 @@ const Accounts = () => {
                                 onChange={e => setTxForm({ ...txForm, timestamp: e.target.value })}
                             />
                         </div>
+                        <div>
+                            <label className="text-xs text-gray-400 uppercase font-bold mb-1 block">Notes</label>
+                            <textarea
+                                placeholder="Optional details..."
+                                className={`${inputClass} h-20 resize-none`}
+                                value={txForm.notes}
+                                onChange={e => setTxForm({ ...txForm, notes: e.target.value })}
+                            />
+                        </div>
 
                         <div className="flex justify-end gap-2 mt-6">
                             <button type="button" onClick={() => setShowTxModal(false)} className="px-4 py-2 text-gray-300 hover:text-white transition">Cancel</button>
@@ -893,6 +909,15 @@ const Accounts = () => {
                             <div className="grid grid-cols-2 gap-4">
                                 <input type="text" placeholder="Last 4 Digits" required className={inputClass} value={accountForm.last_4_digits} onChange={e => setAccountForm({ ...accountForm, last_4_digits: e.target.value })} />
                                 <input type="number" step="0.01" placeholder="Current Balance" required className={inputClass} value={accountForm.current_balance} onChange={e => setAccountForm({ ...accountForm, current_balance: e.target.value })} />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-400 mb-1 block">Notes</label>
+                                <textarea
+                                    placeholder="Account details, purpose, etc."
+                                    className={`${inputClass} h-20 resize-none`}
+                                    value={accountForm.notes}
+                                    onChange={e => setAccountForm({ ...accountForm, notes: e.target.value })}
+                                />
                             </div>
                         </div>
 

@@ -188,7 +188,7 @@ const Loans = () => {
     const [loading, setLoading] = useState(true);
     const [showLoanModal, setShowLoanModal] = useState(false);
     const [editingId, setEditingId] = useState(null);
-    const [loanForm, setLoanForm] = useState({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '', monthly_payment: '', due_day: '' });
+    const [loanForm, setLoanForm] = useState({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '', monthly_payment: '', due_day: '', notes: '' });
 
     const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
@@ -236,7 +236,8 @@ const Loans = () => {
             const payload = {
                 ...loanForm,
                 monthly_payment: loanForm.monthly_payment ? parseFloat(loanForm.monthly_payment) : null,
-                due_day: loanForm.due_day ? parseInt(loanForm.due_day) : null
+                due_day: loanForm.due_day ? parseInt(loanForm.due_day) : null,
+                notes: loanForm.notes
             };
 
             if (editingId) {
@@ -246,7 +247,10 @@ const Loans = () => {
             }
             setShowLoanModal(false);
             setEditingId(null);
-            setLoanForm({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '', monthly_payment: '', due_day: '' });
+            setShowLoanModal(false);
+            setEditingId(null);
+            setLoanForm({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '', monthly_payment: '', due_day: '', notes: '' });
+            fetchLoans();
             fetchLoans();
         } catch (err) { alert('Error saving loan'); }
     };
@@ -277,11 +281,12 @@ const Loans = () => {
                 start_date: loan.start_date ? new Date(loan.start_date).toISOString().split('T')[0] : '',
                 term_months: loan.term_months,
                 monthly_payment: loan.monthly_payment || '',
-                due_day: loan.due_day || ''
+                due_day: loan.due_day || '',
+                notes: loan.notes || ''
             });
         } else {
             setEditingId(null);
-            setLoanForm({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '', monthly_payment: '', due_day: '' });
+            setLoanForm({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '', monthly_payment: '', due_day: '', notes: '' });
         }
         setShowLoanModal(true);
     };
@@ -375,11 +380,19 @@ const Loans = () => {
                         <p className="text-xs text-gray-400">Start Date:</p>
                         <input type="date" required className={inputClass} value={loanForm.start_date} onChange={e => setLoanForm({ ...loanForm, start_date: e.target.value })} />
 
-                        <div className="flex gap-4 items-center">
-                            <div className="flex-1">
-                                <label className="text-xs text-gray-400">Due Day (1-31)</label>
-                                <input type="number" placeholder="27" min="1" max="31" className={inputClass} value={loanForm.due_day} onChange={e => setLoanForm({ ...loanForm, due_day: e.target.value })} />
-                            </div>
+                        <div className="flex-1">
+                            <label className="text-xs text-gray-400">Due Day (1-31)</label>
+                            <input type="number" placeholder="27" min="1" max="31" className={inputClass} value={loanForm.due_day} onChange={e => setLoanForm({ ...loanForm, due_day: e.target.value })} />
+                        </div>
+
+                        <div>
+                            <label className="text-xs text-gray-400 mb-1 block">Notes</label>
+                            <textarea
+                                placeholder="Loan details, bank info..."
+                                className={`${inputClass} h-20 resize-none`}
+                                value={loanForm.notes}
+                                onChange={e => setLoanForm({ ...loanForm, notes: e.target.value })}
+                            />
                         </div>
 
                         <div className="flex gap-4 mt-6">
@@ -394,8 +407,9 @@ const Loans = () => {
                         </div>
                     </form>
                 </Modal>
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 };
 

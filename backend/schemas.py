@@ -14,6 +14,7 @@ class AccountBase(BaseModel):
     bank_name: Optional[str] = None
     bank_logo_url: Optional[str] = None
     is_income: Optional[bool] = False
+    notes: Optional[str] = None
 
 class AccountCreate(AccountBase):
     pass
@@ -29,6 +30,7 @@ class AccountUpdate(BaseModel):
     bank_name: Optional[str] = None
     bank_logo_url: Optional[str] = None
     is_income: Optional[bool] = None
+    notes: Optional[str] = None
 
 class AccountAliasBase(BaseModel):
     alias_name: str
@@ -59,6 +61,7 @@ class TransactionBase(BaseModel):
     timestamp: Optional[datetime] = None
     status: Optional[str] = "completed"
     logo_url: Optional[str] = None
+    notes: Optional[str] = None
 
 class TransactionCreate(TransactionBase):
     account_id: Optional[str] = None
@@ -72,6 +75,7 @@ class TransactionUpdate(BaseModel):
     type: Optional[str] = None
     timestamp: Optional[datetime] = None
     logo_url: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class Transaction(TransactionBase):
@@ -91,6 +95,7 @@ class LoanBase(BaseModel):
     term_months: int
     monthly_payment: Optional[float] = None
     due_day: Optional[int] = None
+    notes: Optional[str] = None
 
 class LoanCreate(LoanBase):
     pass
@@ -104,12 +109,14 @@ class LoanUpdate(BaseModel):
     remaining_balance: Optional[float] = None
     monthly_payment: Optional[float] = None
     due_day: Optional[int] = None
+    notes: Optional[str] = None
 
 class Loan(LoanBase):
     id: str
     remaining_balance: float
     monthly_payment: Optional[float] = None
     due_day: Optional[int] = None
+    notes: Optional[str] = None
     display_order: int = 0
     class Config:
         from_attributes = True
@@ -118,6 +125,7 @@ class ObligationBase(BaseModel):
     name: str
     due_day: int
     category: str = "Other"
+    notes: Optional[str] = None
 
 class ObligationCreate(ObligationBase):
     pass
@@ -126,6 +134,7 @@ class ObligationUpdate(ObligationBase):
     name: Optional[str] = None
     due_day: Optional[int] = None
     category: Optional[str] = None
+    notes: Optional[str] = None
 
 class Obligation(ObligationBase):
     id: str

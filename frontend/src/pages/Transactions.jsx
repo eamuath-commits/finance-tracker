@@ -35,6 +35,7 @@ const Transactions = () => {
         merchant: '',
         category: '',
         type: 'debit',
+        notes: '',
         timestamp: new Date().toISOString().split('T')[0] // YYYY-MM-DD
     });
 
@@ -119,6 +120,7 @@ const Transactions = () => {
             merchant: '',
             category: '',
             type: 'debit',
+            notes: '',
             timestamp: new Date().toISOString().split('T')[0]
         });
     };
@@ -138,7 +140,8 @@ const Transactions = () => {
             merchant: tx.merchant,
             amount: tx.amount, // Optional: Usually disabled for editing to prevent balance mismatch
             account_id: tx.account_id,
-            type: tx.type || 'debit'
+            type: tx.type || 'debit',
+            notes: tx.notes || ''
         });
         setShowEditModal(true);
     };
@@ -181,7 +184,8 @@ const Transactions = () => {
         try {
             await axios.put(`${API_URL}/transactions/${editingTx.id}`, {
                 category: form.category,
-                merchant: form.merchant
+                merchant: form.merchant,
+                notes: form.notes
             });
             setShowEditModal(false);
             setEditingTx(null);
@@ -602,6 +606,12 @@ const Transactions = () => {
                                 <option value="">Select Category (Optional)</option>
                                 {Categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                             </select>
+                            <textarea
+                                placeholder="Notes (Optional)"
+                                className={`${inputClass} h-20 resize-none`}
+                                value={form.notes}
+                                onChange={e => setForm({ ...form, notes: e.target.value })}
+                            />
                             <p className="text-xs text-gray-400">Note: This will deduct the amount from the selected account balance.</p>
                             <button type="submit" className="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700 font-medium">Add Transaction</button>
                         </form>
@@ -639,6 +649,15 @@ const Transactions = () => {
                                         </button>
                                     ))}
                                 </div>
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-400 uppercase font-bold">Notes</label>
+                                <textarea
+                                    placeholder="Add details..."
+                                    className={`${inputClass} mt-1 h-20 resize-none`}
+                                    value={form.notes}
+                                    onChange={e => setForm({ ...form, notes: e.target.value })}
+                                />
                             </div>
                             <button type="submit" className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 font-medium mt-4">Save Changes</button>
                         </form>

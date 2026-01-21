@@ -56,7 +56,7 @@ const Obligations = () => {
     const [selectedHistory, setSelectedHistory] = useState([]);
     const [viewingHistoryId, setViewingHistoryId] = useState(null);
 
-    const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_day: '', category: '' });
+    const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_day: '', category: '', notes: '' });
     const [paymentForm, setPaymentForm] = useState({ id: null, amount: '', note: '', billing_month: new Date().toISOString().split('T')[0] });
 
     const currentPaymentObligation = React.useMemo(() =>
@@ -162,7 +162,10 @@ const Obligations = () => {
         const payload = {
             name: obligationForm.name,
             category: obligationForm.category,
-            due_day: parseInt(obligationForm.due_day || 1)
+            name: obligationForm.name,
+            category: obligationForm.category,
+            due_day: parseInt(obligationForm.due_day || 1),
+            notes: obligationForm.notes
         };
 
         try {
@@ -173,7 +176,7 @@ const Obligations = () => {
             }
             setShowObligationModal(false);
             setEditingId(null);
-            setObligationForm({ name: '', due_day: '', category: '' });
+            setObligationForm({ name: '', due_day: '', category: '', notes: '' });
             fetchData();
         } catch (err) { alert('Error saving obligation'); }
     };
@@ -296,12 +299,13 @@ const Obligations = () => {
     const openObligationModal = (obl = null) => {
         if (obl) {
             setEditingId(obl.id);
+            setEditingId(obl.id);
             setObligationForm({
-                name: obl.name, amount: obl.amount || '', due_day: obl.due_day, category: obl.category
+                name: obl.name, amount: obl.amount || '', due_day: obl.due_day, category: obl.category, notes: obl.notes || ''
             });
         } else {
             setEditingId(null);
-            setObligationForm({ name: '', amount: '', due_day: '', category: '' });
+            setObligationForm({ name: '', amount: '', due_day: '', category: '', notes: '' });
         }
         setShowObligationModal(true);
     };
@@ -461,6 +465,15 @@ const Obligations = () => {
                                     {!categoriesList.find(c => c.name === obligationForm.category) && obligationForm.category && <option value={obligationForm.category}>{obligationForm.category}</option>}
                                 </select>
                             </div>
+                        </div>
+                        <div>
+                            <label className="text-gray-400 text-xs mb-1 block">Notes</label>
+                            <textarea
+                                placeholder="Details..."
+                                className={`${inputClass} h-20 resize-none`}
+                                value={obligationForm.notes}
+                                onChange={e => setObligationForm({ ...obligationForm, notes: e.target.value })}
+                            />
                         </div>
                         <div className="flex gap-2 mt-6">
                             <button type="submit" className="flex-1 bg-blue-600 text-white p-3 rounded font-bold shadow-lg">{editingId ? "Save" : "Create"}</button>

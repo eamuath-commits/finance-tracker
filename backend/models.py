@@ -23,6 +23,7 @@ class Account(Base):
     bank_logo_url = Column(String, nullable=True)
     last_4_digits = Column(String, unique=True, index=True) # Critical for SMS matching
     current_balance = Column(Float, default=0.0)
+    notes = Column(Text, nullable=True)
     credit_limit = Column(Float, nullable=True) 
     interest_rate = Column(Float, nullable=True) # APR for Credit Cards
     minimum_payment = Column(Float, nullable=True) # Minimum monthly payment
@@ -56,6 +57,7 @@ class Transaction(Base):
     category = Column(String, nullable=True)
     # Using String instead of Enum to match manual VARCHAR fix in DB and avoid conflicts
     type = Column(String, default="debit", nullable=False)
+    notes = Column(Text, nullable=True)
     raw_sms_content = Column(Text, nullable=True)
     balance_after_transaction = Column(Float, nullable=True)
     status = Column(String, default="completed", nullable=False)
@@ -73,8 +75,10 @@ class Loan(Base):
     start_date = Column(Date, nullable=False)
     term_months = Column(Integer, nullable=False)
     start_date = Column(Date, nullable=False)
+    start_date = Column(Date, nullable=False)
     term_months = Column(Integer, nullable=False)
     remaining_balance = Column(Float, nullable=False)
+    notes = Column(Text, nullable=True)
     monthly_payment = Column(Float, nullable=True) # Explicit monthly payment amount
     due_day = Column(Integer, nullable=True) # Day of month payment is due
     display_order = Column(Integer, default=0) # For UI ordering
@@ -87,6 +91,7 @@ class MonthlyObligation(Base):
     amount = Column(Float, nullable=True) # User requested optional amount
     due_day = Column(Integer, nullable=False) # e.g. 1 for 1st of month
     category = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
     display_order = Column(Integer, default=0) # For UI ordering
 
 
