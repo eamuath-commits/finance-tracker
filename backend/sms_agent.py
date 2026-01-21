@@ -461,7 +461,7 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
 
     # Determine Status: Pending if Internal Transfer (Wait for confirmation SMS)
     tx_status = "completed"
-    if dest_account and dest_account.id != source_account.id:
+    if source_account and dest_account and dest_account.id != source_account.id:
          tx_status = "pending"
          
          # Same-Bank Exception: If banks match, assume instant transfer and complete immediately
