@@ -24,11 +24,33 @@ const getAccountTheme = (type) => {
     }
 };
 
+const BANK_LOGOS = {
+    'jazira': '/banks/ajb.png',
+    'ajb': '/banks/ajb.png',
+    'rajhi': 'https://logo.clearbit.com/alrajhibank.com.sa',
+    'alrajhi': 'https://logo.clearbit.com/alrajhibank.com.sa',
+    'snb': 'https://logo.clearbit.com/alahli.com',
+    'alahli': 'https://logo.clearbit.com/alahli.com',
+    'ncb': 'https://logo.clearbit.com/alahli.com',
+    'riyad': 'https://logo.clearbit.com/riyadbank.com',
+    'inma': 'https://logo.clearbit.com/alinma.com',
+    'alinma': 'https://logo.clearbit.com/alinma.com',
+    'sab': 'https://logo.clearbit.com/sab.com',
+    'sabb': 'https://logo.clearbit.com/sab.com',
+    'stc': 'https://logo.clearbit.com/stcpay.com.sa',
+    'urpay': 'https://logo.clearbit.com/urpay.com.sa',
+    'anb': 'https://logo.clearbit.com/anb.com.sa',
+    'fransi': 'https://logo.clearbit.com/alfransi.com.sa',
+    'alfransi': 'https://logo.clearbit.com/alfransi.com.sa'
+};
+
 const getLocalLogo = (name) => {
     if (!name) return '/banks/bank2.png';
-    const n = name.toLowerCase();
-    if (n.includes('jazira') || n.includes('ajb')) return '/banks/ajb.png';
-    return '/banks/bank2.png'; // Default for any unknown bank
+    const n = name.toLowerCase().replace(/\s+/g, '');
+    for (const [key, url] of Object.entries(BANK_LOGOS)) {
+        if (n.includes(key)) return url;
+    }
+    return '/banks/bank2.png';
 };
 
 const AccountCard = ({ acc, onEdit = null }) => {
