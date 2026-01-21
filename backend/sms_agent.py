@@ -606,7 +606,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Fetch Accounts safely
             accounts = db.query(models.Account).order_by(models.Account.name).all()
             if acc_idx >= len(accounts):
-                 await query.edit_text("❌ Error: Account selection invalid.")
+                 await query.edit_message_text("❌ Error: Account selection invalid.")
                  db.close()
                  return
             
@@ -615,9 +615,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Assign Account to Transaction
             try:
                 updated_tx = crud.assign_account_to_transaction(db, tx_id, selected_account.id)
-                await query.edit_text(f"✅ Assigned to **{selected_account.name}**. Balance Updated.")
+                await query.edit_message_text(f"✅ Assigned to **{selected_account.name}**. Balance Updated.")
             except Exception as e:
-                await query.edit_text(f"❌ Error updating transaction: {e}")
+                await query.edit_message_text(f"❌ Error updating transaction: {e}")
 
             db.close()
 
