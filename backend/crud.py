@@ -184,7 +184,15 @@ def assign_account_to_transaction(db: Session, transaction_id: str, account_id: 
         # If this was a transfer, we need to create the Credit Leg now that we know the Source
         if tx.category == "Transfer" and tx.merchant.endswith(" Account"):
             potential_acc_name = tx.merchant.replace(" Account", "")
-            dest_acc = db.query(models.Account).filter(models.Account.name == potential_acc_name).first()
+            print(f"DEBUG: Attempting to resolve transfer destination. Potential Name: '{potential_acc_name}'")
+            
+            # Case-insensitive lookup
+            dest_acc = db.query(models.Account).filter(models.Account.name.ilike(potential_acc_name)).first()
+            
+            if dest_acc:
+                print(f"DEBUG: Found destination account: {dest_acc.name} (ID: {dest_acc.id})")
+            else:
+                print(f"DEBUG: Destination account '{potential_acc_name}' NOT FOUND queries.")
             
             if dest_acc and dest_acc.id != account_id:
                 # Check if bank names match for instant completion
