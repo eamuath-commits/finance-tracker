@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Search, Plus, ArrowUpDown, Filter, Edit3, Trash2, MessageSquareText, User, RefreshCw, CheckCircle, MessageSquare } from 'lucide-react';
+import { Search, Plus, ArrowUpDown, Filter, Edit3, Trash2, MessageSquareText, User, RefreshCw, CheckCircle, MessageSquare, Clock } from 'lucide-react';
 import { Card, SectionHeader, Modal, inputClass, selectClass, formatCurrency, BrandLogo } from '../components/UI';
 
 const Transactions = () => {
@@ -447,6 +447,7 @@ const Transactions = () => {
                                         >
                                             <div className="flex items-center gap-1">Date <ArrowUpDown size={14} /></div>
                                         </th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
                                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Category</th>
                                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Account</th>
                                         <th
@@ -494,6 +495,15 @@ const Transactions = () => {
                                                             <div className="text-xs text-slate-600">{new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</div>
                                                         </div>
                                                     </div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    {tx.status === 'pending' ? (
+                                                        <span className="px-2 py-0.5 rounded text-xs bg-yellow-900/30 text-yellow-500 border border-yellow-800/50 flex items-center gap-1 w-fit" title="Waiting for confirmation SMS">
+                                                            <Clock size={12} /> Pending
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-slate-600 text-xs" title="Completed">Done</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     {tx.category ? (
