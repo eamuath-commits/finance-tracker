@@ -349,6 +349,12 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
              merchant_raw = f"{dest_acc.name} Account"
              clean_merchant = dest_acc.name # For logo lookup
 
+    # CLEANUP: Remove leading colons or spaces from merchant name (Common SMS artifact "at :MERCHANT")
+    if merchant_raw:
+        merchant_raw = merchant_raw.lstrip(": ")
+        if clean_merchant:
+             clean_merchant = clean_merchant.lstrip(": ")
+
     # Optimization: If AI identified a destination account Last 4, check if it matches a known account
     # This fixes cases where AI extracts "MUATH" (sender) instead of "7772" (recipient)
     dest_last4 = result.get('destination_account_last4')
