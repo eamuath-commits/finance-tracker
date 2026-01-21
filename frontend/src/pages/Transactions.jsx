@@ -518,7 +518,7 @@ const Transactions = () => {
                                                     {accounts.find(a => a.id === tx.account_id)?.name || 'Unknown'}
                                                 </td>
                                                 <td className={`px-6 py-4 text-right text-sm font-bold ${isCredit ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                    {isCredit ? '+' : '-'} {formatCurrency(tx.amount)}
+                                                    {formatCurrency(tx.amount)}
                                                 </td>
                                                 <td className="px-6 py-4 text-right text-sm text-gray-400 font-mono">
                                                     {tx.balance_after_transaction !== null && tx.balance_after_transaction !== undefined
