@@ -531,6 +531,25 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
         # Return the object for calling function usage
         # If Pending Action (No Account), don't send normal Added message yet
         if tx_status == "pending_action":
+            # AMBIGUOUS TRANSFER LOGIC: 
+            # If we know the destination, create the Credit Leg immediately!
+            if dest_account:
+                 logger.info(f"Ambiguous Source but Known Destination ({dest_account.name}). Creating Credit Leg.")
+                 try:
+                     credit_tx = schemas.TransactionCreate(
+                        account_id=dest_account.id,
+                        amount=result['amount'],
+                        merchant="Unknown Account", # Source Unknown
+                        category="Transfer",
+                        type="credit", # Incoming
+                        timestamp=tx_timestamp,
+                        raw_sms_content=msg_text,
+                        status="completed" # Money is here, even if source is unknown
+                     )
+                     crud.create_transaction(db=db, transaction=credit_tx)
+                 except Exception as e_cred:
+                     logger.error(f"Failed to create immediate credit leg: {e_cred}")
+
             return new_tx
 
     except Exception as e:

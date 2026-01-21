@@ -209,8 +209,14 @@ def assign_account_to_transaction(db: Session, transaction_id: str, account_id: 
                      models.Transaction.timestamp == tx.timestamp
                 ).first()
                 
-                if not existing_credit:
-                    # Create Credit Leg
+                if existing_credit:
+                    # UPDATE EXISTING CREDIT LEG
+                    print(f"DEBUG: Found existing credit leg. Updating merchant to '{account.name} Account'")
+                    existing_credit.merchant = f"{account.name} Account"
+                    db.add(existing_credit)
+                else:
+                    # Create Credit Leg (Fallback if not created earlier)
+                    print(f"DEBUG: No existing credit leg found. Creating new one.")
                     credit_tx = models.Transaction(
                         account_id=dest_acc.id,
                         amount=tx.amount,
