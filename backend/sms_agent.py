@@ -90,12 +90,14 @@ async def parse_with_ai(text: str):
         - **Source Account**: Look for "From Account", "Account:", "Credit Card:", "Card:", "Debited from", followed by digits. 
              - Example: "Credit Card: 1645" -> Source Last4 = 1645.
         - **Destination Account**: Look for "To", "To Account", ending digits (Common in internal transfers).
-    7. **Brand Name (Strict)**: 
-        - Extract the clean BRAND NAME for the merchant.
-        - REMOVE location data, store IDs, terminal codes, and city names (e.g. "Starbucks Riyadh #123" -> "Starbucks").
-        - If the merchant is a person (Transfer), use their name.
-        - DO NOT guess. If you cannot extract a clean name, use null.
-        - DO NOT hallucinate. Only use text present in the SMS.
+    7. **Brand Name (Normalization)**: 
+        - Extract the clean BRAND NAME for fetching logos.
+        - REMOVE location data, store IDs, terminal codes (e.g. "Starbucks Riyadh #123" -> "Starbucks").
+        - **Truncated Names**: You MAY infer the full name if it's a well-known brand and the text is clearly truncated.
+             - Example: "HUNGERSTA" -> "HungerStation"
+             - Example: "ALAFRAH R" -> "Alafrah Restaurant" (If confident)
+             - Example: "UBER TRIP" -> "Uber"
+        - If the merchant is a person (Transfer), using their name is fine.
 
     **Output JSON Schema:**
     {{
