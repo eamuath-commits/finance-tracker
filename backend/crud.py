@@ -180,6 +180,47 @@ def assign_account_to_transaction(db: Session, transaction_id: str, account_id: 
         tx.balance_after_transaction = account.current_balance
         db.add(account)
         
+        # INTERNAL TRANSFER LOGIC (Delayed)
+        # If this was a transfer, we need to create the Credit Leg now that we know the Source
+        if tx.category == "Transfer" and tx.merchant.endswith(" Account"):
+            potential_acc_name = tx.merchant.replace(" Account", "")
+            dest_acc = db.query(models.Account).filter(models.Account.name == potential_acc_name).first()
+            
+            if dest_acc and dest_acc.id != account_id:
+                # Check if bank names match for instant completion
+                is_same_bank = (
+                    account.bank_name and dest_acc.bank_name and 
+                    account.bank_name.strip().lower() == dest_acc.bank_name.strip().lower()
+                )
+                
+                # Check if we already have this credit leg (avoid duplicates)
+                existing_credit = db.query(models.Transaction).filter(
+                     models.Transaction.account_id == dest_acc.id,
+                     models.Transaction.amount == tx.amount,
+                     models.Transaction.type == "credit",
+                     models.Transaction.timestamp == tx.timestamp
+                ).first()
+                
+                if not existing_credit:
+                    # Create Credit Leg
+                    credit_tx = models.Transaction(
+                        account_id=dest_acc.id,
+                        amount=tx.amount,
+                        merchant=f"{account.name} Account", # From the now-known source
+                        category="Transfer",
+                        type="credit",
+                        balance_after_transaction=dest_acc.current_balance + tx.amount if is_same_bank else None,
+                        status="completed" if is_same_bank else "pending",
+                        timestamp=tx.timestamp,
+                        raw_sms_content=tx.raw_sms_content
+                    )
+                    
+                    if is_same_bank:
+                        dest_acc.current_balance += tx.amount
+                        db.add(dest_acc)
+                    
+                    db.add(credit_tx)
+        
     db.commit()
     db.refresh(tx)
     return tx
