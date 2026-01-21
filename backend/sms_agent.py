@@ -66,6 +66,7 @@ async def parse_with_ai(text: str):
     Context:
     - Current Date: {today_date}
     - Current Year: {current_year} (Short: {year_short})
+    - Location: Saudi Arabia (KSA). Most merchants are Saudi businesses. Allows for better guessing of truncated names.
 
     **Date Parsing Rules (CRITICAL):**
     - Output standard ISO format: YYYY-MM-DD.
@@ -96,12 +97,13 @@ async def parse_with_ai(text: str):
              - "str" -> "Street"
              - "ave" -> "Avenue"
              - "rd" -> "Road"
-        - **Truncated/Messy Names**: Aggressively guess the full name if the text looks incomplete or cut off.
-             - "If I googled this string, what business would show up?"
-             - "first str" -> "First Street" (CRITICAL: Do not just return 'first str')
+        - **Truncated/Messy Names**: Aggressively guess the full name if the text looks incomplete. Use your knowledge of SAUDI brands.
+             - "If I googled this string in Saudi Arabia, what business would show up?"
+             - "first str" -> "First Street" (Popular electronics store in KSA) 
              - "HUNGERSTA" -> "HungerStation"
-             - "ALAFRAH R" -> "Alafrah Restaurant"
+             - "ALAFRAH R" -> "Alafrah Restaurant" 
              - "JARIR B" -> "Jarir Bookstore"
+             - "DUNKIN D" -> "Dunkin Donuts"
         - Remove "Riyadh", "Branch", numbers, etc.
 
     **Output JSON Schema:**
