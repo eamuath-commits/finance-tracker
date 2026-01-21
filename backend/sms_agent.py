@@ -87,7 +87,8 @@ async def parse_with_ai(text: str):
     4. **Declines**: If the message says "Declined", "Failed", or "Insufficient Funds", set `status` to "failed".
     5. **Amount**: Extract the numerical amount. Ignore currency symbols in the number, but capture the currency code separately.
     6. **Accounts**:
-        - **Source Account**: Look for "From Account", "Account:", ending digits.
+        - **Source Account**: Look for "From Account", "Account:", "Credit Card:", "Card:", "Debited from", followed by digits. 
+             - Example: "Credit Card: 1645" -> Source Last4 = 1645.
         - **Destination Account**: Look for "To", "To Account", ending digits (Common in internal transfers).
     7. **Brand Name (Strict)**: 
         - Extract the clean BRAND NAME for the merchant.
