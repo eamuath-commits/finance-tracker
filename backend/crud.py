@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 import models
 import schemas
 import uuid
@@ -663,4 +664,4 @@ def create_training_example(db: Session, raw_text: str, parsed_json: str):
 
 def get_random_training_examples(db: Session, limit: int = 3):
     # Fetch random examples using SQL random()
-    return db.query(models.TrainingExample).order_by(models.func.random()).limit(limit).all()
+    return db.query(models.TrainingExample).order_by(func.random()).limit(limit).all()
