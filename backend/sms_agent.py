@@ -260,7 +260,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         source_last4 = result.get('source_account_last4')
         
         if source_last4:
-            source_account = crud.get_account_by_last_4(db, str(source_last4))
+            # Sanitize: Remove spaces, ensure only digits
+            clean_source = "".join(filter(str.isdigit, str(source_last4)))
+            if len(clean_source) >= 4:
+                source_last4 = clean_source[-4:]
+                source_account = crud.get_account_by_last_4(db, source_last4)
 
         # Smart Handling for Incoming Credits (Swap Source if Destination account is owned by user)
         # E.g. SMS says "To: 7772", AI parses Dest=7772. If 7772 is ours, we should credit IT.
