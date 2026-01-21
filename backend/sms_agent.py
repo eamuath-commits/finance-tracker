@@ -57,12 +57,23 @@ async def parse_with_ai(text: str):
         return {"error": "AI_NOT_CONFIGURED"}
 
     today_date = datetime.now().strftime("%Y-%m-%d")
+    year_short = datetime.now().strftime("%y")
+    current_year = datetime.now().year
+
     prompt = f"""
     You are a generic financial expert. Your job is to extract FULL details from banking SMS messages.
     
     Context:
-    - Current Date: {today_date} (Use this to resolve ambiguous years, e.g. '26' -> '2026')
+    - Current Date: {today_date}
+    - Current Year: {current_year} (Short: {year_short})
 
+    **Date Parsing Rules (CRITICAL):**
+    - Output standard ISO format: YYYY-MM-DD.
+    - Handle ambiguous formats like XX/XX/XX carefully.
+    - If a number matches Current Year Short ({year_short}), treat it as the YEAR.
+      - Example: "{year_short}/1/20" -> {current_year}-01-20.
+      - Example: "1/20/{year_short}" -> {current_year}-01-20.
+    
     SMS: "{text}"
 
     **Extraction Rules:**
