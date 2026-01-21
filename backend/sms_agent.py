@@ -60,8 +60,10 @@ async def parse_with_ai(db: Session, text: str):
     year_short = datetime.now().strftime("%y")
     current_year = datetime.now().year
 
-    # Fetch Training Examples (Memory)
-    examples = crud.get_random_training_examples(db, limit=3)
+    # Fetch Training Examples (Smart Memory)
+    examples = crud.get_similar_training_examples(db, text, limit=3)
+    if not examples:
+        examples = crud.get_random_training_examples(db, limit=3)
     examples_text = ""
     if examples:
         examples_text = "**Examples (Learn from these successful parses):**\n"
@@ -98,8 +100,9 @@ async def parse_with_ai(db: Session, text: str):
     4. **Declines**: If the message says "Declined", "Failed", or "Insufficient Funds", set `status` to "failed".
     5. **Amount**: Extract the numerical amount. Ignore currency symbols in the number, but capture the currency code separately.
     6. **Accounts**:
-        - **Source Account**: Look for "From Account", "Account:", "Credit Card:", "Card:", "Debited from", followed by digits. 
+        - **Source Account**: Look for "From Account", "Account:", "Credit Card:", "Card:", "Debited from", "By:", followed by digits. 
              - Example: "Credit Card: 1645" -> Source Last4 = 1645.
+             - Example: "By:9365" -> Source Last4 = 9365.
         - **Destination Account**: Look for "To", "To Account", ending digits (Common in internal transfers).
     7. **Brand Name (Smart Reconstruction)**: 
         - Your goal is to get the BEST possible string for logo lookup.

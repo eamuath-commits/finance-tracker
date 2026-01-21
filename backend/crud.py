@@ -4,6 +4,7 @@ import models
 import schemas
 import uuid
 from datetime import datetime, timedelta
+import re
 
 def get_account_by_last_4(db: Session, last_4: str):
     # 1. Try matching main account last_4
@@ -720,3 +721,31 @@ def create_training_example(db: Session, raw_text: str, parsed_json: str):
 def get_random_training_examples(db: Session, limit: int = 3):
     # Fetch random examples using SQL random()
     return db.query(models.TrainingExample).order_by(func.random()).limit(limit).all()
+
+def get_similar_training_examples(db: Session, sms_content: str, limit: int = 5):
+    # 1. Fetch recent examples (limit search space for performance)
+    all_examples = db.query(models.TrainingExample).order_by(models.TrainingExample.created_at.desc()).limit(200).all()
+    if not all_examples:
+        return []
+
+    # 2. Tokenize input
+    def tokenize(text):
+        return set(re.findall(r'\w+', text.lower()))
+
+    input_tokens = tokenize(sms_content)
+    if not input_tokens:
+        return []
+
+    # 3. Score examples
+    scored = []
+    for ex in all_examples:
+        ex_tokens = tokenize(ex.raw_text)
+        # Intersection count
+        score = len(input_tokens.intersection(ex_tokens))
+        if score > 0:
+            scored.append((score, ex))
+
+    # 4. Sort by score desc
+    scored.sort(key=lambda x: x[0], reverse=True)
+    
+    return [x[1] for x in scored[:limit]]
