@@ -300,9 +300,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             reply_markup = InlineKeyboardMarkup(keyboard)
             
+            title = "❓ **Unknown Account**"
+            details = f"Account ending in **{source_last4}** was not found in your database." if source_last4 else "I couldn't identify the source account."
+            
             await message.reply_text(
-                f"❓ **Ambiguous Account**\n"
-                f"I couldn't identify the source account for this {result.get('amount')} transaction.\n"
+                f"{title}\n"
+                f"{details}\n"
                 f"Please select the **Source Account**:",
                 reply_markup=reply_markup
             )
