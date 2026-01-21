@@ -92,14 +92,17 @@ async def parse_with_ai(text: str):
         - **Destination Account**: Look for "To", "To Account", ending digits (Common in internal transfers).
     7. **Brand Name (Smart Reconstruction)**: 
         - Your goal is to get the BEST possible string for logo lookup.
-        - **Truncated/Messy Names**: Aggressively guess the full name if the text looks incomplete. Use your internal knowledge of brands.
-             - Rule of thumb: "If I googled this string, what business would show up?"
-             - Example: "first str" -> "First Street" (or most likely match)
-             - Example: "HUNGERSTA" -> "HungerStation"
-             - Example: "ALAFRAH R" -> "Alafrah Restaurant"
-             - Example: "JARIR B" -> "Jarir Bookstore"
+        - **Aggressively Expand Abbreviations**:
+             - "str" -> "Street"
+             - "ave" -> "Avenue"
+             - "rd" -> "Road"
+        - **Truncated/Messy Names**: Aggressively guess the full name if the text looks incomplete or cut off.
+             - "If I googled this string, what business would show up?"
+             - "first str" -> "First Street" (CRITICAL: Do not just return 'first str')
+             - "HUNGERSTA" -> "HungerStation"
+             - "ALAFRAH R" -> "Alafrah Restaurant"
+             - "JARIR B" -> "Jarir Bookstore"
         - Remove "Riyadh", "Branch", numbers, etc.
-        - If it's a person/transfer, just keep the name.
 
     **Output JSON Schema:**
     {{
