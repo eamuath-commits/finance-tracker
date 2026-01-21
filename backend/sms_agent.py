@@ -413,6 +413,12 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
     tx_status = "completed"
     if dest_account and dest_account.id != source_account.id:
          tx_status = "pending"
+         
+         # Same-Bank Exception: If banks match, assume instant transfer and complete immediately
+         if (source_account.bank_name and dest_account.bank_name and 
+             source_account.bank_name.strip().lower() == dest_account.bank_name.strip().lower()):
+             tx_status = "completed"
+             logger.info(f"Same-bank transfer detected ({source_account.bank_name}). Marking as completed immediately.")
 
     transaction = schemas.TransactionCreate(
         account_id=source_account.id,
