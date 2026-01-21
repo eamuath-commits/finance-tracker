@@ -23,6 +23,12 @@ def run_migrations(engine):
             with engine.connect() as conn:
                 conn.execute(text("ALTER TABLE transactions ADD COLUMN category VARCHAR"))
                 conn.commit()
+        
+        if 'notes' not in columns:
+            print("Migrating: Adding notes to transactions")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE transactions ADD COLUMN notes TEXT"))
+                conn.commit()
 
         # Check for table rename (obligation_history -> payments)
         table_names = inspector.get_table_names()
@@ -83,6 +89,12 @@ def run_migrations(engine):
                     conn.execute(text("ALTER TABLE accounts ADD COLUMN first_4_digits VARCHAR"))
                     conn.commit()
 
+            if 'notes' not in a_columns:
+                print("Migrating: Adding notes to accounts")
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE accounts ADD COLUMN notes TEXT"))
+                    conn.commit()
+
 
 
         # Check loans table for display_order and due_day
@@ -100,6 +112,12 @@ def run_migrations(engine):
                     conn.execute(text("ALTER TABLE loans ADD COLUMN due_day INTEGER"))
                     conn.commit()
 
+            if 'notes' not in l_columns:
+                print("Migrating: Adding notes to loans")
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE loans ADD COLUMN notes TEXT"))
+                    conn.commit()
+
         # Check obligations table for display_order
         if 'obligations' in inspector.get_table_names():
             o_columns = [col['name'] for col in inspector.get_columns('obligations')]
@@ -107,6 +125,12 @@ def run_migrations(engine):
                 print("Migrating: Adding display_order to obligations")
                 with engine.connect() as conn:
                     conn.execute(text("ALTER TABLE obligations ADD COLUMN display_order INTEGER DEFAULT 0"))
+                    conn.commit()
+
+            if 'notes' not in o_columns:
+                print("Migrating: Adding notes to obligations")
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE obligations ADD COLUMN notes TEXT"))
                     conn.commit()
 
         # Check accounts table for is_income
