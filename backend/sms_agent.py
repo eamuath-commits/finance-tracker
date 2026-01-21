@@ -476,7 +476,6 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
         tx_status = "pending_action"
 
     transaction = schemas.TransactionCreate(
-    transaction = schemas.TransactionCreate(
         account_id=acc_id,
         amount=result['amount'], 
         merchant=merchant_raw,
