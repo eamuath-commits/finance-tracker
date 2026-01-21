@@ -413,8 +413,13 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
     # We check if clean_merchant matches any existing account name
     known_account = crud.get_account_by_name(db, clean_merchant)
     # Only append " Account" if it is a Transfer (to distinguish internal transfer vs external merchant)
-    if known_account and not merchant_raw.endswith(" Account") and category == "Transfer":
-        merchant_raw = f"{known_account.name} Account"
+    if known_account and category == "Transfer":
+         if not merchant_raw.endswith(" Account"):
+            merchant_raw = f"{known_account.name} Account"
+         
+         # CRITICAL FIX: If we identified the account by name, set it as the destination!
+         if 'dest_acc' not in locals() or not dest_acc:
+             dest_acc = known_account
     
     # NEW: If AI returned "Account" suffix for a non-transfer (e.g. "STC Account" for a Bill), strip it
     if category != "Transfer" and merchant_raw.endswith(" Account"):
