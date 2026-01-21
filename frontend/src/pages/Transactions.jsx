@@ -501,6 +501,10 @@ const Transactions = () => {
                                                         <span className="px-2 py-0.5 rounded text-xs bg-yellow-900/30 text-yellow-500 border border-yellow-800/50 flex items-center gap-1 w-fit" title="Waiting for confirmation SMS">
                                                             <Clock size={12} /> Pending
                                                         </span>
+                                                    ) : tx.status === 'pending_action' ? (
+                                                        <span className="px-2 py-0.5 rounded text-xs bg-orange-900/30 text-orange-500 border border-orange-800/50 flex items-center gap-1 w-fit animate-pulse" title="Action Required: Select Account in Telegram">
+                                                            <div className="w-2 h-2 rounded-full bg-orange-500"></div> Action
+                                                        </span>
                                                     ) : (
                                                         <span className="text-slate-600 text-xs" title="Completed">Done</span>
                                                     )}
