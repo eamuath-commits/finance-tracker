@@ -72,6 +72,12 @@ def run_migrations(engine):
                 with engine.connect() as conn:
                     conn.execute(text("ALTER TABLE payments ADD COLUMN status VARCHAR DEFAULT 'PAID'"))
                     conn.commit()
+            
+            if 'transaction_id' not in p_columns:
+                print("Migrating: Adding transaction_id to payments")
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE payments ADD COLUMN transaction_id VARCHAR REFERENCES transactions(id)"))
+                    conn.commit()
 
         # Check accounts table for credit_limit
         if 'accounts' in inspector.get_table_names():
@@ -262,6 +268,69 @@ def delete_obligation(obligation_id: str, db: Session = Depends(get_db)):
     if not deleted_obj:
         raise HTTPException(status_code=404, detail="Obligation not found")
     return deleted_obj
+
+@app.get("/obligations/{obligation_id}/matches", response_model=List[schemas.Transaction])
+def get_obligation_matches(obligation_id: str, db: Session = Depends(get_db)):
+    # 1. Get Obligation
+    obligation = crud.get_obligation(db, obligation_id)
+    if not obligation:
+        raise HTTPException(status_code=404, detail="Obligation not found")
+
+    # 2. Get Search Date Range (Current Month)
+    today = datetime.now()
+    # Look back 5 days before start of month for early payments
+    search_start = datetime(today.year, today.month, 1)
+
+    # 3. Keyword Extraction (Simple: First word of name or strict name)
+    keyword = obligation.name.split(" ")[0].lower() # e.g. "Stc" from "STC Internet"
+    
+    # 4. Search Candidates
+    # Criteria: Debit type, timestamp >= search_start
+    query = db.query(models.Transaction).filter(
+        models.Transaction.timestamp >= search_start,
+        models.Transaction.type == 'debit'
+    )
+    
+    candidates = query.all()
+    
+    # 5. Filter Candidates (Python side for flexibility)
+    matches = []
+    
+    # Get all linked Transaction IDs to exclude
+    linked_tx_ids = [p.transaction_id for p in db.query(models.Payment).filter(models.Payment.transaction_id != None).all()]
+    
+    for tx in candidates:
+        if tx.id in linked_tx_ids:
+            continue
+            
+        match_score = 0
+        
+        # A. Name Match
+        if keyword in (tx.merchant or "").lower() or keyword in (tx.notes or "").lower():
+            match_score += 50
+            
+        # B. Amount Match (if Obligation has amount)
+        if obligation.amount and tx.amount:
+            # 10% tolerance
+            diff = abs(tx.amount - obligation.amount)
+            if diff / obligation.amount <= 0.1:
+                match_score += 40
+            # Exact match bonus
+            if diff == 0:
+                match_score += 20
+        
+        # C. Category Match (if matches obligation category)
+        if obligation.category and tx.category and obligation.category.lower() == tx.category.lower():
+            match_score += 20
+            
+        # Threshold
+        if match_score >= 40:
+             matches.append(tx)
+             
+    # Sort by closest amount, then date desc
+    matches.sort(key=lambda x: abs(x.amount - (obligation.amount or 0)))
+    
+    return matches
 
 @app.post("/obligations/{obligation_id}/pay", response_model=schemas.Payment)
 def pay_obligation(obligation_id: str, payment: schemas.PaymentCreate, db: Session = Depends(get_db)):

@@ -152,6 +152,7 @@ class PaymentBase(BaseModel):
     amount: float
     note: Optional[str] = None
     status: str = "PAID" # "PAID" or "BUDGET"
+    transaction_id: Optional[str] = None
 
 class PaymentCreate(PaymentBase):
     pass
@@ -162,6 +163,7 @@ class PaymentUpdate(BaseModel):
     amount: Optional[float] = None
     note: Optional[str] = None
     status: Optional[str] = None
+    transaction_id: Optional[str] = None
 
 class Payment(PaymentBase):
     obligation_id: str

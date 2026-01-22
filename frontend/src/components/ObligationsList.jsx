@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
-import { CheckCircle, History, Pencil, Trash2, Banknote, Home, Zap, Utensils, Car, Shield, Smartphone, Landmark, CreditCard, Clock, Box, GripVertical, Download } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { CheckCircle, History, Pencil, Trash2, Banknote, Home, Zap, Utensils, Car, Shield, Smartphone, Landmark, CreditCard, Clock, Box, GripVertical, Download, Link } from 'lucide-react';
 import { formatCurrency, EditIcon } from '../components/UI';
+import axios from 'axios';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { exportToCSV } from '../utils/csvExport';
 
-const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObligationModal, openPaymentModal, handleQuickPay, handleDeleteHistory, CATEGORY_ICONS, dragHandleProps }) => {
+const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
+
+const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObligationModal, openPaymentModal, handleQuickPay, handleDeleteHistory, CATEGORY_ICONS, dragHandleProps, match, onLinkPayment }) => {
     const prevMonth = getMonthStatus(obl, monthOffset - 1);
     const currMonth = getMonthStatus(obl, monthOffset);
 
@@ -47,177 +50,14 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
             let val = parseFloat(payAmount);
             if (isNaN(val)) {
                 if (prevMonth.amount !== null && prevMonth.amount > 0) val = prevMonth.amount;
-                // Removed obl.amount fallback
-            }
-
-            // Pass "BUDGET" to save as budget/planned amount (not paid)
-            handleQuickPay(obl.id, val, currMonth.billingDateStr, "BUDGET");
-        }
-    };
-
-    // Brand Logic
-    const getBrandInfo = (name) => {
-        const n = name.toLowerCase();
-        if (n.includes('netflix')) return { domain: 'netflix.com', color: '#E50914' };
-        if (n.includes('spotify')) return { domain: 'spotify.com', color: '#1DB954' };
-        if (n.includes('youtube')) return { domain: 'youtube.com', color: '#FF0000' };
-        if (n.includes('osn')) return { domain: 'osn.com', color: '#2d2d2d' };
-        if (n.includes('stc')) return { domain: 'stc.com.sa', color: '#4F008C' };
-        if (n.includes('mobily')) return { domain: 'mobily.com.sa', color: '#0099D6' };
-        if (n.includes('zain')) return { domain: 'zain.com', color: '#000000' };
-        if (n.includes('amazon')) return { domain: 'amazon.sa', color: '#FF9900' };
-        if (n.includes('apple')) return { domain: 'apple.com', color: '#999999' };
-        if (n.includes('microsoft')) return { domain: 'microsoft.com', color: '#00A4EF' };
-        if (n.includes('adobe')) return { domain: 'adobe.com', color: '#FF0000' };
-        if (n.includes('chatgpt') || n.includes('openai')) return { domain: 'openai.com', color: '#10A37F' };
-        return null;
-    };
-
-    const brand = getBrandInfo(obl.name);
-
-    return (
-        <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition group relative">
-            <div className="bg-slate-900/40 px-3 py-2 border-b border-slate-700 flex justify-between items-center pl-8"> {/* Added pl-8 for drag handle */}
-                {/* Drag Handle */}
-                <div {...dragHandleProps} className="absolute top-2 left-2 cursor-grab opacity-30 hover:opacity-100 z-10 p-1 bg-slate-900/50 rounded touch-none">
-                    <GripVertical size={14} className="text-gray-400" />
-                </div>
-
-                <div className="flex items-center gap-3">
-                    {/* Icon: Method 1 (Brand Logo), Method 2 (Category Icon) */}
-                    <div className="flex-shrink-0">
-                        {brand ? (
-                            <img
-                                src={`https://logo.clearbit.com/${brand.domain}`}
-                                alt={obl.name}
-                                className="w-6 h-6 rounded-full object-cover border border-white/10 shadow-sm"
-                                onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }}
-                            />
-                        ) : null}
-                        <div className={`text-slate-400 opacity-70 scale-75 ${brand ? 'hidden' : 'block'}`}>
-                            {CATEGORY_ICONS[obl.category] || <Box size={24} />}
-                        </div>
-                    </div>
-                    <h3 className="text-sm font-bold text-white truncate max-w-[150px]">{obl.name}</h3>
-                    <span className="text-[10px] text-gray-500">Day: {obl.due_day}</span>
-                </div>
-                <div className="flex gap-2 opacity-50 group-hover:opacity-100 transition">
-                    <button onClick={() => openHistory(obl.id)}><History size={14} className="text-gray-400 hover:text-white" /></button>
-                    <button onClick={() => openObligationModal(obl)}><EditIcon size={14} className="text-gray-400 hover:text-white" /></button>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-2 divide-x divide-slate-700 text-xs">
-                {/* Previous Month Column */}
-                <div className="p-2 flex flex-col items-center justify-center relative hover:bg-slate-700/30 transition group/cell">
-                    <span className="text-[9px] uppercase font-bold text-gray-600 mb-0.5">{prevMonth.shortLabel}</span>
-                    {prevMonth.isPaid ? (
-                        <div className="text-center group-hover/cell:opacity-20 transition">
-                            <CheckCircle size={14} className="text-green-500/50 mx-auto" />
-                            <span className="font-mono text-gray-400">{formatCurrency(prevMonth.amount)}</span>
-                            <span className="text-[8px] text-gray-600 block">#{prevMonth.paymentId}</span>
-                        </div>
-                    ) : (
-                        <div className="text-center">
-                            <span className="font-mono text-gray-500 block mb-1">{prevMonth.amount !== null ? formatCurrency(prevMonth.amount) : "-"}</span>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, prevMonth.billingDateStr, prevMonth.amount || obl.amount); }}
-                                className="text-[9px] bg-blue-900/40 text-blue-300 px-1.5 py-0.5 rounded hover:bg-blue-800 transition"
-                            >
-                                Pay
-                            </button>
-                        </div>
-                    )}
-                    {prevMonth.isPaid && (
-                        <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 group-hover/cell:opacity-100 bg-slate-800/90 transition z-10">
-                            <button onClick={() => openPaymentModal(obl, prevMonth.billingDateStr, null, { id: prevMonth.paymentId, amount: prevMonth.amount, billing_month: prevMonth.billingDateStr })} className="p-1 hover:text-blue-400"><Pencil size={12} /></button>
-                            <button onClick={() => handleDeleteHistory(prevMonth.paymentId)} className="p-1 hover:text-red-400"><Trash2 size={12} /></button>
-                        </div>
-                    )}
-                </div>
-
-                {/* Current Month Column */}
-                <div className="p-2 flex flex-col items-center justify-center bg-slate-700/10 relative group/curr">
-                    <span className="text-[9px] uppercase font-bold text-blue-400 mb-0.5">{currMonth.shortLabel}</span>
-                    {currMonth.isPaid ? (
-                        <div className="text-center relative">
-                            <CheckCircle size={16} className="text-green-400 mx-auto mb-0.5" />
-                            <span className="font-bold font-mono text-white block">{formatCurrency(currMonth.amount)}</span>
-                            <span className="text-[8px] text-slate-600 block absolute bottom-[-10px] w-full text-center group-hover/curr:opacity-100 opacity-0 transition">#{currMonth.paymentId}</span>
-                            <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 group-hover/curr:opacity-100 bg-slate-800/90 transition z-10">
-                                <button onClick={() => openPaymentModal(obl, currMonth.billingDateStr, null, { id: currMonth.paymentId, amount: currMonth.amount, billing_month: currMonth.billingDateStr })} className="p-1 hover:text-blue-400"><Pencil size={12} /></button>
-                                <button onClick={() => handleDeleteHistory(currMonth.paymentId)} className="p-1 hover:text-red-400"><Trash2 size={12} /></button>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="text-center w-full relative">
-                            <div className="flex items-center justify-center gap-1 mb-1 relative">
-                                {isEditing ? (
-                                    <input
-                                        autoFocus
-                                        type="number"
-                                        className="bg-slate-900 border border-slate-600 rounded text-center text-white text-xs py-0.5 w-20 font-mono focus:border-blue-500 outline-none transition"
-                                        placeholder={initialAmount !== "" ? Number(initialAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
-                                        value={payAmount}
-                                        onChange={(e) => setPayAmount(e.target.value)}
-                                        onClick={(e) => e.stopPropagation()}
-                                        onKeyDown={handleKeyDown}
-                                        onBlur={() => setIsEditing(false)}
-                                    />
-                                ) : (
-                                    <div
-                                        onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
-                                        className="bg-slate-900 border border-slate-700/50 hover:border-slate-500 rounded text-center text-white text-xs py-0.5 w-20 font-mono cursor-text transition h-[26px] flex items-center justify-center"
-                                    >
-                                        {payAmount ? formatCurrency(payAmount) : <span className="text-slate-600 italic text-[10px]">Set amount</span>}
-                                    </div>
-                                )}
-                                <button onClick={() => openObligationModal(obl)} className="text-gray-600 hover:text-white"><Pencil size={10} /></button>
-                            </div>
-                            <button
-                                onClick={handlePay}
-                                className="w-full bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold py-0.5 px-2 rounded flex items-center justify-center gap-1 mt-1"
-                            >
-                                Pay
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const SortableObligationItem = (props) => {
-    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: props.obl.id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-    };
-
-    // Pass attributes and listeners to the drag handle inside the Card
-    const dragHandleProps = { ...attributes, ...listeners };
-
-    return (
-        <div ref={setNodeRef} style={style}>
-            <ObligationCard {...props} dragHandleProps={dragHandleProps} />
-        </div>
-    );
-};
-
-
-const ObligationsList = ({
-    obligations,
-    getMonthStatus,
-    openObligationModal,
-    openPaymentModal,
-    handleQuickPay,
-    openHistory,
-    handleDeleteHistory,
-    monthOffset = 0,
-    onReorder
-}) => {
+                openObligationModal,
+                    openPaymentModal,
+                    handleQuickPay,
+                    openHistory,
+                    handleDeleteHistory,
+                    monthOffset = 0,
+                    onReorder
+            }) => {
 
     const CATEGORY_ICONS = {
         "Salary": <Banknote size={20} className="text-emerald-400" />,

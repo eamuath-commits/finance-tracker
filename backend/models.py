@@ -64,6 +64,7 @@ class Transaction(Base):
     logo_url = Column(String, nullable=True)
     
     account = relationship("Account", back_populates="transactions")
+    payments = relationship("Payment", back_populates="transaction")
 
 class Loan(Base):
     __tablename__ = "loans"
@@ -111,8 +112,10 @@ class Payment(Base):
     amount = Column(Float, nullable=False)
     note = Column(String, nullable=True)
     status = Column(Enum(PaymentStatus), default=PaymentStatus.PAID)
+    transaction_id = Column(String, ForeignKey("transactions.id"), nullable=True)
 
     obligation = relationship("MonthlyObligation")
+    transaction = relationship("Transaction", back_populates="payments")
 
 class AllocationRuleType(enum.Enum):
     CATEGORY = "CATEGORY"
