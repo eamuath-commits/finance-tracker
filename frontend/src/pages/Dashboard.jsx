@@ -203,7 +203,12 @@ const Dashboard = () => {
                                     <Analytics
                                         transactions={transactions}
                                         obligations={obligations}
-                                        onCategoryClick={(category) => window.location.href = `/obligations?category=${encodeURIComponent(category)}`}
+                                        onCategoryClick={(category) => {
+                                            console.log("Dashboard received category click:", category);
+                                            const url = `/obligations?category=${encodeURIComponent(category)}`;
+                                            console.log("Redirecting to:", url);
+                                            window.location.href = url;
+                                        }}
                                     />
                                 </SortableWidget>
                             );

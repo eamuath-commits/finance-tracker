@@ -122,8 +122,11 @@ const Obligations = () => {
 
     // Filter Obligations based on URL params
     const filteredObligations = React.useMemo(() => {
+        console.log("Filtering Logic - Filter:", categoryFilter, "Obligations Count:", obligations.length);
         if (!categoryFilter) return obligations;
-        return obligations.filter(o => o.category === categoryFilter);
+        const result = obligations.filter(o => o.category === categoryFilter);
+        console.log("Filtered Result Count:", result.length);
+        return result;
     }, [obligations, categoryFilter]);
 
     // --- Helper Functions ---

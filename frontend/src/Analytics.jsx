@@ -85,7 +85,15 @@ const Analytics = ({ transactions, obligations, onCategoryClick }) => {
                                     fill="#8884d8"
                                     paddingAngle={5}
                                     dataKey="value"
-                                    onClick={(data) => onCategoryClick && onCategoryClick(data.name)}
+                                    onClick={(data) => {
+                                        console.log("Pie Click Data:", data);
+                                        if (onCategoryClick && data && data.name) {
+                                            console.log("Navigating to:", data.name);
+                                            onCategoryClick(data.name);
+                                        } else {
+                                            console.warn("Invalid click data or missing handler", data);
+                                        }
+                                    }}
                                     className="cursor-pointer outline-none"
                                 >
                                     {pieData.map((entry, index) => (
