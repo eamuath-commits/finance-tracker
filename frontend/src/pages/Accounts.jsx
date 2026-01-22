@@ -99,6 +99,9 @@ const AccountCard = ({ acc, onEdit = null }) => {
                     {/* Network Logo (Visa/Mada) */}
                     <div className="flex flex-col items-end gap-1">
                         {(() => {
+                            const hasCard = acc.last_4_digits || (acc.aliases && acc.aliases.length > 0);
+                            if (!hasCard) return null;
+
                             const showVisa = isCreditCard;
                             const showMada = !isCreditCard; // Assume everything else is Mada/Debit for now in SA context
 
@@ -975,7 +978,7 @@ const Accounts = () => {
                             </select>
 
                             <div className="grid grid-cols-2 gap-4">
-                                <input type="text" placeholder="Last 4 Digits" required className={inputClass} value={accountForm.last_4_digits} onChange={e => setAccountForm({ ...accountForm, last_4_digits: e.target.value })} />
+                                <input type="text" placeholder="Last 4 Digits (Optional)" className={inputClass} value={accountForm.last_4_digits} onChange={e => setAccountForm({ ...accountForm, last_4_digits: e.target.value })} />
                                 <input type="number" step="0.01" placeholder="Current Balance" required className={inputClass} value={accountForm.current_balance} onChange={e => setAccountForm({ ...accountForm, current_balance: e.target.value })} />
                             </div>
                             <div>

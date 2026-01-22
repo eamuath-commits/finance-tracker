@@ -469,6 +469,14 @@ def retry_message(message_id: str, db: Session = Depends(get_db)):
     
     return {"status": "success", "message": "Message parsed and logged successfully"}
 
+@app.post("/messages/bulk-delete")
+def bulk_delete_messages(payload: schemas.BulkDeleteRequest, db: Session = Depends(get_db)):
+    deleted_count = 0
+    for msg_id in payload.ids:
+        crud.delete_message(db, msg_id)
+        deleted_count += 1
+    return {"message": f"Deleted {deleted_count} messages"}
+
 # --- Savings Goal Endpoints ---
 @app.post("/goals/", response_model=schemas.SavingsGoal)
 def create_goal(goal: schemas.SavingsGoalCreate, db: Session = Depends(get_db)):

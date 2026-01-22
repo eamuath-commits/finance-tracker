@@ -749,3 +749,11 @@ def get_similar_training_examples(db: Session, sms_content: str, limit: int = 5)
     scored.sort(key=lambda x: x[0], reverse=True)
     
     return [x[1] for x in scored[:limit]]
+
+def delete_message(db: Session, message_id: str):
+    msg = db.query(models.RawMessage).filter(models.RawMessage.id == message_id).first()
+    if msg:
+        db.delete(msg)
+        db.commit()
+        return True
+    return False

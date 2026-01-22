@@ -6,7 +6,7 @@ from models import AccountType, TransactionType
 class AccountBase(BaseModel):
     name: str
     account_type: AccountType
-    last_4_digits: str
+    last_4_digits: Optional[str] = None
     current_balance: float
     credit_limit: Optional[float] = None
     interest_rate: Optional[float] = None

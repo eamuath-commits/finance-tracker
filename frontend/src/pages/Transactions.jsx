@@ -27,6 +27,7 @@ const Transactions = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [editingTx, setEditingTx] = useState(null);
     const [selectedIds, setSelectedIds] = useState(new Set());
+    const [selectedMessageIds, setSelectedMessageIds] = useState(new Set());
 
     // Form State
     const [form, setForm] = useState({
@@ -208,6 +209,30 @@ const Transactions = () => {
         }
     };
 
+    const handleBulkDeleteMessages = async () => {
+        if (selectedMessageIds.size === 0) return;
+        if (!window.confirm(`Are you sure you want to delete ${selectedMessageIds.size} messages?`)) return;
+
+        try {
+            await axios.post(`${API_URL}/messages/bulk-delete`, { ids: Array.from(selectedMessageIds) });
+            setSelectedMessageIds(new Set());
+            fetchMessages();
+        } catch (error) {
+            console.error("Error bulk deleting messages:", error);
+            alert("Failed to delete messages");
+        }
+    };
+
+    const toggleMessageSelection = (id) => {
+        const newSet = new Set(selectedMessageIds);
+        if (newSet.has(id)) {
+            newSet.delete(id);
+        } else {
+            newSet.add(id);
+        }
+        setSelectedMessageIds(newSet);
+    };
+
     // Derived Data
     const filteredTransactions = transactions.filter(tx => {
         // Search Term (Merchant or Category)
@@ -372,10 +397,38 @@ const Transactions = () => {
                 viewMode === 'messages' ? (
                     // MESSAGES TABLE
                     <div className="bg-slate-800 rounded-xl shadow-lg border border-slate-700 overflow-hidden">
+                        {/* Bulk Delete Header */}
+                        <div className="flex justify-between items-center bg-slate-800/50 p-2 border-b border-slate-700/50">
+                            <div className="text-gray-400 text-sm pl-4">
+                                {selectedMessageIds.size} selected
+                            </div>
+                            {selectedMessageIds.size > 0 && (
+                                <button
+                                    onClick={handleBulkDeleteMessages}
+                                    className="bg-red-500/20 text-red-400 hover:bg-red-500/30 px-3 py-1 rounded-md text-sm border border-red-500/30 flex items-center gap-2 transition mr-2"
+                                >
+                                    <Trash2 size={16} /> Delete ({selectedMessageIds.size})
+                                </button>
+                            )}
+                        </div>
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-slate-700">
                                 <thead className="bg-slate-900">
                                     <tr>
+                                        <th className="px-6 py-4 text-left">
+                                            <input
+                                                type="checkbox"
+                                                className="rounded bg-slate-700 border-slate-600 text-blue-600 focus:ring-blue-500"
+                                                checked={messages.length > 0 && selectedMessageIds.size === messages.length}
+                                                onChange={() => {
+                                                    if (selectedMessageIds.size === messages.length) {
+                                                        setSelectedMessageIds(new Set());
+                                                    } else {
+                                                        setSelectedMessageIds(new Set(messages.map(m => m.id)));
+                                                    }
+                                                }}
+                                            />
+                                        </th>
                                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Time</th>
                                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Sender</th>
                                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
@@ -385,7 +438,15 @@ const Transactions = () => {
                                 </thead>
                                 <tbody className="bg-slate-800 divide-y divide-slate-700">
                                     {messages.map(msg => (
-                                        <tr key={msg.id} className="hover:bg-slate-700/50 transition-colors">
+                                        <tr key={msg.id} className={`hover:bg-slate-700/50 transition-colors ${selectedMessageIds.has(msg.id) ? 'bg-blue-900/10' : ''}`}>
+                                            <td className="px-6 py-4">
+                                                <input
+                                                    type="checkbox"
+                                                    className="rounded bg-slate-700 border-slate-600 text-blue-600 focus:ring-blue-500"
+                                                    checked={selectedMessageIds.has(msg.id)}
+                                                    onChange={() => toggleMessageSelection(msg.id)}
+                                                />
+                                            </td>
                                             <td className="px-6 py-4 text-sm text-gray-400 whitespace-nowrap">
                                                 {new Date(msg.timestamp).toLocaleDateString()} {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </td>
@@ -415,7 +476,7 @@ const Transactions = () => {
                                         </tr>
                                     ))}
                                     {messages.length === 0 && (
-                                        <tr><td colSpan="5" className="px-6 py-12 text-center text-gray-500">No messages found.</td></tr>
+                                        <tr><td colSpan="6" className="px-6 py-12 text-center text-gray-500">No messages found.</td></tr>
                                     )}
                                 </tbody>
                             </table>
