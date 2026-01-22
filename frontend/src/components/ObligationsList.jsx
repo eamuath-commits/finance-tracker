@@ -103,7 +103,7 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
                 </div>
                 <div className="flex gap-2 opacity-50 group-hover:opacity-100 transition">
                     <button onClick={() => openHistory(obl.id)}><History size={14} className="text-gray-400 hover:text-white" /></button>
-                    <button onClick={() => openObligationModal(obl)}><EditIcon size={14} className="text-gray-400 hover:text-white" /></button>
+                    <button onClick={() => openObligationModal(obl)}><Pencil size={14} className="text-gray-400 hover:text-white" /></button>
                 </div>
             </div>
 

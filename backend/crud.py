@@ -285,6 +285,9 @@ def delete_loan(db: Session, loan_id: str):
         db.commit()
     return db_loan
 
+def get_obligation(db: Session, obligation_id: str):
+    return db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
+
 def create_obligation(db: Session, obligation: schemas.ObligationCreate):
     db_obj = models.MonthlyObligation(
         name=obligation.name,
