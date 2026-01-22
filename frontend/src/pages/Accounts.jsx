@@ -119,7 +119,7 @@ const AccountCard = ({ acc, onEdit = null }) => {
                                     // Take the first alias as the primary card
                                     const primaryCard = acc.aliases[0];
                                     // Text shadow added for contrast
-                                    showLogo = <img src="/mada-logo.png" alt="Mada" className="h-6 w-auto object-contain drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]" />;
+                                    showLogo = <img src="/mada-logo.png" alt="Mada" className="h-5 w-auto object-contain drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]" />;
                                     cardDigits = primaryCard.last_4_digits;
                                 }
                             }
@@ -227,7 +227,7 @@ const OverviewAccountRow = ({ acc, allTransactions }) => {
                     {acc.account_type === 'Credit Card' ? (
                         <img src="/visa-logo-v2.png" alt="Visa" className="w-6 h-auto object-contain" />
                     ) : (
-                        <img src="/mada-logo.png" alt="Mada" className="w-8 h-auto object-contain drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]" />
+                        <img src="/mada-logo.png" alt="Mada" className="w-7 h-auto object-contain drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]" />
                     )}
                 </div>
             </div>
