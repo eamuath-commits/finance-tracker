@@ -306,8 +306,18 @@ def get_obligation_matches(obligation_id: str, db: Session = Depends(get_db)):
         match_score = 0
         
         # A. Name Match
+        # A. Name/Keyword Match
+        # Check Name
         if keyword in (tx.merchant or "").lower() or keyword in (tx.notes or "").lower():
             match_score += 50
+        
+        # Check Notes (User defined aliases)
+        if obligation.notes:
+            note_keywords = [w.lower() for w in obligation.notes.split() if len(w) > 2] # Ignore small words
+            for k in note_keywords:
+                if k in (tx.merchant or "").lower() or k in (tx.notes or "").lower():
+                    match_score += 50
+                    break # Only bonus once for notes match
             
         # B. Amount Match (if Obligation has amount)
         if obligation.amount and tx.amount:
