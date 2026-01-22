@@ -99,15 +99,43 @@ const AccountCard = ({ acc, onEdit = null }) => {
                     {/* Network Logo (Visa/Mada) */}
                     <div className="flex flex-col items-end gap-1">
                         {(() => {
-                            const hasCard = acc.last_4_digits || (acc.aliases && acc.aliases.length > 0);
-                            if (!hasCard) return null;
+                            // Logic: 
+                            // 1. Credit Card: The account IS the card. Show Visa + Primary Digits.
+                            // 2. Checking/Savings: The account is a bank account. Only show Mada if there is a LINKED card (Alias). Show Alias Digits.
 
-                            const showVisa = isCreditCard;
-                            const showMada = !isCreditCard; // Assume everything else is Mada/Debit for now in SA context
+                            let showLogo = null;
+                            let cardDigits = null;
 
-                            if (showVisa) return <img src="/visa-logo.png" alt="Visa" className="h-10 object-contain drop-shadow-md" />;
-                            if (showMada) return <img src="/mada-logo.png" alt="Mada" className="h-8 object-contain drop-shadow-md" style={{ filter: 'brightness(0) invert(1)' }} />;
-                            return null;
+                            if (isCreditCard) {
+                                // Credit Card Logic
+                                if (acc.last_4_digits) {
+                                    showLogo = <img src="/visa-logo.png" alt="Visa" className="h-8 object-contain drop-shadow-md" />;
+                                    cardDigits = acc.last_4_digits;
+                                }
+                            } else {
+                                // Checking/Savings Logic
+                                // Check for Aliases (Linked Cards)
+                                if (acc.aliases && acc.aliases.length > 0) {
+                                    // Take the first alias as the primary card
+                                    // Future: Could map multiple cards
+                                    const primaryCard = acc.aliases[0];
+                                    showLogo = <img src="/mada-logo.png" alt="Mada" className="h-6 object-contain drop-shadow-md" style={{ filter: 'brightness(0) invert(1)' }} />;
+                                    cardDigits = primaryCard.last_4_digits;
+                                }
+                            }
+
+                            if (!showLogo && !cardDigits) return null;
+
+                            return (
+                                <div className="flex flex-col items-end gap-0.5">
+                                    {showLogo}
+                                    {cardDigits && (
+                                        <span className="text-[10px] font-mono opacity-80 tracking-widest">
+                                            •••• {cardDigits}
+                                        </span>
+                                    )}
+                                </div>
+                            );
                         })()}
                     </div>
                 </div>
