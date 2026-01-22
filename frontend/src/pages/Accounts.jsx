@@ -109,7 +109,7 @@ const AccountCard = ({ acc, onEdit = null }) => {
                             if (isCreditCard) {
                                 // Credit Card Logic
                                 if (acc.last_4_digits) {
-                                    showLogo = <img src="/visa-logo.png" alt="Visa" className="h-8 object-contain drop-shadow-md" />;
+                                    showLogo = <img src="/visa-logo.png" alt="Visa" className="h-12 w-auto object-contain drop-shadow-md" />;
                                     cardDigits = acc.last_4_digits;
                                 }
                             } else {
@@ -117,9 +117,9 @@ const AccountCard = ({ acc, onEdit = null }) => {
                                 // Check for Aliases (Linked Cards)
                                 if (acc.aliases && acc.aliases.length > 0) {
                                     // Take the first alias as the primary card
-                                    // Future: Could map multiple cards
                                     const primaryCard = acc.aliases[0];
-                                    showLogo = <img src="/mada-logo.png" alt="Mada" className="h-6 object-contain drop-shadow-md" style={{ filter: 'brightness(0) invert(1)' }} />;
+                                    // Removed filter to show original branding colors as requested
+                                    showLogo = <img src="/mada-logo.png" alt="Mada" className="h-10 w-auto object-contain drop-shadow-md bg-white/90 rounded px-1 py-0.5" />;
                                     cardDigits = primaryCard.last_4_digits;
                                 }
                             }
@@ -127,11 +127,11 @@ const AccountCard = ({ acc, onEdit = null }) => {
                             if (!showLogo && !cardDigits) return null;
 
                             return (
-                                <div className="flex flex-col items-end gap-0.5">
+                                <div className="flex flex-col items-end gap-1">
                                     {showLogo}
                                     {cardDigits && (
-                                        <span className="text-[10px] font-mono opacity-80 tracking-widest">
-                                            •••• {cardDigits}
+                                        <span className="text-xs font-mono font-bold tracking-wider text-white/90 shadow-sm">
+                                            {cardDigits}
                                         </span>
                                     )}
                                 </div>
