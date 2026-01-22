@@ -1,5 +1,13 @@
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 import { useSearchParams } from 'react-router-dom';
+import { Modal, formatCurrency, inputClass, selectClass } from '../components/UI';
 import { Calendar, Trash2, LayoutGrid, List, Receipt, Tag, Plus, Edit2, ArrowLeft, Filter, X } from 'lucide-react';
+import ObligationsOverview from '../components/ObligationsOverview';
+import ObligationsList from '../components/ObligationsList';
+import ObligationsTable from '../components/ObligationsTable';
+import ObligationsHistory from '../components/ObligationsHistory';
+import PaymentModal from '../components/PaymentModal';
 
 const Obligations = () => {
     // --- Global State ---
