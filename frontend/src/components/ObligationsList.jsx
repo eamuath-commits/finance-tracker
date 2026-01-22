@@ -262,9 +262,9 @@ const ObligationsList = ({
         return () => clearTimeout(timer);
     }, [obligations, monthOffset]);
 
-    const handleLinkPayment = async (obl, tx) => {
-        if (!confirm(`Link transaction "${tx.merchant}" (${formatCurrency(tx.amount)}) to "${obl.name}"?`)) return;
+    const [verifyMatch, setVerifyMatch] = useState(null); // { obl, tx }
 
+    const executeLinkPayment = async (obl, tx) => {
         try {
             const today = new Date();
             const targetMonth = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
@@ -278,9 +278,13 @@ const ObligationsList = ({
                 status: "PAID",
                 transaction_id: tx.id
             });
-            alert("Linked and Paid!");
+            // alert("Linked and Paid!"); // Removed alert for smoother flow
             window.location.reload();
         } catch (e) { alert("Linking failed"); }
+    };
+
+    const handleLinkPayment = (obl, tx) => {
+        setVerifyMatch({ obl, tx });
     };
 
     const CATEGORY_ICONS = {
@@ -525,15 +529,15 @@ const ObligationsList = ({
                                         <SortableObligationItem
                                             key={obl.id}
                                             obl={obl}
+                                            match={matches[obl.id]}
+                                            status={getMonthStatus(obl, monthOffset)}
                                             getMonthStatus={getMonthStatus}
                                             monthOffset={monthOffset}
-                                            openHistory={openHistory}
                                             openObligationModal={openObligationModal}
                                             openPaymentModal={openPaymentModal}
-                                            handleQuickPay={handleQuickPay}
+                                            openHistory={openHistory}
                                             handleDeleteHistory={handleDeleteHistory}
-                                            CATEGORY_ICONS={CATEGORY_ICONS}
-                                            match={matches[obl.id]}
+                                            handleQuickPay={handleQuickPay}
                                             onLinkPayment={handleLinkPayment}
                                         />
                                     ))}
@@ -543,7 +547,45 @@ const ObligationsList = ({
                     );
                 })}
             </DndContext>
-        </div>
+
+            {verifyMatch && (
+                <Modal title="Verify Match" onClose={() => setVerifyMatch(null)}>
+                    <div className="space-y-4">
+                        <p className="text-gray-300 text-sm">Do you want to link this transaction to the obligation?</p>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-slate-900/50 p-3 rounded border border-slate-700">
+                                <span className="text-xs uppercase text-slate-500 font-bold block mb-1">Obligation</span>
+                                <div className="font-bold text-white text-lg">{verifyMatch.obl.name}</div>
+                                {verifyMatch.obl.provider && <div className="text-sm text-blue-400">{verifyMatch.obl.provider}</div>}
+                                <div className="text-xs text-slate-400 mt-1">Due Day: {verifyMatch.obl.due_day}</div>
+                            </div>
+
+                            <div className="bg-slate-900/50 p-3 rounded border border-slate-700">
+                                <span className="text-xs uppercase text-slate-500 font-bold block mb-1">Transaction</span>
+                                <div className="font-bold text-white text-lg">{verifyMatch.tx.merchant}</div>
+                                <div className="text-sm text-green-400 font-mono">{formatCurrency(verifyMatch.tx.amount)}</div>
+                                <div className="text-xs text-slate-400 mt-1">{new Date(verifyMatch.tx.timestamp).toLocaleDateString()}</div>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 mt-6">
+                            <button onClick={() => setVerifyMatch(null)} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded font-medium transition">
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => executeLinkPayment(verifyMatch.obl, verifyMatch.tx)}
+                                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded font-medium transition shadow-lg flex items-center justify-center gap-2"
+                            >
+                                <Link size={16} />
+                                Confirm Match
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
+
+        </div >
     );
 };
 
