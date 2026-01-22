@@ -145,18 +145,18 @@ export const BrandLogo = ({ name, size = "w-8 h-8", className = "", category }) 
         }
 
         if (domain) {
-            // Try Clearbit first
-            setImgSrc(`https://logo.clearbit.com/${domain}`);
+            // Try Google Favicon first (Most reliable)
+            setImgSrc(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`);
             setHasError(false);
         }
     }, [domain, name]);
 
     const handleError = () => {
-        // If Clearbit failed, try Google Favicon
-        if (imgSrc && imgSrc.includes('clearbit')) {
-            setImgSrc(`https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://${domain}&size=128`);
+        // If Google failed, try DuckDuckGo
+        if (imgSrc && imgSrc.includes('google')) {
+            setImgSrc(`https://icons.duckduckgo.com/ip3/${domain}.ico`);
         } else {
-            // If Google failed (or we were already on google), show text fallback
+            // If both failed, show text fallback
             setHasError(true);
         }
     };
