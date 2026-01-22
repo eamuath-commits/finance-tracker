@@ -3,6 +3,10 @@ import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Wallet, PiggyBank, CreditCard, LayoutGrid, List, Receipt, CreditCard as ChipIcon, Edit3, Trash2, Plus, Search, Filter, MessageSquareText, User } from 'lucide-react';
 import { Card, SectionHeader, Modal, formatCurrency, inputClass, selectClass } from '../components/UI';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove, SortableContext, rectSortingStrategy, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
 
 const getAccountTheme = (type) => {
     switch (type) {
@@ -151,6 +155,21 @@ const AccountCard = ({ acc, onEdit = null }) => {
     );
 };
 
+const SortableAccountCard = ({ acc, onEdit }) => {
+    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: acc.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="touch-none h-full">
+            <AccountCard acc={acc} onEdit={onEdit} />
+        </div>
+    );
+};
+
 const OverviewAccountRow = ({ acc, allTransactions }) => {
     const [expanded, setExpanded] = useState(false);
 
@@ -260,6 +279,28 @@ const Accounts = () => {
     const [typeFilter, setTypeFilter] = useState('');
     const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
+    // Order State
+    const [accountOrder, setAccountOrder] = useState([]);
+
+    // Sensors for DnD
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    );
+
+    const handleDragEnd = (event) => {
+        const { active, over } = event;
+        if (active.id !== over.id) {
+            setAccountOrder((items) => {
+                const oldIndex = items.indexOf(active.id);
+                const newIndex = items.indexOf(over.id);
+                const newOrder = arrayMove(items, oldIndex, newIndex);
+                localStorage.setItem('accounts_layout', JSON.stringify(newOrder));
+                return newOrder;
+            });
+        }
+    };
+
     // Account Modal State
     // Account Modal State
     const [showAccountModal, setShowAccountModal] = useState(false);
@@ -303,10 +344,33 @@ const Accounts = () => {
     }, []);
 
     // Derived Data
-    const sortOrder = { 'Checking': 1, 'Savings': 2, 'Credit Card': 3 };
-    const sortedAccounts = [...accounts].sort((a, b) => {
-        return (sortOrder[a.account_type] || 99) - (sortOrder[b.account_type] || 99);
-    });
+    useEffect(() => {
+        if (accounts.length > 0) {
+            const savedLayout = JSON.parse(localStorage.getItem('accounts_layout') || '[]');
+            const currentIds = accounts.map(a => a.id);
+
+            // Filter saved layout to remove deleted accounts
+            const validSaved = savedLayout.filter(id => currentIds.includes(id));
+
+            // Find new accounts not in layout
+            const newAccounts = accounts.filter(a => !validSaved.includes(a.id));
+
+            // Sort new accounts by type (default logic)
+            const sortOrder = { 'Checking': 1, 'Savings': 2, 'Credit Card': 3 };
+            newAccounts.sort((a, b) => (sortOrder[a.account_type] || 99) - (sortOrder[b.account_type] || 99));
+
+            // Combine
+            const finalOrder = [...validSaved, ...newAccounts.map(a => a.id)];
+
+            // Only update if different to avoid infinite loop (though array ref changes, checking length/content helps)
+            setAccountOrder(finalOrder);
+        }
+    }, [accounts]);
+
+    const sortedAccounts = accountOrder
+        .map(id => accounts.find(a => a.id === id))
+        .filter(Boolean); // Filter out any undefined if sync issues occur
+
 
     const filteredTransactions = transactions.filter(tx => {
         // Search Term (Merchant or Category)
@@ -502,21 +566,25 @@ const Accounts = () => {
 
                     {/* List of Account Rows */}
                     {/* List of Account Cards (Grid) */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
-                        {sortedAccounts.map(acc => (
-                            <AccountCard key={acc.id} acc={acc} onEdit={openAccountModal} />
-                        ))}
-                        {/* Add New Card Button */}
-                        <button
-                            onClick={() => openAccountModal(null)}
-                            className="w-full aspect-[1.586/1] rounded-2xl border-2 border-dashed border-slate-700 hover:border-blue-500/50 hover:bg-slate-800/50 transition-all group flex flex-col items-center justify-center gap-3"
-                        >
-                            <div className="p-4 bg-slate-800 rounded-full group-hover:bg-blue-600 group-hover:text-white transition-colors text-slate-400">
-                                <Plus size={24} />
-                            </div>
-                            <span className="text-sm font-medium text-slate-400 group-hover:text-white">Add Account</span>
-                        </button>
-                    </div>
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
+                            <SortableContext items={accountOrder} strategy={rectSortingStrategy}>
+                                {sortedAccounts.map(acc => (
+                                    <SortableAccountCard key={acc.id} acc={acc} onEdit={openAccountModal} />
+                                ))}
+                            </SortableContext>
+                            {/* Add New Card Button - Not draggable */}
+                            <button
+                                onClick={() => openAccountModal(null)}
+                                className="w-full aspect-[1.586/1] rounded-2xl border-2 border-dashed border-slate-700 hover:border-blue-500/50 hover:bg-slate-800/50 transition-all group flex flex-col items-center justify-center gap-3"
+                            >
+                                <div className="p-4 bg-slate-800 rounded-full group-hover:bg-blue-600 group-hover:text-white transition-colors text-slate-400">
+                                    <Plus size={24} />
+                                </div>
+                                <span className="text-sm font-medium text-slate-400 group-hover:text-white">Add Account</span>
+                            </button>
+                        </div>
+                    </DndContext>
                 </div>
             )}
 
