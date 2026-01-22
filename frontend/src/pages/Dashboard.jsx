@@ -200,7 +200,11 @@ const Dashboard = () => {
                         if (id === 'analytics') {
                             return (
                                 <SortableWidget key={id} id={id}>
-                                    <Analytics transactions={transactions} obligations={obligations} />
+                                    <Analytics
+                                        transactions={transactions}
+                                        obligations={obligations}
+                                        onCategoryClick={(category) => window.location.href = `/obligations?category=${encodeURIComponent(category)}`}
+                                    />
                                 </SortableWidget>
                             );
                         }

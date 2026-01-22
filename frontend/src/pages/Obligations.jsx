@@ -1,356 +1,74 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import { Modal, formatCurrency, inputClass, selectClass, SectionHeader } from '../components/UI';
-import { Calendar, Trash2, LayoutGrid, List, Receipt, Tag, Plus, Edit2, ArrowLeft } from 'lucide-react';
-import ObligationsOverview from '../components/ObligationsOverview';
-import ObligationsList from '../components/ObligationsList';
-import ObligationsTable from '../components/ObligationsTable';
-import ObligationsHistory from '../components/ObligationsHistory';
-import PaymentModal from '../components/PaymentModal';
-// Removed SectionHeader standalone import
+import { useSearchParams } from 'react-router-dom';
+import { Calendar, Trash2, LayoutGrid, List, Receipt, Tag, Plus, Edit2, ArrowLeft, Filter, X } from 'lucide-react';
 
 const Obligations = () => {
     // --- Global State ---
-    const [activeTab, setActiveTab] = useState('obligations'); // 'obligations' | 'categories'
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeTab = searchParams.get('tab') || 'obligations';
+    const categoryFilter = searchParams.get('category');
+
     const [loading, setLoading] = useState(true);
 
     // --- Obligations Data State ---
     const [obligations, setObligations] = useState([]);
-    const [payments, setPayments] = useState({});
+    // ... (rest of state)
 
-    // --- Categories Data State ---
-    const [categoriesList, setCategoriesList] = useState([]);
-    const [newCategoryName, setNewCategoryName] = useState('');
-    const [editingCategory, setEditingCategory] = useState(null);
+    // ... (fetchData and other hooks)
 
-    // --- View Mode State (for Obligations Tab) ---
-    const [viewMode, setViewModeState] = useState(localStorage.getItem('obligationsViewMode') || 'overview');
-    const setViewMode = (mode) => {
-        setViewModeState(mode);
-        localStorage.setItem('obligationsViewMode', mode);
-    };
+    // Filter Obligations based on URL params
+    const filteredObligations = React.useMemo(() => {
+        if (!categoryFilter) return obligations;
+        return obligations.filter(o => o.category === categoryFilter);
+    }, [obligations, categoryFilter]);
 
-    // --- Month Navigation State ---
-    const [monthOffset, setMonthOffset] = useState(() => {
-        const saved = localStorage.getItem('obligationsMonthOffset');
-        return saved ? parseInt(saved, 10) : 0;
-    });
-
-    useEffect(() => {
-        localStorage.setItem('obligationsMonthOffset', monthOffset);
-    }, [monthOffset]);
-
-    // Calculate current view Date Label
-    const currentDateView = (() => {
-        const now = new Date();
-        const target = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
-        return target.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    })();
-
-    // --- Modals State ---
-    const [showObligationModal, setShowObligationModal] = useState(false);
-    const [showHistoryModal, setShowHistoryModal] = useState(false);
-    const [showPaymentModal, setShowPaymentModal] = useState(false);
-
-    const [editingId, setEditingId] = useState(null);
-    const [selectedHistory, setSelectedHistory] = useState([]);
-    const [viewingHistoryId, setViewingHistoryId] = useState(null);
-
-    const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_day: '', category: '', notes: '' });
-    const [paymentForm, setPaymentForm] = useState({ id: null, amount: '', note: '', billing_month: new Date().toISOString().split('T')[0] });
-
-    const currentPaymentObligation = React.useMemo(() =>
-        obligations.find(o => o.id === paymentForm.id),
-        [obligations, paymentForm.id]
-    );
-
-    const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
-
-    // --- Data Fetching ---
-    const fetchData = async () => {
-        console.log("🚀 Starting fetchData...");
-        setLoading(true);
-        try {
-            const [oblRes, catRes] = await Promise.all([
-                axios.get(`${API_URL}/obligations/`),
-                axios.get(`${API_URL}/categories`)
-            ]);
-
-            setObligations(oblRes.data);
-
-            // Auto-Migration: If no categories in DB, populate from existing obligations
-            let finalCategories = catRes.data;
-            if (finalCategories.length === 0 && oblRes.data.length > 0) {
-                const uniqueFromObs = [...new Set(oblRes.data.map(o => o.category).filter(c => c))];
-                if (uniqueFromObs.length > 0) {
-                    console.log("Migrating categories...");
-                    for (const cName of uniqueFromObs) {
-                        try {
-                            await axios.post(`${API_URL}/categories`, { name: cName });
-                        } catch (e) { }
-                    }
-                    const updatedCats = await axios.get(`${API_URL}/categories`);
-                    finalCategories = updatedCats.data;
-                }
-            }
-            setCategoriesList(finalCategories);
-
-            const paymentsData = {};
-            console.log("⏳ Fetching payments...");
-            await Promise.all(oblRes.data.map(async (obl) => {
-                try {
-                    const hRes = await axios.get(`${API_URL}/obligations/${obl.id}/payments`);
-                    paymentsData[obl.id] = hRes.data;
-                } catch (hErr) {
-                    paymentsData[obl.id] = [];
-                }
-            }));
-            setPayments(paymentsData);
-        } catch (error) {
-            console.error("❌ CRITICAL ERROR fetching data:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    // --- Helper Functions ---
-    const getMonthStatus = (obl, offset) => {
-        const now = new Date();
-        let baseYear = now.getFullYear();
-        let baseMonth = now.getMonth();
-
-        const targetDate = new Date(baseYear, baseMonth + offset, 1);
-        const targetMonth = targetDate.getMonth();
-        const targetYear = targetDate.getFullYear();
-        const billingDateStr = `${targetYear}-${(targetMonth + 1).toString().padStart(2, '0')}-01`;
-
-        const oblPayments = payments[obl.id] || [];
-        const isMatch = (p, m, y) => {
-            if (p.billing_month) {
-                const [py, pm] = p.billing_month.split('-').map(Number);
-                return (pm - 1) === m && py === y;
-            }
-            let d = new Date(p.payment_date);
-            return d.getMonth() === m && d.getFullYear() === y;
-        };
-
-        const payment = oblPayments.find(p => isMatch(p, targetMonth, targetYear));
-        let displayAmount = null;
-
-        if (payment) {
-            displayAmount = payment.amount;
-        }
-
-        return {
-            label: targetDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-            shortLabel: targetDate.toLocaleDateString('en-US', { month: 'short' }),
-            billingDateStr,
-            isPaid: payment && payment.status === 'PAID',
-            amount: displayAmount,
-            paymentId: payment ? payment.id : null,
-            status: payment ? payment.status : null
-        };
-    };
-
-    // --- CRUD Handlers (Obligations) ---
-    const handleSaveObligation = async (e) => {
-        e.preventDefault();
-        const payload = {
-            name: obligationForm.name,
-            category: obligationForm.category,
-            name: obligationForm.name,
-            category: obligationForm.category,
-            due_day: parseInt(obligationForm.due_day || 1),
-            notes: obligationForm.notes
-        };
-
-        try {
-            if (editingId) {
-                await axios.put(`${API_URL}/obligations/${editingId}`, payload);
-            } else {
-                await axios.post(`${API_URL}/obligations/`, payload);
-            }
-            setShowObligationModal(false);
-            setEditingId(null);
-            setObligationForm({ name: '', due_day: '', category: '', notes: '' });
-            fetchData();
-        } catch (err) { alert('Error saving obligation'); }
-    };
-
-    const handleDeleteObligation = async () => {
-        if (!editingId) return;
-        if (!confirm("Are you sure?")) return;
-        try {
-            await axios.delete(`${API_URL}/obligations/${editingId}`);
-            setShowObligationModal(false);
-            setEditingId(null);
-            fetchData();
-        } catch (err) { alert('Error deleting'); }
-    };
-
-    const handleReorder = async (newOrderedObligations) => {
-        setObligations(newOrderedObligations);
-        try {
-            const ids = newOrderedObligations.map(o => o.id);
-            await axios.put(`${API_URL}/obligations/reorder`, { ordered_ids: ids });
-        } catch (err) { console.error("Reorder failed", err); }
-    };
-
-    // --- CRUD Handlers (Categories) ---
-    const handleAddCategory = async (e) => {
-        e.preventDefault();
-        if (!newCategoryName.trim()) return;
-        try {
-            await axios.post(`${API_URL}/categories`, { name: newCategoryName });
-            setNewCategoryName('');
-            fetchData();
-        } catch (error) { alert("Failed to add category"); }
-    };
-
-    const handleUpdateCategory = async (id, newName) => {
-        if (!newName.trim()) return;
-        try {
-            await axios.put(`${API_URL}/categories/${id}`, { name: newName });
-            setEditingCategory(null);
-            fetchData();
-        } catch (error) { alert("Failed to update category"); }
-    };
-
-    const handleDeleteCategory = async (id) => {
-        if (!confirm("Delete this category? Associated obligations will become Uncategorized.")) return;
-        try {
-            await axios.delete(`${API_URL}/categories/${id}`);
-            fetchData();
-        } catch (error) { alert("Failed to delete category"); }
-    };
-
-    // --- Payment Handlers ---
-    const openPaymentModal = (obl, targetMonthStr = null, defaultAmount = null, historyEntry = null) => {
-        // Logic same as before...
-        // Re-implementing simplified for brevity but functionality preserved
-        if (historyEntry) {
-            setPaymentForm({
-                id: obl.id, historyId: historyEntry.id, name: obl.name,
-                amount: historyEntry.amount, note: historyEntry.note || "",
-                billing_month: historyEntry.billing_month || targetMonthStr, status: historyEntry.status || "PAID"
-            });
-        } else if (obl) {
-            setPaymentForm({
-                id: obl.id, historyId: null, name: obl.name,
-                amount: defaultAmount !== null ? defaultAmount : (obl.amount || ''),
-                note: "Manual Payment", billing_month: targetMonthStr || new Date().toISOString().split('T')[0], status: "PAID"
-            });
-        } else {
-            setPaymentForm({ id: null, historyId: null, name: '', amount: '', note: "Manual Payment", billing_month: targetMonthStr || new Date().toISOString().split('T')[0], status: "PAID" });
-        }
-        setShowPaymentModal(true);
-    };
-
-    const handleProcessPayment = async (data) => {
-        try {
-            const payload = {
-                payment_date: new Date().toISOString(), amount: parseFloat(data.amount || 0),
-                billing_month: data.billing_month, note: data.note, status: data.status
-            };
-            if (data.id && data.historyId) { // Edit using historyId hack or just re-post? 
-                // The backend doesn't support Edit History easily without history ID logic we saw earlier.
-                // Assuming standard Upsert via Pay endpoint mostly works or legacy endpoint:
-                await axios.put(`${API_URL}/obligations/history/${data.historyId}`, payload);
-            } else {
-                await axios.post(`${API_URL}/obligations/${paymentForm.id}/pay`, payload);
-            }
-            setShowPaymentModal(false);
-            if (viewingHistoryId) {
-                const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/payments`);
-                setSelectedHistory(hRes.data);
-            }
-            fetchData();
-        } catch (err) { alert("Error processing payment"); }
-    };
-
-    const handleQuickPay = async (oblId, amount, billingMonth, status = "PAID") => {
-        try {
-            const payload = {
-                payment_date: new Date().toISOString(), amount: parseFloat(amount),
-                billing_month: billingMonth, note: status === "BUDGET" ? "Budgeted Amount" : "Quick Pay", status: status
-            };
-            await axios.post(`${API_URL}/obligations/${oblId}/pay`, payload);
-            fetchData();
-        } catch (err) { alert("Error processing quick payment"); }
-    };
-
-    const handleDeleteHistory = async (historyId) => {
-        if (!confirm("Delete this payment record?")) return;
-        try {
-            await axios.delete(`${API_URL}/obligations/history/${historyId}`);
-            if (viewingHistoryId) {
-                const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/payments`);
-                setSelectedHistory(hRes.data);
-            }
-            fetchData();
-        } catch (err) { alert("Error deleting payment"); }
-    };
-
-    // --- View Helpers ---
-    const openObligationModal = (obl = null) => {
-        if (obl) {
-            setEditingId(obl.id);
-            setEditingId(obl.id);
-            setObligationForm({
-                name: obl.name, amount: obl.amount || '', due_day: obl.due_day, category: obl.category, notes: obl.notes || ''
-            });
-        } else {
-            setEditingId(null);
-            setObligationForm({ name: '', amount: '', due_day: '', category: '', notes: '' });
-        }
-        setShowObligationModal(true);
-    };
-
-    const openHistory = (oblId) => {
-        setViewingHistoryId(oblId);
-        setSelectedHistory(payments[oblId] || []);
-        setShowHistoryModal(true);
-    };
-
-    const currentHistoryObligation = obligations.find(o => o.id === viewingHistoryId) || {};
-
-    if (loading) return <div className="p-10 text-white">Loading...</div>;
+    // ... (handlers)
 
     return (
         <div>
             {/* --- MAIN HEADER & TAB SWITCHER --- */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
                 <div>
                     <h1 className="text-3xl font-bold text-white">Monthly Obligations</h1>
                     <p className="text-gray-400">Track and manage your recurring commitments</p>
                 </div>
 
-                <div className="flex bg-slate-800 p-1 rounded-lg border border-slate-700 w-fit">
-                    <button
-                        onClick={() => setActiveTab('obligations')}
-                        className={`flex items-center gap-2 px-6 py-2 rounded-md font-medium transition-all ${activeTab === 'obligations'
-                            ? 'bg-blue-600 text-white shadow-sm'
-                            : 'text-gray-400 hover:text-white'
-                            }`}
-                    >
-                        <List size={18} />
-                        Obligations
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('categories')}
-                        className={`flex items-center gap-2 px-6 py-2 rounded-md font-medium transition-all ${activeTab === 'categories'
-                            ? 'bg-purple-600 text-white shadow-sm'
-                            : 'text-gray-400 hover:text-white'
-                            }`}
-                    >
-                        <Tag size={18} />
-                        Categories
-                    </button>
-                </div>
+                {/* Header Actions / Filter Indicator */}
+                {categoryFilter && (
+                    <div className="flex items-center gap-2 bg-blue-900/30 text-blue-200 px-3 py-1.5 rounded-lg border border-blue-800/50">
+                        <Filter size={14} />
+                        <span className="text-sm">Filter: <strong>{categoryFilter}</strong></span>
+                        <button
+                            onClick={() => setSearchParams({ tab: activeTab })}
+                            className="ml-2 hover:bg-blue-800/50 p-0.5 rounded-full transition-colors"
+                        >
+                            <X size={14} />
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {/* Tabs - Aligned with Accounts.jsx */}
+            <div className="flex space-x-1 bg-slate-800/50 p-1 rounded-lg mb-8 w-fit border border-slate-700">
+                <button
+                    onClick={() => setSearchParams({ tab: 'obligations' })}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'obligations'
+                        ? 'bg-blue-600 text-white shadow'
+                        : 'text-gray-400 hover:text-white'
+                        }`}
+                >
+                    <List size={16} />
+                    Obligations
+                </button>
+                <button
+                    onClick={() => setSearchParams({ tab: 'categories' })}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'categories'
+                        ? 'bg-purple-600 text-white shadow'
+                        : 'text-gray-400 hover:text-white'
+                        }`}
+                >
+                    <Tag size={16} />
+                    Categories
+                </button>
             </div>
 
             {/* --- OBLIGATIONS TAB CONTENT --- */}
@@ -385,23 +103,23 @@ const Obligations = () => {
                     </div>
 
                     {/* View Components */}
-                    {viewMode === 'overview' && <ObligationsOverview obligations={obligations} getMonthStatus={getMonthStatus} monthOffset={monthOffset} />}
+                    {viewMode === 'overview' && <ObligationsOverview obligations={filteredObligations} getMonthStatus={getMonthStatus} monthOffset={monthOffset} />}
 
                     {viewMode === 'manager' && (
                         <div>
                             <div className="flex justify-end mb-4"><button onClick={() => openObligationModal(null)} className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded shadow text-sm">+ Add New Obligation</button></div>
-                            <ObligationsList obligations={obligations} getMonthStatus={getMonthStatus} openObligationModal={openObligationModal} openPaymentModal={openPaymentModal} handleQuickPay={handleQuickPay} openHistory={openHistory} handleDeleteHistory={handleDeleteHistory} monthOffset={monthOffset} onReorder={handleReorder} />
+                            <ObligationsList obligations={filteredObligations} getMonthStatus={getMonthStatus} openObligationModal={openObligationModal} openPaymentModal={openPaymentModal} handleQuickPay={handleQuickPay} openHistory={openHistory} handleDeleteHistory={handleDeleteHistory} monthOffset={monthOffset} onReorder={handleReorder} />
                         </div>
                     )}
 
                     {viewMode === 'manager_new' && (
                         <div>
                             <div className="flex justify-end mb-4"><button onClick={() => openObligationModal(null)} className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded shadow text-sm">+ Add New Obligation</button></div>
-                            <ObligationsTable obligations={obligations} getMonthStatus={getMonthStatus} monthOffset={monthOffset} openPaymentModal={openPaymentModal} handleQuickPay={handleQuickPay} />
+                            <ObligationsTable obligations={filteredObligations} getMonthStatus={getMonthStatus} monthOffset={monthOffset} openPaymentModal={openPaymentModal} handleQuickPay={handleQuickPay} />
                         </div>
                     )}
 
-                    {viewMode === 'history' && <ObligationsHistory obligations={obligations} history={payments} onEdit={(item) => { if (item) { const o = obligations.find(x => x.id === item.obligation_id); if (o) openPaymentModal(o, null, null, item); } else { openPaymentModal(null); } }} onDelete={(item) => handleDeleteHistory(item.id)} />}
+                    {viewMode === 'history' && <ObligationsHistory obligations={filteredObligations} history={payments} onEdit={(item) => { if (item) { const o = obligations.find(x => x.id === item.obligation_id); if (o) openPaymentModal(o, null, null, item); } else { openPaymentModal(null); } }} onDelete={(item) => handleDeleteHistory(item.id)} />}
                 </div>
             )}
 

@@ -43,7 +43,7 @@ const processTransactionCategoryData = (transactions) => {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
-const Analytics = ({ transactions, obligations }) => {
+const Analytics = ({ transactions, obligations, onCategoryClick }) => {
     const barData = processTransactionData(transactions);
     const pieData = processTransactionCategoryData(transactions);
 
@@ -85,9 +85,15 @@ const Analytics = ({ transactions, obligations }) => {
                                     fill="#8884d8"
                                     paddingAngle={5}
                                     dataKey="value"
+                                    onClick={(data) => onCategoryClick && onCategoryClick(data.name)}
+                                    className="cursor-pointer outline-none"
                                 >
                                     {pieData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill={COLORS[index % COLORS.length]}
+                                            className="cursor-pointer hover:opacity-80 transition-opacity"
+                                        />
                                     ))}
                                 </Pie>
                                 <Tooltip
