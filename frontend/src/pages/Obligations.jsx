@@ -399,6 +399,25 @@ const Obligations = () => {
                         {/* Month Nav for Overview Mode */}
                         {viewMode !== 'history' && (
                             <div className="flex items-center gap-2">
+                                {/* Category Filter Dropdown */}
+                                <div className="relative">
+                                    <select
+                                        className="bg-slate-800 text-xs text-gray-300 border border-slate-600 rounded px-2 py-1 outline-none focus:border-blue-500 mr-2"
+                                        value={categoryFilter || ""}
+                                        onChange={(e) => setSearchParams(prev => {
+                                            const newParams = new URLSearchParams(prev);
+                                            if (e.target.value) newParams.set('category', e.target.value);
+                                            else newParams.delete('category');
+                                            return newParams;
+                                        })}
+                                    >
+                                        <option value="">All Categories</option>
+                                        {categoriesList.map(c => (
+                                            <option key={c.id} value={c.name}>{c.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
                                 <button onClick={() => setMonthOffset(p => p - 1)} className="p-1 hover:bg-slate-700 rounded text-gray-400"><ArrowLeft size={16} className="transform rotate-0" /> &lt;</button>
                                 <span className="text-sm font-bold text-white min-w-[100px] text-center">{currentDateView}</span>
                                 <button onClick={() => setMonthOffset(p => p + 1)} className="p-1 hover:bg-slate-700 rounded text-gray-400">&gt;</button>
