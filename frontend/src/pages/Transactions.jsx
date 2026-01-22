@@ -156,19 +156,7 @@ const Transactions = () => {
         setSelectedIds(newSet);
     };
 
-    const handleBulkDelete = async () => {
-        if (window.confirm(`Are you sure you want to delete ${selectedIds.size} transactions?`)) {
-            try {
-                await axios.post(`${API_URL}/transactions/bulk-delete`, {
-                    ids: Array.from(selectedIds)
-                });
-                fetchData();
-            } catch (err) {
-                console.error("Error deleting transactions", err);
-                alert('Error deleting transactions');
-            }
-        }
-    };
+
 
     const handleSaveAdd = async (e) => {
         e.preventDefault();
@@ -191,6 +179,21 @@ const Transactions = () => {
             setEditingTx(null);
             fetchData();
         } catch (err) { alert('Error updating transaction'); }
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedIds.size === 0) return;
+        if (!window.confirm(`Are you sure you want to delete ${selectedIds.size} transactions?`)) return;
+
+        try {
+            // Convert Set to Array for JSON payload
+            await axios.post(`${API_URL}/transactions/bulk-delete`, { ids: Array.from(selectedIds) });
+            setSelectedIds(new Set());
+            fetchData();
+        } catch (error) {
+            console.error("Error bulk deleting:", error);
+            alert("Failed to delete transactions");
+        }
     };
 
     const handleDelete = async (id) => {
@@ -280,9 +283,9 @@ const Transactions = () => {
                         {selectedIds.size > 0 && (
                             <button
                                 onClick={handleBulkDelete}
-                                className="bg-red-600/20 text-red-300 hover:bg-red-600/40 px-3 py-1 rounded-md text-sm border border-red-500/30 flex items-center gap-2 transition"
+                                className="bg-red-500/20 text-red-400 hover:bg-red-500/30 px-3 py-1 rounded-md text-sm border border-red-500/30 flex items-center gap-2 transition"
                             >
-                                <Trash2 size={14} /> Delete Selected ({selectedIds.size})
+                                <Trash2 size={16} /> Delete Selected ({selectedIds.size})
                             </button>
                         )}
                     </div>
