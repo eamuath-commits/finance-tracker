@@ -59,7 +59,7 @@ const Obligations = () => {
     const [selectedHistory, setSelectedHistory] = useState([]);
     const [viewingHistoryId, setViewingHistoryId] = useState(null);
 
-    const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_day: '', category: '', notes: '' });
+    const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_day: '', category: '', notes: '', provider: '' });
     const [paymentForm, setPaymentForm] = useState({ id: null, amount: '', note: '', billing_month: new Date().toISOString().split('T')[0] });
 
     const currentPaymentObligation = React.useMemo(() =>
@@ -177,7 +177,8 @@ const Obligations = () => {
             // name: obligationForm.name, // Redundant
             // category: obligationForm.category, // Redundant
             due_day: parseInt(obligationForm.due_day || 1),
-            notes: obligationForm.notes
+            notes: obligationForm.notes,
+            provider: obligationForm.provider
         };
 
         try {
@@ -309,11 +310,11 @@ const Obligations = () => {
             setEditingId(obl.id);
             setEditingId(obl.id);
             setObligationForm({
-                name: obl.name, amount: obl.amount || '', due_day: obl.due_day, category: obl.category, notes: obl.notes || ''
+                name: obl.name, amount: obl.amount || '', due_day: obl.due_day, category: obl.category, notes: obl.notes || '', provider: obl.provider || ''
             });
         } else {
             setEditingId(null);
-            setObligationForm({ name: '', amount: '', due_day: '', category: '', notes: '' });
+            setObligationForm({ name: '', amount: '', due_day: '', category: '', notes: '', provider: '' });
         }
         setShowObligationModal(true);
     };
@@ -492,7 +493,10 @@ const Obligations = () => {
             {showObligationModal && (
                 <Modal title={editingId ? "Edit Obligation" : "Add Obligation"} onClose={() => setShowObligationModal(false)}>
                     <form onSubmit={handleSaveObligation} className="space-y-4">
-                        <input type="text" placeholder="Name" required className={inputClass} value={obligationForm.name} onChange={e => setObligationForm({ ...obligationForm, name: e.target.value })} />
+                        <div className="flex gap-4">
+                            <input type="text" placeholder="Provider (e.g. STC)" className={`${inputClass} flex-1`} value={obligationForm.provider || ''} onChange={e => setObligationForm({ ...obligationForm, provider: e.target.value })} />
+                            <input type="text" placeholder="Name (e.g. Internet)" required className={`${inputClass} flex-1`} value={obligationForm.name} onChange={e => setObligationForm({ ...obligationForm, name: e.target.value })} />
+                        </div>
                         <div className="grid grid-cols-2 gap-4">
                             <input type="number" placeholder="Due Day (1-31)" min="1" max="31" required className={inputClass} value={obligationForm.due_day} onChange={e => setObligationForm({ ...obligationForm, due_day: e.target.value })} />
                             <input type="number" placeholder="Amount (Optional)" className={inputClass} value={obligationForm.amount} onChange={e => setObligationForm({ ...obligationForm, amount: e.target.value })} />

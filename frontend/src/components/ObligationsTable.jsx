@@ -66,6 +66,7 @@ const TableRow = ({ obl, getMonthStatus, monthOffset, openPaymentModal, handleQu
                 <div className="flex items-center gap-3">
                     <div className="opacity-70">{CATEGORY_ICONS[obl.category] || <Box size={16} />}</div>
                     <div>
+                        {obl.provider && <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider leading-none mb-0.5">{obl.provider}</div>}
                         <div className="font-semibold text-white text-sm">{obl.name}</div>
                         <div className="text-[10px] text-slate-500">Day {obl.due_day}</div>
                     </div>

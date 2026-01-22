@@ -73,7 +73,9 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
         return null;
     };
 
-    const brand = getBrandInfo(obl.name);
+    // Use Provider if available for better logo matching
+    const logoSource = obl.provider || obl.name;
+    const brand = getBrandInfo(logoSource);
 
     return (
         <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition group relative">
@@ -98,8 +100,12 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
                             {CATEGORY_ICONS[obl.category] || <Box size={24} />}
                         </div>
                     </div>
-                    <h3 className="text-sm font-bold text-white truncate max-w-[150px]">{obl.name}</h3>
-                    <span className="text-[10px] text-gray-500">Day: {obl.due_day}</span>
+
+                    <div className="min-w-0">
+                        {obl.provider && <div className="text-[10px] text-gray-400 font-medium uppercase tracking-wider leading-none mb-0.5">{obl.provider}</div>}
+                        <h3 className="text-sm font-bold text-white truncate max-w-[150px]">{obl.name}</h3>
+                        <span className="text-[10px] text-gray-500">Day: {obl.due_day}</span>
+                    </div>
                 </div>
                 <div className="flex gap-2 opacity-50 group-hover:opacity-100 transition">
                     <button onClick={() => openHistory(obl.id)}><History size={14} className="text-gray-400 hover:text-white" /></button>

@@ -92,6 +92,7 @@ class MonthlyObligation(Base):
     amount = Column(Float, nullable=True) # User requested optional amount
     due_day = Column(Integer, nullable=False) # e.g. 1 for 1st of month
     category = Column(String, nullable=True)
+    provider = Column(String, nullable=True) # New optional field
     notes = Column(Text, nullable=True)
     display_order = Column(Integer, default=0) # For UI ordering
 

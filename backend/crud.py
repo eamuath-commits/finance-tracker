@@ -292,7 +292,9 @@ def create_obligation(db: Session, obligation: schemas.ObligationCreate):
     db_obj = models.MonthlyObligation(
         name=obligation.name,
         due_day=obligation.due_day,
-        category=obligation.category
+        category=obligation.category,
+        provider=obligation.provider,
+        notes=obligation.notes
     )
     db.add(db_obj)
     db.commit()

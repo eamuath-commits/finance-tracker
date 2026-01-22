@@ -126,6 +126,7 @@ class ObligationBase(BaseModel):
     due_day: int
     category: str = "Other"
     notes: Optional[str] = None
+    provider: Optional[str] = None
 
 class ObligationCreate(ObligationBase):
     pass
@@ -135,6 +136,7 @@ class ObligationUpdate(ObligationBase):
     due_day: Optional[int] = None
     category: Optional[str] = None
     notes: Optional[str] = None
+    provider: Optional[str] = None
 
 class Obligation(ObligationBase):
     id: str
