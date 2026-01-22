@@ -118,9 +118,8 @@ const AccountCard = ({ acc, onEdit = null }) => {
                                 if (acc.aliases && acc.aliases.length > 0) {
                                     // Take the first alias as the primary card
                                     const primaryCard = acc.aliases[0];
-                                    // Removed filter to show original branding colors as requested
-                                    // Added white drop-shadow to make black text readable on dark background without a white box
-                                    showLogo = <img src="/mada-logo-v2.png" alt="Mada" className="h-16 w-auto object-contain drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]" />;
+                                    // Text shadow added for contrast
+                                    showLogo = <img src="/mada-logo.png" alt="Mada" className="h-16 w-auto object-contain drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]" />;
                                     cardDigits = primaryCard.last_4_digits;
                                 }
                             }
@@ -228,7 +227,7 @@ const OverviewAccountRow = ({ acc, allTransactions }) => {
                     {acc.account_type === 'Credit Card' ? (
                         <img src="/visa-logo-v2.png" alt="Visa" className="w-12 h-auto object-contain" />
                     ) : (
-                        <img src="/mada-logo-v2.png" alt="Mada" className="w-16 h-auto object-contain drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]" />
+                        <img src="/mada-logo.png" alt="Mada" className="w-16 h-auto object-contain drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]" />
                     )}
                 </div>
             </div>
