@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useSearchParams } from 'react-router-dom';
 import { Modal, formatCurrency, inputClass, selectClass } from '../components/UI';
-import { Calendar, Trash2, LayoutGrid, List, Receipt, Tag, Plus, Edit2, ArrowLeft, Filter, X } from 'lucide-react';
+import { Calendar, Trash2, LayoutGrid, List, Receipt, Tag, Plus, Edit2, ArrowLeft, ArrowRight, Filter, X } from 'lucide-react';
 import ObligationsOverview from '../components/ObligationsOverview';
 import ObligationsList from '../components/ObligationsList';
 import ObligationsTable from '../components/ObligationsTable';
@@ -418,9 +418,9 @@ const Obligations = () => {
                                     </select>
                                 </div>
 
-                                <button onClick={() => setMonthOffset(p => p - 1)} className="p-1 hover:bg-slate-700 rounded text-gray-400"><ArrowLeft size={16} className="transform rotate-0" /> &lt;</button>
+                                <button onClick={() => setMonthOffset(p => p - 1)} className="p-1 hover:bg-slate-700 rounded text-gray-400"><ArrowLeft size={16} /></button>
                                 <span className="text-sm font-bold text-white min-w-[100px] text-center">{currentDateView}</span>
-                                <button onClick={() => setMonthOffset(p => p + 1)} className="p-1 hover:bg-slate-700 rounded text-gray-400">&gt;</button>
+                                <button onClick={() => setMonthOffset(p => p + 1)} className="p-1 hover:bg-slate-700 rounded text-gray-400"><ArrowRight size={16} /></button>
                                 <button onClick={() => setMonthOffset(0)} className="ml-2 text-xs bg-blue-900/40 text-blue-400 px-2 py-1 rounded">Today</button>
                             </div>
                         )}
