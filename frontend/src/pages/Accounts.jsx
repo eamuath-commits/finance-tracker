@@ -109,7 +109,7 @@ const AccountCard = ({ acc, onEdit = null }) => {
                             if (isCreditCard) {
                                 // Credit Card Logic
                                 if (acc.last_4_digits) {
-                                    showLogo = <img src="/visa-logo-v2.png" alt="Visa" className="h-12 w-auto object-contain drop-shadow-md" />;
+                                    showLogo = <img src="/visa-logo-v2.png" alt="Visa" className="h-9 w-auto object-contain drop-shadow-md" />;
                                     cardDigits = acc.last_4_digits;
                                 }
                             } else {
@@ -225,7 +225,7 @@ const OverviewAccountRow = ({ acc, allTransactions }) => {
                 {/* Logo Image */}
                 <div className="flex flex-col items-end">
                     {acc.account_type === 'Credit Card' ? (
-                        <img src="/visa-logo-v2.png" alt="Visa" className="w-12 h-auto object-contain" />
+                        <img src="/visa-logo-v2.png" alt="Visa" className="w-9 h-auto object-contain" />
                     ) : (
                         <img src="/mada-logo.png" alt="Mada" className="w-16 h-auto object-contain drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]" />
                     )}
