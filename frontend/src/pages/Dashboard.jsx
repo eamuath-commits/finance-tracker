@@ -2,6 +2,10 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import Analytics from '../Analytics';
 import { Card, SectionHeader, Modal, formatCurrency, inputClass } from '../components/UI';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove, SortableContext, verticalListSortingStrategy, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { GripVertical } from 'lucide-react';
 
 const AllocationCard = ({ analysis }) => {
     if (!analysis) return null;
@@ -11,7 +15,7 @@ const AllocationCard = ({ analysis }) => {
     const textClass = isDanger ? "text-red-400" : "text-green-400";
 
     return (
-        <div className={`p-6 rounded-xl border ${colorClass} mb-8 backdrop-blur-sm`}>
+        <div className={`p-6 rounded-xl border ${colorClass} backdrop-blur-sm h-full`}>
             <h2 className={`text-xl font-bold ${textClass} mb-2`}>Smart Analysis</h2>
             <p className="text-gray-300 font-medium text-lg">{analysis.message}</p>
 
@@ -46,6 +50,59 @@ const AllocationCard = ({ analysis }) => {
     );
 };
 
+const RecentTransactionsWidget = ({ transactions, openTransactionModal }) => (
+    <div className="bg-slate-800 rounded-xl shadow-lg border border-slate-700 overflow-hidden h-full">
+        <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/50">
+            <h3 className="font-bold text-white">Recent Transactions</h3>
+            {transactions.length > 5 && (
+                <button onClick={() => window.location.href = '/transactions'} className="text-xs text-blue-400 hover:text-blue-300">View All</button>
+            )}
+        </div>
+        <table className="min-w-full divide-y divide-slate-700">
+            <tbody className="divide-y divide-slate-700">
+                {transactions.slice(0, 5).map(tx => (
+                    <tr key={tx.id} className="hover:bg-slate-700/30 transition-colors">
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-white">
+                            <div className="flex flex-col">
+                                <span className="font-medium">{tx.merchant}</span>
+                                {tx.category && <span className="text-xs text-gray-500">{tx.category}</span>}
+                            </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium text-red-400">
+                            {formatCurrency(tx.amount)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
+                            <button onClick={() => openTransactionModal(tx)} className="text-gray-500 hover:text-white">✏️</button>
+                        </td>
+                    </tr>
+                ))}
+                {transactions.length === 0 && (
+                    <tr><td colSpan="3" className="px-6 py-8 text-center text-gray-500 italic">No transactions yet.</td></tr>
+                )}
+            </tbody>
+        </table>
+    </div>
+);
+
+const SortableWidget = ({ id, children }) => {
+    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} className="relative group mb-8">
+            {/* Drag Handle - Visible on Hover/Touch */}
+            <div {...attributes} {...listeners} className="absolute top-2 right-2 z-20 p-1.5 cursor-grab bg-slate-900/80 rounded-md text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity hover:text-white touch-none">
+                <GripVertical size={16} />
+            </div>
+            {children}
+        </div>
+    );
+};
+
 const Dashboard = () => {
     const [obligations, setObligations] = useState([]);
     const [transactions, setTransactions] = useState([]);
@@ -56,6 +113,30 @@ const Dashboard = () => {
     const [showTransactionModal, setShowTransactionModal] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [transactionForm, setTransactionForm] = useState({ category: '' });
+
+    // Dashboard State
+    const [widgetOrder, setWidgetOrder] = useState(() => {
+        const saved = localStorage.getItem('dashboard_layout');
+        return saved ? JSON.parse(saved) : ['allocation', 'analytics', 'transactions'];
+    });
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    );
+
+    const handleDragEnd = (event) => {
+        const { active, over } = event;
+        if (active.id !== over.id) {
+            setWidgetOrder((items) => {
+                const oldIndex = items.indexOf(active.id);
+                const newIndex = items.indexOf(over.id);
+                const newOrder = arrayMove(items, oldIndex, newIndex);
+                localStorage.setItem('dashboard_layout', JSON.stringify(newOrder));
+                return newOrder;
+            });
+        }
+    };
 
     // Allow overriding API URL via environment variable for remote development
     const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
@@ -106,44 +187,34 @@ const Dashboard = () => {
                 <p className="text-gray-400">Welcome back, Muath</p>
             </header>
 
-            <AllocationCard analysis={analysis} />
-
-            <Analytics transactions={transactions} obligations={obligations} />
-
-            <SectionHeader title="Recent Transactions" />
-            <div className="bg-slate-800 rounded-xl shadow-lg border border-slate-700 overflow-hidden mb-8">
-                <table className="min-w-full divide-y divide-slate-700">
-                    <thead className="bg-slate-900">
-                        <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Merchant</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Amount</th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Edit</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-slate-800 divide-y divide-slate-700">
-                        {transactions.slice(0, 5).map(tx => (
-                            <tr key={tx.id}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                                    {tx.merchant}
-                                    {tx.category && <span className="ml-2 px-2 py-0.5 rounded text-xs bg-slate-700 text-blue-300 border border-slate-600">{tx.category}</span>}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{new Date(tx.timestamp).toLocaleDateString()}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-red-400">- {formatCurrency(tx.amount)}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <button onClick={() => openTransactionModal(tx)} className="text-blue-400 hover:text-blue-300">Edit</button>
-                                </td>
-                            </tr>
-                        ))}
-                        {transactions.length === 0 && (
-                            <tr><td colSpan="4" className="px-6 py-4 text-center text-gray-500">No transactions recorded yet.</td></tr>
-                        )}
-                        {transactions.length > 5 && (
-                            <tr><td colSpan="4" className="px-6 py-2 text-center text-xs text-gray-500 hover:text-white cursor-pointer" onClick={() => window.location.href = '/transactions'}>View All Transactions</td></tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={widgetOrder} strategy={verticalListSortingStrategy}>
+                    {widgetOrder.map(id => {
+                        if (id === 'allocation') {
+                            return (
+                                <SortableWidget key={id} id={id}>
+                                    <AllocationCard analysis={analysis} />
+                                </SortableWidget>
+                            );
+                        }
+                        if (id === 'analytics') {
+                            return (
+                                <SortableWidget key={id} id={id}>
+                                    <Analytics transactions={transactions} obligations={obligations} />
+                                </SortableWidget>
+                            );
+                        }
+                        if (id === 'transactions') {
+                            return (
+                                <SortableWidget key={id} id={id}>
+                                    <RecentTransactionsWidget transactions={transactions} openTransactionModal={openTransactionModal} />
+                                </SortableWidget>
+                            );
+                        }
+                        return null;
+                    })}
+                </SortableContext>
+            </DndContext>
 
             {showTransactionModal && (
                 <Modal title="Edit Transaction" onClose={() => setShowTransactionModal(false)}>
