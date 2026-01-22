@@ -19,9 +19,106 @@ const Obligations = () => {
 
     // --- Obligations Data State ---
     const [obligations, setObligations] = useState([]);
-    // ... (rest of state)
+    const [payments, setPayments] = useState({});
 
-    // ... (fetchData and other hooks)
+    // --- Categories Data State ---
+    const [categoriesList, setCategoriesList] = useState([]);
+    const [newCategoryName, setNewCategoryName] = useState('');
+    const [editingCategory, setEditingCategory] = useState(null);
+
+    // --- View Mode State (for Obligations Tab) ---
+    const [viewMode, setViewModeState] = useState(localStorage.getItem('obligationsViewMode') || 'overview');
+    const setViewMode = (mode) => {
+        setViewModeState(mode);
+        localStorage.setItem('obligationsViewMode', mode);
+    };
+
+    // --- Month Navigation State ---
+    const [monthOffset, setMonthOffset] = useState(() => {
+        const saved = localStorage.getItem('obligationsMonthOffset');
+        return saved ? parseInt(saved, 10) : 0;
+    });
+
+    useEffect(() => {
+        localStorage.setItem('obligationsMonthOffset', monthOffset);
+    }, [monthOffset]);
+
+    // Calculate current view Date Label
+    const currentDateView = (() => {
+        const now = new Date();
+        const target = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
+        return target.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    })();
+
+    // --- Modals State ---
+    const [showObligationModal, setShowObligationModal] = useState(false);
+    const [showHistoryModal, setShowHistoryModal] = useState(false);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+
+    const [editingId, setEditingId] = useState(null);
+    const [selectedHistory, setSelectedHistory] = useState([]);
+    const [viewingHistoryId, setViewingHistoryId] = useState(null);
+
+    const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_day: '', category: '', notes: '' });
+    const [paymentForm, setPaymentForm] = useState({ id: null, amount: '', note: '', billing_month: new Date().toISOString().split('T')[0] });
+
+    const currentPaymentObligation = React.useMemo(() =>
+        obligations.find(o => o.id === paymentForm.id),
+        [obligations, paymentForm.id]
+    );
+
+    const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
+
+    // --- Data Fetching ---
+    const fetchData = async () => {
+        console.log("🚀 Starting fetchData...");
+        setLoading(true);
+        try {
+            const [oblRes, catRes] = await Promise.all([
+                axios.get(`${API_URL}/obligations/`),
+                axios.get(`${API_URL}/categories`)
+            ]);
+
+            setObligations(oblRes.data);
+
+            // Auto-Migration: If no categories in DB, populate from existing obligations
+            let finalCategories = catRes.data;
+            if (finalCategories.length === 0 && oblRes.data.length > 0) {
+                const uniqueFromObs = [...new Set(oblRes.data.map(o => o.category).filter(c => c))];
+                if (uniqueFromObs.length > 0) {
+                    console.log("Migrating categories...");
+                    for (const cName of uniqueFromObs) {
+                        try {
+                            await axios.post(`${API_URL}/categories`, { name: cName });
+                        } catch (e) { }
+                    }
+                    const updatedCats = await axios.get(`${API_URL}/categories`);
+                    finalCategories = updatedCats.data;
+                }
+            }
+            setCategoriesList(finalCategories);
+
+            const paymentsData = {};
+            console.log("⏳ Fetching payments...");
+            await Promise.all(oblRes.data.map(async (obl) => {
+                try {
+                    const hRes = await axios.get(`${API_URL}/obligations/${obl.id}/payments`);
+                    paymentsData[obl.id] = hRes.data;
+                } catch (hErr) {
+                    paymentsData[obl.id] = [];
+                }
+            }));
+            setPayments(paymentsData);
+        } catch (error) {
+            console.error("❌ CRITICAL ERROR fetching data:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+    }, []);
 
     // Filter Obligations based on URL params
     const filteredObligations = React.useMemo(() => {
@@ -29,7 +126,204 @@ const Obligations = () => {
         return obligations.filter(o => o.category === categoryFilter);
     }, [obligations, categoryFilter]);
 
-    // ... (handlers)
+    // --- Helper Functions ---
+    const getMonthStatus = (obl, offset) => {
+        const now = new Date();
+        let baseYear = now.getFullYear();
+        let baseMonth = now.getMonth();
+
+        const targetDate = new Date(baseYear, baseMonth + offset, 1);
+        const targetMonth = targetDate.getMonth();
+        const targetYear = targetDate.getFullYear();
+        const billingDateStr = `${targetYear}-${(targetMonth + 1).toString().padStart(2, '0')}-01`;
+
+        const oblPayments = payments[obl.id] || [];
+        const isMatch = (p, m, y) => {
+            if (p.billing_month) {
+                const [py, pm] = p.billing_month.split('-').map(Number);
+                return (pm - 1) === m && py === y;
+            }
+            let d = new Date(p.payment_date);
+            return d.getMonth() === m && d.getFullYear() === y;
+        };
+
+        const payment = oblPayments.find(p => isMatch(p, targetMonth, targetYear));
+        let displayAmount = null;
+
+        if (payment) {
+            displayAmount = payment.amount;
+        }
+
+        return {
+            label: targetDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+            shortLabel: targetDate.toLocaleDateString('en-US', { month: 'short' }),
+            billingDateStr,
+            isPaid: payment && payment.status === 'PAID',
+            amount: displayAmount,
+            paymentId: payment ? payment.id : null,
+            status: payment ? payment.status : null
+        };
+    };
+
+    // --- CRUD Handlers (Obligations) ---
+    const handleSaveObligation = async (e) => {
+        e.preventDefault();
+        const payload = {
+            name: obligationForm.name,
+            category: obligationForm.category,
+            // name: obligationForm.name, // Redundant
+            // category: obligationForm.category, // Redundant
+            due_day: parseInt(obligationForm.due_day || 1),
+            notes: obligationForm.notes
+        };
+
+        try {
+            if (editingId) {
+                await axios.put(`${API_URL}/obligations/${editingId}`, payload);
+            } else {
+                await axios.post(`${API_URL}/obligations/`, payload);
+            }
+            setShowObligationModal(false);
+            setEditingId(null);
+            setObligationForm({ name: '', due_day: '', category: '', notes: '' });
+            fetchData();
+        } catch (err) { alert('Error saving obligation'); }
+    };
+
+    const handleDeleteObligation = async () => {
+        if (!editingId) return;
+        if (!confirm("Are you sure?")) return;
+        try {
+            await axios.delete(`${API_URL}/obligations/${editingId}`);
+            setShowObligationModal(false);
+            setEditingId(null);
+            fetchData();
+        } catch (err) { alert('Error deleting'); }
+    };
+
+    const handleReorder = async (newOrderedObligations) => {
+        setObligations(newOrderedObligations);
+        try {
+            const ids = newOrderedObligations.map(o => o.id);
+            await axios.put(`${API_URL}/obligations/reorder`, { ordered_ids: ids });
+        } catch (err) { console.error("Reorder failed", err); }
+    };
+
+    // --- CRUD Handlers (Categories) ---
+    const handleAddCategory = async (e) => {
+        e.preventDefault();
+        if (!newCategoryName.trim()) return;
+        try {
+            await axios.post(`${API_URL}/categories`, { name: newCategoryName });
+            setNewCategoryName('');
+            fetchData();
+        } catch (error) { alert("Failed to add category"); }
+    };
+
+    const handleUpdateCategory = async (id, newName) => {
+        if (!newName.trim()) return;
+        try {
+            await axios.put(`${API_URL}/categories/${id}`, { name: newName });
+            setEditingCategory(null);
+            fetchData();
+        } catch (error) { alert("Failed to update category"); }
+    };
+
+    const handleDeleteCategory = async (id) => {
+        if (!confirm("Delete this category? Associated obligations will become Uncategorized.")) return;
+        try {
+            await axios.delete(`${API_URL}/categories/${id}`);
+            fetchData();
+        } catch (error) { alert("Failed to delete category"); }
+    };
+
+    // --- Payment Handlers ---
+    const openPaymentModal = (obl, targetMonthStr = null, defaultAmount = null, historyEntry = null) => {
+        if (historyEntry) {
+            setPaymentForm({
+                id: obl.id, historyId: historyEntry.id, name: obl.name,
+                amount: historyEntry.amount, note: historyEntry.note || "",
+                billing_month: historyEntry.billing_month || targetMonthStr, status: historyEntry.status || "PAID"
+            });
+        } else if (obl) {
+            setPaymentForm({
+                id: obl.id, historyId: null, name: obl.name,
+                amount: defaultAmount !== null ? defaultAmount : (obl.amount || ''),
+                note: "Manual Payment", billing_month: targetMonthStr || new Date().toISOString().split('T')[0], status: "PAID"
+            });
+        } else {
+            setPaymentForm({ id: null, historyId: null, name: '', amount: '', note: "Manual Payment", billing_month: targetMonthStr || new Date().toISOString().split('T')[0], status: "PAID" });
+        }
+        setShowPaymentModal(true);
+    };
+
+    const handleProcessPayment = async (data) => {
+        try {
+            const payload = {
+                payment_date: new Date().toISOString(), amount: parseFloat(data.amount || 0),
+                billing_month: data.billing_month, note: data.note, status: data.status
+            };
+            if (data.id && data.historyId) {
+                await axios.put(`${API_URL}/obligations/history/${data.historyId}`, payload);
+            } else {
+                await axios.post(`${API_URL}/obligations/${paymentForm.id}/pay`, payload);
+            }
+            setShowPaymentModal(false);
+            if (viewingHistoryId) {
+                const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/payments`);
+                setSelectedHistory(hRes.data);
+            }
+            fetchData();
+        } catch (err) { alert("Error processing payment"); }
+    };
+
+    const handleQuickPay = async (oblId, amount, billingMonth, status = "PAID") => {
+        try {
+            const payload = {
+                payment_date: new Date().toISOString(), amount: parseFloat(amount),
+                billing_month: billingMonth, note: status === "BUDGET" ? "Budgeted Amount" : "Quick Pay", status: status
+            };
+            await axios.post(`${API_URL}/obligations/${oblId}/pay`, payload);
+            fetchData();
+        } catch (err) { alert("Error processing quick payment"); }
+    };
+
+    const handleDeleteHistory = async (historyId) => {
+        if (!confirm("Delete this payment record?")) return;
+        try {
+            await axios.delete(`${API_URL}/obligations/history/${historyId}`);
+            if (viewingHistoryId) {
+                const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/payments`);
+                setSelectedHistory(hRes.data);
+            }
+            fetchData();
+        } catch (err) { alert("Error deleting payment"); }
+    };
+
+    // --- View Helpers ---
+    const openObligationModal = (obl = null) => {
+        if (obl) {
+            setEditingId(obl.id);
+            setEditingId(obl.id);
+            setObligationForm({
+                name: obl.name, amount: obl.amount || '', due_day: obl.due_day, category: obl.category, notes: obl.notes || ''
+            });
+        } else {
+            setEditingId(null);
+            setObligationForm({ name: '', amount: '', due_day: '', category: '', notes: '' });
+        }
+        setShowObligationModal(true);
+    };
+
+    const openHistory = (oblId) => {
+        setViewingHistoryId(oblId);
+        setSelectedHistory(payments[oblId] || []);
+        setShowHistoryModal(true);
+    };
+
+    const currentHistoryObligation = obligations.find(o => o.id === viewingHistoryId) || {};
+
+    if (loading) return <div className="p-10 text-white">Loading...</div>;
 
     return (
         <div>
