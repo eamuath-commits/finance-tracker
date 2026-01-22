@@ -88,7 +88,7 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
                     <div className="flex-shrink-0">
                         {brand ? (
                             <img
-                                src={`https://logo.clearbit.com/${brand.domain}`}
+                                src={`https://www.google.com/s2/favicons?domain=${brand.domain}&sz=64`}
                                 alt={obl.name}
                                 className="w-6 h-6 rounded-full object-cover border border-white/10 shadow-sm"
                                 onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }}
