@@ -526,10 +526,23 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
              logger.warning(f"Could not parse AI date: {result.get('date')}, error: {e}")
              ai_date_success = False
 
-    # 2. Regex Fallback (Run if AI failed OR was rejected)
-    if not ai_date_success:
+             else:
+                 tx_timestamp = parsed_ai
+                 ai_date_success = True
+                 
+        except Exception as e:
+             logger.warning(f"Could not parse AI date: {result.get('date')}, error: {e}")
+             ai_date_success = False
+
+    # 2. Regex Parsing (Always Run for Robustness)
+    # Even if AI succeeded, we check if Regex finds a better match (e.g. Current Year)
+    # This fixes cases like "26/1/22" where AI sees 22 as Year 2022, but Regex knows 26 is Year 2026.
+    regex_date_success = False
+    best_candidate = None
+    
+    if True: # Always run regex
         import re
-        logger.info("Attempting Regex Date Parsing fallback...")
+        # logger.info("Running Regex Date Parsing...")
         
         # Current Year Info
         now = datetime.now()
@@ -611,7 +624,9 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
     
     # SANITY CHECK (Again, final)
     # If the parsed date is more than 24 hours in the future, assume parsing error and use NOW.
-    from datetime import timedelta
+    # SANITY CHECK (Again, final)
+    # If the parsed date is more than 24 hours in the future, assume parsing error and use NOW.
+    # from datetime import timedelta (Removed - Global)
     if tx_timestamp > datetime.now() + timedelta(days=1):
          logger.warning(f"⚠️ Future date detected (Parsed: {tx_timestamp}, Now: {datetime.now()}). Reverting to NOW.")
          tx_timestamp = datetime.now()
