@@ -90,6 +90,10 @@ async def parse_with_ai(db: Session, text: str):
     - If the SMS has NO date, return "{today_date}".
     
     SMS: "{text}"
+    
+    **Input Format Note:**
+    - Input might start with "Sender: [BankName]". Use this to identify the Source Bank.
+    - Example: "Sender: AlRajhiBank" -> Source is likely AlRajhi.
 
     **Extraction Rules:**
     1. **Identify Type**: Is this a Purchase, Transfer (In/Out), Bill Payment, Cash Withdrawal, Deposit, or Decline/Failed transaction?
