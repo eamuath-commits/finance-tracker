@@ -301,6 +301,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if len(clean_source) >= 4:
                 source_last4 = clean_source[-4:]
                 source_account = crud.get_account_by_last_4(db, source_last4)
+                logger.info(f"DEBUG: Source Logic -> Extracted: {source_last4}, Account: {source_account.name if source_account else 'None'}")
 
         # Smart Handling for Incoming Credits
         # Heuristic: If message says "Credit Transfer" or "Deposit", likely a CREDIT.
@@ -324,6 +325,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                      logger.info(f"Incoming Credit detected to own account {dest_acc_obj.name}. Swapping primary account.")
                      source_account = dest_acc_obj
                      result['transaction_type'] = 'credit' # Force logic to treat as credit
+                     logger.info(f"DEBUG: Swap Logic Triggered. Source is now: {source_account.name} (from Dest {dest_last4})")
         
         if not source_account:
             # INTERACTIVE FALLBACK (Now creates a PENDING_ACTION transaction)
