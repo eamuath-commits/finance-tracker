@@ -526,13 +526,7 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
              logger.warning(f"Could not parse AI date: {result.get('date')}, error: {e}")
              ai_date_success = False
 
-             else:
-                 tx_timestamp = parsed_ai
-                 ai_date_success = True
-                 
-        except Exception as e:
-             logger.warning(f"Could not parse AI date: {result.get('date')}, error: {e}")
-             ai_date_success = False
+
 
     # 2. Regex Parsing (Always Run for Robustness)
     # Even if AI succeeded, we check if Regex finds a better match (e.g. Current Year)
