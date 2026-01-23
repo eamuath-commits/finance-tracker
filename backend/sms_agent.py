@@ -95,8 +95,10 @@ async def parse_with_ai(db: Session, text: str):
     1. **Identify Type**: Is this a Purchase, Transfer (In/Out), Bill Payment, Cash Withdrawal, Deposit, or Decline/Failed transaction?
     2. **Merchant/Counterparty**: 
        - For Purchases: Store Name (e.g. "Starbucks", "Uber").
-       - For Transfers: Recipient Name or Account (e.g. "Ahmed", "Account 7772"). 
-       - If message says "To: 1234", "1234" is the Recipient.
+       - For Transfers: **PRIORITIZE HUMAN NAMES**. 
+            - If msg says "To: MUATH" and "Account: 7772", Set merchant="MUATH". Put "7772" in `destination_account_last4`.
+            - If msg says "From: AHMED" and "Account: 8888", Set merchant="AHMED". Put "8888" in `source_account_last4`.
+       - ONLY use Account Number for `merchant` if NO name is present.
        - For Government/Bills: Entity Name (e.g. "STC", "MOI").
     3. **Internal Transfers**: If it says "Internal Transfer" or transfer between your own accounts, set merchant to "Self" or "Internal".
     4. **Declines**: If the message says "Declined", "Failed", or "Insufficient Funds", set `status` to "failed".
