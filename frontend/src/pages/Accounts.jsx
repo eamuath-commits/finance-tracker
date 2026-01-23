@@ -393,6 +393,11 @@ const Accounts = () => {
             // Combine
             const finalOrder = [...validSaved, ...newAccounts.map(a => a.id)];
 
+            // Auto-save the determined order to lock it in (prevents jumping on edit)
+            if (JSON.stringify(finalOrder) !== JSON.stringify(savedLayout)) {
+                localStorage.setItem('accounts_layout', JSON.stringify(finalOrder));
+            }
+
             // Only update if different to avoid infinite loop (though array ref changes, checking length/content helps)
             setAccountOrder(finalOrder);
         }
