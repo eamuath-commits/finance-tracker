@@ -62,6 +62,7 @@ class Transaction(Base):
     balance_after_transaction = Column(Float, nullable=True)
     status = Column(String, default="completed", nullable=False)
     logo_url = Column(String, nullable=True)
+    fees = Column(Float, default=0.0)
     
     account = relationship("Account", back_populates="transactions")
     payments = relationship("Payment", back_populates="transaction")

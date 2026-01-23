@@ -62,6 +62,7 @@ class TransactionBase(BaseModel):
     status: Optional[str] = "completed"
     logo_url: Optional[str] = None
     notes: Optional[str] = None
+    fees: Optional[float] = 0.0
 
 class TransactionCreate(TransactionBase):
     account_id: Optional[str] = None
@@ -76,6 +77,7 @@ class TransactionUpdate(BaseModel):
     timestamp: Optional[datetime] = None
     logo_url: Optional[str] = None
     notes: Optional[str] = None
+    fees: Optional[float] = None
 
 
 class Transaction(TransactionBase):

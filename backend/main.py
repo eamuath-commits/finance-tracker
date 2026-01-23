@@ -30,6 +30,12 @@ def run_migrations(engine):
                 conn.execute(text("ALTER TABLE transactions ADD COLUMN notes TEXT"))
                 conn.commit()
 
+        if 'fees' not in columns:
+            print("Migrating: Adding fees to transactions")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE transactions ADD COLUMN fees FLOAT DEFAULT 0.0"))
+                conn.commit()
+
         # Check for table rename (obligation_history -> payments)
         table_names = inspector.get_table_names()
         if 'obligation_history' in table_names and 'payments' not in table_names:

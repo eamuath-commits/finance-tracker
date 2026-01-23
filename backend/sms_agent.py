@@ -120,6 +120,8 @@ async def parse_with_ai(db: Session, text: str):
              - "JARIR B" -> "Jarir Bookstore"
              - "DUNKIN D" -> "Dunkin Donuts"
         - Remove "Riyadh", "Branch", numbers, etc.
+    8. **Fees/Tax**: Extract any explicit fee amount mentioned (e.g. "Fees: SAR 0.29").
+        - If text says "Tax", "VAT", "Fee", capture the amount.
 
     **Output JSON Schema:**
     {{
@@ -131,6 +133,7 @@ async def parse_with_ai(db: Session, text: str):
       "brand_name": string (The CLEAN brand name for logo fetching, e.g. "Uber", "Netflix"),
       "amount": number,
       "currency": string,
+      "fees": number (Optional, default 0.0),
       "date": "YYYY-MM-DD",
       "time": "HH:MM", (24-hour format)
       "category": string (Best guess: Food, Transport, Bills, Transfer, Income, etc.),
@@ -537,6 +540,7 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
     transaction = schemas.TransactionCreate(
         account_id=acc_id,
         amount=result['amount'], 
+        fees=result.get('fees', 0.0), # Add fees
         merchant=merchant_raw,
         category=category,
         type=tx_type_value,

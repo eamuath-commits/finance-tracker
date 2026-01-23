@@ -125,7 +125,8 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate):
         category=transaction.category,
         type=transaction.type,
         balance_after_transaction=new_balance if account and transaction.status == "completed" else None,
-        status=transaction.status
+        status=transaction.status,
+        fees=transaction.fees
     )
     db.add(db_transaction)
 
