@@ -82,10 +82,12 @@ async def parse_with_ai(db: Session, text: str):
 
     **Date Parsing Rules (CRITICAL):**
     - Output standard ISO format: YYYY-MM-DD.
-    - Handle ambiguous formats like XX/XX/XX carefully.
+    - Today's Date is: {today_date}.
+    - Handle ambiguous formats like XX/XX/XX carefully. Saudi SMS usually use DD/MM/YYYY.
     - If a number matches Current Year Short ({year_short}), treat it as the YEAR.
-      - Example: "{year_short}/1/20" -> {current_year}-01-20.
-      - Example: "1/20/{year_short}" -> {current_year}-01-20.
+      - Example: "22/01/{year_short}" -> {current_year}-01-22.
+    - WARNING: Do NOT confuse the Year Short ({year_short}) with the Day (26). 
+    - If the SMS has NO date, return "{today_date}".
     
     SMS: "{text}"
 
@@ -455,6 +457,16 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
              tx_timestamp = datetime.now()
     else:
         logger.info(f"No date returned by AI. Using now(). AI Output: {json.dumps(result)}")
+
+    # SANITY CHECK: Future Date Protection
+    # If the parsed date is more than 24 hours in the future, assume parsing error and use NOW.
+    # (Allowing 1 day buffer for timezone differences, but 3 days like 26th vs 23rd is definitely wrong)
+    from datetime import timedelta
+    if tx_timestamp > datetime.now() + timedelta(days=1):
+         logger.warning(f"⚠️ Future date detected (Parsed: {tx_timestamp}, Now: {datetime.now()}). Reverting to NOW.")
+         # Keep the time if it seems reasonable? No, if date is wrong, time is likely wrong/irrelevant.
+         # But maybe we keep the time if only year was wrong? Hard to say. Safest is NOW.
+         tx_timestamp = datetime.now()
 
     # Resolve Destination Account Early to determine Status
     dest_last4 = result.get('destination_account_last4')
