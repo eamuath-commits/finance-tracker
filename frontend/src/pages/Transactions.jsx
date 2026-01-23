@@ -143,7 +143,7 @@ const Transactions = () => {
             account_id: tx.account_id,
             type: tx.type || 'debit',
             notes: tx.notes || '',
-            timestamp: tx.timestamp ? tx.timestamp.split('T')[0] : new Date().toISOString().split('T')[0]
+            timestamp: tx.timestamp ? tx.timestamp.slice(0, 16) : new Date().toISOString().slice(0, 16)
         });
         setShowEditModal(true);
     };
@@ -719,9 +719,9 @@ const Transactions = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-xs text-gray-400 uppercase font-bold">Date</label>
+                                    <label className="text-xs text-gray-400 uppercase font-bold">Date & Time</label>
                                     <input
-                                        type="date"
+                                        type="datetime-local"
                                         className={`${inputClass} mt-1`}
                                         value={form.timestamp}
                                         onChange={e => setForm({ ...form, timestamp: e.target.value })}
