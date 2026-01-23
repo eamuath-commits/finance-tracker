@@ -70,73 +70,86 @@ async def parse_with_ai(db: Session, text: str):
         for ex in examples:
             examples_text += f"- Input: \"{ex.raw_text}\"\n  Output: {ex.parsed_json}\n\n"
 
+    # Fetch User Accounts (Context Injection)
+    # We strip sensitive info, keeping Name, Bank, and Last 4 digits for matching.
+    user_accounts = db.query(models.Account).all()
+    accounts_context = []
+    for acc in user_accounts:
+        accounts_context.append({
+            "name": acc.name,
+            "bank_name": acc.bank_name,
+            "last_4_digits": acc.last_4_digits,
+            "id": acc.id # ID is internal, AI doesn't need it but good for debugging if we logged it. actually AI doesn't need UUID.
+        })
+    
+    accounts_json_str = json.dumps(accounts_context, indent=2)
+
     prompt = f"""
-    You are a generic financial expert. Your job is to extract FULL details from banking SMS messages.
+    You are a highly intelligent financial AI assistant. Your task is to extract structured banking transaction data from SMS messages.
     
-    Context:
-    - Current Date: {today_date}
-    - Current Year: {current_year} (Short: {year_short})
-    - Location: Saudi Arabia (KSA). Most merchants are Saudi businesses. Allows for better guessing of truncated names.
+    **CRITICAL CONTEXT: USER'S EXISTING ACCOUNTS**
+    You must use this list to determine if a mentioned account is INTERNAL (User's own) or EXTERNAL.
+    {accounts_json_str}
 
-    {examples_text}
+    **Input SMS**: "{text}"
+    **Current Context**: Date={today_date}, Year={current_year}, Location=Saudi Arabia.
+    **Input Format**: Message might start with "Sender: [BankName]". Use this to strictly identify the SOURCE BANK.
 
-    **Date Parsing Rules (CRITICAL):**
-    - Output standard ISO format: YYYY-MM-DD.
-    - Today's Date is: {today_date}.
-    - Handle ambiguous formats like XX/XX/XX carefully. Saudi SMS usually use DD/MM/YYYY.
-    - If a number matches Current Year Short ({year_short}), treat it as the YEAR.
-      - Example: "22/01/{year_short}" -> {current_year}-01-22.
-    - WARNING: Do NOT confuse the Year Short ({year_short}) with the Day (26). 
-    - If the SMS has NO date, return "{today_date}".
+    **EXTRACTION RULES (Strict Logic)**:
+    1.  **Identify Transaction Type**:
+        -   **Transfer**: Movement of funds between accounts. Includes "Credit Transfer" (Incoming) and "Outgoing Transfer" (Outgoing).
+        -   **Purchase**: POS, Online Purchase (Card Usage).
+        -   **Bill Payment**: SADAD, Utility bills.
+        -   **Withdrawal**: Cash from ATM.
+        -   **Deposit**: Cash/Check deposit.
+        -   **Decline**: Failed transaction.
     
-    SMS: "{text}"
-    
-    **Input Format Note:**
-    - Input might start with "Sender: [BankName]". Use this to identify the Source Bank.
-    - Example: "Sender: AlRajhiBank" -> Source is likely AlRajhi.
+    2.  **Strict Field Extraction**:
+        -   **Source Bank**: The bank sending the money. Usually identified by "Sender: [Name]" or matching known account bank names.
+        -   **Destination Bank**: The bank receiving the money.
+        -   **Source Account**: The account money is LEAVING. 
+            -   Matches `last_4_digits` in User Accounts List? -> **Type: INTERNAL**.
+            -   Extracted digits (e.g. 8001)? 
+        -   **Destination Account**: The account money is ENTERING.
+            -   Matches `last_4_digits` in User Accounts List? -> **Type: INTERNAL**.
+            -   Extracted Digits/IBAN (e.g. 7772)?
+        -   **Beneficiary**: The NAME of the person/entity receiving money (External).
+        -   **Merchant**: The store/service name (for Purchases).
+        -   **Sender Name**: The NAME of the person sending money (for Incoming Transfers).
 
-    **Extraction Rules:**
-    1. **Identify Type**: Is this a Purchase, Transfer (In/Out), Bill Payment, Cash Withdrawal, Deposit, or Decline/Failed transaction?
-       - "Outgoing Funds Transfer" -> **debit** (Money leaving).
-       - "Credit Transfer" -> **credit** (Money arriving).
-       - "Purchase" -> **debit**.
-       - "Deposit" -> **credit**.
-    2. **Metadata Extraction (CRITICAL)**:
-       - **Source**: Where did the money come FROM?
-         - "Debited from Account: 8001" -> Source Last4 = 8001.
-         - "From: MUATH" -> Merchant/Counterparty = "MUATH".
-       - **Destination**: Where did the money go TO?
-         - "To: MUATH ALAS..." -> Destination Name = "MUATH ALAS...".
-         - "IBAN/Alias: 7772" -> Destination Last4 = 7772.
-         - "To Account: 1234" -> Destination Last4 = 1234.
-    3. **Merchant/Counterparty Logic**:
-       - For **Debit/Purchase**: Merchant = Store Name (e.g. "Starbucks").
-       - For **Debit Transfer**: Merchant = **Destination Name** (e.g. "MUATH ALAS").
-            - If no Dest Name, use Dest Account (e.g. "Account 7772").
-       - For **Credit Transfer**: Merchant = **Source Name** (e.g. "AHMED").
-            - If no Source Name, use Source Account.
-    4. **Amount**: Extract numerical amount and currency.
-    5. **Brand Name**: Clean up the Merchant Name for logo search (e.g. "Starbucks", "Uber").
+    3.  **Logical Rules**:
+        -   **Internal Detection**: If an extracted account number (Source/Dest) matches the "User's Existing Accounts" list, mark it as INTERNAL.
+        -   **Direction**: 
+            -   "Outgoing" / "Debit" -> Money LEAVES Source Account. (Transaction Type: DEBIT).
+            -   "Credit" / "Deposit" -> Money ENTERS Destination Account. (Transaction Type: CREDIT).
+        -   **Merchant/Counterparty Logic for UI**:
+            -   If Purchase: Merchant = Store Name.
+            -   If Transfer TO Output (Debit): Merchant = Beneficiary Name OR Destination Account Digits.
+            -   If Transfer FROM Input (Credit): Merchant = Sender Name OR Source Account Digits.
+            -   **Internal Transfer**: If BOTH Source and Dest are INTERNAL (found in DB list), set `sub_type`="internal_transfer".
 
-    **Output JSON Schema:**
+    **OUTPUT JSON SCHEMA (Strict)**:
     {{
       "is_financial_event": boolean,
       "is_transaction": boolean,
       "transaction_type": "debit" | "credit",
-      "sub_type": "purchase" | "transfer" | "payment" | "withdrawal" | "deposit" | "decline",
-      "merchant": string, (The main counterparty name to show in UI),
-      "brand_name": string, (Clean name for logo),
+      "sub_type": "purchase" | "transfer" | "payment" | "withdrawal" | "deposit" | "internal_transfer" | "decline",
+      "source_bank": stringOrNull,
+      "destination_bank": stringOrNull,
+      "source_account_last4": stringOrNull,
+      "destination_account_last4": stringOrNull,
+      "card_info": stringOrNull, (e.g. "mada x8438"),
       "amount": number,
       "currency": string,
       "fees": number,
-      "date": "YYYY-MM-DD",
-      "time": "HH:MM",
-      "category": string,
-      "source_account_last4": string, (The digits of the account money LEFT),
-      "destination_account_last4": stringOrNull, (The digits of the account money entered, or IBAN/Alias),
-      "status": "success" | "failed"
+      "timestamp": "YYYY-MM-DD HH:MM",
+      "available_balance": numberOrNull,
+      "beneficiary": stringOrNull, (Person receiving money),
+      "merchant": stringOrNull, (Store or Entity),
+      "sender_name": stringOrNull, (Person sending money),
+      "description": stringOrNull, (A logical summary e.g. "Transfer to Muath")
     }}
-
+    
     Respond ONLY with valid JSON.
     """
 
@@ -379,74 +392,103 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.close()
 
 async def _create_transaction_logic(db, result, source_account, msg_text, reply_target):
-    # Prepare Schema
-    category = result.get('category') or "Uncategorized"
-    if result.get('sub_type') == 'internal_transfer':
-        category = "Transfer"
+    # --- 1. Resolve Accounts (Context Aware) ---
+    # Override Source Account if AI explicitly identified a different internal one
+    ai_source_last4 = result.get('source_account_last4')
+    if ai_source_last4:
+        found_source = crud.get_account_by_last_4(db, str(ai_source_last4))
+        if found_source:
+             source_account = found_source # Trust AI extraction over heuristic
     
+    # Resolve Destination Account
+    dest_account = None
+    ai_dest_last4 = result.get('destination_account_last4')
+    if ai_dest_last4:
+        dest_account = crud.get_account_by_last_4(db, str(ai_dest_last4))
+
+    # --- 2. Determine Transaction Type & Category ---
+    tx_type_str = result.get('transaction_type', 'debit').lower()
+    sub_type = result.get('sub_type', 'purchase').lower()
+    
+    category = result.get('category') or "Uncategorized"
+    if sub_type in ['transfer', 'internal_transfer']:
+        category = "Transfer"
+    elif sub_type == 'payment':
+        category = "Bills"
+    
+    # --- 3. Construct Merchant / Counterparty Name ---
+    merchant_raw = "Unknown"
     clean_merchant = result.get('brand_name')
-    merchant_raw = result.get('merchant') or "Unknown"
 
-    # Optimization: If merchant is numeric (e.g. '1505'), try to find the account name
-    if merchant_raw.isdigit() or (len(merchant_raw) < 6 and merchant_raw.isnumeric()):
-         dest_acc = crud.get_account_by_last_4(db, merchant_raw)
-         if dest_acc:
-             merchant_raw = f"{dest_acc.name} Account"
-             clean_merchant = dest_acc.name # For logo lookup
+    if sub_type == 'purchase':
+        merchant_raw = result.get('merchant') or "POS Purchase"
+    
+    elif sub_type in ['transfer', 'internal_transfer']:
+        # LOGIC: Transfer Naming
+        if tx_type_str == 'debit':
+            # Money Leaving -> To Whom?
+            if dest_account:
+                merchant_raw = f"Transfer to {dest_account.name}"
+                clean_merchant = dest_account.name
+            elif result.get('beneficiary'):
+                merchant_raw = result.get('beneficiary')
+                clean_merchant = result.get('beneficiary')
+            elif result.get('destination_bank'):
+                 merchant_raw = f"Transfer to {result.get('destination_bank')}"
+            else:
+                 merchant_raw = "Outgoing Transfer"
 
-    # CLEANUP: Remove leading colons or spaces from merchant name (Common SMS artifact "at :MERCHANT")
-    if merchant_raw:
-        merchant_raw = merchant_raw.lstrip(": ")
-        if clean_merchant:
-             clean_merchant = clean_merchant.lstrip(": ")
+        elif tx_type_str == 'credit':
+            # Money Entering -> From Whom?
+            # Check if source is actually another internal account (Internal Transfer received)
+            # The 'source_account' var here is the RECEIVER (since it's a Credit to 'source_account'). 
+            # Wait, standard logic says 'source_account' is the one the transaction is attached to.
+            # If Credit, we attached to the Receiver. So we need the SENDER.
+            
+            # AI might have put Sender Account in 'source_account_last4' or 'sender_name'
+            # But if 'source_account' (variable) is the Receiver, we check result['source_account_last4']?
+            # AI Logic: "Source Account" = Money LEAVING. "Destination Account" = Money ENTERING.
+            # If this is a Credit, the User's Account is the DESTINATION.
+            # So 'source_account' passed to this function SHOULD BE the User's Dest Account? 
+            # No, 'handle_message' finds an account and calls it 'source_account'.
+            
+            # LET'S CORRELATE:
+            # If Type=Credit, User's Account is the DESTINATION.
+            # So `source_account` (the variable) is actually the Destination.
+            # The SENDER is external or another internal account.
+            
+            # Check if AI identified a Source (Sender) that is Internal
+            sender_internal = None
+            if ai_source_last4:
+                 sender_internal = crud.get_account_by_last_4(db, str(ai_source_last4))
 
-    # Optimization: If AI identified a destination account Last 4, check if it matches a known account
-    # This fixes cases where AI extracts "MUATH" (sender) instead of "7772" (recipient)
-    dest_last4 = result.get('destination_account_last4')
-    if dest_last4:
-         # Clean digits only just in case
-         clean_last4 = "".join(filter(str.isdigit, str(dest_last4)))[-4:]
-         if len(clean_last4) == 4:
-             dest_acc = crud.get_account_by_last_4(db, clean_last4)
-             if dest_acc:
-                 # Found the destination account! 
-                 # LOGIC FIX: Only use Dest Name as Merchant if DEBIT (Transfer TO).
-                 # If CREDIT (Transfer IN), we want the Sender Name.
-                 if result.get('transaction_type') != 'credit':
-                     merchant_raw = f"Transfer to {dest_acc.name}"
-                     clean_merchant = dest_acc.name
-                 category = "Transfer" 
+            if sender_internal:
+                merchant_raw = f"Transfer from {sender_internal.name}"
+                clean_merchant = sender_internal.name
+            elif result.get('sender_name'):
+                merchant_raw = result.get('sender_name')
+                clean_merchant = result.get('sender_name')
+            elif result.get('source_bank'):
+                merchant_raw = f"Transfer from {result.get('source_bank')}"
+            else:
+                merchant_raw = "Incoming Transfer"
+    
+    elif sub_type == 'payment':
+        merchant_raw = result.get('merchant') or result.get('beneficiary') or "Bill Payment"
+    elif sub_type == 'deposit':
+        merchant_raw = result.get('source_bank') or "Cash Deposit"
+    elif sub_type == 'withdrawal':
+        merchant_raw = "ATM Withdrawal"
 
-    # Optimization FOR CREDITS: If Source matches a known account, use THAT as Merchant
-    if result.get('transaction_type') == 'credit':
-        src_last4 = result.get('source_account_last4')
-        if src_last4:
-             clean_src = "".join(filter(str.isdigit, str(src_last4)))[-4:]
-             if len(clean_src) == 4:
-                 src_acc = crud.get_account_by_last_4(db, clean_src)
-                 if src_acc:
-                      merchant_raw = f"Transfer from {src_acc.name}"
-                      clean_merchant = src_acc.name
-
-    if not clean_merchant or clean_merchant == "null":
+    if not clean_merchant:
         clean_merchant = merchant_raw
 
-    # Ensure "Account" suffix if it's a known internal account name but missing the suffix
-    # This covers cases where AI extracts "Daily Expense" but user wants "Daily Expense Account"
-    # We check if clean_merchant matches any existing account name
-    known_account = crud.get_account_by_name(db, clean_merchant)
-    # Only append " Account" if it is a Transfer (to distinguish internal transfer vs external merchant)
-    if known_account and category == "Transfer":
-         if not merchant_raw.endswith(" Account"):
-            merchant_raw = f"{known_account.name} Account"
-         
-         # CRITICAL FIX: If we identified the account by name, set it as the destination!
-         if 'dest_acc' not in locals() or not dest_acc:
-             dest_acc = known_account
-    
-    # NEW: If AI returned "Account" suffix for a non-transfer (e.g. "STC Account" for a Bill), strip it
-    if category != "Transfer" and merchant_raw.endswith(" Account"):
-        merchant_raw = merchant_raw[:-8]
+    # --- 4. Internal Transfer Detection ---
+    # If explicitly detected or both accounts known
+    is_internal = sub_type == 'internal_transfer' or (source_account and dest_account)
+    if is_internal:
+         sub_type = 'internal_transfer'
+         category = "Transfer"
 
     # Determine Transaction Type
     tx_type_str = result.get('transaction_type', 'debit').lower()
@@ -694,7 +736,7 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
          credit_tx = schemas.TransactionCreate(
              account_id=dest_account.id,
              amount=result['amount'], 
-             merchant=f"{source_account.name} Account",
+             merchant=f"Transfer from {source_account.name}",
              category="Transfer", 
              type=models.TransactionType.CREDIT.value,
              timestamp=tx_timestamp, # Use same timestamp
