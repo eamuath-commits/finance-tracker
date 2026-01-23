@@ -251,6 +251,8 @@ const ObligationsList = ({
 }) => {
     const [matches, setMatches] = useState({});
 
+    const [rejectedMatches, setRejectedMatches] = useState(new Set()); // Persist rejections
+
     // 1. Fetch matches for unpaid obligations
     useEffect(() => {
         const fetchMatches = async () => {
@@ -267,7 +269,11 @@ const ObligationsList = ({
                     // Only fetch if not already paid
                     const res = await axios.get(`${API_URL}/obligations/${o.id}/matches`);
                     if (res.data && res.data.length > 0) {
-                        newMatches[o.id] = res.data; // Store ALL matches
+                        // Filter out rejected matches locally
+                        const validMatches = res.data.filter(tx => !rejectedMatches.has(tx.id));
+                        if (validMatches.length > 0) {
+                            newMatches[o.id] = validMatches; // Store ALL valid matches
+                        }
                     }
                 } catch (e) { console.error("Match fetch error", e); }
             }));
@@ -277,7 +283,7 @@ const ObligationsList = ({
         // Slight delay to allow data to settle
         const timer = setTimeout(fetchMatches, 1000);
         return () => clearTimeout(timer);
-    }, [obligations, monthOffset]);
+    }, [obligations, monthOffset, rejectedMatches]); // Re-run if rejected list changes (to fetch next batch if needed)
 
     const [verifyMatch, setVerifyMatch] = useState(null); // { obl, tx, allMatches }
 
@@ -309,10 +315,17 @@ const ObligationsList = ({
     const handleRejectMatch = () => {
         if (!verifyMatch) return;
 
-        // Remove current match (index 0) from the specific obligation's match list
+        const rejectedTxId = verifyMatch.tx.id;
         const remainingMatches = verifyMatch.allMatches.slice(1);
 
-        // Update global matches state to reflect this rejection/cycling
+        // 1. Persist Rejection (so API refetch respects it)
+        setRejectedMatches(prev => {
+            const newSet = new Set(prev);
+            newSet.add(rejectedTxId);
+            return newSet;
+        });
+
+        // 2. Update Local State Immediately (for UI responsiveness)
         setMatches(prev => {
             const updated = { ...prev };
             if (remainingMatches.length > 0) {
@@ -323,7 +336,7 @@ const ObligationsList = ({
             return updated;
         });
 
-        // Close modal if no more matches, otherwise update modal to show next one
+        // 3. Cycle Modal State
         if (remainingMatches.length > 0) {
             setVerifyMatch({ ...verifyMatch, tx: remainingMatches[0], allMatches: remainingMatches });
         } else {
