@@ -312,20 +312,31 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not dest_last4 and result.get('merchant') and str(result.get('merchant')).isdigit():
              dest_last4 = result.get('merchant')
 
-        # Swap Logic:
-        # If explicitly a credit OR AI thinks it's a credit
-        # AND we have a destination matched to our accounts
-        if (result.get('transaction_type') == 'credit' or is_explicit_credit) and dest_last4:
-             dest_last4 = str(dest_last4)
-             # Clean digits just in case
-             dest_last4 = "".join(filter(str.isdigit, dest_last4))[-4:]
-             if len(dest_last4) == 4:
-                 dest_acc_obj = crud.get_account_by_last_4(db, dest_last4)
-                 if dest_acc_obj:
-                     logger.info(f"Incoming Credit detected to own account {dest_acc_obj.name}. Swapping primary account.")
-                     source_account = dest_acc_obj
-                     result['transaction_type'] = 'credit' # Force logic to treat as credit
-                     logger.info(f"DEBUG: Swap Logic Triggered. Source is now: {source_account.name} (from Dest {dest_last4})")
+        # Swap Logic / Credit Correction:
+        # If explicitly a credit OR AI thinks it's a credit, ensure we target the correct account.
+        if (result.get('transaction_type') == 'credit' or is_explicit_credit):
+             target_dest_last4 = None
+             if dest_last4:
+                  target_dest_last4 = "".join(filter(str.isdigit, str(dest_last4)))[-4:]
+             
+             final_target_acc = None
+             
+             # Case A: Destination matched from extract
+             if target_dest_last4 and len(target_dest_last4) == 4:
+                 final_target_acc = crud.get_account_by_last_4(db, target_dest_last4)
+             
+             # Case B: AI Mistake - Extracted Destination as Source
+             # If no Dest found, but we have a Source Account, and it's definitely a CREDIT...
+             # Then that 'Source' (e.g. 7772) is actually the Destination.
+             if not final_target_acc and source_account:
+                  final_target_acc = source_account
+                  logger.info(f"DEBUG: AI mapped Credit Destination to Source field ({source_account.name}). Correcting.")
+
+             if final_target_acc:
+                 logger.info(f"Incoming Credit detected to own account {final_target_acc.name}. ensure primary.")
+                 source_account = final_target_acc
+                 result['transaction_type'] = 'credit' # Force logic to treat as credit
+                 logger.info(f"DEBUG: Credit Logic Applied. Primary Account: {source_account.name}")
         
         if not source_account:
             # INTERACTIVE FALLBACK (Now creates a PENDING_ACTION transaction)
