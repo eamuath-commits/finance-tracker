@@ -817,7 +817,41 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Assign Account to Transaction
             try:
                 updated_tx = crud.assign_account_to_transaction(db, tx_id, selected_account.id)
-                await query.edit_message_text(f"✅ Assigned to **{selected_account.name}**. Balance Updated.")
+                success_msg = f"✅ Assigned to **{selected_account.name}**. Balance Updated."
+                
+                # UPDATE LINKED TRANSACTION (If Duplicate/Linked Credit Leg exists)
+                # When we resolve the Source (Debit) account, we should verify if there is a Destination (Credit) leg
+                # that has "Unknown Account" as the merchant/source name, and update it.
+                linked_tx = crud.find_potential_duplicate(
+                    db,
+                    None, # Verify across ALL accounts? No, we don't know the Dest account easily here unless we query.
+                    # Actually, we can just search by 'timestamp' (+/- 1s) and 'amount' and 'type=credit'
+                    updated_tx.amount,
+                    "credit" if updated_tx.type == "debit" else "debit",
+                    updated_tx.timestamp
+                )
+                
+                # Note: find_potential_duplicate usually takes account_id. 
+                # If we pass None, we need to ensure crud handles it or we search manually.
+                # Let's do a manual search for safety since find_potential_duplicate is specific.
+                
+                linked_candidates = db.query(models.Transaction).filter(
+                    models.Transaction.amount == updated_tx.amount,
+                    models.Transaction.type != updated_tx.type,
+                    models.Transaction.timestamp == updated_tx.timestamp
+                ).all()
+                
+                for link in linked_candidates:
+                    # Update Merchant Name to reflect the now-known source
+                    if updated_tx.type == "debit": # This was the Source
+                        link.merchant = f"Transfer from {selected_account.name}"
+                        db.commit()
+                        success_msg += f"\n🔄 Updated Linked Credit on {link.account.name}"
+                    elif updated_tx.type == "credit":
+                         link.merchant = f"Transfer to {selected_account.name}"
+                         db.commit()
+
+                await query.edit_message_text(success_msg)
             except Exception as e:
                 await query.edit_message_text(f"❌ Error updating transaction: {e}")
 
