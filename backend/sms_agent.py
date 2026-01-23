@@ -474,61 +474,82 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
         import re
         logger.info("Attempting Regex Date Parsing fallback...")
         
-        # Current Year Short (e.g., '26')
-        yr_short = datetime.now().strftime("%y")
-        yr_long = str(datetime.now().year)
-        
-        # Priority 1: YY/MM/DD (e.g. 26/01/22)
-        # Note: '26' matches year short, but also matches day (26th). 
-        # But commonly 'YY/MM/DD' is used. OR 'DD/MM/YY'.
-        # The user's example: 26/1/22. 
-        # If today is 2026. 22 is 2022.
-        # If Regex matches '22' as the last part, it might be the year.
-        
-        match_yy_mm_dd = re.search(r'\b(' + yr_short + r')/(\d{1,2})/(\d{1,2})', msg_text) # 26/01/22 (YYYY-MM-DD-ish if 26 is year?)
+        # Current Year Info
+        now = datetime.now()
+        yr_short = now.strftime("%y") # '26'
+        yr_long = str(now.year) # '2026'
         
         parsed_regex = None
-        
-        # Try DD/MM/YY explicitly for "26/1/22" (Day 26, Month 1, Year 22)
-        # Assuming last part is YearShort
-        match_dd_mm_yy = re.search(r'\b(\d{1,2})[/-](\d{1,2})[/-](\d{2})\b', msg_text)
-        if match_dd_mm_yy:
-             d, m, y = match_dd_mm_yy.groups()
-             # If y is 22, it's 2022. If y is 26, it's 2026.
-             # We need to distinguish DAY vs YEAR.
-             # Usually Day is first in Saudi.
-             try:
-                 # Check if 'y' looks like a year (e.g. close to now)
-                 if int(y) > 20 and int(y) < 30: # 2021-2029
-                     parsed_regex = datetime(int("20"+y), int(m), int(d))
-                     logger.info(f"Regex found DD/MM/YY: {parsed_regex}")
-             except: pass
+        candidates = []
 
-        if not parsed_regex and match_yy_mm_dd: # Try the YY/MM/DD logic from before
-            y, m, d = match_yy_mm_dd.groups()
+        # Helper to safely parse Y, M, D strings
+        def try_parse(y_str, m_str, d_str):
             try:
-                parsed_regex = datetime(int("20"+y), int(m), int(d))
-                logger.info(f"Regex found YY/MM/DD: {parsed_regex}")
-            except: pass
-            
-        if not parsed_regex:
-             # Try DD/MM/YYYY
-             match_dd_mm_yyyy = re.search(r'\b(\d{1,2})[/-](\d{1,2})[/-](' + yr_long + r')', msg_text)
-             if match_dd_mm_yyyy:
-                  d, m, y = match_dd_mm_yyyy.groups()
-                  try:
-                      parsed_regex = datetime(int(y), int(m), int(d))
-                      logger.info(f"Regex found DD/MM/YYYY: {parsed_regex}")
-                  except: pass
+                # Normalize Year
+                y = int(y_str)
+                if y < 100: y += 2000
+                m, d = int(m_str), int(d_str)
+                return datetime(y, m, d)
+            except: return None
 
-        if parsed_regex:
-            tx_timestamp = parsed_regex
+        # Strategy: Find ALL possible matches for ambiguous patterns, then score them.
+        
+        # Pattern A: YY/MM/DD (e.g. 26/01/22)
+        match_yy_mm_dd = re.search(r'\b(\d{2})[/-](\d{1,2})[/-](\d{1,2})\b', msg_text)
+        if match_yy_mm_dd:
+            # Ambiguous: could be YY/MM/DD or DD/MM/YY
+            p1, p2, p3 = match_yy_mm_dd.groups()
+            
+            # Option 1: YY/MM/DD (p1=Year)
+            dt1 = try_parse(p1, p2, p3)
+            if dt1: candidates.append(dt1)
+            
+            # Option 2: DD/MM/YY (p3=Year)
+            dt2 = try_parse(p3, p2, p1)
+            if dt2: candidates.append(dt2)
+
+        # Pattern B: DD/MM/YYYY (Full Year) -> Unambiguous Year, but capture anyway
+        match_full = re.search(r'\b(\d{1,2})[/-](\d{1,2})[/-](' + yr_long + r')', msg_text)
+        if match_full:
+             dt_full = try_parse(match_full.group(3), match_full.group(2), match_full.group(1))
+             if dt_full: candidates.append(dt_full)
+
+        # SELECTION LOGIC
+        # We prefer the candidate where Year == Current Year
+        best_candidate = None
+        
+        logger.info(f"Date Candidates found: {candidates}")
+        
+        for cand in candidates:
+            # Rule 1: Must not be future (allow 1 day buffer)
+            if cand > now + timedelta(days=1):
+                continue
+                
+            # Rule 2: Prefer Current Year
+            if cand.year == now.year:
+                best_candidate = cand
+                break # Found a perfect match!
+            
+            # Rule 3: If no current year match yet, take the most recent valid one (e.g. late Dec last year)
+            if best_candidate is None:
+                best_candidate = cand
+            else:
+                 # If we have one, keeps the first one or logic? 
+                 # Usually if we have "22" vs "26", and neither is current year (say current is 2025), 
+                 # we'd just want reasonable.
+                 # But sticking to "Matches Current Year" is the strongest heuristic for "26/1/22" in 2026.
+                 pass
+        
+        if best_candidate:
+            logger.info(f"Selected Best Regex Date: {best_candidate}")
+            tx_timestamp = best_candidate
+            
             # Try to grab time HH:MM
             time_match = re.search(r'\b(\d{1,2}):(\d{2})', msg_text)
             if time_match:
                 try:
                     h, m = time_match.groups()
-                    tx_timestamp = parsed_regex.replace(hour=int(h), minute=int(m))
+                    tx_timestamp = best_candidate.replace(hour=int(h), minute=int(m))
                 except: pass
     
     # SANITY CHECK (Again, final)
