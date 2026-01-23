@@ -341,13 +341,48 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
     if not db_tx:
         return None
     
+    # 1. Capture Old State for Balance Reversal
+    old_amount = db_tx.amount
+    old_type = db_tx.type
+    old_account_id = db_tx.account_id
+    old_status = db_tx.status
+    
+    # 2. Apply Updates
     update_data = transaction_update.dict(exclude_unset=True)
     for key, value in update_data.items():
         setattr(db_tx, key, value)
-        
+    
+    # 3. Handle Balance Adjustment if critical fields changed
+    # Only if transaction was/is completed
+    if old_status == "completed" or db_tx.status == "completed":
+        account = db.query(models.Account).filter(models.Account.id == db_tx.account_id).first()
+        if account:
+            # Revert Old Effect (if it was completed)
+            if old_status == "completed":
+                 is_old_credit = str(old_type).lower() == "credit" or old_type == models.TransactionType.CREDIT
+                 if is_old_credit:
+                     account.current_balance -= old_amount
+                 else:
+                     account.current_balance += old_amount
+            
+            # Apply New Effect (if it is completed)
+            if db_tx.status == "completed":
+                 is_new_credit = str(db_tx.type).lower() == "credit" or db_tx.type == models.TransactionType.CREDIT
+                 if is_new_credit:
+                     account.current_balance += db_tx.amount
+                 else:
+                     account.current_balance -= db_tx.amount
+            
+            # Save Account Balance
+            db.add(account)
+            # Update snapshot logic if needed, but risky to overwrite historical snapshot. 
+            # Best effort: Update balance_after_transaction to current balance? 
+            # Or leave it as the historical record. 
+            # Let's update it to reflect the *corrected* state essentially.
+            db_tx.balance_after_transaction = account.current_balance
+
     db.add(db_tx)
     db.commit()
-    db.refresh(db_tx)
     db.refresh(db_tx)
     return db_tx
 

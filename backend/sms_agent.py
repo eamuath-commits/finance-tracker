@@ -439,33 +439,72 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
 
     # Parse Date from AI result or use current time
     tx_timestamp = datetime.now()
+    ai_date_success = False
+
     if 'date' in result and result['date']:
         try:
             # AI usually returns ISO format or YYYY-MM-DD
-            # We can use a lenient parser or try standard formats
             from dateutil import parser
             tx_timestamp = parser.parse(result['date'])
             # Combine with time if available
             if 'time' in result and result['time']:
                  try:
-                     time_part = parser.parse(result['time']).time()
-                     tx_timestamp = datetime.combine(tx_timestamp.date(), time_part)
+                      time_part = parser.parse(result['time']).time()
+                      tx_timestamp = datetime.combine(tx_timestamp.date(), time_part)
                  except:
-                     pass # Keep just the date part if time fails 
+                      pass 
+            ai_date_success = True
         except Exception as e:
-             logger.warning(f"Could not parse date: {result.get('date')}, error: {e}. AI response was: {json.dumps(result)}")
+             logger.warning(f"Could not parse date: {result.get('date')}, error: {e}")
              tx_timestamp = datetime.now()
     else:
         logger.info(f"No date returned by AI. Using now(). AI Output: {json.dumps(result)}")
 
+    # FALLBACK: Regex Date Parsing (If AI failed OR date is suspicious)
+    if not ai_date_success:
+        import re
+        logger.info("Attempting Regex Date Parsing fallback...")
+        
+        # Current Year Short (e.g., '26')
+        yr_short = datetime.now().strftime("%y")
+        yr_long = str(datetime.now().year)
+        
+        # 1. YY/MM/DD (e.g. 26/01/22)
+        match_yy_mm_dd = re.search(r'\\b(' + yr_short + r')/(\\d{1,2})/(\\d{1,2})', msg_text)
+        
+        parsed_date = None
+        if match_yy_mm_dd:
+            y, m, d = match_yy_mm_dd.groups()
+            try:
+                parsed_date = datetime(int("20"+y), int(m), int(d))
+                logger.info(f"Regex found YY/MM/DD: {parsed_date}")
+            except: pass
+            
+        if not parsed_date:
+            # 2. DD/MM/YYYY
+            match_dd_mm_yyyy = re.search(r'\\b(\\d{1,2})[/-](\\d{1,2})[/-](' + yr_long + r')', msg_text)
+            if match_dd_mm_yyyy:
+                 d, m, y = match_dd_mm_yyyy.groups()
+                 try:
+                     parsed_date = datetime(int(y), int(m), int(d))
+                     logger.info(f"Regex found DD/MM/YYYY: {parsed_date}")
+                 except: pass
+
+        if parsed_date:
+            tx_timestamp = parsed_date
+            # Try to grab time HH:MM
+            time_match = re.search(r'\\b(\\d{1,2}):(\\d{2})', msg_text)
+            if time_match:
+                try:
+                    h, m = time_match.groups()
+                    tx_timestamp = parsed_date.replace(hour=int(h), minute=int(m))
+                except: pass
+
     # SANITY CHECK: Future Date Protection
     # If the parsed date is more than 24 hours in the future, assume parsing error and use NOW.
-    # (Allowing 1 day buffer for timezone differences, but 3 days like 26th vs 23rd is definitely wrong)
     from datetime import timedelta
     if tx_timestamp > datetime.now() + timedelta(days=1):
          logger.warning(f"⚠️ Future date detected (Parsed: {tx_timestamp}, Now: {datetime.now()}). Reverting to NOW.")
-         # Keep the time if it seems reasonable? No, if date is wrong, time is likely wrong/irrelevant.
-         # But maybe we keep the time if only year was wrong? Hard to say. Safest is NOW.
          tx_timestamp = datetime.now()
 
     # Resolve Destination Account Early to determine Status
@@ -572,9 +611,6 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
 
             return new_tx
 
-    except Exception as e:
-        logger.error(f"Failed to create main transaction: {e}")
-        return f"Error creating transaction: {str(e)}"
     except Exception as e:
         logger.error(f"Failed to create main transaction: {e}")
         return f"Error creating transaction: {str(e)}"

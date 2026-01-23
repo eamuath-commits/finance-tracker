@@ -139,10 +139,11 @@ const Transactions = () => {
         setForm({
             category: tx.category || '',
             merchant: tx.merchant,
-            amount: tx.amount, // Optional: Usually disabled for editing to prevent balance mismatch
+            amount: tx.amount,
             account_id: tx.account_id,
             type: tx.type || 'debit',
-            notes: tx.notes || ''
+            notes: tx.notes || '',
+            timestamp: tx.timestamp ? tx.timestamp.split('T')[0] : new Date().toISOString().split('T')[0]
         });
         setShowEditModal(true);
     };
@@ -174,7 +175,9 @@ const Transactions = () => {
             await axios.put(`${API_URL}/transactions/${editingTx.id}`, {
                 category: form.category,
                 merchant: form.merchant,
-                notes: form.notes
+                notes: form.notes,
+                amount: form.amount,
+                timestamp: form.timestamp
             });
             setShowEditModal(false);
             setEditingTx(null);
@@ -712,6 +715,26 @@ const Transactions = () => {
                                             {cat}
                                         </button>
                                     ))}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs text-gray-400 uppercase font-bold">Date</label>
+                                    <input
+                                        type="date"
+                                        className={`${inputClass} mt-1`}
+                                        value={form.timestamp}
+                                        onChange={e => setForm({ ...form, timestamp: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-400 uppercase font-bold">Amount</label>
+                                    <input
+                                        type="number" step="0.01"
+                                        className={`${inputClass} mt-1`}
+                                        value={form.amount}
+                                        onChange={e => setForm({ ...form, amount: e.target.value })}
+                                    />
                                 </div>
                             </div>
                             <div>
