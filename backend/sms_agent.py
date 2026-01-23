@@ -416,10 +416,24 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
          if len(clean_last4) == 4:
              dest_acc = crud.get_account_by_last_4(db, clean_last4)
              if dest_acc:
-                 # Found the destination account! Use it as the Merchant/Counterparty
-                 merchant_raw = f"{dest_acc.name} Account"
-                 clean_merchant = dest_acc.name
-                 category = "Transfer" # Ensure category is correct
+                 # Found the destination account! 
+                 # LOGIC FIX: Only use Dest Name as Merchant if DEBIT (Transfer TO).
+                 # If CREDIT (Transfer IN), we want the Sender Name.
+                 if result.get('transaction_type') != 'credit':
+                     merchant_raw = f"{dest_acc.name} Account"
+                     clean_merchant = dest_acc.name
+                 category = "Transfer" 
+
+    # Optimization FOR CREDITS: If Source matches a known account, use THAT as Merchant
+    if result.get('transaction_type') == 'credit':
+        src_last4 = result.get('source_account_last4')
+        if src_last4:
+             clean_src = "".join(filter(str.isdigit, str(src_last4)))[-4:]
+             if len(clean_src) == 4:
+                 src_acc = crud.get_account_by_last_4(db, clean_src)
+                 if src_acc:
+                      merchant_raw = f"{src_acc.name} Account"
+                      clean_merchant = src_acc.name
 
     if not clean_merchant or clean_merchant == "null":
         clean_merchant = merchant_raw
