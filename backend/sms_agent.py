@@ -415,6 +415,15 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
         category = "Transfer"
     elif sub_type == 'payment':
         category = "Bills"
+
+    # --- SWAP LOGIC: Ensure Credits are applied to the Destination Account ---
+    # If Type is Credit and Dest is Internal, the transaction belongs to Dest.
+    # (Fixes issue where "From: 8001 To: 7772" Credit was applied to 8001 because 8001 was matched first)
+    if tx_type_str == 'credit' and dest_account:
+        if not source_account or source_account.id != dest_account.id:
+            logger.info(f"Swapping Primary Account for Credit: {source_account.name if source_account else 'None'} -> {dest_account.name}")
+            source_account = dest_account
+            # Note: The original source (sender) is still available via ai_source_last4 lookup in Merchant block
     
     # --- 3. Construct Merchant / Counterparty Name ---
     merchant_raw = "Unknown"
