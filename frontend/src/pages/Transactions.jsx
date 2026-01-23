@@ -143,6 +143,7 @@ const Transactions = () => {
             account_id: tx.account_id,
             type: tx.type || 'debit',
             notes: tx.notes || '',
+            fees: tx.fees || 0.0,
             timestamp: tx.timestamp ? tx.timestamp.slice(0, 16) : new Date().toISOString().slice(0, 16)
         });
         setShowEditModal(true);
@@ -734,6 +735,16 @@ const Transactions = () => {
                                         className={`${inputClass} mt-1`}
                                         value={form.amount}
                                         onChange={e => setForm({ ...form, amount: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-400 uppercase font-bold">Fees</label>
+                                    <input
+                                        type="number" step="0.01"
+                                        className={`${inputClass} mt-1`}
+                                        value={form.fees}
+                                        onChange={e => setForm({ ...form, fees: e.target.value })}
+                                        placeholder="0.00"
                                     />
                                 </div>
                             </div>

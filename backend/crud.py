@@ -113,6 +113,10 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate):
              # DEBIT
              account.current_balance -= transaction.amount
         
+        # Deduct Fees if present (Fees are always a debit)
+        if transaction.fees:
+            account.current_balance -= transaction.fees
+        
         new_balance = account.current_balance
         db.add(account)
 
@@ -347,6 +351,7 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
     old_type = db_tx.type
     old_account_id = db_tx.account_id
     old_status = db_tx.status
+    old_fees = db_tx.fees if db_tx.fees else 0.0
     
     # 2. Apply Updates
     update_data = transaction_update.dict(exclude_unset=True)
@@ -365,7 +370,11 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
                      account.current_balance -= old_amount
                  else:
                      account.current_balance += old_amount
-            
+                 
+                 # Revert old fee (add it back)
+                 if old_fees:
+                     account.current_balance += old_fees
+
             # Apply New Effect (if it is completed)
             if db_tx.status == "completed":
                  is_new_credit = str(db_tx.type).lower() == "credit" or db_tx.type == models.TransactionType.CREDIT
@@ -373,6 +382,10 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
                      account.current_balance += db_tx.amount
                  else:
                      account.current_balance -= db_tx.amount
+                
+                 # Deduct new fee
+                 if db_tx.fees:
+                     account.current_balance -= db_tx.fees
             
             # Save Account Balance
             db.add(account)
