@@ -409,7 +409,7 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
                  # LOGIC FIX: Only use Dest Name as Merchant if DEBIT (Transfer TO).
                  # If CREDIT (Transfer IN), we want the Sender Name.
                  if result.get('transaction_type') != 'credit':
-                     merchant_raw = f"{dest_acc.name} Account"
+                     merchant_raw = f"Transfer to {dest_acc.name}"
                      clean_merchant = dest_acc.name
                  category = "Transfer" 
 
@@ -421,7 +421,7 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
              if len(clean_src) == 4:
                  src_acc = crud.get_account_by_last_4(db, clean_src)
                  if src_acc:
-                      merchant_raw = f"{src_acc.name} Account"
+                      merchant_raw = f"Transfer from {src_acc.name}"
                       clean_merchant = src_acc.name
 
     if not clean_merchant or clean_merchant == "null":
