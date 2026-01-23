@@ -97,6 +97,10 @@ async def parse_with_ai(db: Session, text: str):
 
     **Extraction Rules:**
     1. **Identify Type**: Is this a Purchase, Transfer (In/Out), Bill Payment, Cash Withdrawal, Deposit, or Decline/Failed transaction?
+       - "Outgoing Funds Transfer" -> **debit** (Money leaving).
+       - "Credit Transfer" -> **credit** (Money arriving).
+       - "Purchase" -> **debit**.
+       - "Deposit" -> **credit**.
     2. **Metadata Extraction (CRITICAL)**:
        - **Source**: Where did the money come FROM?
          - "Debited from Account: 8001" -> Source Last4 = 8001.
