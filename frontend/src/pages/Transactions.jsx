@@ -595,6 +595,11 @@ const Transactions = () => {
                                                 </td>
                                                 <td className={`px-6 py-4 text-right text-sm font-bold ${isCredit ? 'text-emerald-400' : 'text-red-400'}`}>
                                                     {formatCurrency(tx.amount)}
+                                                    {tx.fees > 0 && (
+                                                        <div className="text-[10px] text-red-500/70 font-normal">
+                                                            + {formatCurrency(tx.fees)} fees
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 <td className="px-6 py-4 text-right text-sm text-gray-400 font-mono">
                                                     {tx.balance_after_transaction !== null && tx.balance_after_transaction !== undefined

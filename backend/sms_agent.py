@@ -443,27 +443,33 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
     # Parse Date from AI result or use current time
     tx_timestamp = datetime.now()
     ai_date_success = False
-
+    
+    # 1. Try AI Date
     if 'date' in result and result['date']:
         try:
-            # AI usually returns ISO format or YYYY-MM-DD
             from dateutil import parser
-            tx_timestamp = parser.parse(result['date'])
+            parsed_ai = parser.parse(result['date'])
             # Combine with time if available
             if 'time' in result and result['time']:
                  try:
                       time_part = parser.parse(result['time']).time()
-                      tx_timestamp = datetime.combine(tx_timestamp.date(), time_part)
-                 except:
-                      pass 
-            ai_date_success = True
+                      parsed_ai = datetime.combine(parsed_ai.date(), time_part)
+                 except: pass
+            
+            # CHECK VALIDITY immediately
+            from datetime import timedelta
+            if parsed_ai > datetime.now() + timedelta(days=1):
+                logger.warning(f"⚠️ AI Date {parsed_ai} is in the future. Ignoring it.")
+                ai_date_success = False # Reject it
+            else:
+                tx_timestamp = parsed_ai
+                ai_date_success = True
+                
         except Exception as e:
-             logger.warning(f"Could not parse date: {result.get('date')}, error: {e}")
-             tx_timestamp = datetime.now()
-    else:
-        logger.info(f"No date returned by AI. Using now(). AI Output: {json.dumps(result)}")
+             logger.warning(f"Could not parse AI date: {result.get('date')}, error: {e}")
+             ai_date_success = False
 
-    # FALLBACK: Regex Date Parsing (If AI failed OR date is suspicious)
+    # 2. Regex Fallback (Run if AI failed OR was rejected)
     if not ai_date_success:
         import re
         logger.info("Attempting Regex Date Parsing fallback...")
@@ -472,38 +478,60 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
         yr_short = datetime.now().strftime("%y")
         yr_long = str(datetime.now().year)
         
-        # 1. YY/MM/DD (e.g. 26/01/22)
-        match_yy_mm_dd = re.search(r'\\b(' + yr_short + r')/(\\d{1,2})/(\\d{1,2})', msg_text)
+        # Priority 1: YY/MM/DD (e.g. 26/01/22)
+        # Note: '26' matches year short, but also matches day (26th). 
+        # But commonly 'YY/MM/DD' is used. OR 'DD/MM/YY'.
+        # The user's example: 26/1/22. 
+        # If today is 2026. 22 is 2022.
+        # If Regex matches '22' as the last part, it might be the year.
         
-        parsed_date = None
-        if match_yy_mm_dd:
+        match_yy_mm_dd = re.search(r'\b(' + yr_short + r')/(\d{1,2})/(\d{1,2})', msg_text) # 26/01/22 (YYYY-MM-DD-ish if 26 is year?)
+        
+        parsed_regex = None
+        
+        # Try DD/MM/YY explicitly for "26/1/22" (Day 26, Month 1, Year 22)
+        # Assuming last part is YearShort
+        match_dd_mm_yy = re.search(r'\b(\d{1,2})[/-](\d{1,2})[/-](\d{2})\b', msg_text)
+        if match_dd_mm_yy:
+             d, m, y = match_dd_mm_yy.groups()
+             # If y is 22, it's 2022. If y is 26, it's 2026.
+             # We need to distinguish DAY vs YEAR.
+             # Usually Day is first in Saudi.
+             try:
+                 # Check if 'y' looks like a year (e.g. close to now)
+                 if int(y) > 20 and int(y) < 30: # 2021-2029
+                     parsed_regex = datetime(int("20"+y), int(m), int(d))
+                     logger.info(f"Regex found DD/MM/YY: {parsed_regex}")
+             except: pass
+
+        if not parsed_regex and match_yy_mm_dd: # Try the YY/MM/DD logic from before
             y, m, d = match_yy_mm_dd.groups()
             try:
-                parsed_date = datetime(int("20"+y), int(m), int(d))
-                logger.info(f"Regex found YY/MM/DD: {parsed_date}")
+                parsed_regex = datetime(int("20"+y), int(m), int(d))
+                logger.info(f"Regex found YY/MM/DD: {parsed_regex}")
             except: pass
             
-        if not parsed_date:
-            # 2. DD/MM/YYYY
-            match_dd_mm_yyyy = re.search(r'\\b(\\d{1,2})[/-](\\d{1,2})[/-](' + yr_long + r')', msg_text)
-            if match_dd_mm_yyyy:
-                 d, m, y = match_dd_mm_yyyy.groups()
-                 try:
-                     parsed_date = datetime(int(y), int(m), int(d))
-                     logger.info(f"Regex found DD/MM/YYYY: {parsed_date}")
-                 except: pass
+        if not parsed_regex:
+             # Try DD/MM/YYYY
+             match_dd_mm_yyyy = re.search(r'\b(\d{1,2})[/-](\d{1,2})[/-](' + yr_long + r')', msg_text)
+             if match_dd_mm_yyyy:
+                  d, m, y = match_dd_mm_yyyy.groups()
+                  try:
+                      parsed_regex = datetime(int(y), int(m), int(d))
+                      logger.info(f"Regex found DD/MM/YYYY: {parsed_regex}")
+                  except: pass
 
-        if parsed_date:
-            tx_timestamp = parsed_date
+        if parsed_regex:
+            tx_timestamp = parsed_regex
             # Try to grab time HH:MM
-            time_match = re.search(r'\\b(\\d{1,2}):(\\d{2})', msg_text)
+            time_match = re.search(r'\b(\d{1,2}):(\d{2})', msg_text)
             if time_match:
                 try:
                     h, m = time_match.groups()
-                    tx_timestamp = parsed_date.replace(hour=int(h), minute=int(m))
+                    tx_timestamp = parsed_regex.replace(hour=int(h), minute=int(m))
                 except: pass
-
-    # SANITY CHECK: Future Date Protection
+    
+    # SANITY CHECK (Again, final)
     # If the parsed date is more than 24 hours in the future, assume parsing error and use NOW.
     from datetime import timedelta
     if tx_timestamp > datetime.now() + timedelta(days=1):
