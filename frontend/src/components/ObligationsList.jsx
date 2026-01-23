@@ -7,9 +7,26 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStr
 import { CSS } from '@dnd-kit/utilities';
 import { exportToCSV } from '../utils/csvExport';
 
+
 const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
-const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObligationModal, openPaymentModal, handleQuickPay, handleDeleteHistory, CATEGORY_ICONS, dragHandleProps, match, onLinkPayment }) => {
+const CATEGORY_ICONS = {
+    "Salary": <Banknote size={20} className="text-emerald-400" />,
+    "House": <Home size={20} className="text-blue-400" />,
+    "Utilities": <Zap size={20} className="text-yellow-400" />,
+    "Auto Loan": <Car size={20} className="text-red-400" />,
+    "Food & Groceries": <Utensils size={20} className="text-orange-400" />,
+    "Transport": <Car size={20} className="text-red-400" />,
+    "Insurance": <Shield size={20} className="text-purple-400" />,
+    "Subscription": <Smartphone size={20} className="text-cyan-400" />,
+    "Tech & Subscriptions": <Smartphone size={20} className="text-cyan-400" />,
+    "Loan": <Landmark size={20} className="text-rose-400" />,
+    "Credit Card": <CreditCard size={20} className="text-pink-400" />,
+    "Pay Later": <Clock size={20} className="text-amber-400" />,
+    "Other": <Box size={20} className="text-gray-400" />
+};
+
+const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObligationModal, openPaymentModal, handleQuickPay, handleDeleteHistory, dragHandleProps, match, onLinkPayment }) => {
     const prevMonth = getMonthStatus(obl, monthOffset - 1);
     const currMonth = getMonthStatus(obl, monthOffset);
 
@@ -285,22 +302,6 @@ const ObligationsList = ({
 
     const handleLinkPayment = (obl, tx) => {
         setVerifyMatch({ obl, tx });
-    };
-
-    const CATEGORY_ICONS = {
-        "Salary": <Banknote size={20} className="text-emerald-400" />,
-        "House": <Home size={20} className="text-blue-400" />,
-        "Utilities": <Zap size={20} className="text-yellow-400" />,
-        "Auto Loan": <Car size={20} className="text-red-400" />,
-        "Food & Groceries": <Utensils size={20} className="text-orange-400" />,
-        "Transport": <Car size={20} className="text-red-400" />,
-        "Insurance": <Shield size={20} className="text-purple-400" />,
-        "Subscription": <Smartphone size={20} className="text-cyan-400" />,
-        "Tech & Subscriptions": <Smartphone size={20} className="text-cyan-400" />,
-        "Loan": <Landmark size={20} className="text-rose-400" />,
-        "Credit Card": <CreditCard size={20} className="text-pink-400" />,
-        "Pay Later": <Clock size={20} className="text-amber-400" />,
-        "Other": <Box size={20} className="text-gray-400" />
     };
 
     const grouped = obligations.reduce((acc, obl) => {
