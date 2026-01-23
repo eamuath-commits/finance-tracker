@@ -514,7 +514,6 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
                  except: pass
             
             # CHECK VALIDITY immediately
-            from datetime import timedelta
             if parsed_ai > datetime.now() + timedelta(days=1):
                 logger.warning(f"⚠️ AI Date {parsed_ai} is in the future. Ignoring it.")
                 ai_date_success = False # Reject it
