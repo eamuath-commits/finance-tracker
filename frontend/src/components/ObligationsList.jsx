@@ -174,14 +174,14 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
                         </div>
                     ) : (
                         <div className="text-center w-full relative">
-                            {match && (
+                            {match && match.length > 0 && (
                                 <button
                                     onClick={(e) => { e.stopPropagation(); onLinkPayment(obl, match); }}
                                     className="absolute -top-7 left-1/2 -translate-x-1/2 flex items-center gap-1 text-[9px] bg-blue-900/60 text-blue-200 px-2 py-0.5 rounded-full border border-blue-500/30 whitespace-nowrap z-20 hover:bg-blue-800 animate-pulse shadow-sm"
-                                    title={`Found matching transaction: ${match.merchant} (${formatCurrency(match.amount)})`}
+                                    title={`Found matching transaction: ${match[0].merchant} (${formatCurrency(match[0].amount)})`}
                                 >
                                     <Link size={10} />
-                                    <span>Found {formatCurrency(match.amount)}</span>
+                                    <span>Found {formatCurrency(match[0].amount)} {match.length > 1 && `(+${match.length - 1})`}</span>
                                 </button>
                             )}
                             <div className="flex items-center justify-center gap-1 mb-1 relative">
@@ -267,7 +267,7 @@ const ObligationsList = ({
                     // Only fetch if not already paid
                     const res = await axios.get(`${API_URL}/obligations/${o.id}/matches`);
                     if (res.data && res.data.length > 0) {
-                        newMatches[o.id] = res.data[0]; // Top match
+                        newMatches[o.id] = res.data; // Store ALL matches
                     }
                 } catch (e) { console.error("Match fetch error", e); }
             }));
@@ -279,7 +279,7 @@ const ObligationsList = ({
         return () => clearTimeout(timer);
     }, [obligations, monthOffset]);
 
-    const [verifyMatch, setVerifyMatch] = useState(null); // { obl, tx }
+    const [verifyMatch, setVerifyMatch] = useState(null); // { obl, tx, allMatches }
 
     const executeLinkPayment = async (obl, tx) => {
         try {
@@ -300,8 +300,35 @@ const ObligationsList = ({
         } catch (e) { alert("Linking failed"); }
     };
 
-    const handleLinkPayment = (obl, tx) => {
-        setVerifyMatch({ obl, tx });
+    const handleLinkPayment = (obl, matchArray) => {
+        // matchArray is the full list of matches for this obligation
+        if (!matchArray || matchArray.length === 0) return;
+        setVerifyMatch({ obl, tx: matchArray[0], allMatches: matchArray });
+    };
+
+    const handleRejectMatch = () => {
+        if (!verifyMatch) return;
+
+        // Remove current match (index 0) from the specific obligation's match list
+        const remainingMatches = verifyMatch.allMatches.slice(1);
+
+        // Update global matches state to reflect this rejection/cycling
+        setMatches(prev => {
+            const updated = { ...prev };
+            if (remainingMatches.length > 0) {
+                updated[verifyMatch.obl.id] = remainingMatches;
+            } else {
+                delete updated[verifyMatch.obl.id]; // No more matches
+            }
+            return updated;
+        });
+
+        // Close modal if no more matches, otherwise update modal to show next one
+        if (remainingMatches.length > 0) {
+            setVerifyMatch({ ...verifyMatch, tx: remainingMatches[0], allMatches: remainingMatches });
+        } else {
+            setVerifyMatch(null);
+        }
     };
 
     const grouped = obligations.reduce((acc, obl) => {
@@ -550,7 +577,7 @@ const ObligationsList = ({
             </DndContext>
 
             {verifyMatch && (
-                <Modal title="Verify Match" onClose={() => setVerifyMatch(null)}>
+                <Modal title={`Verify Match (${1 + verifyMatch.allMatches.indexOf(verifyMatch.tx)}/${verifyMatch.allMatches.length})`} onClose={() => setVerifyMatch(null)}>
                     <div className="space-y-4">
                         <p className="text-gray-300 text-sm">Do you want to link this transaction to the obligation?</p>
 
@@ -571,6 +598,9 @@ const ObligationsList = ({
                         </div>
 
                         <div className="flex gap-3 mt-6">
+                            <button onClick={handleRejectMatch} className="flex-1 bg-red-900/30 hover:bg-red-900/50 text-red-200 border border-red-800/50 py-2 rounded font-medium transition">
+                                Reject & Next
+                            </button>
                             <button onClick={() => setVerifyMatch(null)} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded font-medium transition">
                                 Cancel
                             </button>
@@ -579,7 +609,7 @@ const ObligationsList = ({
                                 className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded font-medium transition shadow-lg flex items-center justify-center gap-2"
                             >
                                 <Link size={16} />
-                                Confirm Match
+                                Confirm
                             </button>
                         </div>
                     </div>
