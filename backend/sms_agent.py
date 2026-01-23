@@ -118,6 +118,12 @@ async def parse_with_ai(db: Session, text: str):
         -   **Sender Name**: The NAME of the person sending money (for Incoming Transfers).
 
     3.  **Logical Rules**:
+        -   **To/From Logic (CRITICAL)**:
+            -   "To: 1234" -> 1234 is **Destination Account**.
+            -   "From: 1234" -> 1234 is **Source Account**.
+            -   **Ambiguous Internal Transfer**: If text says "Transfer Between Your Accounts" and ONLY "To: 1234" is found (where 1234 is a User Account):
+                -   Treat as **CREDIT** (Incoming to 1234).
+                -   Source is Unknown.
         -   **Internal Detection**: If an extracted account number (Source/Dest) matches the "User's Existing Accounts" list, mark it as INTERNAL.
         -   **Direction**: 
             -   "Outgoing" / "Debit" -> Money LEAVES Source Account. (Transaction Type: DEBIT).
