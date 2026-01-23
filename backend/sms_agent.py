@@ -732,7 +732,7 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
                         type="credit", # Incoming
                         timestamp=tx_timestamp,
                         raw_sms_content=msg_text,
-                        status="completed" # Money is here, even if source is unknown
+                        status="pending" # Mark as Pending until Source is resolved
                      )
                      crud.create_transaction(db=db, transaction=credit_tx)
                  except Exception as e_cred:
@@ -851,6 +851,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         success_msg += f"\n🔄 Updated Linked Credit on {link.account.name}"
                     elif updated_tx.type == "credit":
                          link.merchant = f"Transfer to {selected_account.name}"
+                         # Also Confirm the Linked Credit since Source is now known
+                         link.status = "completed"
                          db.commit()
 
                 await query.edit_message_text(success_msg)
