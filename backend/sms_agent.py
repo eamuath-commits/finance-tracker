@@ -294,14 +294,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 source_last4 = clean_source[-4:]
                 source_account = crud.get_account_by_last_4(db, source_last4)
 
-        # Smart Handling for Incoming Credits (Swap Source if Destination account is owned by user)
-        # E.g. SMS says "To: 7772", AI parses Dest=7772. If 7772 is ours, we should credit IT.
+        # Smart Handling for Incoming Credits
+        # Heuristic: If message says "Credit Transfer" or "Deposit", likely a CREDIT.
+        is_explicit_credit = "credit transfer" in msg_text.lower() or "deposit" in msg_text.lower()
+        
         dest_last4 = result.get('destination_account_last4')
         # Fallback: If AI put account number in merchant field (common in credits)
         if not dest_last4 and result.get('merchant') and str(result.get('merchant')).isdigit():
              dest_last4 = result.get('merchant')
 
-        if result.get('transaction_type') == 'credit' and dest_last4:
+        # Swap Logic:
+        # If explicitly a credit OR AI thinks it's a credit
+        # AND we have a destination matched to our accounts
+        if (result.get('transaction_type') == 'credit' or is_explicit_credit) and dest_last4:
              dest_last4 = str(dest_last4)
              # Clean digits just in case
              dest_last4 = "".join(filter(str.isdigit, dest_last4))[-4:]
@@ -310,6 +315,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                  if dest_acc_obj:
                      logger.info(f"Incoming Credit detected to own account {dest_acc_obj.name}. Swapping primary account.")
                      source_account = dest_acc_obj
+                     result['transaction_type'] = 'credit' # Force logic to treat as credit
         
         if not source_account:
             # INTERACTIVE FALLBACK (Now creates a PENDING_ACTION transaction)

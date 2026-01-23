@@ -762,6 +762,16 @@ const Transactions = () => {
                                     onChange={e => setForm({ ...form, notes: e.target.value })}
                                 />
                             </div>
+
+                            {/* Raw SMS Display (Read-Only) */}
+                            {editingTx?.raw_sms_content && (
+                                <div className="pt-2 border-t border-white/5">
+                                    <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Raw Message Details</label>
+                                    <div className="mt-1 p-3 bg-slate-900/50 rounded-lg border border-slate-700/50 text-xs font-mono text-gray-400 whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
+                                        {editingTx.raw_sms_content}
+                                    </div>
+                                </div>
+                            )}
                             <button type="submit" className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 font-medium mt-4">Save Changes</button>
                         </form>
                     </Modal>
