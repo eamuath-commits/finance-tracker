@@ -93,54 +93,39 @@ async def parse_with_ai(db: Session, text: str):
 
     **Extraction Rules:**
     1. **Identify Type**: Is this a Purchase, Transfer (In/Out), Bill Payment, Cash Withdrawal, Deposit, or Decline/Failed transaction?
-    2. **Merchant/Counterparty**: 
-       - For Purchases: Store Name (e.g. "Starbucks", "Uber").
-       - For Transfers: **PRIORITIZE HUMAN NAMES**. 
-            - If msg says "To: MUATH" and "Account: 7772", Set merchant="MUATH". Put "7772" in `destination_account_last4`.
-            - If msg says "From: AHMED" and "Account: 8888", Set merchant="AHMED". Put "8888" in `source_account_last4`.
-       - ONLY use Account Number for `merchant` if NO name is present.
-       - For Government/Bills: Entity Name (e.g. "STC", "MOI").
-    3. **Internal Transfers**: If it says "Internal Transfer" or transfer between your own accounts, set merchant to "Self" or "Internal".
-    4. **Declines**: If the message says "Declined", "Failed", or "Insufficient Funds", set `status` to "failed".
-    5. **Amount**: Extract the numerical amount. Ignore currency symbols in the number, but capture the currency code separately.
-    6. **Accounts**:
-        - **Source Account**: Look for "From Account", "Account:", "Credit Card:", "Card:", "Debited from", "By:", followed by digits. 
-             - Example: "Credit Card: 1645" -> Source Last4 = 1645.
-             - Example: "By:9365" -> Source Last4 = 9365.
-        - **Destination Account**: Look for "To", "To Account", ending digits (Common in internal transfers).
-    7. **Brand Name (Smart Reconstruction)**: 
-        - Your goal is to get the BEST possible string for logo lookup.
-        - **Aggressively Expand Abbreviations**:
-             - "str" -> "Street"
-             - "ave" -> "Avenue"
-             - "rd" -> "Road"
-        - **Truncated/Messy Names**: Aggressively guess the full name if the text looks incomplete. Use your knowledge of SAUDI brands.
-             - "If I googled this string in Saudi Arabia, what business would show up?"
-             - "first str" -> "First Street" (Popular electronics store in KSA) 
-             - "HUNGERSTA" -> "HungerStation"
-             - "ALAFRAH R" -> "Alafrah Restaurant" 
-             - "JARIR B" -> "Jarir Bookstore"
-             - "DUNKIN D" -> "Dunkin Donuts"
-        - Remove "Riyadh", "Branch", numbers, etc.
-    8. **Fees/Tax**: Extract any explicit fee amount mentioned (e.g. "Fees: SAR 0.29").
-        - If text says "Tax", "VAT", "Fee", capture the amount.
+    2. **Metadata Extraction (CRITICAL)**:
+       - **Source**: Where did the money come FROM?
+         - "Debited from Account: 8001" -> Source Last4 = 8001.
+         - "From: MUATH" -> Merchant/Counterparty = "MUATH".
+       - **Destination**: Where did the money go TO?
+         - "To: MUATH ALAS..." -> Destination Name = "MUATH ALAS...".
+         - "IBAN/Alias: 7772" -> Destination Last4 = 7772.
+         - "To Account: 1234" -> Destination Last4 = 1234.
+    3. **Merchant/Counterparty Logic**:
+       - For **Debit/Purchase**: Merchant = Store Name (e.g. "Starbucks").
+       - For **Debit Transfer**: Merchant = **Destination Name** (e.g. "MUATH ALAS").
+            - If no Dest Name, use Dest Account (e.g. "Account 7772").
+       - For **Credit Transfer**: Merchant = **Source Name** (e.g. "AHMED").
+            - If no Source Name, use Source Account.
+    4. **Amount**: Extract numerical amount and currency.
+    5. **Brand Name**: Clean up the Merchant Name for logo search (e.g. "Starbucks", "Uber").
 
     **Output JSON Schema:**
     {{
-      "is_financial_event": boolean, (True for ANY money related message, including declines)
-      "is_transaction": boolean, (True ONLY if money actually moved. False for Declines or purely informational msgs)
+      "is_financial_event": boolean,
+      "is_transaction": boolean,
       "transaction_type": "debit" | "credit",
-      "sub_type": "purchase" | "transfer" | "payment" | "withdrawal" | "deposit" | "internal_transfer" | "decline",
-      "merchant": string (The RAW merchant string found in the text),
-      "brand_name": string (The CLEAN brand name for logo fetching, e.g. "Uber", "Netflix"),
+      "sub_type": "purchase" | "transfer" | "payment" | "withdrawal" | "deposit" | "decline",
+      "merchant": string, (The main counterparty name to show in UI),
+      "brand_name": string, (Clean name for logo),
       "amount": number,
       "currency": string,
-      "fees": number (Optional, default 0.0),
+      "fees": number,
       "date": "YYYY-MM-DD",
-      "time": "HH:MM", (24-hour format)
-      "category": string (Best guess: Food, Transport, Bills, Transfer, Income, etc.),
-      "source_account_last4": string,
-      "destination_account_last4": stringOrNull,
+      "time": "HH:MM",
+      "category": string,
+      "source_account_last4": string, (The digits of the account money LEFT),
+      "destination_account_last4": stringOrNull, (The digits of the account money entered, or IBAN/Alias),
       "status": "success" | "failed"
     }}
 
