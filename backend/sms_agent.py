@@ -841,35 +841,35 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
 
     try:
         # Edit if it's a callback query message, else reply
-            
-            # CHECK FOR LINK_SENDER SIGNAL
-            if "❓ [LINK_SENDER:" in reply_message:
-                 clean_reply, signal_part = reply_message.split("❓ [LINK_SENDER:")
-                 tx_id_str = signal_part.replace("]", "")
-                 
-                 # Prepare Buttons for Linking Source
-                 link_keyboard = []
-                 accounts_link = db.query(models.Account).order_by(models.Account.name).all()
-                 for i, acc in enumerate(accounts_link):
-                     # Use 'link:' prefix for callback handling
-                     link_keyboard.append([InlineKeyboardButton(f"{acc.name}", callback_data=f"link:{tx_id_str}:{i}")])
-                 
-                 link_markup = InlineKeyboardMarkup(link_keyboard)
-                 clean_reply += "\n❓ **Link Source Account?**"
-                 
-                 if hasattr(reply_target, 'edit_text'):
-                     await reply_target.edit_text(clean_reply, reply_markup=link_markup)
-                 else:
-                     await reply_target.reply_text(clean_reply, reply_markup=link_markup)
+        
+        # CHECK FOR LINK_SENDER SIGNAL
+        if "❓ [LINK_SENDER:" in reply_message:
+             clean_reply, signal_part = reply_message.split("❓ [LINK_SENDER:")
+             tx_id_str = signal_part.replace("]", "")
+             
+             # Prepare Buttons for Linking Source
+             link_keyboard = []
+             accounts_link = db.query(models.Account).order_by(models.Account.name).all()
+             for i, acc in enumerate(accounts_link):
+                 # Use 'link:' prefix for callback handling
+                 link_keyboard.append([InlineKeyboardButton(f"{acc.name}", callback_data=f"link:{tx_id_str}:{i}")])
+             
+             link_markup = InlineKeyboardMarkup(link_keyboard)
+             clean_reply += "\n❓ **Link Source Account?**"
+             
+             if hasattr(reply_target, 'edit_text'):
+                 await reply_target.edit_text(clean_reply, reply_markup=link_markup)
+             else:
+                 await reply_target.reply_text(clean_reply, reply_markup=link_markup)
 
+        else:
+            # Normal Reply
+            if hasattr(reply_target, 'edit_text'):
+                 await reply_target.edit_text(reply_message)
             else:
-                # Normal Reply
-                if hasattr(reply_target, 'edit_text'):
-                     await reply_target.edit_text(reply_message)
-                else:
-                     await reply_target.reply_text(reply_message)
-        except Exception as e:
-            logger.error(f"Reply error: {e}")
+                 await reply_target.reply_text(reply_message)
+    except Exception as e:
+        logger.error(f"Reply error: {e}")
 
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
