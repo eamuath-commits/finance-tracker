@@ -157,6 +157,28 @@ async def parse_with_ai(db: Session, text: str):
     }}
     
     Respond ONLY with valid JSON.
+    
+    **Examples**:
+    1. Input:
+       AlrajhiBank
+       Transfer Between Your Accounts
+       Amount: SAR 22
+       To: 1505
+       26/1/24 2:19
+       
+       Output:
+       {{
+         "is_financial_event": true,
+         "is_transaction": true,
+         "transaction_type": "credit",
+         "sub_type": "internal_transfer",
+         "source_bank": "AlRajhiBank",
+         "source_account_last4": null,
+         "destination_account_last4": "1505",
+         "amount": 22,
+         "currency": "SAR",
+         "description": "Transfer to 1505"
+       }}
     """
 
     MAX_RETRIES = 5
