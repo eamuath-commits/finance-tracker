@@ -816,17 +816,59 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
              try:
                  crud.create_transaction(db=db, transaction=credit_tx)
                  reply_message += f"\n\n🔀 **Linked Transfer**\nCredited: {dest_account.name}"
-             except Exception as e:
-                 logger.error(f"Failed to create credit leg: {e}")
+                     reply_message += f"\n\n🔀 **Linked Transfer**\nCredited: {dest_account.name}"
+                 except Exception as e:
+                     logger.error(f"Failed to create credit leg: {e}")
 
-    try:
-        # Edit if it's a callback query message, else reply
-        if hasattr(reply_target, 'edit_text'):
-             await reply_target.edit_text(reply_message)
-        else:
-             await reply_target.reply_text(reply_message)
-    except Exception as e:
-        logger.error(f"Reply error: {e}")
+        # SIGNAL FOR INTERACTIVE SENDER LINKING
+        # Condition: 
+        # 1. Type is Credit (Incoming)
+        # 2. Category is Transfer (Internal/External)
+        # 3. Source Account (Sender Internal) is NOT known (source_account here is the Primary/Dest)
+        # 4. Sender Name is missing or generic (so we don't know who sent it)
+        # 5. Not already linked (we just created it as a single leg or didn't find the source)
+        
+        should_link_sender = (
+            tx_type_value == models.TransactionType.CREDIT.value and
+            category == "Transfer" and
+            (not result.get('source_account_last4')) and # No specific source identified
+            (not result.get('sender_name')) # No external sender name
+        )
+        
+        if should_link_sender:
+             reply_message += f"\n❓ [LINK_SENDER:{new_tx.id}]"
+
+        try:
+            # Edit if it's a callback query message, else reply
+            
+            # CHECK FOR LINK_SENDER SIGNAL
+            if "❓ [LINK_SENDER:" in reply_message:
+                 clean_reply, signal_part = reply_message.split("❓ [LINK_SENDER:")
+                 tx_id_str = signal_part.replace("]", "")
+                 
+                 # Prepare Buttons for Linking Source
+                 link_keyboard = []
+                 accounts_link = db.query(models.Account).order_by(models.Account.name).all()
+                 for i, acc in enumerate(accounts_link):
+                     # Use 'link:' prefix for callback handling
+                     link_keyboard.append([InlineKeyboardButton(f"{acc.name}", callback_data=f"link:{tx_id_str}:{i}")])
+                 
+                 link_markup = InlineKeyboardMarkup(link_keyboard)
+                 clean_reply += "\n❓ **Link Source Account?**"
+                 
+                 if hasattr(reply_target, 'edit_text'):
+                     await reply_target.edit_text(clean_reply, reply_markup=link_markup)
+                 else:
+                     await reply_target.reply_text(clean_reply, reply_markup=link_markup)
+
+            else:
+                # Normal Reply
+                if hasattr(reply_target, 'edit_text'):
+                     await reply_target.edit_text(reply_message)
+                else:
+                     await reply_target.reply_text(reply_message)
+        except Exception as e:
+            logger.error(f"Reply error: {e}")
 
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -886,6 +928,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     # Update Merchant Name to reflect the now-known source
                     if updated_tx.type == "debit": # This was the Source
                         link.merchant = f"Transfer from {selected_account.name}"
+                        # Also Confirm the Linked Credit since Source is now known
+                        link.status = "completed"
                         db.commit()
                         success_msg += f"\n🔄 Updated Linked Credit on {link.account.name}"
                     elif updated_tx.type == "credit":
@@ -899,6 +943,58 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_text(f"❌ Error updating transaction: {e}")
 
             db.close()
+
+        # LINK SENDER CALLBACK
+        elif data.startswith("link:"):
+             _, tx_id, acc_idx_str = data.split(":")
+             acc_idx = int(acc_idx_str)
+             
+             db = database.SessionLocal()
+             accounts = db.query(models.Account).order_by(models.Account.name).all()
+             
+             if acc_idx >= len(accounts):
+                  await query.edit_message_text("❌ Error: Account selection invalid.")
+                  db.close()
+                  return
+             
+             source_account = accounts[acc_idx]
+             
+             # Fetch the Credit Transaction (Destination)
+             credit_tx = crud.get_transaction(db, tx_id)
+             if not credit_tx:
+                  await query.edit_message_text("❌ Error: Original Credit Transaction not found.")
+                  db.close()
+                  return
+
+             # Create the Debit Leg (Sender)
+             try:
+                 debit_tx = schemas.TransactionCreate(
+                     account_id=source_account.id,
+                     amount=credit_tx.amount,
+                     merchant=f"Transfer to {credit_tx.account.name}",
+                     category="Transfer",
+                     type="debit",
+                     timestamp=credit_tx.timestamp,
+                     raw_sms_content=f"Linked Debit Source for TX {tx_id}",
+                     status="completed" # Source linkage confirms both
+                 )
+                 
+                 new_debit = crud.create_transaction(db=db, transaction=debit_tx)
+                 
+                 # IMPORTANT: Update the Credit Leg's description to show the Source
+                 credit_tx.merchant = f"Transfer from {source_account.name}"
+                 # credit_tx.status = "completed" # It's likely already created as completed/verified, but ensure it.
+                 db.commit()
+                 
+                 await query.edit_message_text(
+                     f"✅ **Source Linked**: {source_account.name}\n"
+                     f"🔄 Created Debit Leg: {new_debit.amount}\n"
+                     f"✅ Updated Credit Leg: Transfer from {source_account.name}"
+                 )
+             except Exception as e:
+                  await query.edit_message_text(f"❌ Error creating sender leg: {e}")
+             
+             db.close()
 
     except Exception as e:
         logger.error(f"Callback Error: {e}")
