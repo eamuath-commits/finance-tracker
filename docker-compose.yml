@@ -27,7 +27,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/finance_db
       - TZ=Asia/Riyadh
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-1.5-flash}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash-exp}
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ./backend:/app
@@ -45,7 +45,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/finance_db
       - TZ=Asia/Riyadh
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-1.5-flash}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash-exp}
     command: [ "python", "sms_agent.py" ]
     volumes:
       - /etc/localtime:/etc/localtime:ro
