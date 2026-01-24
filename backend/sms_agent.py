@@ -836,11 +836,11 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
         (not result.get('sender_name')) # No external sender name
     )
         
-        if should_link_sender:
-             reply_message += f"\n❓ [LINK_SENDER:{new_tx.id}]"
+    if should_link_sender:
+         reply_message += f"\n❓ [LINK_SENDER:{new_tx.id}]"
 
-        try:
-            # Edit if it's a callback query message, else reply
+    try:
+        # Edit if it's a callback query message, else reply
             
             # CHECK FOR LINK_SENDER SIGNAL
             if "❓ [LINK_SENDER:" in reply_message:
