@@ -790,7 +790,9 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
     # Handle Internal Transfer (Credit Leg)
     # dest_account already resolved above
 
-    if dest_account and dest_account.id != source_account.id:
+    # Handle Internal Transfer (Credit Leg)
+    # Only if both accounts are known and different
+    if dest_account and source_account and dest_account.id != source_account.id:
          credit_tx = schemas.TransactionCreate(
              account_id=dest_account.id,
              amount=result['amount'], 
@@ -819,20 +821,20 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
              except Exception as e:
                  logger.error(f"Failed to create credit leg: {e}")
 
-        # SIGNAL FOR INTERACTIVE SENDER LINKING
-        # Condition: 
-        # 1. Type is Credit (Incoming)
-        # 2. Category is Transfer (Internal/External)
-        # 3. Source Account (Sender Internal) is NOT known (source_account here is the Primary/Dest)
-        # 4. Sender Name is missing or generic (so we don't know who sent it)
-        # 5. Not already linked (we just created it as a single leg or didn't find the source)
-        
-        should_link_sender = (
-            tx_type_value == models.TransactionType.CREDIT.value and
-            category == "Transfer" and
-            (not result.get('source_account_last4')) and # No specific source identified
-            (not result.get('sender_name')) # No external sender name
-        )
+    # SIGNAL FOR INTERACTIVE SENDER LINKING
+    # Condition: 
+    # 1. Type is Credit (Incoming)
+    # 2. Category is Transfer (Internal/External)
+    # 3. Source Account (Sender Internal) is NOT known (source_account here is the Primary/Dest)
+    # 4. Sender Name is missing or generic (so we don't know who sent it)
+    # 5. Not already linked (we just created it as a single leg or didn't find the source)
+    
+    should_link_sender = (
+        tx_type_value == models.TransactionType.CREDIT.value and
+        category == "Transfer" and
+        (not result.get('source_account_last4')) and # No specific source identified
+        (not result.get('sender_name')) # No external sender name
+    )
         
         if should_link_sender:
              reply_message += f"\n❓ [LINK_SENDER:{new_tx.id}]"
