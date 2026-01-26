@@ -345,7 +345,6 @@ const Accounts = () => {
         account_id: '',
         amount: '',
         merchant: '',
-        merchant: '',
         category: '',
         notes: '',
         timestamp: new Date().toISOString().split('T')[0]
@@ -445,7 +444,6 @@ const Accounts = () => {
             setTxForm({
                 account_id: tx.account_id,
                 amount: tx.amount,
-                merchant: tx.merchant,
                 merchant: tx.merchant,
                 category: tx.category || '',
                 notes: tx.notes || '',

@@ -200,3 +200,60 @@ export const BrandLogo = ({ name, size = "w-8 h-8", className = "", category }) 
         />
     );
 };
+
+// --- Missing Components Added by Agent ---
+
+export const Badge = ({ children, variant = "neutral", className = "" }) => {
+    const variants = {
+        success: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+        warning: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+        danger: "bg-red-500/10 text-red-400 border-red-500/20",
+        neutral: "bg-slate-700 text-slate-300 border-slate-600",
+        primary: "bg-blue-500/10 text-blue-400 border-blue-500/20"
+    };
+    return (
+        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${variants[variant] || variants.neutral} ${className}`}>
+            {children}
+        </span>
+    );
+};
+
+export const Button = ({ children, variant = "primary", onClick, className = "", icon: Icon, ...props }) => {
+    const variants = {
+        primary: "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20",
+        secondary: "bg-slate-700 hover:bg-slate-600 text-white",
+        danger: "bg-red-600 hover:bg-red-500 text-white",
+        ghost: "hover:bg-white/5 text-slate-400 hover:text-white"
+    };
+
+    return (
+        <button
+            onClick={onClick}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 active:scale-95 ${variants[variant] || variants.primary} ${className}`}
+            {...props}
+        >
+            {Icon && <Icon size={18} />}
+            {children}
+        </button>
+    );
+};
+
+export const Spinner = () => (
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+);
+
+const UI = {
+    Card,
+    Badge,
+    Button,
+    Spinner,
+    SectionHeader,
+    Modal,
+    BrandLogo,
+    formatCurrency,
+    inputClass,
+    selectClass,
+    EditIcon
+};
+
+export default UI;

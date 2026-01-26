@@ -804,6 +804,26 @@ def find_transaction_matches(
             
     return matches
 
+def get_categories(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Category).order_by(models.Category.name.asc()).offset(skip).limit(limit).all()
+
+def create_category(db: Session, category: schemas.CategoryCreate):
+    db_cat = models.Category(
+        name=category.name,
+        type=category.type
+    )
+    db.add(db_cat)
+    db.commit()
+    db.refresh(db_cat)
+    return db_cat
+
+def delete_category(db: Session, category_id: str):
+    db_cat = db.query(models.Category).filter(models.Category.id == category_id).first()
+    if db_cat:
+        db.delete(db_cat)
+        db.commit()
+    return db_cat
+
 def get_similar_training_examples(db: Session, text: str, limit: int = 3):
     """
     Naive similarity search. In production, use embeddings (pgvector).
@@ -830,82 +850,4 @@ def get_similar_training_examples(db: Session, text: str, limit: int = 3):
 def get_random_training_examples(db: Session, limit: int = 3):
     return db.query(models.TrainingExample).order_by(func.random()).limit(limit).all()
 
-# --- Obligations & Payments ---
 
-def get_obligations(db: Session):
-    return db.query(models.MonthlyObligation).order_by(models.MonthlyObligation.display_order.asc(), models.MonthlyObligation.due_day.asc()).all()
-
-def create_obligation(db: Session, obligation: schemas.ObligationCreate):
-    # Set display_order to last + 1
-    last = db.query(models.MonthlyObligation).order_by(models.MonthlyObligation.display_order.desc()).first()
-    new_order = (last.display_order + 1) if last else 0
-    
-    db_obl = models.MonthlyObligation(**obligation.dict(), display_order=new_order)
-    db.add(db_obl)
-    db.commit()
-    db.refresh(db_obl)
-    return db_obl
-
-def update_obligation(db: Session, obl_id: str, updates: schemas.ObligationUpdate):
-    db_obl = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obl_id).first()
-    if not db_obl:
-        return None
-    
-    update_data = updates.dict(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(db_obl, key, value)
-    
-    db.commit()
-    db.refresh(db_obl)
-    return db_obl
-
-def delete_obligation(db: Session, obl_id: str):
-    db_obl = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obl_id).first()
-    if not db_obl:
-        return False
-    
-    # Cascade delete payments? Or keep them? Usually cascade or set null.
-    # Models likely handle relation, but let's be safe.
-    db.query(models.Payment).filter(models.Payment.obligation_id == obl_id).delete()
-    
-    db.delete(db_obl)
-    db.commit()
-    return True
-
-def reorder_obligations(db: Session, ordered_ids: List[str]):
-    for idx, obl_id in enumerate(ordered_ids):
-        db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obl_id).update({"display_order": idx})
-    db.commit()
-
-# --- Payments ---
-
-def get_payment_history(db: Session, obligation_id: str):
-    return db.query(models.Payment).filter(models.Payment.obligation_id == obligation_id).order_by(models.Payment.payment_date.desc()).all()
-
-def create_payment(db: Session, obligation_id: str, payment: schemas.PaymentCreate):
-    db_pay = models.Payment(**payment.dict(), obligation_id=obligation_id)
-    db.add(db_pay)
-    db.commit()
-    db.refresh(db_pay)
-    return db_pay
-
-def update_payment(db: Session, payment_id: int, updates: schemas.PaymentUpdate):
-    db_pay = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
-    if not db_pay:
-        return None
-    
-    update_data = updates.dict(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(db_pay, key, value)
-        
-    db.commit()
-    db.refresh(db_pay)
-    return db_pay
-
-def delete_payment(db: Session, payment_id: int):
-    db_pay = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
-    if not db_pay:
-        return False
-    db.delete(db_pay)
-    db.commit()
-    return True

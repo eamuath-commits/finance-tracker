@@ -85,7 +85,7 @@ class Transaction(Base):
     raw_sms_content = Column(Text)
     timestamp = Column(DateTime)
     category = Column(String, nullable=True)
-    type = Column(Enum(TransactionType), default=TransactionType.DEBIT) # "credit" or "debit"
+    type = Column(String, default="debit") # "credit" or "debit"
     balance_after_transaction = Column(Float, nullable=True)
     status = Column(String, default="completed", nullable=False) # pending, completed, pending_action (for unknown source/dest)
     notes = Column(Text, nullable=True)
