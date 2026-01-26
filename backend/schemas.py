@@ -20,7 +20,7 @@ class CurrencyWallet(CurrencyWalletBase):
     last_updated: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # --- Account Alias Schemas ---
 class AccountAliasBase(BaseModel):
@@ -35,7 +35,7 @@ class AccountAlias(AccountAliasBase):
     account_id: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # --- Transaction Schemas ---
 class TransactionBase(BaseModel):
@@ -52,7 +52,7 @@ class TransactionBase(BaseModel):
     logo_url: Optional[str] = None
 
 class TransactionCreate(TransactionBase):
-    account_id: str
+    account_id: Optional[str] = None
     raw_sms_content: Optional[str] = None
     timestamp: datetime
 
@@ -76,10 +76,13 @@ class Transaction(TransactionBase):
     balance_after_transaction: Optional[float] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class BulkDeleteRequest(BaseModel):
     ids: List[str]
+
+class ReorderSchema(BaseModel):
+    ordered_ids: List[str]
 
 class BulkDeleteObligationsRequest(BaseModel):
     ids: List[str]
@@ -87,32 +90,28 @@ class BulkDeleteObligationsRequest(BaseModel):
 # --- Payment Schemas ---
 class PaymentBase(BaseModel):
     amount: float
-    planned_amount: Optional[float] = None
-    payment_date: date
-    billing_month: str
-    note: Optional[str] = None
+    payment_date: Optional[datetime] = None
+    billing_month: Optional[str] = None
     status: str = "PAID"
+    note: Optional[str] = None
 
 class PaymentCreate(PaymentBase):
-    transaction_id: Optional[str] = None
+    pass
 
 class PaymentUpdate(BaseModel):
     amount: Optional[float] = None
-    payment_date: Optional[date] = None
+    payment_date: Optional[datetime] = None
     billing_month: Optional[str] = None
-    note: Optional[str] = None
     status: Optional[str] = None
-    transaction_id: Optional[str] = None
+    note: Optional[str] = None
 
 class Payment(PaymentBase):
     id: int
     obligation_id: str
-    transaction_id: Optional[str] = None
-    transaction: Optional[Transaction] = None
-
     class Config:
-        orm_mode = True
+        from_attributes = True
 
+# --- Obligation Schemas ---
 class ObligationBase(BaseModel):
     name: str
     amount: Optional[float] = None
@@ -120,7 +119,7 @@ class ObligationBase(BaseModel):
     category: Optional[str] = None
     provider: Optional[str] = None
     notes: Optional[str] = None
-    display_order: int = 0
+    status: str = "ACTIVE"
 
 class ObligationCreate(ObligationBase):
     pass
@@ -132,15 +131,18 @@ class ObligationUpdate(BaseModel):
     category: Optional[str] = None
     provider: Optional[str] = None
     notes: Optional[str] = None
+    status: Optional[str] = None
     display_order: Optional[int] = None
 
-class MonthlyObligation(ObligationBase):
+class Obligation(ObligationBase):
     id: str
+    display_order: int
     payments: List[Payment] = []
-
+    
     class Config:
-        orm_mode = True
+        from_attributes = True
 
+# --- Account Schemas ---
 class AccountBase(BaseModel):
     name: str
     account_type: str
@@ -169,7 +171,7 @@ class Account(AccountBase):
     wallets: List[CurrencyWallet] = []
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class RawMessage(BaseModel):
     id: str
@@ -180,7 +182,7 @@ class RawMessage(BaseModel):
     error_log: Optional[str]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class CategoryBase(BaseModel):
     name: str
@@ -189,11 +191,15 @@ class CategoryBase(BaseModel):
 class CategoryCreate(CategoryBase):
     pass
 
+class CategoryUpdate(BaseModel):
+    name: Optional[str] = None
+    type: Optional[str] = None
+
 class Category(CategoryBase):
     id: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class SavingsGoalBase(BaseModel):
     name: str
@@ -218,7 +224,7 @@ class SavingsGoal(SavingsGoalBase):
     id: str
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class LoanBase(BaseModel):
     name: str
@@ -251,7 +257,7 @@ class Loan(LoanBase):
     display_order: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # --- Allocation Rules Schemas ---
 class AllocationRuleBase(BaseModel):
@@ -267,7 +273,7 @@ class AllocationRule(AllocationRuleBase):
     id: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class AllocationHistoryBase(BaseModel):
     month: str
@@ -283,4 +289,24 @@ class AllocationHistory(AllocationHistoryBase):
     id: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+        
+# --- Allocation Preview Schemas ---
+class AllocationMatch(BaseModel):
+    rule_id: str
+    keyword: str
+    percentage: float
+    category_group: str
+    allocated_amount: float
+
+class AllocationPreviewResponse(BaseModel):
+    transaction_id: str
+    merchant: str
+    amount: float
+    matches: List[AllocationMatch]
+    total_allocated: float
+    remaining: float
+
+class AllocationExecuteRequest(BaseModel):
+    transaction_ids: List[str]
+    # Optionally override allocations? For now simple list.
