@@ -1,37 +1,28 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import List, Optional
 from datetime import datetime, date
-from models import AccountType, TransactionType
+import enum
 
-class AccountBase(BaseModel):
-    name: str
-    account_type: AccountType
-    last_4_digits: Optional[str] = None
-    current_balance: float
-    credit_limit: Optional[float] = None
-    interest_rate: Optional[float] = None
-    minimum_payment: Optional[float] = None
-    bank_name: Optional[str] = None
-    bank_logo_url: Optional[str] = None
-    is_income: Optional[bool] = False
-    notes: Optional[str] = None
+# --- Currency Wallet Schemas ---
+class CurrencyWalletBase(BaseModel):
+    currency_code: str
+    balance: float
 
-class AccountCreate(AccountBase):
+class CurrencyWalletCreate(CurrencyWalletBase):
     pass
 
-class AccountUpdate(BaseModel):
-    name: Optional[str] = None
-    account_type: Optional[AccountType] = None
-    last_4_digits: Optional[str] = None
-    current_balance: Optional[float] = None
-    credit_limit: Optional[float] = None
-    interest_rate: Optional[float] = None
-    minimum_payment: Optional[float] = None
-    bank_name: Optional[str] = None
-    bank_logo_url: Optional[str] = None
-    is_income: Optional[bool] = None
-    notes: Optional[str] = None
+class CurrencyWalletUpdate(BaseModel):
+    balance: Optional[float] = None
 
+class CurrencyWallet(CurrencyWalletBase):
+    id: str
+    account_id: str
+    last_updated: datetime
+
+    class Config:
+        orm_mode = True
+
+# --- Account Alias Schemas ---
 class AccountAliasBase(BaseModel):
     alias_name: str
     last_4_digits: str
@@ -42,157 +33,172 @@ class AccountAliasCreate(AccountAliasBase):
 class AccountAlias(AccountAliasBase):
     id: int
     account_id: str
-    class Config:
-        from_attributes = True
 
-class Account(AccountBase):
-    id: str
-    aliases: List[AccountAlias] = []
     class Config:
-        from_attributes = True
+        orm_mode = True
 
+# --- Transaction Schemas ---
 class TransactionBase(BaseModel):
     amount: float
-    merchant: str
+    merchant: Optional[str] = None
     category: Optional[str] = None
-    # Changed from TransactionType to str to avoid Pydantic casting it back to Enum object which fails in DB
-    type: Optional[str] = "debit"
-    raw_sms_content: Optional[str] = None
-    timestamp: Optional[datetime] = None
-    status: Optional[str] = "completed"
-    logo_url: Optional[str] = None
+    type: str # "credit" or "debit"
+    status: str = "completed"
     notes: Optional[str] = None
     fees: Optional[float] = 0.0
+    original_amount: Optional[float] = None
+    original_currency: Optional[str] = None
+    exchange_rate: Optional[float] = None
+    logo_url: Optional[str] = None
 
 class TransactionCreate(TransactionBase):
-    account_id: Optional[str] = None
-    # ...
+    account_id: str
+    raw_sms_content: Optional[str] = None
+    timestamp: datetime
 
 class TransactionUpdate(BaseModel):
-    account_id: Optional[str] = None
     amount: Optional[float] = None
     merchant: Optional[str] = None
     category: Optional[str] = None
     type: Optional[str] = None
-    timestamp: Optional[datetime] = None
-    logo_url: Optional[str] = None
+    status: Optional[str] = None
     notes: Optional[str] = None
+    timestamp: Optional[datetime] = None
     fees: Optional[float] = None
-
+    original_amount: Optional[float] = None
+    original_currency: Optional[str] = None
+    exchange_rate: Optional[float] = None
 
 class Transaction(TransactionBase):
     id: str
-    account_id: Optional[str] = None
+    account_id: str
     timestamp: datetime
     balance_after_transaction: Optional[float] = None
-    logo_url: Optional[str] = None
+
     class Config:
-        from_attributes = True
+        orm_mode = True
 
-class LoanBase(BaseModel):
-    name: str
-    principal_amount: float
-    interest_rate: float
-    start_date: datetime
-    term_months: int
-    monthly_payment: Optional[float] = None
-    due_day: Optional[int] = None
-    notes: Optional[str] = None
+class BulkDeleteRequest(BaseModel):
+    ids: List[str]
 
-class LoanCreate(LoanBase):
-    pass
+class BulkDeleteObligationsRequest(BaseModel):
+    ids: List[str]
 
-class LoanUpdate(BaseModel):
-    name: Optional[str] = None
-    principal_amount: Optional[float] = None
-    interest_rate: Optional[float] = None
-    start_date: Optional[datetime] = None
-    term_months: Optional[int] = None
-    remaining_balance: Optional[float] = None
-    monthly_payment: Optional[float] = None
-    due_day: Optional[int] = None
-    notes: Optional[str] = None
-
-class Loan(LoanBase):
-    id: str
-    remaining_balance: float
-    monthly_payment: Optional[float] = None
-    due_day: Optional[int] = None
-    notes: Optional[str] = None
-    display_order: int = 0
-    class Config:
-        from_attributes = True
-
-class ObligationBase(BaseModel):
-    name: str
-    due_day: int
-    category: str = "Other"
-    notes: Optional[str] = None
-    provider: Optional[str] = None
-
-class ObligationCreate(ObligationBase):
-    pass
-
-class ObligationUpdate(ObligationBase):
-    name: Optional[str] = None
-    due_day: Optional[int] = None
-    category: Optional[str] = None
-    notes: Optional[str] = None
-    provider: Optional[str] = None
-
-class Obligation(ObligationBase):
-    id: str
-    class Config:
-        from_attributes = True
-
-class SMSPayload(BaseModel):
-    body: str
-    sender: str
-    timestamp: Optional[datetime] = None
-
+# --- Payment Schemas ---
 class PaymentBase(BaseModel):
-    payment_date: datetime
-    billing_month: Optional[datetime] = None
     amount: float
+    planned_amount: Optional[float] = None
+    payment_date: date
+    billing_month: str
     note: Optional[str] = None
-    status: str = "PAID" # "PAID" or "BUDGET"
-    transaction_id: Optional[str] = None
+    status: str = "PAID"
 
 class PaymentCreate(PaymentBase):
-    pass
+    transaction_id: Optional[str] = None
 
 class PaymentUpdate(BaseModel):
-    payment_date: Optional[datetime] = None
-    billing_month: Optional[datetime] = None
     amount: Optional[float] = None
+    payment_date: Optional[date] = None
+    billing_month: Optional[str] = None
     note: Optional[str] = None
     status: Optional[str] = None
     transaction_id: Optional[str] = None
 
 class Payment(PaymentBase):
+    id: int
     obligation_id: str
+    transaction_id: Optional[str] = None
+    transaction: Optional[Transaction] = None
+
     class Config:
-        from_attributes = True
+        orm_mode = True
 
-class ReorderSchema(BaseModel):
-    ordered_ids: List[str]
+class ObligationBase(BaseModel):
+    name: str
+    amount: Optional[float] = None
+    due_day: int
+    category: Optional[str] = None
+    provider: Optional[str] = None
+    notes: Optional[str] = None
+    display_order: int = 0
 
-class RawMessageBase(BaseModel):
-    sender: Optional[str] = None
-    body: str
-    status: str
-    error_log: Optional[str] = None
-    timestamp: datetime
+class ObligationCreate(ObligationBase):
+    pass
 
-class RawMessage(RawMessageBase):
+class ObligationUpdate(BaseModel):
+    name: Optional[str] = None
+    amount: Optional[float] = None
+    due_day: Optional[int] = None
+    category: Optional[str] = None
+    provider: Optional[str] = None
+    notes: Optional[str] = None
+    display_order: Optional[int] = None
+
+class MonthlyObligation(ObligationBase):
     id: str
+    payments: List[Payment] = []
+
     class Config:
-        from_attributes = True
+        orm_mode = True
+
+class AccountBase(BaseModel):
+    name: str
+    account_type: str
+    last_4_digits: Optional[str] = None
+    current_balance: float = 0.0
+    credit_limit: Optional[float] = None
+    bank_name: Optional[str] = None
+    bank_logo_url: Optional[str] = None
+    notes: Optional[str] = None
+
+class AccountCreate(AccountBase):
+    pass
+
+class AccountUpdate(BaseModel):
+    name: Optional[str] = None
+    account_type: Optional[str] = None
+    last_4_digits: Optional[str] = None
+    current_balance: Optional[float] = None
+    credit_limit: Optional[float] = None
+    bank_name: Optional[str] = None
+    notes: Optional[str] = None
+
+class Account(AccountBase):
+    id: str
+    aliases: List[AccountAlias] = []
+    wallets: List[CurrencyWallet] = []
+
+    class Config:
+        orm_mode = True
+
+class RawMessage(BaseModel):
+    id: str
+    sender: Optional[str]
+    body: str
+    timestamp: datetime
+    status: str
+    error_log: Optional[str]
+
+    class Config:
+        orm_mode = True
+
+class CategoryBase(BaseModel):
+    name: str
+    type: str
+
+class CategoryCreate(CategoryBase):
+    pass
+
+class Category(CategoryBase):
+    id: str
+
+    class Config:
+        orm_mode = True
 
 class SavingsGoalBase(BaseModel):
     name: str
     target_amount: float
-    current_amount: Optional[float] = 0.0
+    current_amount: float = 0.0
     target_date: Optional[date] = None
     icon: Optional[str] = None
     color: Optional[str] = None
@@ -210,59 +216,71 @@ class SavingsGoalUpdate(BaseModel):
 
 class SavingsGoal(SavingsGoalBase):
     id: str
+    
     class Config:
-        from_attributes = True
+        orm_mode = True
 
+class LoanBase(BaseModel):
+    name: str
+    principal_amount: float
+    interest_rate: float
+    start_date: date
+    term_months: int
+    notes: Optional[str] = None
+    monthly_payment: Optional[float] = None
+    due_day: Optional[int] = None
+
+class LoanCreate(LoanBase):
+    pass
+
+class LoanUpdate(BaseModel):
+    name: Optional[str] = None
+    principal_amount: Optional[float] = None
+    interest_rate: Optional[float] = None
+    start_date: Optional[date] = None
+    term_months: Optional[int] = None
+    remaining_balance: Optional[float] = None
+    notes: Optional[str] = None
+    monthly_payment: Optional[float] = None
+    due_day: Optional[int] = None
+    display_order: Optional[int] = None
+
+class Loan(LoanBase):
+    id: str
+    remaining_balance: float
+    display_order: int
+
+    class Config:
+        orm_mode = True
+
+# --- Allocation Rules Schemas ---
 class AllocationRuleBase(BaseModel):
-    rule_type: str # "CATEGORY" or "LOAN"
-    identifier: str
-    target_account_id: str
+    keyword: str
+    field: str = "merchant"
+    percentage: float
+    category_group: str
 
 class AllocationRuleCreate(AllocationRuleBase):
     pass
 
 class AllocationRule(AllocationRuleBase):
     id: str
+
     class Config:
-        from_attributes = True
+        orm_mode = True
 
-class AllocationPreviewItem(BaseModel):
-    rule_type: str
-    identifier: str
-    name: str 
-    amount: float
-    required_amount: float = 0.0
-    target_account_id: str
-    target_account_name: str
+class AllocationHistoryBase(BaseModel):
+    month: str
+    income: float
+    needs_planned: float
+    needs_actual: float
+    wants_planned: float
+    wants_actual: float
+    savings_planned: float
+    savings_actual: float
 
-class AllocationPreviewResponse(BaseModel):
-    total_amount: float
-    total_required: float = 0.0
-    surplus: float = 0.0
-    allocations: List[AllocationPreviewItem]
-    skipped_items: List[str] = []
-    fulfilled_items: List[str] = []
-
-class AllocationExecuteRequest(BaseModel):
-    source_account_id: str
-    month_offset: Optional[int] = 0
-    target_account_id: Optional[str] = None
-    override_amount: Optional[float] = None
-
-class CategoryBase(BaseModel):
-    name: str
-
-class CategoryCreate(CategoryBase):
-    pass
-
-class Category(CategoryBase):
+class AllocationHistory(AllocationHistoryBase):
     id: str
+
     class Config:
-        from_attributes = True
-
-
-class CategoryUpdate(BaseModel):
-    name: str
-
-class BulkDeleteRequest(BaseModel):
-    ids: List[str]
+        orm_mode = True

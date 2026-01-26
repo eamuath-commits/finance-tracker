@@ -2,14 +2,16 @@ from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, B
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text, inspect
-from typing import List
+from typing import List, Optional
 from datetime import datetime
+import re
 
 import models
 import schemas
 import crud
 from database import engine, get_db
 from sms_parser import parser
+import sms_agent
 import analysis
 import analysis_schema
 
@@ -450,59 +452,52 @@ async def receive_sms(request: Request, db: Session = Depends(get_db)):
     
     print(f"Extract SMS Body: {body}")
 
-    # 2. Parse (Regex)
-    parsed_data = parser.parse(body)
-    
-    if not parsed_data:
+    # 2. Unified AI Parse
+    try:
+        result = await sms_agent.parse_with_ai(db, body)
+    except Exception as e:
         raw_msg.status = models.MessageStatus.FAILED
-        raw_msg.error_log = "No pattern matched"
+        raw_msg.error_log = f"AI Parse Error: {str(e)}"
         db.commit()
-        return {"status": "ignored", "reason": "No pattern matched"}
-    
-    last_4 = parsed_data["last_4"]
-    amount = parsed_data["amount"]
-    merchant = parsed_data["merchant"]
+        return {"status": "failed", "reason": f"AI Parse Error: {str(e)}"}
+
+    if not result or not result.get("is_financial_event"):
+        raw_msg.status = models.MessageStatus.FAILED
+        raw_msg.error_log = "Not a financial event"
+        db.commit()
+        return {"status": "ignored", "reason": "Not a financial event"}
 
     # 3. Find Account
-    account = crud.get_account_by_last_4(db, last_4=last_4)
+    last_4 = result.get("destination_account_last4") or result.get("source_account_last4")
+    if not last_4 and result.get("card_info"):
+        # Heuristic for cards
+        card_match = re.search(r"(\d{4})", result["card_info"])
+        if card_match: last_4 = card_match.group(1)
+
+    account = crud.get_account_by_last_4(db, last_4=last_4) if last_4 else None
+    
     if not account:
         raw_msg.status = models.MessageStatus.FAILED
-        raw_msg.error_log = f"Account with last 4 digits {last_4} not found"
+        raw_msg.error_log = f"Account {last_4} not found"
         db.commit()
         return {
             "status": "warning", 
             "reason": f"Account with last 4 digits {last_4} not found",
-            "parsed": parsed_data
+            "parsed": result
         }
 
-    # 4. Create Transaction
-    transaction_data = schemas.TransactionCreate(
-        account_id=account.id,
-        amount=amount,
-        merchant=merchant,
-        raw_sms_content=body
-    )
-    # Use parsed timestamp if available
-    if parsed_data.get("timestamp"):
-        transaction_data.timestamp = parsed_data["timestamp"]
-    else:
-        transaction_data.timestamp = datetime.now()
-
-    crud.create_transaction(db, transaction_data)
-
-    # 5. Update Status
-    raw_msg.status = models.MessageStatus.PARSED
-    db.commit()
-
-    return {
-        "status": "success",
-        "message": f"Logged {amount} at {merchant} for account {account.name}"
-    }
-
-    return {
-        "status": "success",
-        "message": f"Logged {amount} at {merchant} for account {account.name}"
-    }
+    # 4. Create Transaction Logic (Handles Conversion, Credit/Debit, etc.)
+    try:
+        await sms_agent._create_transaction_logic(db, result, account, body, reply_target=None)
+        raw_msg.status = models.MessageStatus.PARSED
+        raw_msg.error_log = None
+        db.commit()
+        return {"status": "success", "message": "Logged successfully via AI"}
+    except Exception as e:
+        raw_msg.status = models.MessageStatus.FAILED
+        raw_msg.error_log = f"Storage Error: {str(e)}"
+        db.commit()
+        return {"status": "failed", "reason": str(e)}
 
 # --- SMS Inbox Endpoints ---
 @app.get("/messages/", response_model=List[schemas.RawMessage])
@@ -510,49 +505,54 @@ def read_messages(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
     return db.query(models.RawMessage).order_by(models.RawMessage.timestamp.desc()).offset(skip).limit(limit).all()
 
 @app.post("/messages/{message_id}/retry")
-def retry_message(message_id: str, db: Session = Depends(get_db)):
+async def retry_message(message_id: str, db: Session = Depends(get_db)):
     # Fetch Message
     msg = db.query(models.RawMessage).filter(models.RawMessage.id == message_id).first()
     if not msg:
         raise HTTPException(status_code=404, detail="Message not found")
 
-    # Re-run logic (Duplicate of receive_sms almost, should refactor)
-    # Refactor: Encapsulate parse-and-log logic?
-    # For now, inline for speed.
-    
-    parsed_data = parser.parse(msg.body)
-    if not parsed_data:
+    # 1. Re-Run AI Parse
+    try:
+        result = await sms_agent.parse_with_ai(db, msg.body)
+    except Exception as e:
         msg.status = models.MessageStatus.FAILED
-        msg.error_log = "Retry: No pattern matched"
+        msg.error_log = f"Retry AI Error: {str(e)}"
         db.commit()
-        return {"status": "failed", "reason": "No pattern matched"}
+        return {"status": "failed", "reason": str(e)}
+        
+    if not result or not result.get("is_financial_event"):
+        msg.status = models.MessageStatus.FAILED
+        msg.error_log = "Retry: AI said not financial"
+        db.commit()
+        return {"status": "ignored", "reason": "Not financial"}
 
-    last_4 = parsed_data["last_4"]
-    account = crud.get_account_by_last_4(db, last_4=last_4)
+    # 2. Find Account logic (Unified)
+    last_4 = result.get("destination_account_last4") or result.get("source_account_last4")
+    # Fallback to card info
+    if not last_4 and result.get("card_info"):
+         card_match = re.search(r"(\d{4})", result["card_info"])
+         if card_match: last_4 = card_match.group(1)
+
+    account = crud.get_account_by_last_4(db, last_4=last_4) if last_4 else None
+
     if not account:
         msg.status = models.MessageStatus.FAILED
         msg.error_log = f"Retry: Account {last_4} not found"
         db.commit()
         return {"status": "warning", "reason": "Account not found"}
 
-    # Success
-    transaction_data = schemas.TransactionCreate(
-        account_id=account.id,
-        amount=parsed_data["amount"],
-        merchant=parsed_data["merchant"],
-        raw_sms_content=msg.body
-    )
-    # Use parsed timestamp if available
-    if parsed_data.get("timestamp"):
-        transaction_data.timestamp = parsed_data["timestamp"]
-
-    crud.create_transaction(db, transaction_data)
-    
-    msg.status = models.MessageStatus.PARSED
-    msg.error_log = None
-    db.commit()
-    
-    return {"status": "success", "message": "Message parsed and logged successfully"}
+    # 3. Create Logic
+    try:
+        await sms_agent._create_transaction_logic(db, result, account, msg.body, reply_target=None)
+        msg.status = models.MessageStatus.PARSED
+        msg.error_log = None
+        db.commit()
+        return {"status": "success", "message": "Parsed and logged successfully via AI"}
+    except Exception as e:
+        msg.status = models.MessageStatus.FAILED
+        msg.error_log = f"Retry Error: {str(e)}"
+        db.commit()
+        return {"status": "failed", "reason": str(e)}
 
 @app.post("/messages/bulk-delete")
 def bulk_delete_messages(payload: schemas.BulkDeleteRequest, db: Session = Depends(get_db)):
@@ -598,6 +598,50 @@ def get_allocation_rules(db: Session = Depends(get_db)):
 @app.delete("/allocation/rules/{rule_id}")
 def delete_allocation_rule(rule_id: str, db: Session = Depends(get_db)):
     success = crud.delete_allocation_rule(db, rule_id)
+    return {"success": success}
+
+# --- Obligations ---
+
+@app.get("/obligations/", response_model=List[schemas.Obligation])
+def get_obligations(db: Session = Depends(get_db)):
+    return crud.get_obligations(db)
+
+@app.post("/obligations/", response_model=schemas.Obligation)
+def create_obligation(obligation: schemas.ObligationCreate, db: Session = Depends(get_db)):
+    return crud.create_obligation(db, obligation)
+
+@app.put("/obligations/{obligation_id}", response_model=schemas.Obligation)
+def update_obligation(obligation_id: str, obligation: schemas.ObligationUpdate, db: Session = Depends(get_db)):
+    return crud.update_obligation(db, obligation_id, obligation)
+
+@app.delete("/obligations/{obligation_id}")
+def delete_obligation(obligation_id: str, db: Session = Depends(get_db)):
+    crud.delete_obligation(db, obligation_id)
+    return {"message": "Deleted"}
+
+@app.put("/obligations/reorder")
+def reorder_obligations(payload: schemas.ReorderSchema, db: Session = Depends(get_db)):
+    crud.reorder_obligations(db, payload.ordered_ids)
+    return {"message": "Reordered"}
+
+# --- Payments (Obligation History) ---
+
+@app.get("/obligations/{obligation_id}/payments", response_model=List[schemas.Payment])
+def get_payment_history(obligation_id: str, db: Session = Depends(get_db)):
+    return crud.get_payment_history(db, obligation_id)
+
+@app.post("/obligations/{obligation_id}/pay", response_model=schemas.Payment)
+def create_payment(obligation_id: str, payment: schemas.PaymentCreate, db: Session = Depends(get_db)):
+    return crud.create_payment(db, obligation_id, payment)
+
+@app.put("/obligations/history/{payment_id}", response_model=schemas.Payment)
+def update_payment(payment_id: int, payment: schemas.PaymentUpdate, db: Session = Depends(get_db)):
+    return crud.update_payment(db, payment_id, payment)
+
+@app.delete("/obligations/history/{payment_id}")
+def delete_payment(payment_id: int, db: Session = Depends(get_db)):
+    crud.delete_payment(db, payment_id)
+    return {"message": "Deleted"}
     if not success:
         raise HTTPException(status_code=404, detail="Rule not found")
     return {"message": "Rule deleted"}
@@ -686,7 +730,7 @@ def get_categories(db: Session = Depends(get_db)):
 
 @app.put("/categories/{category_id}", response_model=schemas.Category)
 def update_category(category_id: str, payload: schemas.CategoryUpdate, db: Session = Depends(get_db)):
-    updated = crud.update_category_name(db, category_id, payload.name)
+    updated = crud.update_category(db, category_id, payload)
     if not updated:
          raise HTTPException(status_code=404, detail="Category not found")
     return updated

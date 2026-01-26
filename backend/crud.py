@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 import models
 import schemas
-import uuid
+from typing import List, Optional
 from datetime import datetime, timedelta
 import re
 
@@ -22,6 +22,9 @@ def get_account_by_last_4(db: Session, last_4: str):
 def get_account_by_name(db: Session, name: str):
     # Try case-insensitive matching if possible, otherwise exact
     return db.query(models.Account).filter(models.Account.name == name).first()
+
+def get_account(db: Session, account_id: str):
+    return db.query(models.Account).filter(models.Account.id == account_id).first()
 
 def create_account(db: Session, account: schemas.AccountCreate):
     db_account = models.Account(
@@ -79,17 +82,25 @@ def update_account(db: Session, account_id: str, account_update: schemas.Account
     return db_account
 
 def find_potential_duplicate(db: Session, account_id: str, amount: float, tx_type: str, timestamp: datetime):
-    # Window: +/- 10 minutes to account for SMS delivery lag or slight internal clock diffs
-    window_min = timestamp - timedelta(minutes=10)
-    window_max = timestamp + timedelta(minutes=10)
+    # Window: +/- 24 hours to account for SMS delays or date parsing ambiguities (YY/MM/DD vs DD/MM/YY)
+    window_min = timestamp - timedelta(hours=24)
+    window_max = timestamp + timedelta(hours=24)
     
-    return db.query(models.Transaction).filter(
+    # DEBUG: Log what we are looking for
+    # print(f"DEBUG: Searching for Duplicate: Acc={account_id}, Amt={amount}, Type={tx_type}, Time={timestamp} (Window: {window_min} - {window_max})")
+
+    potential = db.query(models.Transaction).filter(
         models.Transaction.account_id == account_id,
         models.Transaction.amount == amount, # Exact match expected for same-currency transfers
         models.Transaction.type == tx_type,
         models.Transaction.timestamp >= window_min,
         models.Transaction.timestamp <= window_max
     ).first()
+
+    if potential:
+        print(f"DEBUG: Found Duplicate/Match: {potential.id} (Date: {potential.timestamp})")
+    
+    return potential
 
 def create_transaction(db: Session, transaction: schemas.TransactionCreate):
     # Update Account Balance FIRST so we can record it
@@ -120,6 +131,30 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate):
         new_balance = account.current_balance
         db.add(account)
 
+        # Handle Multi-Currency Wallet
+        if transaction.original_currency and transaction.original_currency.upper() != "SAR":
+            curr = transaction.original_currency.upper()
+            wallet = db.query(models.CurrencyWallet).filter(
+                models.CurrencyWallet.account_id == account.id,
+                models.CurrencyWallet.currency_code == curr
+            ).first()
+            if not wallet:
+                import uuid
+                wallet = models.CurrencyWallet(
+                    id=str(uuid.uuid4()),
+                    account_id=account.id,
+                    currency_code=curr,
+                    balance=0.0
+                )
+                db.add(wallet)
+            
+            if is_credit:
+                wallet.balance += (transaction.original_amount or 0.0)
+            else:
+                wallet.balance -= (transaction.original_amount or 0.0)
+            wallet.last_updated = datetime.utcnow()
+            db.add(wallet)
+
     db_transaction = models.Transaction(
         account_id=transaction.account_id,
         amount=transaction.amount,
@@ -130,13 +165,19 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate):
         type=transaction.type,
         balance_after_transaction=new_balance if account and transaction.status == "completed" else None,
         status=transaction.status,
-        fees=transaction.fees
+        fees=transaction.fees,
+        original_amount=transaction.original_amount,
+        original_currency=transaction.original_currency,
+        exchange_rate=transaction.exchange_rate
     )
     db.add(db_transaction)
 
     db.commit()
     db.refresh(db_transaction)
     return db_transaction
+
+def get_transaction(db: Session, transaction_id: str):
+    return db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
 
 def confirm_transaction(db: Session, transaction_id: str):
     tx = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
@@ -159,6 +200,31 @@ def confirm_transaction(db: Session, transaction_id: str):
         # But 'current_balance' is the source of truth.
         tx.balance_after_transaction = account.current_balance
         db.add(account)
+
+        # Update Wallet if multi-currency
+        if tx.original_currency and tx.original_currency.upper() != "SAR":
+            curr = tx.original_currency.upper()
+            wallet = db.query(models.CurrencyWallet).filter(
+                models.CurrencyWallet.account_id == account.id,
+                models.CurrencyWallet.currency_code == curr
+            ).first()
+            if not wallet:
+                import uuid
+                wallet = models.CurrencyWallet(
+                    id=str(uuid.uuid4()),
+                    account_id=account.id,
+                    currency_code=curr,
+                    balance=0.0
+                )
+                db.add(wallet)
+            
+            is_credit = str(tx.type).lower() == "credit"
+            if is_credit:
+                wallet.balance += (tx.original_amount or 0.0)
+            else:
+                wallet.balance -= (tx.original_amount or 0.0)
+            wallet.last_updated = datetime.utcnow()
+            db.add(wallet)
     
     db.commit()
     db.refresh(tx)
@@ -352,6 +418,8 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
     old_account_id = db_tx.account_id
     old_status = db_tx.status
     old_fees = db_tx.fees if db_tx.fees else 0.0
+    old_orig_amt = db_tx.original_amount
+    old_orig_curr = db_tx.original_currency
     
     # 2. Apply Updates
     update_data = transaction_update.dict(exclude_unset=True)
@@ -375,6 +443,20 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
                  if old_fees:
                      account.current_balance += old_fees
 
+                 # Revert Old Wallet Effect
+                 if old_status == "completed" and old_orig_curr and old_orig_curr.upper() != "SAR":
+                     wallet = db.query(models.CurrencyWallet).filter(
+                         models.CurrencyWallet.account_id == old_account_id,
+                         models.CurrencyWallet.currency_code == old_orig_curr.upper()
+                     ).first()
+                     if wallet:
+                         is_old_credit = str(old_type).lower() == "credit"
+                         if is_old_credit:
+                             wallet.balance -= (old_orig_amt or 0.0)
+                         else:
+                             wallet.balance += (old_orig_amt or 0.0)
+                         db.add(wallet)
+
             # Apply New Effect (if it is completed)
             if db_tx.status == "completed":
                  is_new_credit = str(db_tx.type).lower() == "credit" or db_tx.type == models.TransactionType.CREDIT
@@ -386,6 +468,29 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
                  # Deduct new fee
                  if db_tx.fees:
                      account.current_balance -= db_tx.fees
+
+                 # Apply New Wallet Effect
+                 if db_tx.status == "completed" and db_tx.original_currency and db_tx.original_currency.upper() != "SAR":
+                    curr = db_tx.original_currency.upper()
+                    wallet = db.query(models.CurrencyWallet).filter(
+                        models.CurrencyWallet.account_id == db_tx.account_id,
+                        models.CurrencyWallet.currency_code == curr
+                    ).first()
+                    if not wallet:
+                        import uuid
+                        wallet = models.CurrencyWallet(
+                            id=str(uuid.uuid4()),
+                            account_id=db_tx.account_id,
+                            currency_code=curr,
+                            balance=0.0
+                        )
+                    
+                    if is_new_credit:
+                        wallet.balance += (db_tx.original_amount or 0.0)
+                    else:
+                        wallet.balance -= (db_tx.original_amount or 0.0)
+                    wallet.last_updated = datetime.utcnow()
+                    db.add(wallet)
             
             # Save Account Balance
             db.add(account)
@@ -413,6 +518,20 @@ def delete_transaction(db: Session, transaction_id: str):
                 # Original was SUBTRACT, so removal is ADD
                 account.current_balance += db_tx.amount
             
+            # Revert Wallet Balance
+            if db_tx.original_currency and db_tx.original_currency.upper() != "SAR":
+                curr = db_tx.original_currency.upper()
+                wallet = db.query(models.CurrencyWallet).filter(
+                    models.CurrencyWallet.account_id == account.id,
+                    models.CurrencyWallet.currency_code == curr
+                ).first()
+                if wallet:
+                    if db_tx.type == models.TransactionType.CREDIT or str(db_tx.type).lower() == "credit":
+                        wallet.balance -= (db_tx.original_amount or 0.0)
+                    else:
+                        wallet.balance += (db_tx.original_amount or 0.0)
+                    db.add(wallet)
+
             db.add(account)
         
         db.delete(db_tx)
@@ -427,9 +546,7 @@ def create_payment(db: Session, obligation_id: str, payment: schemas.PaymentCrea
             models.Payment.billing_month == payment.billing_month
         ).first()
         if existing:
-            # Upsert Logic: If it exists (PENDING or PAID), update it with the new details.
-            # This handles cases where user edits the amount/date via the "Pay" button (POST).
-            
+            # Upsert Logic
             status_enum = models.PaymentStatus.PAID
             if payment.status:
                 try:
@@ -437,18 +554,25 @@ def create_payment(db: Session, obligation_id: str, payment: schemas.PaymentCrea
                 except ValueError:
                     pass
             
+            # SNAPSHOT LOGIC:
+            # If transitioning from BUDGET/PENDING -> PAID, capture the current 'budget' as planned_amount
+            # But wait, 'existing.amount' is the old value (budget). 
+            # If we are "Top Up" (PAID -> PAID), we keep old planned_amount.
+            
+            if existing.status != models.PaymentStatus.PAID and status_enum == models.PaymentStatus.PAID:
+                # Transitioning to PAID: Lock in the budget (existing.amount)
+                # Unless planned_amount was already set for some reason
+                if existing.planned_amount is None:
+                    existing.planned_amount = existing.amount
+            
+            # If creating completely new logic or whatever, just ensure we don't lose it.
+            # If it's a Top Up (PAID -> PAID), we just update 'amount'. planned_amount stays constant.
+
             existing.amount = payment.amount
             existing.payment_date = payment.payment_date
             existing.note = payment.note
             existing.status = status_enum
-            
-            # Auto-update expected amount if PAID --> DEPRECATED/REMOVED
-            # if status_enum == models.PaymentStatus.PAID:
-            #     obligation = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
-            #     if obligation:
-            #         # obligation.amount = payment.amount
-            #         # db.add(obligation)
-            #         pass
+            existing.transaction_id = payment.transaction_id
             
             db.commit()
             db.refresh(existing)
@@ -462,13 +586,24 @@ def create_payment(db: Session, obligation_id: str, payment: schemas.PaymentCrea
         except ValueError:
             pass # Default to PAID
 
+    # New Payment Logic
+    planned = None
+    if payment.planned_amount:
+        planned = payment.planned_amount
+    else:
+        # Default behavior for new entries:
+        # If paying now, assume planned = actual (unless overwritten later)
+        planned = payment.amount
+
     db_payment = models.Payment(
         obligation_id=obligation_id,
         amount=payment.amount,
+        planned_amount=planned,
         payment_date=payment.payment_date,
         billing_month=payment.billing_month,
         note=payment.note,
-        status=status_enum
+        status=status_enum,
+        transaction_id=payment.transaction_id
     )
     db.add(db_payment)
     
@@ -477,7 +612,6 @@ def create_payment(db: Session, obligation_id: str, payment: schemas.PaymentCrea
     if status_enum == models.PaymentStatus.PAID:
         obligation = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
         if obligation:
-            # If obligation has no amount, or we want to update it to latest payment
             obligation.amount = payment.amount
             db.add(obligation)
 
@@ -510,7 +644,21 @@ def update_payment(db: Session, payment_id: int, update_data: schemas.PaymentUpd
             db_payment.status = models.PaymentStatus(update_data.status)
         except ValueError:
             pass
+            
+    if update_data.transaction_id is not None:
+        db_payment.transaction_id = update_data.transaction_id
+
         
+    db.commit()
+    db.refresh(db_payment)
+    return db_payment
+
+def update_payment_link(db: Session, payment_id: int, transaction_id: str):
+    db_payment = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
+    if not db_payment:
+        return None
+    
+    db_payment.transaction_id = transaction_id
     db.commit()
     db.refresh(db_payment)
     return db_payment
@@ -556,6 +704,16 @@ def delete_goal(db: Session, goal_id: str):
         db.commit()
     return db_goal
 
+def update_currency_wallet(db: Session, wallet_id: str, update_data: schemas.CurrencyWalletUpdate):
+    db_wallet = db.query(models.CurrencyWallet).filter(models.CurrencyWallet.id == wallet_id).first()
+    if not db_wallet:
+        return None
+    db_wallet.balance = update_data.balance
+    db_wallet.last_updated = datetime.utcnow()
+    db.commit()
+    db.refresh(db_wallet)
+    return db_wallet
+
 # --- Allocation Rules ---
 
 def create_allocation_rule(db: Session, rule: schemas.AllocationRuleCreate):
@@ -575,239 +733,179 @@ def delete_allocation_rule(db: Session, rule_id: str):
         db.commit()
     return True
 
-from datetime import date
+def delete_allocation_history_items(db: Session, ids: List[str]):
+    try:
+        db.query(models.AllocationHistory).filter(models.AllocationHistory.id.in_(ids)).delete(synchronize_session=False)
+        db.commit()
+        return True
+    except Exception as e:
+        db.rollback()
+        print(f"Error deleting allocation history: {e}")
+        return False
 
-def calculate_allocation_preview(db: Session, source_account_id: str, month_offset: int = 0):
-    # 1. Determine target month/year
-    today = date.today()
-    year = today.year
-    month = today.month + month_offset
-    while month > 12:
-        month -= 12
-        year += 1
-    while month < 1:
-        month += 12
-        year -= 1
+
+def find_transaction_matches(
+    db: Session,
+    keyword: str,
+    search_start: datetime,
+    amount: Optional[float] = None,
+    notes: List[str] = None,
+    category: str = None,
+    exclude_ids: List[str] = []
+) -> List[models.Transaction]:
     
-    target_billing_month = date(year, month, 1)
-
-    # 2. Fetch Budgeted/Pending Payments for that month
-    payments = db.query(models.Payment).join(models.MonthlyObligation).filter(
-        models.Payment.billing_month == target_billing_month,
-        models.Payment.status.in_([models.PaymentStatus.BUDGET, models.PaymentStatus.PENDING])
-    ).all()
-
-    # 3. Fetch Rules
-    rules = get_allocation_rules(db)
-
-    # 4. Aggregate
-    allocations = {} # TargetAccountID -> { amount, acc_name, details, current_balance }
-    skipped_items = []
-    fulfilled_items = []
-
-    for p in payments:
-        obl = p.obligation
-        matched_rule = None
-        
-        # Priority 1: Match Name (LOAN type)
-        for r in rules:
-            if r.rule_type == models.AllocationRuleType.LOAN and r.identifier.lower() == obl.name.lower():
-                matched_rule = r
-                break
-        
-        # Priority 2: Match Category (CATEGORY type)
-        if not matched_rule and obl.category:
-            for r in rules:
-                if r.rule_type == models.AllocationRuleType.CATEGORY and r.identifier.lower() == obl.category.lower():
-                    matched_rule = r
-                    break
-        
-        if matched_rule:
-            tid = matched_rule.target_account_id
-            if tid not in allocations:
-                t_acc = db.query(models.Account).filter(models.Account.id == tid).first()
-                if t_acc:
-                    allocations[tid] = {
-                        "target_account_id": tid,
-                        "target_account_name": t_acc.name,
-                        "current_balance": t_acc.current_balance,
-                        "amount": 0,
-                        "details": []
-                    }
+    # 1. Base Query: Debit transactions after search_start
+    query = db.query(models.Transaction).filter(
+        models.Transaction.timestamp >= search_start,
+        models.Transaction.type == 'debit'
+    )
+    candidates = query.all()
+    
+    matches = []
+    
+    for tx in candidates:
+        if tx.id in exclude_ids:
+            continue
             
-            if tid in allocations:
-                allocations[tid]["amount"] += p.amount
-                allocations[tid]["details"].append(obl.category if obl.category else obl.name)
-        else:
-            skipped_items.append(f"{obl.name} (No Rule)")
-
-    # Format Response
-    result_list = []
-    total = 0
-    total_required = 0
-    # Fetch Source Balance to track depletion
-    source_acc = db.query(models.Account).filter(models.Account.id == source_account_id).first()
-    running_balance = source_acc.current_balance if source_acc else 0
-
-    for tid, data in allocations.items():
-        # Deduplicate details to show unique categories
-        data["details"] = sorted(list(set(data["details"])))
-        required_amount = data["amount"]
-        total_required += required_amount
+        match_score = 0
+        txn_merchant = (tx.merchant or "").lower()
+        txn_notes = (tx.notes or "").lower()
+        keyword_lower = keyword.lower()
         
-        # Cap transfer at available source balance
-        transfer_amount = min(required_amount, running_balance)
-        gap = required_amount - transfer_amount
+        # A. Name/Keyword Match
+        if keyword_lower in txn_merchant or keyword_lower in txn_notes:
+            match_score += 50
+            
+        # B. Notes/Alias Match
+        if notes:
+            for k in notes:
+                k_lower = k.lower()
+                # Determine if k is significant (len > 2) handled by caller usually, but check here
+                if len(k_lower) > 2 and (k_lower in txn_merchant or k_lower in txn_notes):
+                    match_score += 50
+                    break 
 
-        # Update running balance
-        running_balance = max(0, running_balance - transfer_amount)
-
-        # Update running balance
-        running_balance = max(0, running_balance - transfer_amount)
-
-        if transfer_amount > 0 or gap > 0:
-            total += transfer_amount
-            # Summary name
-            details_txt = ", ".join(data["details"])
-            if len(details_txt) > 500:
-                details_txt = details_txt[:500] + "..."
-                
-            result_list.append(schemas.AllocationPreviewItem(
-                rule_type="AGGREGATE",
-                identifier=f"aggregate_{tid}",
-                name=details_txt, 
-                amount=transfer_amount,
-                required_amount=required_amount,
-                target_account_id=tid,
-                target_account_name=data["target_account_name"]
-            ))
-        else:
-            # Entirely covered by balance (This case matches 'fulfilled' only if required was 0? 
-            # With new logic, if required > 0 and transfer is 0, it goes to IF block above with gap.
-            # So this ELSE is mostly dead unless required was 0 initially which shouldn't happen in this loop)
-            pass
+        # C. Amount Match
+        if amount and tx.amount:
+            diff = abs(tx.amount - amount)
+            # 10% tolerance
+            if amount > 0 and diff / amount <= 0.1:
+                match_score += 40
+            # Exact match bonus
+            if diff == 0:
+                match_score += 20
         
-    return schemas.AllocationPreviewResponse(
-        total_amount=total, 
-        total_required=total_required,
-        surplus=running_balance,
-        allocations=result_list,
-        skipped_items=skipped_items,
-        fulfilled_items=fulfilled_items
-    )
-
-# --- Category Management ---
-
-def create_category(db: Session, category: schemas.CategoryCreate):
-    # Check case-insensitive
-    existing = db.query(models.Category).filter(models.Category.name.ilike(category.name)).first()
-    if existing:
-        return existing
+        # D. Category Match
+        if category and tx.category and category.lower() == tx.category.lower():
+            match_score += 20
         
-    db_cat = models.Category(name=category.name)
-    db.add(db_cat)
+        if match_score >= 50:
+            matches.append(tx)
+            
+    return matches
+
+def get_similar_training_examples(db: Session, text: str, limit: int = 3):
+    """
+    Naive similarity search. In production, use embeddings (pgvector).
+    Here we just find examples that share significant words.
+    """
+    # 1. Tokenize Input
+    tokens = set(re.findall(r'\w+', text.lower()))
+    
+    # 2. Score all examples
+    all_examples = db.query(models.TrainingExample).all()
+    scored_examples = []
+    
+    for ex in all_examples:
+        ex_tokens = set(re.findall(r'\w+', ex.raw_text.lower()))
+        common = tokens.intersection(ex_tokens)
+        score = len(common)
+        if score > 0:
+            scored_examples.append((score, ex))
+    
+    # 3. Sort and Return
+    scored_examples.sort(key=lambda x: x[0], reverse=True)
+    return [x[1] for x in scored_examples[:limit]]
+
+def get_random_training_examples(db: Session, limit: int = 3):
+    return db.query(models.TrainingExample).order_by(func.random()).limit(limit).all()
+
+# --- Obligations & Payments ---
+
+def get_obligations(db: Session):
+    return db.query(models.MonthlyObligation).order_by(models.MonthlyObligation.display_order.asc(), models.MonthlyObligation.due_day.asc()).all()
+
+def create_obligation(db: Session, obligation: schemas.ObligationCreate):
+    # Set display_order to last + 1
+    last = db.query(models.MonthlyObligation).order_by(models.MonthlyObligation.display_order.desc()).first()
+    new_order = (last.display_order + 1) if last else 0
+    
+    db_obl = models.MonthlyObligation(**obligation.dict(), display_order=new_order)
+    db.add(db_obl)
     db.commit()
-    db.refresh(db_cat)
-    return db_cat
+    db.refresh(db_obl)
+    return db_obl
 
-def get_categories(db: Session):
-    return db.query(models.Category).order_by(models.Category.name).all()
-
-def update_category_name(db: Session, category_id: str, new_name: str):
-    cat = db.query(models.Category).filter(models.Category.id == category_id).first()
-    if not cat:
+def update_obligation(db: Session, obl_id: str, updates: schemas.ObligationUpdate):
+    db_obl = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obl_id).first()
+    if not db_obl:
         return None
     
-    old_name = cat.name
-    # Update Category Table
-    cat.name = new_name
-    db.add(cat)
-    
-    # 1. Update Obligations
-    db.query(models.MonthlyObligation).filter(models.MonthlyObligation.category == old_name).update(
-        {"category": new_name}, synchronize_session=False
-    )
-    
-    # 2. Update Allocation Rules
-    db.query(models.AllocationRule).filter(
-        models.AllocationRule.rule_type == models.AllocationRuleType.CATEGORY,
-        models.AllocationRule.identifier == old_name
-    ).update(
-        {"identifier": new_name}, synchronize_session=False
-    )
+    update_data = updates.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_obl, key, value)
     
     db.commit()
-    db.refresh(cat)
-    return cat
+    db.refresh(db_obl)
+    return db_obl
 
-def delete_category(db: Session, category_id: str):
-    cat = db.query(models.Category).filter(models.Category.id == category_id).first()
-    if not cat:
-        return None
-        
-    old_name = cat.name
+def delete_obligation(db: Session, obl_id: str):
+    db_obl = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obl_id).first()
+    if not db_obl:
+        return False
     
-    # 1. Clear Obligations (Set to NULL)
-    db.query(models.MonthlyObligation).filter(models.MonthlyObligation.category == old_name).update(
-        {"category": None}, synchronize_session=False
-    )
+    # Cascade delete payments? Or keep them? Usually cascade or set null.
+    # Models likely handle relation, but let's be safe.
+    db.query(models.Payment).filter(models.Payment.obligation_id == obl_id).delete()
     
-    # 2. Delete related Rules
-    db.query(models.AllocationRule).filter(
-        models.AllocationRule.rule_type == models.AllocationRuleType.CATEGORY,
-        models.AllocationRule.identifier == old_name
-    ).delete(synchronize_session=False)
-
-    db.delete(cat)
+    db.delete(db_obl)
     db.commit()
     return True
 
-def create_training_example(db: Session, raw_text: str, parsed_json: str):
-    db_ex = models.TrainingExample(
-        raw_text=raw_text,
-        parsed_json=parsed_json
-    )
-    db.add(db_ex)
+def reorder_obligations(db: Session, ordered_ids: List[str]):
+    for idx, obl_id in enumerate(ordered_ids):
+        db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obl_id).update({"display_order": idx})
     db.commit()
-    db.refresh(db_ex)
-    return db_ex
 
-def get_random_training_examples(db: Session, limit: int = 3):
-    # Fetch random examples using SQL random()
-    return db.query(models.TrainingExample).order_by(func.random()).limit(limit).all()
+# --- Payments ---
 
-def get_similar_training_examples(db: Session, sms_content: str, limit: int = 5):
-    # 1. Fetch recent examples (limit search space for performance)
-    all_examples = db.query(models.TrainingExample).order_by(models.TrainingExample.created_at.desc()).limit(200).all()
-    if not all_examples:
-        return []
+def get_payment_history(db: Session, obligation_id: str):
+    return db.query(models.Payment).filter(models.Payment.obligation_id == obligation_id).order_by(models.Payment.payment_date.desc()).all()
 
-    # 2. Tokenize input
-    def tokenize(text):
-        return set(re.findall(r'\w+', text.lower()))
+def create_payment(db: Session, obligation_id: str, payment: schemas.PaymentCreate):
+    db_pay = models.Payment(**payment.dict(), obligation_id=obligation_id)
+    db.add(db_pay)
+    db.commit()
+    db.refresh(db_pay)
+    return db_pay
 
-    input_tokens = tokenize(sms_content)
-    if not input_tokens:
-        return []
-
-    # 3. Score examples
-    scored = []
-    for ex in all_examples:
-        ex_tokens = tokenize(ex.raw_text)
-        # Intersection count
-        score = len(input_tokens.intersection(ex_tokens))
-        if score > 0:
-            scored.append((score, ex))
-
-    # 4. Sort by score desc
-    scored.sort(key=lambda x: x[0], reverse=True)
+def update_payment(db: Session, payment_id: int, updates: schemas.PaymentUpdate):
+    db_pay = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
+    if not db_pay:
+        return None
     
-    return [x[1] for x in scored[:limit]]
+    update_data = updates.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_pay, key, value)
+        
+    db.commit()
+    db.refresh(db_pay)
+    return db_pay
 
-def delete_message(db: Session, message_id: str):
-    msg = db.query(models.RawMessage).filter(models.RawMessage.id == message_id).first()
-    if msg:
-        db.delete(msg)
-        db.commit()
-        return True
-    return False
+def delete_payment(db: Session, payment_id: int):
+    db_pay = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
+    if not db_pay:
+        return False
+    db.delete(db_pay)
+    db.commit()
+    return True

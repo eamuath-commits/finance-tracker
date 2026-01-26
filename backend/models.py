@@ -28,9 +28,26 @@ class Account(Base):
     interest_rate = Column(Float, nullable=True) # APR for Credit Cards
     minimum_payment = Column(Float, nullable=True) # Minimum monthly payment
     is_income = Column(Boolean, default=False)
+    last_successful_audit_date = Column(DateTime, nullable=True)
     
     transactions = relationship("Transaction", back_populates="account")
     aliases = relationship("AccountAlias", back_populates="account", cascade="all, delete-orphan")
+    audits = relationship("AccountAudit", back_populates="account", cascade="all, delete-orphan")
+    wallets = relationship("CurrencyWallet", back_populates="account", cascade="all, delete-orphan")
+
+class AccountAudit(Base):
+    __tablename__ = "account_audits"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    account_id = Column(String, ForeignKey("accounts.id"), nullable=False)
+    audit_date = Column(DateTime, default=datetime.utcnow)
+    system_balance = Column(Float, nullable=False)
+    actual_balance = Column(Float, nullable=False)
+    difference = Column(Float, nullable=False)
+    status = Column(String, nullable=False) # "MATCH" or "MISMATCH"
+    notes = Column(Text, nullable=True)
+
+    account = relationship("Account", back_populates="audits")
 
 class AccountAlias(Base):
     __tablename__ = "account_aliases"
@@ -41,6 +58,18 @@ class AccountAlias(Base):
     last_4_digits = Column(String, nullable=False) # The fallback/linked number
 
     account = relationship("Account", back_populates="aliases")
+
+class CurrencyWallet(Base):
+    __tablename__ = "currency_wallets"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    account_id = Column(String, ForeignKey("accounts.id"), nullable=False)
+    currency_code = Column(String, nullable=False) # USD, EUR, etc.
+    balance = Column(Float, default=0.0)
+    last_updated = Column(DateTime, default=datetime.utcnow)
+
+    account = relationship("Account", back_populates="wallets")
+
 
 class TransactionType(enum.Enum):
     DEBIT = "debit"
@@ -53,13 +82,18 @@ class Transaction(Base):
     account_id = Column(String, ForeignKey("accounts.id"))
     amount = Column(Float, nullable=False)
     merchant = Column(String)
-    timestamp = Column(DateTime, default=datetime.now)
+    raw_sms_content = Column(Text)
+    timestamp = Column(DateTime)
     category = Column(String, nullable=True)
-    # Using String instead of Enum to match manual VARCHAR fix in DB and avoid conflicts
-    type = Column(String, default="debit", nullable=False)
-    notes = Column(Text, nullable=True)
-    raw_sms_content = Column(Text, nullable=True)
+    type = Column(Enum(TransactionType), default=TransactionType.DEBIT) # "credit" or "debit"
     balance_after_transaction = Column(Float, nullable=True)
+    status = Column(String, default="completed", nullable=False) # pending, completed, pending_action (for unknown source/dest)
+    notes = Column(Text, nullable=True)
+    
+    # Financial fields
+    original_amount = Column(Float, nullable=True)
+    original_currency = Column(String, nullable=True)
+    exchange_rate = Column(Float, nullable=True)
     status = Column(String, default="completed", nullable=False)
     logo_url = Column(String, nullable=True)
     fees = Column(Float, default=0.0)
@@ -74,9 +108,6 @@ class Loan(Base):
     name = Column(String, nullable=False)
     principal_amount = Column(Float, nullable=False)
     interest_rate = Column(Float, nullable=False) # Annual percentage
-    start_date = Column(Date, nullable=False)
-    term_months = Column(Integer, nullable=False)
-    start_date = Column(Date, nullable=False)
     start_date = Column(Date, nullable=False)
     term_months = Column(Integer, nullable=False)
     remaining_balance = Column(Float, nullable=False)
@@ -108,30 +139,17 @@ class Payment(Base):
     __tablename__ = "payments"
 
     id = Column(Integer, primary_key=True, index=True)
-    obligation_id = Column(String, ForeignKey("obligations.id"), nullable=False)
-    payment_date = Column(DateTime, default=datetime.now)
-    billing_month = Column(Date, nullable=True) # First day of the cycle month
-    amount = Column(Float, nullable=False)
+    obligation_id = Column(String, ForeignKey("obligations.id"))
+    amount = Column(Float)
+    planned_amount = Column(Float, nullable=True) # Snapshot of budget at time of payment creation
+    payment_date = Column(Date)
+    billing_month = Column(String) # YYYY-MM to track monthly payments
     note = Column(String, nullable=True)
     status = Column(Enum(PaymentStatus), default=PaymentStatus.PAID)
-    transaction_id = Column(String, ForeignKey("transactions.id"), nullable=True)
+    transaction_id = Column(String, ForeignKey("transactions.id"), nullable=True) # Link to actual transaction
 
-    obligation = relationship("MonthlyObligation")
+    obligation = relationship("MonthlyObligation") # Removed back_populates to avoid circular dependency conflict if needed, or add back
     transaction = relationship("Transaction", back_populates="payments")
-
-class AllocationRuleType(enum.Enum):
-    CATEGORY = "CATEGORY"
-    LOAN = "LOAN"
-
-class AllocationRule(Base):
-    __tablename__ = "allocation_rules"
-
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    rule_type = Column(Enum(AllocationRuleType), nullable=False)
-    identifier = Column(String, nullable=False, unique=True) # Category Name or Loan ID
-    target_account_id = Column(String, ForeignKey("accounts.id"), nullable=False)
-    
-    target_account = relationship("Account")
 
 class MessageStatus(enum.Enum):
     PENDING = "PENDING"
@@ -154,6 +172,7 @@ class Category(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, nullable=False, unique=True)
+    type = Column(String, default="BOTH") # OBLIGATION, TRANSACTION, BOTH
 
 class SavingsGoal(Base):
     __tablename__ = "savings_goals"
@@ -173,3 +192,29 @@ class TrainingExample(Base):
     raw_text = Column(String, nullable=False)
     parsed_json = Column(Text, nullable=False) # JSON string
     created_at = Column(DateTime, default=datetime.now)
+
+class AllocationRule(Base):
+    __tablename__ = "allocation_rules"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    keyword = Column(String, nullable=False) # e.g. "Grocery", "Salary"
+    field = Column(String, default="merchant") # field to match: merchant, notes, category
+    percentage = Column(Float, nullable=False) # 0.0 to 100.0
+    target_category = Column(String, nullable=True) # For auto-categorization? Or for split? 
+    # Actually, allocation is usually "Spend X% on Needs".
+    # Let's simplify: Rule maps Transaction -> Bucket/Tag?
+    # Or simpler: Just a stored rule for the UI calculator.
+    category_group = Column(String, nullable=False) # "Needs", "Wants", "Savings"
+
+class AllocationHistory(Base):
+    __tablename__ = "allocation_history"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    month = Column(String, nullable=False) # YYYY-MM
+    income = Column(Float, default=0.0)
+    needs_planned = Column(Float, default=0.0)
+    needs_actual = Column(Float, default=0.0)
+    wants_planned = Column(Float, default=0.0)
+    wants_actual = Column(Float, default=0.0)
+    savings_planned = Column(Float, default=0.0)
+    savings_actual = Column(Float, default=0.0)

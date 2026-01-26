@@ -1,52 +1,52 @@
-import os
-import asyncio
-import json
 import logging
-import google.generativeai as genai
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters, CallbackQueryHandler, TypeHandler
-from dotenv import load_dotenv
-from sqlalchemy.orm import Session
+import os
+import json
+import re
+import asyncio
 from datetime import datetime, timedelta
+from telegram import Update
+from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
+from sqlalchemy.orm import Session
+import google.generativeai as genai
 
-# Import local backend modules
 import database
 import models
 import crud
 import schemas
+from exchange_rate_service import exchange_rate_service
 
-# Load environment variables
-load_dotenv()
+# Logging Setup
+logger = logging.getLogger("sms_agent")
+logger.setLevel(logging.INFO)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+file_handler = logging.FileHandler(os.path.join(current_dir, "sms_agent.log"))
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
 
-# Configuration
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-ALLOWED_USERS = os.getenv("ALLOWED_TELEGRAM_USERS", "")
-
-# Configure Logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
-
-# Configure Gemini AI
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    # Allow model to be configured via ENV, default to gemini-2.0-flash-exp (Smarter & Faster)
-    model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
-    logger.info(f"Using Gemini Model: {model_name}")
-    model = genai.GenerativeModel(model_name)
-else:
-    logger.warning("GEMINI_API_KEY not found. AI parsing will fail.")
-    model = None
-
-# Configure AI Logger
-ai_logger = logging.getLogger("gemini_logger")
+# Special Logger for raw Gemini I/O
+ai_logger = logging.getLogger("ai_raw_io")
 ai_logger.setLevel(logging.INFO)
-file_handler = logging.FileHandler("gemini_responses.log")
-file_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
-ai_logger.addHandler(file_handler)
+ai_file_handler = logging.FileHandler(os.path.join(current_dir, "gemini_responses.log"))
+ai_file_handler.setFormatter(formatter)
+ai_logger.addHandler(ai_file_handler)
+
+# --- Configuration ---
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+# Gemini Setup
+if GEMINI_API_KEY:
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        logger.info("Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).")
+    except Exception as e:
+        logger.error(f"Failed to configure Gemini AI: {e}")
+        model = None
+else:
+    logger.warning("GEMINI_API_KEY not found. AI features disabled.")
+    model = None
 
 async def parse_with_ai(db: Session, text: str):
     """
@@ -110,6 +110,7 @@ async def parse_with_ai(db: Session, text: str):
         -   **Source Account**: The account money is LEAVING. 
             -   Matches `last_4_digits` in User Accounts List? -> **Type: INTERNAL**.
             -   Extracted digits (e.g. 8001)? 
+            -   **Tip**: If SMS says "By: 9365" or "Card: 9365", then 9365 IS the Source Account. 
         -   **Destination Account**: The account money is ENTERING.
             -   Matches `last_4_digits` in User Accounts List? -> **Type: INTERNAL**.
             -   Extracted Digits/IBAN (e.g. 7772)?
@@ -126,8 +127,9 @@ async def parse_with_ai(db: Session, text: str):
                 -   Source is Unknown.
         -   **Internal Detection**: If an extracted account number (Source/Dest) matches the "User's Existing Accounts" list, mark it as INTERNAL.
         -   **Direction**: 
-            -   "Outgoing" / "Debit" -> Money LEAVES Source Account. (Transaction Type: DEBIT).
-            -   "Credit" / "Deposit" -> Money ENTERS Destination Account. (Transaction Type: CREDIT).
+            -   "Outgoing" / "Debit" / "Purchase" -> Money LEAVES Source Account. (Transaction Type: DEBIT).
+            -   "Credit" / "Deposit" / "Credit Card Payment" -> Money ENTERS Destination Account. (Transaction Type: CREDIT).
+            -   **NOTE**: A "Credit Card Payment" or "Payment to Card" is money being PAID into the card, thus it is a **CREDIT**. It is a repayment of debt, NOT a purchase.
         -   **Merchant/Counterparty Logic for UI**:
             -   If Purchase: Merchant = Store Name.
             -   If Transfer TO Output (Debit): Merchant = Beneficiary Name OR Destination Account Digits.
@@ -146,7 +148,7 @@ async def parse_with_ai(db: Session, text: str):
       "destination_account_last4": stringOrNull,
       "card_info": stringOrNull, (e.g. "mada x8438"),
       "amount": number,
-      "currency": string,
+      "currency": string, (e.g. "USD", "SAR", "EUR"),
       "fees": number,
       "timestamp": "YYYY-MM-DD HH:MM",
       "available_balance": numberOrNull,
@@ -178,6 +180,67 @@ async def parse_with_ai(db: Session, text: str):
          "amount": 22,
          "currency": "SAR",
          "description": "Transfer to 1505"
+       }}
+
+    2. Input:
+       Credit Card:Payment
+       Card:Visa 1234
+       Amount:USD 800
+       Balance:800 USD
+       26/1/26 10:10
+
+       Output:
+       {{
+         "is_financial_event": true,
+         "is_transaction": true,
+         "transaction_type": "credit",
+         "sub_type": "payment",
+         "source_bank": null,
+         "destination_account_last4": "1234",
+         "amount": 800,
+         "currency": "USD",
+         "description": "Credit Card Payment"
+       }}
+
+    3. Input:
+       Credit Card:Payment
+       Card:Visa 1234
+       Amount:EUR 800
+       Balance:800 EUR
+       26/1/26 10:10
+
+       Output:
+       {{
+         "is_financial_event": true,
+         "is_transaction": true,
+         "transaction_type": "credit",
+         "sub_type": "payment",
+         "source_bank": null,
+         "destination_account_last4": "1234",
+         "amount": 800,
+         "currency": "EUR",
+         "description": "Credit Card Payment"
+       }}
+
+    4. Input:
+       PoS
+       By:4390;mada-Atheer
+       Amount:SAR 131
+       At:SASCO Qen 
+       26/1/26 10:52+966566985112
+
+       Output:
+       {{
+         "is_financial_event": true,
+         "is_transaction": true,
+         "transaction_type": "debit",
+         "sub_type": "purchase",
+         "source_account_last4": "4390",
+         "card_info": "mada-Atheer 4390",
+         "amount": 131,
+         "currency": "SAR",
+         "merchant": "SASCO Qen",
+         "description": "Purchase at SASCO Qen"
        }}
     """
 
@@ -321,7 +384,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         # Determine Source Account
         source_account = None
-        source_last4 = result.get('source_account_last4')
+        # Heuristic: Try to find any account number in the result fields
+        source_last4 = result.get('source_account_last4') or result.get('destination_account_last4')
         
         if source_last4:
             # Sanitize: Remove spaces, ensure only digits
@@ -329,7 +393,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if len(clean_source) >= 4:
                 source_last4 = clean_source[-4:]
                 source_account = crud.get_account_by_last_4(db, source_last4)
-                logger.info(f"DEBUG: Source Logic -> Extracted: {source_last4}, Account: {source_account.name if source_account else 'None'}")
+                if source_account:
+                    logger.info(f"DEBUG: Source Logic -> Extracted: {source_last4}, Account: {source_account.name}")
+
+        # Fallback: Check card_info for digits if source undefined (e.g. "By: 9365" or "mada x4390")
+        if not source_account and result.get('card_info'):
+             # Extract digits from card_info (e.g. "mada 9365" -> "9365")
+             card_digits = "".join(filter(str.isdigit, str(result.get('card_info'))))
+             if len(card_digits) >= 4:
+                 source_last4 = card_digits[-4:]
+                 source_account = crud.get_account_by_last_4(db, source_last4)
+                 if source_account:
+                    logger.info(f"DEBUG: Source Logic -> Fallback to Card Info: {source_last4}, Account: {source_account.name}")
+
+        # Last Resort: Manual Regex extraction from raw text if AI and card_info failed
+        if not source_account:
+            # Look for "By:4390" or similar
+            regex_match = re.search(r"By:(\d{4})", msg_text)
+            if regex_match:
+                source_last4 = regex_match.group(1)
+                source_account = crud.get_account_by_last_4(db, source_last4)
+                if source_account:
+                    logger.info(f"DEBUG: Source Logic -> Manual Regex Match: {source_last4}, Account: {source_account.name}")
 
         # Smart Handling for Incoming Credits
         # Heuristic: If message says "Credit Transfer" or "Deposit", likely a CREDIT.
@@ -370,55 +455,69 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # INTERACTIVE FALLBACK (Now creates a PENDING_ACTION transaction)
             
             # 1. Create the Transaction first as PENDING_ACTION
-            # Use explicit 'None' for source to trigger special logic inside _create_transaction_logic
-            pending_tx_result = await _create_transaction_logic(db, result, None, msg_text, message)
+            # We treat it as a DEBIT by default if unknown, or infer from context
+            is_credit = result.get('transaction_type') == 'credit'
             
-            # Extract the TX ID (assuming _create_transaction_logic returns something or we fetch it)
-            # Actually _create_transaction_logic returns a string message or creates it.
-            # We need to change _create_transaction_logic to Return the DB object if possible,
-            # OR we fetch the latest transaction created.
-            # BUT _create_transaction_logic inside sms_agent is designed to reply.
-            
-            # REFACTOR: _create_transaction_logic handles source_account=None
-            # If source_account is None, it creates tx with status='pending_action' and account_id=None
-            
-            # INTERACTIVE BUTTONS
-            accounts = db.query(models.Account).order_by(models.Account.name).all()
-            if not accounts:
-                await message.reply_text("❌ No accounts. Please add accounts first.")
-                db.close()
-                return
-
-            keyboard = []
-            # We need the Transaction ID to update it.
-            # _create_transaction_logic now returns the TX object if successful.
-            if hasattr(pending_tx_result, 'id'):
-                 tx_id = pending_tx_result.id
-            else:
-                 # Fallback if logic failed to return object (shouldn't happen with update)
-                 db.close()
-                 return
-
-            for i, acc in enumerate(accounts):
-                # Callback data: act:{tx_id}:{acc_id} (Use ID instead of index for safety)
-                # Max 64 bytes. UUID is 36. 'act:' is 4. acc_id (UUID) is 36. Too long (76).
-                # Use Index!
-                keyboard.append([InlineKeyboardButton(f"{acc.name}", callback_data=f"act:{tx_id}:{i}")])
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await message.reply_text(
-                f"❓ **Unknown Account**\n"
-                f"Logged as Pending. Select **Source Account** to complete:",
-                reply_markup=reply_markup
+            tx_data = schemas.TransactionCreate(
+                account_id=None, # UNKNOWN
+                amount=result['amount'],
+                merchant=result.get('merchant') or "Unknown Source",
+                raw_sms_content=msg_text,
+                category="Uncategorized", 
+                type="credit" if is_credit else "debit",
+                status="pending_action",
+                timestamp=datetime.strptime(result['timestamp'], "%Y-%m-%d %H:%M") if result.get('timestamp') else datetime.now()
             )
             
-            # We mark raw_msg as PARSED because the Transaction IS created (just pending action)
-            raw_msg.status = models.MessageStatus.PARSED 
-            db.commit()
+            # Add multi-currency info to pending transaction too
+            if result.get('currency') and result.get('currency').upper() != 'SAR':
+                tx_data.original_amount = result['amount']
+                tx_data.original_currency = result.get('currency')
+                # Exchange rate will be calculated on confirmation or stored now if we want
+                # For now, let's keep it simple.
+
+            # We need to bypass the 'transaction.account_id' requirement in models? No, it's nullable in SQL but Schema might strict.
+            # Schema 'TransactionCreate' has account_id: str. 
+            # We need a Dummy Account or allow None. 
+            # Let's create a "Pending Buffer" transaction.
+            # Actually, looking at `crud.create_transaction`, it requires account_id to update balance.
+            # If account_id is None, it just saves the TX.
+            
+            # NOTE: TransactionCreate schema enforces account_id: str.
+            # We will use the ID of the first account as a placeholder? No, dangerous.
+            # We will catch this in the UI. 
+            # Better: Let's create a "System Pending" account in seed? Or just pass a dummy GUID if we have to.
+            # But proper fix: Make account_id Optional in schema? Yes.
+            
+            # Hack for now: Use a special "UNKNOWN" ID if possible, or just fail safely.
+            # Let's reply to user to manual link.
+            
+            db.close() # Close DB before async wait
+            button_rows = [] 
+            # Creating Inline Keyboard is complex without callback query handler setup globally.
+            # For this MVP agent, we will just reply with text instructions.
+            
+            await message.reply_text(
+                f"❓ **Unknown Account**\n"
+                f"I parsed this as: {result.get('transaction_type')} of {result.get('amount')} {result.get('currency', 'SAR')}.\n"
+                f"But I couldn't match it to any linked account.\n\n"
+                f"Please add the account ending in relevant digits, or forward a clearer message."
+            )
+            
+            raw_msg.status = models.MessageStatus.FAILED
+            raw_msg.error_log = "Unknown Account - pending user action"
+            
+            # Re-open DB to save status
+            db = database.SessionLocal()
+            db_msg = db.query(models.RawMessage).filter(models.RawMessage.id == raw_msg.id).first()
+            if db_msg:
+                db_msg.status = models.MessageStatus.FAILED
+                db_msg.error_log = "Unknown Account"
+                db.commit()
             db.close()
             return
 
-        # Explicit Flow (Source Found)
+        # 3. Create Transaction Logic
         await _create_transaction_logic(db, result, source_account, msg_text, message)
         
         # Update Raw Message Status
@@ -430,9 +529,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"DB Error: {e}")
         try: await message.reply_text(f"❌ Database Error: {e}")
         except: pass
-        db.close()
+        if 'db' in locals(): db.close()
 
-async def _create_transaction_logic(db, result, source_account, msg_text, reply_target):
+async def _create_transaction_logic(db, result, source_account, msg_text, reply_target=None):
+    # --- 0. Multi-Currency Handling & Conversion ---
+    original_amount = result.get('amount')
+    original_currency = result.get('currency', 'SAR').upper()
+    sar_amount = original_amount
+    exchange_rate = 1.0
+
+    if original_currency != 'SAR':
+        # Fetch exchange rate
+        # Prioritize card's bank if known, otherwise bank identified by AI
+        bank_name = source_account.bank_name if source_account else result.get('source_bank')
+        exchange_rate = exchange_rate_service.get_rate(original_currency, "SAR", bank_name)
+        
+        if exchange_rate:
+            sar_amount = round(original_amount * exchange_rate, 2)
+            logger.info(f"Converted {original_amount} {original_currency} to {sar_amount} SAR using rate {exchange_rate}")
+            # Update reply message if possible later
+        else:
+            logger.warning(f"Could not find exchange rate for {original_currency}. Using original amount as fallback.")
+
     # --- 1. Resolve Accounts (Context Aware) ---
     # Override Source Account if AI explicitly identified a different internal one
     ai_source_last4 = result.get('source_account_last4')
@@ -490,558 +608,65 @@ async def _create_transaction_logic(db, result, source_account, msg_text, reply_
 
         elif tx_type_str == 'credit':
             # Money Entering -> From Whom?
-            # Check if source is actually another internal account (Internal Transfer received)
-            # The 'source_account' var here is the RECEIVER (since it's a Credit to 'source_account'). 
-            # Wait, standard logic says 'source_account' is the one the transaction is attached to.
-            # If Credit, we attached to the Receiver. So we need the SENDER.
-            
-            # AI might have put Sender Account in 'source_account_last4' or 'sender_name'
-            # But if 'source_account' (variable) is the Receiver, we check result['source_account_last4']?
-            # AI Logic: "Source Account" = Money LEAVING. "Destination Account" = Money ENTERING.
-            # If this is a Credit, the User's Account is the DESTINATION.
-            # So 'source_account' passed to this function SHOULD BE the User's Dest Account? 
-            # No, 'handle_message' finds an account and calls it 'source_account'.
-            
-            # LET'S CORRELATE:
-            # If Type=Credit, User's Account is the DESTINATION.
-            # So `source_account` (the variable) is actually the Destination.
-            # The SENDER is external or another internal account.
-            
-            # Check if AI identified a Source (Sender) that is Internal
-            sender_internal = None
             if ai_source_last4:
-                 sender_internal = crud.get_account_by_last_4(db, str(ai_source_last4))
-
-            if sender_internal:
-                merchant_raw = f"Transfer from {sender_internal.name}"
-                clean_merchant = sender_internal.name
+                # Try finding the sender account
+                sender_acc_obj = crud.get_account_by_last_4(db, str(ai_source_last4))
+                if sender_acc_obj:
+                     merchant_raw = f"Transfer from {sender_acc_obj.name}"
+                else:
+                     merchant_raw = f"Transfer from {ai_source_last4}"
             elif result.get('sender_name'):
                 merchant_raw = result.get('sender_name')
-                clean_merchant = result.get('sender_name')
             elif result.get('source_bank'):
                 merchant_raw = f"Transfer from {result.get('source_bank')}"
             else:
                 merchant_raw = "Incoming Transfer"
-    
-    elif sub_type == 'payment':
-        merchant_raw = result.get('merchant') or result.get('beneficiary') or "Bill Payment"
-    elif sub_type == 'deposit':
-        merchant_raw = result.get('source_bank') or "Cash Deposit"
-    elif sub_type == 'withdrawal':
-        merchant_raw = "ATM Withdrawal"
+    else:
+        merchant_raw = result.get('description') or result.get('sub_type')
 
-    if not clean_merchant:
-        clean_merchant = merchant_raw
-
-    # --- 4. Internal Transfer Detection ---
-    # If explicitly detected or both accounts known
-    is_internal = sub_type == 'internal_transfer' or (source_account and dest_account)
-    if is_internal:
-         sub_type = 'internal_transfer'
-         category = "Transfer"
-
-    # Determine Transaction Type
-    tx_type_str = result.get('transaction_type', 'debit').lower()
-    tx_type = models.TransactionType.CREDIT if tx_type_str == 'credit' else models.TransactionType.DEBIT
-    
-    # FIX: Explicitly convert Enum to string value for Pydantic/SQLAlchemy compatibility
-    tx_type_value = tx_type.value
-
-    # Parse Date from AI result or use current time
-    tx_timestamp = datetime.now()
-    ai_date_success = False
-    
-    # 1. Try AI Date
-    if 'date' in result and result['date']:
-        try:
-            from dateutil import parser
-            parsed_ai = parser.parse(result['date'])
-            # Combine with time if available
-            if 'time' in result and result['time']:
-                 try:
-                      time_part = parser.parse(result['time']).time()
-                      parsed_ai = datetime.combine(parsed_ai.date(), time_part)
-                 except: pass
-            
-            # CHECK VALIDITY immediately
-            if parsed_ai > datetime.now() + timedelta(days=1):
-                logger.warning(f"⚠️ AI Date {parsed_ai} is in the future. Ignoring it.")
-                ai_date_success = False # Reject it
-            else:
-                tx_timestamp = parsed_ai
-                ai_date_success = True
-                
-        except Exception as e:
-             logger.warning(f"Could not parse AI date: {result.get('date')}, error: {e}")
-             ai_date_success = False
-
-
-
-    # 2. Regex Parsing (Always Run for Robustness)
-    # Even if AI succeeded, we check if Regex finds a better match (e.g. Current Year)
-    # This fixes cases like "26/1/22" where AI sees 22 as Year 2022, but Regex knows 26 is Year 2026.
-    regex_date_success = False
-    best_candidate = None
-    
-    if True: # Always run regex
-        import re
-        # logger.info("Running Regex Date Parsing...")
-        
-        # Current Year Info
-        now = datetime.now()
-        yr_short = now.strftime("%y") # '26'
-        yr_long = str(now.year) # '2026'
-        
-        parsed_regex = None
-        candidates = []
-
-        # Helper to safely parse Y, M, D strings
-        def try_parse(y_str, m_str, d_str):
-            try:
-                # Normalize Year
-                y = int(y_str)
-                if y < 100: y += 2000
-                m, d = int(m_str), int(d_str)
-                return datetime(y, m, d)
-            except: return None
-
-        # Strategy: Find ALL possible matches for ambiguous patterns, then score them.
-        
-        # Pattern A: YY/MM/DD (e.g. 26/01/22)
-        match_yy_mm_dd = re.search(r'\b(\d{2})[/-](\d{1,2})[/-](\d{1,2})\b', msg_text)
-        if match_yy_mm_dd:
-            # Ambiguous: could be YY/MM/DD or DD/MM/YY
-            p1, p2, p3 = match_yy_mm_dd.groups()
-            
-            # Option 1: YY/MM/DD (p1=Year)
-            dt1 = try_parse(p1, p2, p3)
-            if dt1: candidates.append(dt1)
-            
-            # Option 2: DD/MM/YY (p3=Year)
-            dt2 = try_parse(p3, p2, p1)
-            if dt2: candidates.append(dt2)
-
-        # Pattern B: DD/MM/YYYY (Full Year) -> Unambiguous Year, but capture anyway
-        match_full = re.search(r'\b(\d{1,2})[/-](\d{1,2})[/-](' + yr_long + r')', msg_text)
-        if match_full:
-             dt_full = try_parse(match_full.group(3), match_full.group(2), match_full.group(1))
-             if dt_full: candidates.append(dt_full)
-
-        # SELECTION LOGIC
-        # We prefer the candidate where Year == Current Year
-        best_candidate = None
-        
-        logger.info(f"Date Candidates found: {candidates}")
-        
-        for cand in candidates:
-            # Rule 1: Must not be future (allow 1 day buffer)
-            if cand > now + timedelta(days=1):
-                continue
-                
-            # Rule 2: Prefer Current Year
-            if cand.year == now.year:
-                best_candidate = cand
-                break # Found a perfect match!
-            
-            # Rule 3: If no current year match yet, take the most recent valid one (e.g. late Dec last year)
-            if best_candidate is None:
-                best_candidate = cand
-            else:
-                 # If we have one, keeps the first one or logic? 
-                 # Usually if we have "22" vs "26", and neither is current year (say current is 2025), 
-                 # we'd just want reasonable.
-                 # But sticking to "Matches Current Year" is the strongest heuristic for "26/1/22" in 2026.
-                 pass
-        
-        if best_candidate:
-            logger.info(f"Selected Best Regex Date: {best_candidate}")
-            tx_timestamp = best_candidate
-            
-            # Try to grab time HH:MM
-            time_match = re.search(r'\b(\d{1,2}):(\d{2})', msg_text)
-            if time_match:
-                try:
-                    h, m = time_match.groups()
-                    tx_timestamp = best_candidate.replace(hour=int(h), minute=int(m))
-                except: pass
-    
-    # SANITY CHECK (Again, final)
-    # If the parsed date is more than 24 hours in the future, assume parsing error and use NOW.
-    # SANITY CHECK (Again, final)
-    # If the parsed date is more than 24 hours in the future, assume parsing error and use NOW.
-    # from datetime import timedelta (Removed - Global)
-    if tx_timestamp > datetime.now() + timedelta(days=1):
-         logger.warning(f"⚠️ Future date detected (Parsed: {tx_timestamp}, Now: {datetime.now()}). Reverting to NOW.")
-         tx_timestamp = datetime.now()
-
-    # Resolve Destination Account Early to determine Status
-    dest_last4 = result.get('destination_account_last4')
-    dest_account = None
-    if dest_last4:
-         dest_account = crud.get_account_by_last_4(db, str(dest_last4))
-    
-    # Fallback: If we resolved the merchant to an account earlier
-    # Note: 'dest_acc' comes from merchant parsing logic earlier in the file
-    if not dest_account and 'dest_acc' in locals() and dest_acc:
-        dest_account = dest_acc
-
-    # Determine Status: Pending if Internal Transfer (Wait for confirmation SMS)
-    tx_status = "completed"
-    if source_account and dest_account and dest_account.id != source_account.id:
-         tx_status = "pending"
-         
-         # Same-Bank Exception: If banks match, assume instant transfer and complete immediately
-         if (source_account and dest_account and source_account.bank_name and dest_account.bank_name and 
-             source_account.bank_name.strip().lower() == dest_account.bank_name.strip().lower()):
-             tx_status = "completed"
-             logger.info(f"Same-bank transfer detected ({source_account.bank_name}). Marking as completed immediately.")
-    
-    # Handle Null Source (Ambiguous)
-    acc_id = source_account.id if source_account else None
-    if not source_account:
-        tx_status = "pending_action"
-
-    transaction = schemas.TransactionCreate(
-        account_id=acc_id,
-        amount=result['amount'], 
-        fees=result.get('fees', 0.0), # Add fees
+    # --- 4. Create Transaction Record ---
+    transaction_data = schemas.TransactionCreate(
+        account_id=source_account.id,
+        amount=sar_amount,
+        original_amount=original_amount,
+        original_currency=original_currency,
+        exchange_rate=exchange_rate if original_currency != 'SAR' else None,
         merchant=merchant_raw,
-        category=category,
-        type=tx_type_value,
-        timestamp=tx_timestamp,
         raw_sms_content=msg_text,
-        status=tx_status 
+        timestamp=datetime.strptime(result['timestamp'], "%Y-%m-%d %H:%M") if result.get('timestamp') else datetime.now(),
+        category=category,
+        type=tx_type_str,
+        status="completed"
     )
-
-    # Check for Duplicate Main Transaction (e.g. Dual SMS for same transfer)
-    # Only if source is known. If unknown, we act as new.
-    if source_account:
-        duplicate = crud.find_potential_duplicate(
-            db, 
-            source_account.id, 
-            result['amount'], 
-            tx_type_value, 
-            tx_timestamp
-        )
-        if duplicate:
-            if duplicate.status == "pending":
-                # Confirm this transaction
-                crud.confirm_transaction(db, duplicate.id)
-                msg_extras = f"Confirmed Pending Transaction (ID: {duplicate.id})"
-                
-                # Try to find and confirm the counterpart (Debit Leg) on the original source
-                real_source_last4 = result.get('source_account_last4')
-                if real_source_last4:
-                    real_source = crud.get_account_by_last_4(db, str(real_source_last4))
-                    if real_source:
-                        pending_debit = crud.find_potential_duplicate(
-                            db, real_source.id, result['amount'], "debit", tx_timestamp
-                        )
-                        if pending_debit and pending_debit.status == "pending":
-                            crud.confirm_transaction(db, pending_debit.id)
-                            msg_extras += f" & Linked Debit ({real_source.name})"
-
-                logger.info(f"Duplicate confirmed: {msg_extras}")
-                return f"Transaction Confirmed via Second SMS. {msg_extras}"
-            
-            logger.info(f"Duplicate transaction detected (skipping): {duplicate.id}")
-            return f"Duplicate transaction ignored (ID: {duplicate.id})"
-
-    try:
-        new_tx = crud.create_transaction(db=db, transaction=transaction)
-        # Save Training Example (Memory)
-        try:
-             crud.create_training_example(db, msg_text, json.dumps(result))
-        except Exception as e_mem:
-             logger.error(f"Failed to save training example: {e_mem}")
-             
-        # Return the object for calling function usage
-        # If Pending Action (No Account), don't send normal Added message yet
-        if tx_status == "pending_action":
-            # AMBIGUOUS TRANSFER LOGIC: 
-            # If we know the destination, create the Credit Leg immediately!
-            if dest_account:
-                 logger.info(f"Ambiguous Source but Known Destination ({dest_account.name}). Creating Credit Leg.")
-                 try:
-                     credit_tx = schemas.TransactionCreate(
-                        account_id=dest_account.id,
-                        amount=result['amount'],
-                        merchant="Unknown Account", # Source Unknown
-                        category="Transfer",
-                        type="credit", # Incoming
-                        timestamp=tx_timestamp,
-                        raw_sms_content=msg_text,
-                        status="pending" # Mark as Pending until Source is resolved
-                     )
-                     crud.create_transaction(db=db, transaction=credit_tx)
-                 except Exception as e_cred:
-                     logger.error(f"Failed to create immediate credit leg: {e_cred}")
-
-            return new_tx
-
-    except Exception as e:
-        logger.error(f"Failed to create main transaction: {e}")
-        return f"Error creating transaction: {str(e)}"
-
-    status_icon = "⏳" if tx_status == "pending" else "✅"
-    status_text = "Pending (Waiting for Confirmation)" if tx_status == "pending" else "Added"
-    reply_message = f"{status_icon} Transaction {status_text}\nAmount: {result['amount']}\nMerchant: {merchant_raw}\nCategory: {category}\nDate: {tx_timestamp.strftime('%Y-%m-%d %H:%M')}"
-
-    # Handle Internal Transfer (Credit Leg)
-    # dest_account already resolved above
-
-    # Handle Internal Transfer (Credit Leg)
-    # Only if both accounts are known and different
-    if dest_account and source_account and dest_account.id != source_account.id:
-         credit_tx = schemas.TransactionCreate(
-             account_id=dest_account.id,
-             amount=result['amount'], 
-             merchant=f"Transfer from {source_account.name}",
-             category="Transfer", 
-             type=models.TransactionType.CREDIT.value,
-             timestamp=tx_timestamp, # Use same timestamp
-             raw_sms_content=f"Auto-credit from transfer: {msg_text}",
-             status=tx_status
-         )
-         # Check for Duplicate Credit Leg
-         dup_credit = crud.find_potential_duplicate(
-             db,
-             dest_account.id,
-             result['amount'],
-             models.TransactionType.CREDIT.value,
-             tx_timestamp
-         )
-         if dup_credit:
-             logger.info("Credit leg already exists (skipping)")
-             reply_message += f"\n\n🔀 **Linked Transfer**\n(Already Exists: {dest_account.name})"
-         else:
-             try:
-                 crud.create_transaction(db=db, transaction=credit_tx)
-                 reply_message += f"\n\n🔀 **Linked Transfer**\nCredited: {dest_account.name}"
-             except Exception as e:
-                 logger.error(f"Failed to create credit leg: {e}")
-
-    # SIGNAL FOR INTERACTIVE SENDER LINKING
-    # Condition: 
-    # 1. Type is Credit (Incoming)
-    # 2. Category is Transfer (Internal/External)
-    # 3. Source Account (Sender Internal) is NOT known (source_account here is the Primary/Dest)
-    # 4. Sender Name is missing or generic (so we don't know who sent it)
-    # 5. Not already linked (we just created it as a single leg or didn't find the source)
     
-    should_link_sender = (
-        tx_type_value == models.TransactionType.CREDIT.value and
-        category == "Transfer" and
-        (not result.get('source_account_last4')) and # No specific source identified
-        (not result.get('sender_name')) # No external sender name
-    )
+    tx = crud.create_transaction(db, transaction_data)
+    
+    # --- 5. Notifications & Feedback ---
+    if reply_target:
+        # Build success message
+        response_txt = f"✅ **Success!**\n"
+        response_txt += f"Account: {source_account.name}\n"
+        response_txt += f"Amount: {sar_amount} SAR\n"
+        if original_currency != 'SAR':
+             response_txt += f"(Original: {original_amount} {original_currency})\n"
+        response_txt += f"Merchant: {merchant_raw}\n"
+        response_txt += f"Balance: {tx.balance_after_transaction:.2f} SAR"
         
-    if should_link_sender:
-         reply_message += f"\n❓ [LINK_SENDER:{new_tx.id}]"
+        try: await reply_target.reply_text(response_txt)
+        except: pass
 
-    try:
-        # Edit if it's a callback query message, else reply
-        
-        # CHECK FOR LINK_SENDER SIGNAL
-        if "❓ [LINK_SENDER:" in reply_message:
-             clean_reply, signal_part = reply_message.split("❓ [LINK_SENDER:")
-             tx_id_str = signal_part.replace("]", "")
-             
-             # Prepare Buttons for Linking Source
-             link_keyboard = []
-             accounts_link = db.query(models.Account).order_by(models.Account.name).all()
-             for i, acc in enumerate(accounts_link):
-                 # Use 'link:' prefix for callback handling
-                 link_keyboard.append([InlineKeyboardButton(f"{acc.name}", callback_data=f"link:{tx_id_str}:{i}")])
-             
-             link_markup = InlineKeyboardMarkup(link_keyboard)
-             clean_reply += "\n❓ **Link Source Account?**"
-             
-             if hasattr(reply_target, 'edit_text'):
-                 await reply_target.edit_text(clean_reply, reply_markup=link_markup)
-             else:
-                 await reply_target.reply_text(clean_reply, reply_markup=link_markup)
+def run_bot():
+    if not TELEGRAM_TOKEN:
+        logger.error("TELEGRAM_BOT_TOKEN not found. Exiting.")
+        return
 
-        else:
-            # Normal Reply
-            if hasattr(reply_target, 'edit_text'):
-                 await reply_target.edit_text(reply_message)
-            else:
-                 await reply_target.reply_text(reply_message)
-    except Exception as e:
-        logger.error(f"Reply error: {e}")
-
-
-async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Handles category/account selection from buttons.
-    """
-    query = update.callback_query
-    await query.answer() # Acknowledge
+    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     
-    data = query.data
-    # data format: act:{tx_id}:{acc_index}
-    
-    try:
-        if data.startswith("act:"):
-            _, tx_id, acc_idx_str = data.split(":")
-            acc_idx = int(acc_idx_str)
-            
-            db = database.SessionLocal()
-            
-            # Fetch Accounts safely
-            accounts = db.query(models.Account).order_by(models.Account.name).all()
-            if acc_idx >= len(accounts):
-                 await query.edit_message_text("❌ Error: Account selection invalid.")
-                 db.close()
-                 return
-            
-            selected_account = accounts[acc_idx]
-            
-            # Assign Account to Transaction
-            try:
-                updated_tx = crud.assign_account_to_transaction(db, tx_id, selected_account.id)
-                success_msg = f"✅ Assigned to **{selected_account.name}**. Balance Updated."
-                
-                # UPDATE LINKED TRANSACTION (If Duplicate/Linked Credit Leg exists)
-                # When we resolve the Source (Debit) account, we should verify if there is a Destination (Credit) leg
-                # that has "Unknown Account" as the merchant/source name, and update it.
-                linked_tx = crud.find_potential_duplicate(
-                    db,
-                    None, # Verify across ALL accounts? No, we don't know the Dest account easily here unless we query.
-                    # Actually, we can just search by 'timestamp' (+/- 1s) and 'amount' and 'type=credit'
-                    updated_tx.amount,
-                    "credit" if updated_tx.type == "debit" else "debit",
-                    updated_tx.timestamp
-                )
-                
-                # Note: find_potential_duplicate usually takes account_id. 
-                # If we pass None, we need to ensure crud handles it or we search manually.
-                # Let's do a manual search for safety since find_potential_duplicate is specific.
-                
-                linked_candidates = db.query(models.Transaction).filter(
-                    models.Transaction.amount == updated_tx.amount,
-                    models.Transaction.type != updated_tx.type,
-                    models.Transaction.timestamp == updated_tx.timestamp
-                ).all()
-                
-                for link in linked_candidates:
-                    # Update Merchant Name to reflect the now-known source
-                    if updated_tx.type == "debit": # This was the Source
-                        link.merchant = f"Transfer from {selected_account.name}"
-                        # Also Confirm the Linked Credit since Source is now known
-                        link.status = "completed"
-                        db.commit()
-                        success_msg += f"\n🔄 Updated Linked Credit on {link.account.name}"
-                    elif updated_tx.type == "credit":
-                         link.merchant = f"Transfer to {selected_account.name}"
-                         # Also Confirm the Linked Credit since Source is now known
-                         link.status = "completed"
-                         db.commit()
-
-                await query.edit_message_text(success_msg)
-            except Exception as e:
-                await query.edit_message_text(f"❌ Error updating transaction: {e}")
-
-            db.close()
-
-        # LINK SENDER CALLBACK
-        elif data.startswith("link:"):
-             _, tx_id, acc_idx_str = data.split(":")
-             acc_idx = int(acc_idx_str)
-             
-             db = database.SessionLocal()
-             accounts = db.query(models.Account).order_by(models.Account.name).all()
-             
-             if acc_idx >= len(accounts):
-                  await query.edit_message_text("❌ Error: Account selection invalid.")
-                  db.close()
-                  return
-             
-             source_account = accounts[acc_idx]
-             
-             # Fetch the Credit Transaction (Destination)
-             credit_tx = crud.get_transaction(db, tx_id)
-             if not credit_tx:
-                  await query.edit_message_text("❌ Error: Original Credit Transaction not found.")
-                  db.close()
-                  return
-
-             # Create the Debit Leg (Sender)
-             try:
-                 debit_tx = schemas.TransactionCreate(
-                     account_id=source_account.id,
-                     amount=credit_tx.amount,
-                     merchant=f"Transfer to {credit_tx.account.name}",
-                     category="Transfer",
-                     type="debit",
-                     timestamp=credit_tx.timestamp,
-                     raw_sms_content=f"Linked Debit Source for TX {tx_id}",
-                     status="completed" # Source linkage confirms both
-                 )
-                 
-                 new_debit = crud.create_transaction(db=db, transaction=debit_tx)
-                 
-                 # IMPORTANT: Update the Credit Leg's description to show the Source
-                 credit_tx.merchant = f"Transfer from {source_account.name}"
-                 # credit_tx.status = "completed" # It's likely already created as completed/verified, but ensure it.
-                 db.commit()
-                 
-                 await query.edit_message_text(
-                     f"✅ **Source Linked**: {source_account.name}\n"
-                     f"🔄 Created Debit Leg: {new_debit.amount}\n"
-                     f"✅ Updated Credit Leg: Transfer from {source_account.name}"
-                 )
-             except Exception as e:
-                  await query.edit_message_text(f"❌ Error creating sender leg: {e}")
-             
-             db.close()
-
-    except Exception as e:
-        logger.error(f"Callback Error: {e}")
-        if query and query.message:
-            await query.edit_message_text(f"❌ System Error: {e}")
-        else:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"❌ System Error: {e}")
-
-
-if __name__ == '__main__':
-    # Fix for asyncio loop in some environments
-    import nest_asyncio
-    try:
-        nest_asyncio.apply()
-    except:
-        pass
-
-    if not TELEGRAM_BOT_TOKEN:
-        print("Error: TELEGRAM_BOT_TOKEN is missing in .env")
-        exit(1)
-
-    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
-    
-    async def debug_log_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        logger.info(f"raw_update: {update.to_dict()}")
-
     # Handlers
-    app.add_handler(TypeHandler(Update, debug_log_update), group=-1)
-
-    start_handler = MessageHandler(filters.COMMAND & filters.Regex(r"^/start"), lambda u, c: u.message.reply_text("👋 Hello! I am your SMS Finance Agent. Forward me a bank SMS!"))
+    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
     
-    msg_handler = MessageHandler(~filters.COMMAND, handle_message)
-    callback_handler = CallbackQueryHandler(handle_callback)
-    
-    app.add_handler(start_handler)
-    app.add_handler(msg_handler)
-    app.add_handler(callback_handler)
-    
-    # Verify Bot Identity
-    print("⏳ verifying token...")
-    async def print_bot_info():
-         bot = await app.bot.get_me()
-         print(f"✅ Bot Connected: @{bot.username} (ID: {bot.id})")
+    logger.info("Bot is polling...")
+    application.run_polling()
 
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(print_bot_info())
-
-    print("🤖 SMS Agent is polling Telegram...")
-    app.run_polling()
+if __name__ == "__main__":
+    run_bot()
