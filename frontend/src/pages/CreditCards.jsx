@@ -59,7 +59,7 @@ const CreditCardVisual = ({ card, onEdit, onPayment }) => {
             {/* Content */}
             <div className="relative z-10 flex flex-col h-full justify-between">
 
-                {/* Header - simplified for custom backgrounds */}
+                {/* Header - Card name only (no bank logo) */}
                 <div className="flex justify-between items-start">
                     {hasCustomBackground ? (
                         // Custom background - just show card name
@@ -67,7 +67,7 @@ const CreditCardVisual = ({ card, onEdit, onPayment }) => {
                             <span className="font-bold tracking-wide text-lg drop-shadow-md">{card.name}</span>
                         </div>
                     ) : (
-                        // Fallback - show icon and names
+                        // Fallback - show icon and names (no bank logo)
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-white/10 rounded-xl backdrop-blur-md shadow-inner border border-white/5">
                                 <CreditCardIcon className="w-5 h-5 text-violet-200" />
@@ -76,18 +76,6 @@ const CreditCardVisual = ({ card, onEdit, onPayment }) => {
                                 {card.bank_name && <span className="text-[10px] uppercase tracking-wider opacity-75 leading-tight">{card.bank_name}</span>}
                                 <span className="font-bold tracking-wide text-base">{card.name}</span>
                             </div>
-                        </div>
-                    )}
-
-                    {/* Visa Logo - only show for non-custom backgrounds */}
-                    {!hasCustomBackground && (
-                        <div className="flex flex-col items-end gap-1">
-                            <img src="/visa-logo.png" alt="Visa" className="h-6 w-auto object-contain drop-shadow-md" />
-                            {card.last_4_digits && (
-                                <span className="text-xs font-mono font-bold tracking-wider text-white/90 shadow-sm">
-                                    {card.last_4_digits}
-                                </span>
-                            )}
                         </div>
                     )}
                 </div>
@@ -110,16 +98,22 @@ const CreditCardVisual = ({ card, onEdit, onPayment }) => {
                     </button>
                 </div>
 
-                {/* Footer (Balance & Utilization) */}
+                {/* Footer (Balance & Utilization with Visa Logo) */}
                 <div>
                     <div className="flex justify-between items-end mb-1">
                         <div>
                             <p className="text-[10px] uppercase tracking-wider opacity-70 mb-0.5 drop-shadow-sm">Balance Owed</p>
                             <p className="text-2xl font-bold tracking-tight text-white drop-shadow-md">{formatCurrency(card.current_balance)}</p>
                         </div>
-                        <div className="text-right">
-                            <p className="text-[10px] uppercase tracking-wider opacity-70 mb-0.5 drop-shadow-sm">Available</p>
-                            <p className="text-lg font-bold text-emerald-300 drop-shadow-sm">{formatCurrency(card.available_credit)}</p>
+
+                        {/* Right side: Visa Logo + Card Digits */}
+                        <div className="text-right flex flex-col items-end gap-1">
+                            <img src="/visa-logo.png" alt="Visa" className="h-6 w-auto object-contain drop-shadow-md" />
+                            {card.last_4_digits && (
+                                <span className="text-xs font-mono font-bold tracking-wider text-white/90 drop-shadow-sm">
+                                    •••• {card.last_4_digits}
+                                </span>
+                            )}
                         </div>
                     </div>
 

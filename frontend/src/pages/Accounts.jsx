@@ -63,9 +63,15 @@ const AccountCard = ({ acc, onEdit = null }) => {
     const isCreditCard = acc.account_type === 'Credit Card';
     const hasLimit = isCreditCard && acc.credit_limit > 0;
     const utilPercent = hasLimit ? Math.min(100, (Math.abs(acc.current_balance) / acc.credit_limit) * 100) : 0;
-
-    // Use background image if bank has custom theme, otherwise use gradient
     const hasCustomBackground = !!bankTheme;
+
+    // Determine if we should show mada or visa logo
+    // Credit cards: show Visa
+    // Checking/Savings with linked card (aliases): show Mada
+    const hasLinkedCard = !isCreditCard && acc.aliases && acc.aliases.length > 0;
+    const showVisa = isCreditCard;
+    const showMada = hasLinkedCard;
+    const cardDigits = isCreditCard ? acc.last_4_digits : (hasLinkedCard ? acc.aliases[0].last_4_digits : null);
 
     return (
         <div
@@ -88,15 +94,15 @@ const AccountCard = ({ acc, onEdit = null }) => {
             {/* Content */}
             <div className="relative z-10 flex flex-col h-full justify-between">
 
-                {/* Header - Only show account name for custom backgrounds (bank logo already in image) */}
+                {/* Header - Account name only (no bank logo) */}
                 <div className="flex justify-between items-start">
                     {hasCustomBackground ? (
-                        // Custom background - just show account name
+                        // Custom background - just show account name at top-left
                         <div className="flex flex-col">
                             <span className="font-bold tracking-wide text-lg drop-shadow-md">{acc.name}</span>
                         </div>
                     ) : (
-                        // Fallback - show icon and names
+                        // Fallback - show icon and names (no bank logo)
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-white/10 rounded-xl backdrop-blur-md shadow-inner border border-white/5">
                                 {theme.icon}
@@ -108,41 +114,7 @@ const AccountCard = ({ acc, onEdit = null }) => {
                         </div>
                     )}
 
-                    {/* Network Logo (Visa/Mada) - only show for non-custom backgrounds */}
-                    {!hasCustomBackground && (
-                        <div className="flex flex-col items-end gap-1">
-                            {(() => {
-                                let showLogo = null;
-                                let cardDigits = null;
-
-                                if (isCreditCard) {
-                                    if (acc.last_4_digits) {
-                                        showLogo = <img src="/visa-logo.png" alt="Visa" className="h-6 w-auto object-contain drop-shadow-md" />;
-                                        cardDigits = acc.last_4_digits;
-                                    }
-                                } else {
-                                    if (acc.aliases && acc.aliases.length > 0) {
-                                        const primaryCard = acc.aliases[0];
-                                        showLogo = <img src="/mada-logo.png" alt="Mada" className="h-5 w-auto object-contain drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]" />;
-                                        cardDigits = primaryCard.last_4_digits;
-                                    }
-                                }
-
-                                if (!showLogo && !cardDigits) return null;
-
-                                return (
-                                    <div className="flex flex-col items-end gap-1">
-                                        {showLogo}
-                                        {cardDigits && (
-                                            <span className="text-xs font-mono font-bold tracking-wider text-white/90 shadow-sm">
-                                                {cardDigits}
-                                            </span>
-                                        )}
-                                    </div>
-                                );
-                            })()}
-                        </div>
-                    )}
+                    {/* Empty space for balance on top-right reserved below */}
                 </div>
 
                 {/* Edit Button */}
@@ -156,23 +128,37 @@ const AccountCard = ({ acc, onEdit = null }) => {
                     </button>
                 )}
 
-                {/* Footer (Balance & Number) */}
+                {/* Footer (Balance, Type, and Payment Network Logo) */}
                 <div>
                     <div className="flex justify-between items-end mb-1">
                         <div>
                             <p className="text-[10px] uppercase tracking-wider opacity-70 mb-0.5 drop-shadow-sm">Current Balance</p>
                             <p className="text-2xl font-bold tracking-tight text-white drop-shadow-md">{formatCurrency(acc.current_balance)}</p>
                         </div>
-                        <div className="text-right">
-                            <p className="text-[10px] uppercase tracking-wider opacity-70 mb-0.5 drop-shadow-sm">{acc.account_type}</p>
-                            {acc.last_4_digits && <p className="font-mono text-sm tracking-widest opacity-90 drop-shadow-sm">•••• {acc.last_4_digits}</p>}
+
+                        {/* Right side: Payment Network Logo (Mada/Visa) + Account Type */}
+                        <div className="text-right flex flex-col items-end gap-1">
+                            {/* Mada or Visa Logo */}
+                            {showVisa && (
+                                <img src="/visa-logo.png" alt="Visa" className="h-6 w-auto object-contain drop-shadow-md" />
+                            )}
+                            {showMada && (
+                                <img src="/mada-logo.png" alt="Mada" className="h-5 w-auto object-contain drop-shadow-md" />
+                            )}
+
+                            {/* Card digits if available */}
+                            {cardDigits && (
+                                <span className="text-xs font-mono font-bold tracking-wider text-white/90 drop-shadow-sm">
+                                    •••• {cardDigits}
+                                </span>
+                            )}
                         </div>
                     </div>
 
-                    {/* Utilization Bar */}
+                    {/* Utilization Bar for Credit Cards */}
                     {hasLimit && (
                         <div className="mt-2">
-                            <div className="flex justify-between text-[10px] opacity-70 mb-0.5">
+                            <div className="flex justify-between text-[10px] opacity-70 mb-0.5 drop-shadow-sm">
                                 <span>Credit Limit: {formatCurrency(acc.credit_limit)}</span>
                                 <span>{utilPercent.toFixed(0)}% Used</span>
                             </div>
