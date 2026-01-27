@@ -8,6 +8,35 @@ import { arrayMove, SortableContext, rectSortingStrategy, sortableKeyboardCoordi
 import { CSS } from '@dnd-kit/utilities';
 
 
+// Get bank-specific card background image based on bank name and account type
+const getBankCardTheme = (bankName, accountType) => {
+    if (!bankName) return null;
+    const n = bankName.toLowerCase().replace(/\s+/g, '');
+    const isCreditCard = accountType === 'Credit Card';
+
+    // STC Bank
+    if (n.includes('stc')) {
+        return { backgroundImage: '/banks/stc-card.png', textColor: 'text-white' };
+    }
+    // Alrajhi Bank
+    if (n.includes('rajhi') || n.includes('alrajhi')) {
+        return {
+            backgroundImage: isCreditCard ? '/banks/alrajhi-credit.png' : '/banks/alrajhi-card.png',
+            textColor: 'text-white'
+        };
+    }
+    // Jazira Bank (AJB)
+    if (n.includes('jazira') || n.includes('ajb')) {
+        return {
+            backgroundImage: isCreditCard ? '/banks/jazira-credit.png' : '/banks/jazira-card.png',
+            textColor: 'text-white'
+        };
+    }
+
+    return null;
+};
+
+// Fallback gradient themes for banks without custom images
 const getAccountTheme = (type) => {
     switch (type) {
         case 'Savings': return {
@@ -28,141 +57,115 @@ const getAccountTheme = (type) => {
     }
 };
 
-const BANK_LOGOS = {
-    'jazira': '/banks/ajb.png',
-    'ajb': '/banks/ajb.png',
-    'rajhi': 'https://logo.clearbit.com/alrajhibank.com.sa',
-    'alrajhi': 'https://logo.clearbit.com/alrajhibank.com.sa',
-    'snb': 'https://logo.clearbit.com/alahli.com',
-    'alahli': 'https://logo.clearbit.com/alahli.com',
-    'ncb': 'https://logo.clearbit.com/alahli.com',
-    'riyad': 'https://logo.clearbit.com/riyadbank.com',
-    'inma': 'https://logo.clearbit.com/alinma.com',
-    'alinma': 'https://logo.clearbit.com/alinma.com',
-    'sab': 'https://logo.clearbit.com/sab.com',
-    'sabb': 'https://logo.clearbit.com/sab.com',
-    'stc': 'https://logo.clearbit.com/stcpay.com.sa',
-    'urpay': 'https://logo.clearbit.com/urpay.com.sa',
-    'anb': 'https://logo.clearbit.com/anb.com.sa',
-    'fransi': 'https://logo.clearbit.com/alfransi.com.sa',
-    'alfransi': 'https://logo.clearbit.com/alfransi.com.sa'
-};
-
-const getLocalLogo = (name) => {
-    if (!name) return '/banks/bank2.png';
-    const n = name.toLowerCase().replace(/\s+/g, '');
-    for (const [key, url] of Object.entries(BANK_LOGOS)) {
-        if (n.includes(key)) return url;
-    }
-    return '/banks/bank2.png';
-};
-
 const AccountCard = ({ acc, onEdit = null }) => {
     const theme = getAccountTheme(acc.account_type);
+    const bankTheme = getBankCardTheme(acc.bank_name, acc.account_type);
     const isCreditCard = acc.account_type === 'Credit Card';
     const hasLimit = isCreditCard && acc.credit_limit > 0;
     const utilPercent = hasLimit ? Math.min(100, (Math.abs(acc.current_balance) / acc.credit_limit) * 100) : 0;
 
-    return (
-        <div className={`relative w-full aspect-[1.586/1] rounded-xl p-5 shadow-lg bg-gradient-to-br ${theme.gradient} text-white overflow-hidden group hover:scale-[1.02] transition-all duration-300 border border-white/10`}>
+    // Use background image if bank has custom theme, otherwise use gradient
+    const hasCustomBackground = !!bankTheme;
 
-            {/* Background Decor */}
-            <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white/5 blur-3xl"></div>
-            <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 rounded-full bg-black/20 blur-3xl"></div>
+    return (
+        <div
+            className={`relative w-full aspect-[1.586/1] rounded-xl p-5 shadow-lg text-white overflow-hidden group hover:scale-[1.02] transition-all duration-300 border border-white/10 ${!hasCustomBackground ? `bg-gradient-to-br ${theme.gradient}` : ''}`}
+            style={hasCustomBackground ? {
+                backgroundImage: `url(${bankTheme.backgroundImage})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center'
+            } : {}}
+        >
+
+            {/* Background Decor - only show for non-custom backgrounds */}
+            {!hasCustomBackground && (
+                <>
+                    <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white/5 blur-3xl"></div>
+                    <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 rounded-full bg-black/20 blur-3xl"></div>
+                </>
+            )}
 
             {/* Content */}
             <div className="relative z-10 flex flex-col h-full justify-between">
 
-                {/* Header */}
+                {/* Header - Only show account name for custom backgrounds (bank logo already in image) */}
                 <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-white/10 rounded-xl backdrop-blur-md shadow-inner border border-white/5">
-                            {/* Bank Logo if valid, else Theme Icon */}
-                            {(acc.bank_logo_url || acc.bank_name) ? (
-                                <img
-                                    src={acc.bank_logo_url || getLocalLogo(acc.bank_name)}
-                                    alt={acc.bank_name}
-                                    className="w-8 h-8 object-contain drop-shadow-sm"
-                                    onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }}
-                                />
-                            ) : null}
-                            <div className={`${(acc.bank_logo_url || acc.bank_name) ? 'hidden' : 'block'}`}>
+                    {hasCustomBackground ? (
+                        // Custom background - just show account name
+                        <div className="flex flex-col">
+                            <span className="font-bold tracking-wide text-lg drop-shadow-md">{acc.name}</span>
+                        </div>
+                    ) : (
+                        // Fallback - show icon and names
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-white/10 rounded-xl backdrop-blur-md shadow-inner border border-white/5">
                                 {theme.icon}
                             </div>
+                            <div className="flex flex-col">
+                                {acc.bank_name && <span className="text-[10px] uppercase tracking-wider opacity-75 leading-tight">{acc.bank_name}</span>}
+                                <span className="font-bold tracking-wide text-base">{acc.name}</span>
+                            </div>
                         </div>
-                        <div className="flex flex-col">
-                            {acc.bank_name && <span className="text-[10px] uppercase tracking-wider opacity-75 leading-tight">{acc.bank_name}</span>}
-                            <span className="font-bold tracking-wide text-base">{acc.name}</span>
+                    )}
+
+                    {/* Network Logo (Visa/Mada) - only show for non-custom backgrounds */}
+                    {!hasCustomBackground && (
+                        <div className="flex flex-col items-end gap-1">
+                            {(() => {
+                                let showLogo = null;
+                                let cardDigits = null;
+
+                                if (isCreditCard) {
+                                    if (acc.last_4_digits) {
+                                        showLogo = <img src="/visa-logo.png" alt="Visa" className="h-6 w-auto object-contain drop-shadow-md" />;
+                                        cardDigits = acc.last_4_digits;
+                                    }
+                                } else {
+                                    if (acc.aliases && acc.aliases.length > 0) {
+                                        const primaryCard = acc.aliases[0];
+                                        showLogo = <img src="/mada-logo.png" alt="Mada" className="h-5 w-auto object-contain drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]" />;
+                                        cardDigits = primaryCard.last_4_digits;
+                                    }
+                                }
+
+                                if (!showLogo && !cardDigits) return null;
+
+                                return (
+                                    <div className="flex flex-col items-end gap-1">
+                                        {showLogo}
+                                        {cardDigits && (
+                                            <span className="text-xs font-mono font-bold tracking-wider text-white/90 shadow-sm">
+                                                {cardDigits}
+                                            </span>
+                                        )}
+                                    </div>
+                                );
+                            })()}
                         </div>
-                    </div>
-
-                    {/* Network Logo (Visa/Mada) */}
-                    <div className="flex flex-col items-end gap-1">
-                        {(() => {
-                            // Logic: 
-                            // 1. Credit Card: The account IS the card. Show Visa + Primary Digits.
-                            // 2. Checking/Savings: The account is a bank account. Only show Mada if there is a LINKED card (Alias). Show Alias Digits.
-
-                            let showLogo = null;
-                            let cardDigits = null;
-
-                            if (isCreditCard) {
-                                // Credit Card Logic
-                                if (acc.last_4_digits) {
-                                    showLogo = <img src="/visa-logo.png" alt="Visa" className="h-6 w-auto object-contain drop-shadow-md" />;
-                                    cardDigits = acc.last_4_digits;
-                                }
-                            } else {
-                                // Checking/Savings Logic
-                                // Check for Aliases (Linked Cards)
-                                if (acc.aliases && acc.aliases.length > 0) {
-                                    // Take the first alias as the primary card
-                                    const primaryCard = acc.aliases[0];
-                                    // Text shadow added for contrast
-                                    showLogo = <img src="/mada-logo.png" alt="Mada" className="h-5 w-auto object-contain drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]" />;
-                                    cardDigits = primaryCard.last_4_digits;
-                                }
-                            }
-
-                            if (!showLogo && !cardDigits) return null;
-
-                            return (
-                                <div className="flex flex-col items-end gap-1">
-                                    {showLogo}
-                                    {cardDigits && (
-                                        <span className="text-xs font-mono font-bold tracking-wider text-white/90 shadow-sm">
-                                            {cardDigits}
-                                        </span>
-                                    )}
-                                </div>
-                            );
-                        })()}
-                    </div>
+                    )}
                 </div>
 
-                {/* Edit Button (Absolute positioned now or next to name?) - Let's keep it consistent layout-wise */}
+                {/* Edit Button */}
                 {onEdit && (
                     <button
                         onClick={(e) => { e.stopPropagation(); onEdit(acc); }}
                         onPointerDown={(e) => e.stopPropagation()}
-                        className="absolute top-3 right-3 p-1.5 bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-md transition opacity-0 group-hover:opacity-100 z-20"
+                        className="absolute top-3 right-3 p-1.5 bg-black/30 hover:bg-black/50 rounded-full backdrop-blur-md transition opacity-0 group-hover:opacity-100 z-20"
                     >
                         <Edit3 size={14} />
                     </button>
                 )}
 
-
-
                 {/* Footer (Balance & Number) */}
                 <div>
                     <div className="flex justify-between items-end mb-1">
                         <div>
-                            <p className="text-[10px] uppercase tracking-wider opacity-70 mb-0.5">Current Balance</p>
-                            <p className="text-2xl font-bold tracking-tight text-white drop-shadow-sm">{formatCurrency(acc.current_balance)}</p>
+                            <p className="text-[10px] uppercase tracking-wider opacity-70 mb-0.5 drop-shadow-sm">Current Balance</p>
+                            <p className="text-2xl font-bold tracking-tight text-white drop-shadow-md">{formatCurrency(acc.current_balance)}</p>
                         </div>
                         <div className="text-right">
-                            <p className="text-[10px] uppercase tracking-wider opacity-70 mb-0.5">{acc.account_type}</p>
-                            {acc.last_4_digits && <p className="font-mono text-sm tracking-widest opacity-90">•••• {acc.last_4_digits}</p>}
+                            <p className="text-[10px] uppercase tracking-wider opacity-70 mb-0.5 drop-shadow-sm">{acc.account_type}</p>
+                            {acc.last_4_digits && <p className="font-mono text-sm tracking-widest opacity-90 drop-shadow-sm">•••• {acc.last_4_digits}</p>}
                         </div>
                     </div>
 

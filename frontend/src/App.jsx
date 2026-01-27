@@ -14,6 +14,7 @@ import Accounts from './pages/Accounts';
 import Loans from './pages/Loans';
 import CreditCards from './pages/CreditCards';
 import Categories from './pages/Categories';
+import Audit from './pages/Audit';
 
 function App() {
     return (
@@ -30,6 +31,7 @@ function App() {
                     <Route path="reports" element={<Reports />} />
                     <Route path="planning" element={<Planning />} />
                     <Route path="categories" element={<Categories />} />
+                    <Route path="audit" element={<Audit />} />
                 </Route>
             </Routes>
         </Router>

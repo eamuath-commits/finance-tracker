@@ -6,6 +6,163 @@ import { Modal, formatCurrency, formatCurrencyText, inputClass, selectClass } fr
 
 const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
+// Get bank-specific card background image for credit cards
+const getBankCardTheme = (bankName) => {
+    if (!bankName) return null;
+    const n = bankName.toLowerCase().replace(/\s+/g, '');
+
+    // Alrajhi Bank Credit Card
+    if (n.includes('rajhi') || n.includes('alrajhi')) {
+        return { backgroundImage: '/banks/alrajhi-credit.png', textColor: 'text-white' };
+    }
+    // Jazira Bank Credit Card (AJB)
+    if (n.includes('jazira') || n.includes('ajb')) {
+        return { backgroundImage: '/banks/jazira-credit.png', textColor: 'text-white' };
+    }
+
+    return null;
+};
+
+const getUtilizationColor = (percent) => {
+    if (percent >= 80) return { bar: 'bg-red-400', text: 'text-red-400' };
+    if (percent >= 50) return { bar: 'bg-amber-400', text: 'text-amber-400' };
+    return { bar: 'bg-emerald-400', text: 'text-emerald-400' };
+};
+
+// Credit Card Visual Component with custom bank themes
+const CreditCardVisual = ({ card, onEdit, onPayment }) => {
+    const utilPercent = card.credit_limit > 0
+        ? Math.min(100, (Math.abs(card.current_balance) / card.credit_limit) * 100)
+        : 0;
+    const colors = getUtilizationColor(utilPercent);
+    const bankTheme = getBankCardTheme(card.bank_name);
+    const hasCustomBackground = !!bankTheme;
+
+    return (
+        <div
+            className={`relative w-full aspect-[1.586/1] rounded-xl p-5 shadow-lg text-white overflow-hidden group hover:scale-[1.02] transition-all duration-300 border border-white/10 ${!hasCustomBackground ? 'bg-gradient-to-br from-violet-600 to-purple-900' : ''}`}
+            style={hasCustomBackground ? {
+                backgroundImage: `url(${bankTheme.backgroundImage})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center'
+            } : {}}
+        >
+
+            {/* Background Decor - only show for non-custom backgrounds */}
+            {!hasCustomBackground && (
+                <>
+                    <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white/5 blur-3xl"></div>
+                    <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 rounded-full bg-black/20 blur-3xl"></div>
+                </>
+            )}
+
+            {/* Content */}
+            <div className="relative z-10 flex flex-col h-full justify-between">
+
+                {/* Header - simplified for custom backgrounds */}
+                <div className="flex justify-between items-start">
+                    {hasCustomBackground ? (
+                        // Custom background - just show card name
+                        <div className="flex flex-col">
+                            <span className="font-bold tracking-wide text-lg drop-shadow-md">{card.name}</span>
+                        </div>
+                    ) : (
+                        // Fallback - show icon and names
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-white/10 rounded-xl backdrop-blur-md shadow-inner border border-white/5">
+                                <CreditCardIcon className="w-5 h-5 text-violet-200" />
+                            </div>
+                            <div className="flex flex-col">
+                                {card.bank_name && <span className="text-[10px] uppercase tracking-wider opacity-75 leading-tight">{card.bank_name}</span>}
+                                <span className="font-bold tracking-wide text-base">{card.name}</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Visa Logo - only show for non-custom backgrounds */}
+                    {!hasCustomBackground && (
+                        <div className="flex flex-col items-end gap-1">
+                            <img src="/visa-logo.png" alt="Visa" className="h-6 w-auto object-contain drop-shadow-md" />
+                            {card.last_4_digits && (
+                                <span className="text-xs font-mono font-bold tracking-wider text-white/90 shadow-sm">
+                                    {card.last_4_digits}
+                                </span>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Action Buttons (hover) */}
+                <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition z-20">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onPayment(card); }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        className="p-1.5 bg-emerald-500/80 hover:bg-emerald-500 rounded-full backdrop-blur-md transition"
+                    >
+                        <DollarSign size={14} />
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onEdit(card); }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        className="p-1.5 bg-black/30 hover:bg-black/50 rounded-full backdrop-blur-md transition"
+                    >
+                        <Edit3 size={14} />
+                    </button>
+                </div>
+
+                {/* Footer (Balance & Utilization) */}
+                <div>
+                    <div className="flex justify-between items-end mb-1">
+                        <div>
+                            <p className="text-[10px] uppercase tracking-wider opacity-70 mb-0.5 drop-shadow-sm">Balance Owed</p>
+                            <p className="text-2xl font-bold tracking-tight text-white drop-shadow-md">{formatCurrency(card.current_balance)}</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[10px] uppercase tracking-wider opacity-70 mb-0.5 drop-shadow-sm">Available</p>
+                            <p className="text-lg font-bold text-emerald-300 drop-shadow-sm">{formatCurrency(card.available_credit)}</p>
+                        </div>
+                    </div>
+
+                    {/* Utilization Bar */}
+                    {card.credit_limit > 0 && (
+                        <div className="mt-2">
+                            <div className="flex justify-between text-[10px] opacity-70 mb-0.5 drop-shadow-sm">
+                                <span>Credit Limit: {formatCurrency(card.credit_limit)}</span>
+                                <span className={colors.text}>{utilPercent.toFixed(0)}% Used</span>
+                            </div>
+                            <div className="w-full bg-black/30 h-1.5 rounded-full overflow-hidden backdrop-blur-sm">
+                                <div
+                                    className={`h-full rounded-full shadow-sm transition-all duration-1000 ${colors.bar}`}
+                                    style={{ width: `${utilPercent}%` }}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Card Details Row */}
+                    <div className="mt-3 flex gap-4 text-[10px] opacity-70 drop-shadow-sm">
+                        {card.statement_day && (
+                            <span className="flex items-center gap-1">
+                                <Calendar size={10} /> Statement: Day {card.statement_day}
+                            </span>
+                        )}
+                        {card.due_day && (
+                            <span className="flex items-center gap-1">
+                                <Calendar size={10} /> Due: Day {card.due_day}
+                            </span>
+                        )}
+                        {card.apr && (
+                            <span className="flex items-center gap-1">
+                                <Percent size={10} /> {card.apr}% APR
+                            </span>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 function CreditCards() {
     const [creditCards, setCreditCards] = useState([]);
     const [accounts, setAccounts] = useState([]);
@@ -155,41 +312,35 @@ function CreditCards() {
         }
     };
 
-    const getUtilizationColor = (percent) => {
-        if (percent >= 80) return 'text-red-400';
-        if (percent >= 50) return 'text-amber-400';
-        return 'text-emerald-400';
-    };
-
-    const getUtilizationBarColor = (percent) => {
-        if (percent >= 80) return 'bg-red-500';
-        if (percent >= 50) return 'bg-amber-500';
-        return 'bg-emerald-500';
-    };
-
     // Calculate totals
     const totalBalance = creditCards.reduce((sum, c) => sum + (c.current_balance || 0), 0);
     const totalLimit = creditCards.reduce((sum, c) => sum + (c.credit_limit || 0), 0);
     const totalAvailable = creditCards.reduce((sum, c) => sum + (c.available_credit || 0), 0);
+    const avgUtilization = totalLimit > 0 ? ((totalBalance / totalLimit) * 100).toFixed(0) : 0;
 
     return (
         <div className="space-y-6">
             {/* Header */}
             <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold text-white">Credit Cards</h1>
-                    <p className="text-gray-400">Manage your credit cards and track balances</p>
+                <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
+                        <CreditCardIcon className="text-white" size={28} />
+                    </div>
+                    <div>
+                        <h1 className="text-3xl font-bold text-white">Credit Cards</h1>
+                        <p className="text-gray-400">Manage your credit cards and track balances</p>
+                    </div>
                 </div>
                 <button
                     onClick={() => { resetForm(); setShowModal(true); }}
                     className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:from-purple-700 hover:to-pink-700 transition shadow-lg"
                 >
-                    <Plus size={20} /> Add Credit Card
+                    <Plus size={20} /> Add Card
                 </button>
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-gradient-to-br from-red-600/20 to-red-900/20 p-5 rounded-xl border border-red-600/30">
                     <div className="flex justify-between items-start">
                         <div>
@@ -204,7 +355,7 @@ function CreditCards() {
                 <div className="bg-gradient-to-br from-blue-600/20 to-blue-900/20 p-5 rounded-xl border border-blue-600/30">
                     <div className="flex justify-between items-start">
                         <div>
-                            <p className="text-blue-300 text-sm font-medium">Total Credit Limit</p>
+                            <p className="text-blue-300 text-sm font-medium">Credit Limit</p>
                             <p className="text-2xl font-bold text-white mt-1">{formatCurrency(totalLimit)}</p>
                         </div>
                         <div className="p-2 bg-blue-600/20 rounded-lg">
@@ -215,7 +366,7 @@ function CreditCards() {
                 <div className="bg-gradient-to-br from-emerald-600/20 to-emerald-900/20 p-5 rounded-xl border border-emerald-600/30">
                     <div className="flex justify-between items-start">
                         <div>
-                            <p className="text-emerald-300 text-sm font-medium">Available Credit</p>
+                            <p className="text-emerald-300 text-sm font-medium">Available</p>
                             <p className="text-2xl font-bold text-white mt-1">{formatCurrency(totalAvailable)}</p>
                         </div>
                         <div className="p-2 bg-emerald-600/20 rounded-lg">
@@ -223,9 +374,20 @@ function CreditCards() {
                         </div>
                     </div>
                 </div>
+                <div className="bg-gradient-to-br from-amber-600/20 to-amber-900/20 p-5 rounded-xl border border-amber-600/30">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <p className="text-amber-300 text-sm font-medium">Utilization</p>
+                            <p className="text-2xl font-bold text-white mt-1">{avgUtilization}%</p>
+                        </div>
+                        <div className="p-2 bg-amber-600/20 rounded-lg">
+                            <Percent className="text-amber-400" size={24} />
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            {/* Credit Cards List */}
+            {/* Credit Cards Grid */}
             {loading ? (
                 <div className="text-center py-12 text-gray-400">Loading...</div>
             ) : creditCards.length === 0 ? (
@@ -240,125 +402,45 @@ function CreditCards() {
                     </button>
                 </div>
             ) : (
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {creditCards.map(card => (
-                        <div key={card.id} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-                            {/* Card Header */}
-                            <div className="p-5">
-                                <div className="flex justify-between items-start">
-                                    <div className="flex items-center gap-4">
-                                        <div className="p-3 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl">
-                                            <CreditCardIcon className="text-white" size={28} />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-xl font-bold text-white">{card.name}</h3>
-                                            <div className="flex items-center gap-3 text-sm text-gray-400 mt-1">
-                                                {card.bank_name && <span>{card.bank_name}</span>}
-                                                {card.last_4_digits && <span className="font-mono">•••• {card.last_4_digits}</span>}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => openPaymentModal(card)}
-                                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-sm flex items-center gap-1"
-                                        >
-                                            <DollarSign size={14} /> Pay
-                                        </button>
-                                        <button onClick={() => openEditModal(card)} className="text-gray-400 hover:text-white p-1.5 hover:bg-slate-700 rounded">
-                                            <Edit3 size={16} />
-                                        </button>
-                                        <button onClick={() => handleDelete(card.id)} className="text-red-400 hover:text-red-300 p-1.5 hover:bg-slate-700 rounded">
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
-                                </div>
+                        <div key={card.id} className="space-y-2">
+                            <CreditCardVisual
+                                card={card}
+                                onEdit={openEditModal}
+                                onPayment={openPaymentModal}
+                            />
 
-                                {/* Balance & Utilization */}
-                                <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    <div>
-                                        <p className="text-gray-500 text-xs uppercase tracking-wider">Balance</p>
-                                        <p className="text-xl font-bold text-red-400">{formatCurrency(card.current_balance)}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-gray-500 text-xs uppercase tracking-wider">Credit Limit</p>
-                                        <p className="text-xl font-bold text-white">{formatCurrency(card.credit_limit)}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-gray-500 text-xs uppercase tracking-wider">Available</p>
-                                        <p className="text-xl font-bold text-emerald-400">{formatCurrency(card.available_credit)}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-gray-500 text-xs uppercase tracking-wider">Utilization</p>
-                                        <p className={`text-xl font-bold ${getUtilizationColor(card.utilization_percent)}`}>
-                                            {card.utilization_percent}%
-                                        </p>
-                                    </div>
-                                </div>
+                            {/* Transactions Toggle */}
+                            <button
+                                onClick={() => toggleExpand(card.id)}
+                                className="w-full text-gray-400 hover:text-white text-sm flex items-center justify-center gap-1 py-2 hover:bg-slate-800/50 rounded-lg transition"
+                            >
+                                {expandedCard === card.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                {expandedCard === card.id ? 'Hide' : 'Show'} Transactions
+                            </button>
 
-                                {/* Utilization Bar */}
-                                <div className="mt-4">
-                                    <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                                        <div
-                                            className={`h-full ${getUtilizationBarColor(card.utilization_percent)} transition-all`}
-                                            style={{ width: `${Math.min(card.utilization_percent, 100)}%` }}
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Card Details */}
-                                <div className="mt-4 flex flex-wrap gap-4 text-sm text-gray-400">
-                                    {card.statement_day && (
-                                        <div className="flex items-center gap-1">
-                                            <Calendar size={14} />
-                                            Statement: Day {card.statement_day}
-                                        </div>
-                                    )}
-                                    {card.due_day && (
-                                        <div className="flex items-center gap-1">
-                                            <Calendar size={14} />
-                                            Due: Day {card.due_day}
-                                        </div>
-                                    )}
-                                    {card.apr && (
-                                        <div className="flex items-center gap-1">
-                                            <Percent size={14} />
-                                            APR: {card.apr}%
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Expand Button */}
-                                <button
-                                    onClick={() => toggleExpand(card.id)}
-                                    className="mt-4 text-gray-400 hover:text-white text-sm flex items-center gap-1"
-                                >
-                                    {expandedCard === card.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                    {expandedCard === card.id ? 'Hide' : 'Show'} Transactions
-                                </button>
-                            </div>
-
-                            {/* Transactions Section */}
+                            {/* Transactions List */}
                             {expandedCard === card.id && (
-                                <div className="border-t border-slate-700 p-4 bg-slate-900/50">
+                                <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700">
                                     {cardTransactions[card.id]?.length > 0 ? (
-                                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                                        <div className="space-y-2 max-h-48 overflow-y-auto">
                                             {cardTransactions[card.id].map(tx => (
-                                                <div key={tx.id} className="flex justify-between items-center py-2 px-3 bg-slate-800 rounded-lg">
+                                                <div key={tx.id} className="flex justify-between items-center py-2 px-3 bg-slate-900/50 rounded-lg">
                                                     <div>
                                                         <p className="text-white text-sm">{tx.merchant}</p>
                                                         <p className="text-gray-500 text-xs">
-                                                            {format(new Date(tx.timestamp), "MMM d, yyyy HH:mm")}
+                                                            {format(new Date(tx.timestamp), "MMM d, yyyy")}
                                                         </p>
                                                     </div>
-                                                    <span className={`font-mono font-bold ${tx.type === 'credit' ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                    <span className={`font-mono font-bold text-sm ${tx.type === 'credit' ? 'text-emerald-400' : 'text-red-400'}`}>
                                                         {tx.type === 'credit' ? '-' : '+'}{formatCurrency(tx.amount)}
                                                     </span>
                                                 </div>
                                             ))}
                                         </div>
                                     ) : (
-                                        <p className="text-gray-500 text-center py-4">No transactions yet</p>
+                                        <p className="text-gray-500 text-center py-4 text-sm">No transactions yet</p>
                                     )}
                                 </div>
                             )}

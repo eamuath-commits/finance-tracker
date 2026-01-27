@@ -21,12 +21,11 @@ const AllocationRules = ({ accounts }) => {
             setRules(ruleRes.data);
             setLoans(loanRes.data);
 
-            // Extract unique categories from obligations + existing categories endpoint if needed
-            // Merging both sources for completeness
-            const uniqueCats = [...new Set([
-                ...oblRes.data.map(o => o.category).filter(c => c && c !== 'Loan'),
-                ...catsRes.data.map(c => c.name)
-            ])];
+            // Extract unique categories ONLY from obligations (not from all categories)
+            // This ensures only categories with actual monthly obligations appear in the rules manager
+            const uniqueCats = [...new Set(
+                oblRes.data.map(o => o.category).filter(c => c && c !== 'Loan')
+            )];
             setCategories(uniqueCats.sort());
         } catch (error) {
             console.error("Error fetching rules data", error);

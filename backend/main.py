@@ -1053,3 +1053,46 @@ def delete_category(category_id: str, db: Session = Depends(get_db)):
     if not success:
          raise HTTPException(status_code=404, detail="Category not found")
     return {"message": "Category deleted"}
+
+
+# --- Audit Endpoints ---
+
+@app.post("/audit/check", response_model=schemas.AuditCheckResponse)
+def check_audit(request: schemas.AuditCheckRequest, db: Session = Depends(get_db)):
+    """Check system balance against actual balance and return discrepancy with transaction history."""
+    result = crud.check_audit(db, request.account_id, request.actual_balance)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return result
+
+@app.post("/audit/confirm", response_model=schemas.Audit)
+def confirm_audit(request: schemas.AuditConfirmRequest, db: Session = Depends(get_db)):
+    """Confirm an audit (create audit record). For mismatches, requires force_confirm=True and notes."""
+    # Validate: if mismatch and force_confirm, notes are required
+    check_result = crud.check_audit(db, request.account_id, request.actual_balance)
+    if check_result is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    if not check_result["is_match"] and request.force_confirm and not request.notes:
+        raise HTTPException(status_code=400, detail="Notes are required when force confirming a mismatch")
+    
+    if not check_result["is_match"] and not request.force_confirm:
+        raise HTTPException(status_code=400, detail="Cannot confirm mismatch. Set force_confirm=True and provide notes to proceed.")
+    
+    result = crud.create_audit(
+        db, 
+        request.account_id, 
+        request.actual_balance, 
+        request.notes, 
+        request.force_confirm
+    )
+    
+    if isinstance(result, dict) and "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    
+    return result
+
+@app.get("/audit/history/{account_id}", response_model=List[schemas.Audit])
+def get_audit_history(account_id: str, limit: int = 20, db: Session = Depends(get_db)):
+    """Get audit history for an account."""
+    return crud.get_audit_history(db, account_id, limit)

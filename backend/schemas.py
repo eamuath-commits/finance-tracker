@@ -346,6 +346,7 @@ class AllocationItem(BaseModel):
     target_account_name: str
     amount: float  # Calculated amount based on obligations
     required_amount: Optional[float] = None  # Full required if source is short
+    status: str = "pending"  # 'pending', 'allocated', 'no_history'
 
 class AllocationPreviewResponse(BaseModel):
     total_required: float
@@ -360,3 +361,37 @@ class AllocationExecuteRequest(BaseModel):
     target_account_id: Optional[str] = None  # Specific target, or all if None
     override_amount: Optional[float] = None  # Override transfer amount
 
+
+# --- Audit Schemas ---
+class AuditCheckRequest(BaseModel):
+    account_id: str
+    actual_balance: float
+
+class AuditCheckResponse(BaseModel):
+    is_match: bool
+    system_balance: float
+    actual_balance: float
+    discrepancy: float  # actual - system
+    last_audit_date: Optional[datetime] = None
+    transactions_since_audit: List['Transaction'] = []
+
+class AuditConfirmRequest(BaseModel):
+    account_id: str
+    actual_balance: float
+    notes: Optional[str] = None
+    force_confirm: bool = False
+
+class AuditBase(BaseModel):
+    account_id: str
+    audit_date: datetime
+    system_balance: float
+    actual_balance: float
+    difference: float
+    status: str  # "MATCH" or "MISMATCH"
+    notes: Optional[str] = None
+
+class Audit(AuditBase):
+    id: str
+
+    class Config:
+        from_attributes = True

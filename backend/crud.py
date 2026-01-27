@@ -84,9 +84,24 @@ def get_account(db: Session, account_id: str):
     return db.query(models.Account).filter(models.Account.id == account_id).first()
 
 def create_account(db: Session, account: schemas.AccountCreate):
+    # Convert account_type string to enum
+    account_type_enum = account.account_type
+    if isinstance(account.account_type, str):
+        type_mapping = {
+            'Checking': models.AccountType.CHECKING,
+            'Savings': models.AccountType.SAVINGS,
+            'Credit Card': models.AccountType.CREDIT_CARD,
+            'Loan': models.AccountType.LOAN,
+            'CHECKING': models.AccountType.CHECKING,
+            'SAVINGS': models.AccountType.SAVINGS,
+            'CREDIT_CARD': models.AccountType.CREDIT_CARD,
+            'LOAN': models.AccountType.LOAN,
+        }
+        account_type_enum = type_mapping.get(account.account_type, models.AccountType.CHECKING)
+    
     db_account = models.Account(
         name=account.name,
-        account_type=account.account_type,
+        account_type=account_type_enum,
         last_4_digits=account.last_4_digits,
         current_balance=account.current_balance,
         credit_limit=account.credit_limit
@@ -130,6 +145,25 @@ def update_account(db: Session, account_id: str, account_update: schemas.Account
         return None
     
     update_data = account_update.dict(exclude_unset=True)
+    
+    # Convert account_type string to enum if present
+    if 'account_type' in update_data and update_data['account_type']:
+        type_str = update_data['account_type']
+        # Map display values to enum members
+        type_mapping = {
+            'Checking': models.AccountType.CHECKING,
+            'Savings': models.AccountType.SAVINGS,
+            'Credit Card': models.AccountType.CREDIT_CARD,
+            'Loan': models.AccountType.LOAN,
+            # Also accept uppercase enum names
+            'CHECKING': models.AccountType.CHECKING,
+            'SAVINGS': models.AccountType.SAVINGS,
+            'CREDIT_CARD': models.AccountType.CREDIT_CARD,
+            'LOAN': models.AccountType.LOAN,
+        }
+        if type_str in type_mapping:
+            update_data['account_type'] = type_mapping[type_str]
+    
     for key, value in update_data.items():
         setattr(db_account, key, value)
     
@@ -1061,7 +1095,13 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     ).all()
     paid_obligations = {p.obligation_id for p in target_payments if p.status == models.PaymentStatus.PAID}
     
-    # Get previous month payments for Smart Default amounts
+    # Get this month's payment amounts for already-paid obligations
+    target_payment_amounts = {}
+    for p in target_payments:
+        if p.status == models.PaymentStatus.PAID:
+            target_payment_amounts[p.obligation_id] = p.amount
+    
+    # Get previous month payments for Smart Default amounts (for pending obligations)
     prev_payments = db.query(models.Payment).filter(
         models.Payment.billing_month.like(f"{prev_month_str}%")
     ).all()
@@ -1069,73 +1109,117 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     for p in prev_payments:
         prev_amounts_by_obl[p.obligation_id] = p.amount
     
-    # Aggregate obligations by category
-    category_amounts = {}  # category -> amount
-    loan_amounts = {}  # loan_name -> amount (for loans)
+    # Aggregate obligations by category with status tracking
+    # Structure: { category: { 'pending': amount, 'allocated': amount } }
+    category_data = {}  # category -> { 'pending': float, 'allocated': float }
+    loan_data = {}  # loan_name -> { 'pending': float, 'allocated': float }
     
     skipped_items = []
     fulfilled_items = []
     
     for obl in obligations:
-        # Skip already paid obligations
-        if obl.id in paid_obligations:
-            fulfilled_items.append(f"{obl.name} (already paid this month)")
-            continue
+        is_paid = obl.id in paid_obligations
         
-        # Get expected amount: Previous month's payment or 0
-        expected_amount = prev_amounts_by_obl.get(obl.id, 0)
+        # Get expected amount from payment history or current month payment
+        if is_paid:
+            expected_amount = target_payment_amounts.get(obl.id, 0)
+        else:
+            expected_amount = prev_amounts_by_obl.get(obl.id, 0)
         
         if expected_amount <= 0:
             skipped_items.append(f"{obl.name} (no payment history)")
             continue
         
         category = obl.category or "Other"
+        status = 'allocated' if is_paid else 'pending'
         
         # Check if this is a Loan category (special handling)
         if category.lower() == "loan":
             # Use obligation name as loan identifier
-            loan_amounts[obl.name] = loan_amounts.get(obl.name, 0) + expected_amount
+            if obl.name not in loan_data:
+                loan_data[obl.name] = {'pending': 0, 'allocated': 0}
+            loan_data[obl.name][status] += expected_amount
         else:
             # Regular category
-            category_amounts[category] = category_amounts.get(category, 0) + expected_amount
+            if category not in category_data:
+                category_data[category] = {'pending': 0, 'allocated': 0}
+            category_data[category][status] += expected_amount
     
     # Build allocation items
     allocations = []
     total_required = 0.0
     
     # Process categories
-    for category, amount in category_amounts.items():
+    for category, amounts in category_data.items():
         rule = rules_by_identifier.get(('CATEGORY', category))
         if rule:
             target_acc = accounts_by_id.get(rule.target_account_id)
-            allocations.append(schemas.AllocationItem(
-                identifier=category,
-                name=f"{category} Bills",
-                rule_type='CATEGORY',
-                target_account_id=rule.target_account_id,
-                target_account_name=target_acc.name if target_acc else "Unknown",
-                amount=amount,
-                required_amount=amount
-            ))
-            total_required += amount
+            pending_amount = amounts['pending']
+            allocated_amount = amounts['allocated']
+            
+            # Add pending allocation if any
+            if pending_amount > 0:
+                allocations.append(schemas.AllocationItem(
+                    identifier=category,
+                    name=category,
+                    rule_type='CATEGORY',
+                    target_account_id=rule.target_account_id,
+                    target_account_name=target_acc.name if target_acc else "Unknown",
+                    amount=pending_amount,
+                    required_amount=pending_amount,
+                    status='pending'
+                ))
+                total_required += pending_amount
+            
+            # Add allocated items if any
+            if allocated_amount > 0:
+                allocations.append(schemas.AllocationItem(
+                    identifier=f"{category}_allocated",
+                    name=category,
+                    rule_type='CATEGORY',
+                    target_account_id=rule.target_account_id,
+                    target_account_name=target_acc.name if target_acc else "Unknown",
+                    amount=allocated_amount,
+                    required_amount=allocated_amount,
+                    status='allocated'
+                ))
         else:
             skipped_items.append(f"{category} category (no rule)")
     
     # Process loans
-    for loan_name, amount in loan_amounts.items():
+    for loan_name, amounts in loan_data.items():
         rule = rules_by_identifier.get(('LOAN', loan_name))
         if rule:
             target_acc = accounts_by_id.get(rule.target_account_id)
-            allocations.append(schemas.AllocationItem(
-                identifier=loan_name,
-                name=f"{loan_name} Payment",
-                rule_type='LOAN',
-                target_account_id=rule.target_account_id,
-                target_account_name=target_acc.name if target_acc else "Unknown",
-                amount=amount,
-                required_amount=amount
-            ))
-            total_required += amount
+            pending_amount = amounts['pending']
+            allocated_amount = amounts['allocated']
+            
+            # Add pending allocation if any
+            if pending_amount > 0:
+                allocations.append(schemas.AllocationItem(
+                    identifier=loan_name,
+                    name=loan_name,
+                    rule_type='LOAN',
+                    target_account_id=rule.target_account_id,
+                    target_account_name=target_acc.name if target_acc else "Unknown",
+                    amount=pending_amount,
+                    required_amount=pending_amount,
+                    status='pending'
+                ))
+                total_required += pending_amount
+            
+            # Add allocated items if any
+            if allocated_amount > 0:
+                allocations.append(schemas.AllocationItem(
+                    identifier=f"{loan_name}_allocated",
+                    name=loan_name,
+                    rule_type='LOAN',
+                    target_account_id=rule.target_account_id,
+                    target_account_name=target_acc.name if target_acc else "Unknown",
+                    amount=allocated_amount,
+                    required_amount=allocated_amount,
+                    status='allocated'
+                ))
         else:
             skipped_items.append(f"{loan_name} loan (no rule)")
     
@@ -1155,3 +1239,93 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
         fulfilled_items=fulfilled_items,
         skipped_items=skipped_items
     )
+
+
+# --- Audit Functions ---
+
+def get_last_audit(db: Session, account_id: str):
+    """Get the most recent audit for an account."""
+    return db.query(models.AccountAudit).filter(
+        models.AccountAudit.account_id == account_id
+    ).order_by(models.AccountAudit.audit_date.desc()).first()
+
+def get_transactions_since_audit(db: Session, account_id: str, since_date: datetime = None):
+    """Get all transactions for an account since the last audit date."""
+    query = db.query(models.Transaction).filter(
+        models.Transaction.account_id == account_id
+    )
+    if since_date:
+        query = query.filter(models.Transaction.timestamp >= since_date)
+    return query.order_by(models.Transaction.timestamp.desc()).all()
+
+def check_audit(db: Session, account_id: str, actual_balance: float):
+    """Check if system balance matches actual balance and return transactions since last audit."""
+    # Get the account
+    account = db.query(models.Account).filter(models.Account.id == account_id).first()
+    if not account:
+        return None
+    
+    system_balance = account.current_balance
+    discrepancy = round(actual_balance - system_balance, 2)
+    is_match = abs(discrepancy) < 0.01  # Allow for rounding differences
+    
+    # Get last audit
+    last_audit = get_last_audit(db, account_id)
+    last_audit_date = last_audit.audit_date if last_audit else None
+    
+    # Get transactions since last audit
+    transactions = get_transactions_since_audit(db, account_id, last_audit_date)
+    
+    return {
+        "is_match": is_match,
+        "system_balance": system_balance,
+        "actual_balance": actual_balance,
+        "discrepancy": discrepancy,
+        "last_audit_date": last_audit_date,
+        "transactions_since_audit": transactions
+    }
+
+def create_audit(db: Session, account_id: str, actual_balance: float, notes: str = None, force_confirm: bool = False):
+    """Create a new audit record."""
+    # Get the account
+    account = db.query(models.Account).filter(models.Account.id == account_id).first()
+    if not account:
+        return None
+    
+    system_balance = account.current_balance
+    difference = round(actual_balance - system_balance, 2)
+    is_match = abs(difference) < 0.01
+    
+    # Determine status
+    if is_match:
+        status = "MATCH"
+    elif force_confirm:
+        status = "MISMATCH"
+    else:
+        # Can't create audit for mismatch without force_confirm
+        return {"error": "Cannot confirm mismatch without force_confirm. Please provide notes."}
+    
+    # Create audit record
+    db_audit = models.AccountAudit(
+        account_id=account_id,
+        system_balance=system_balance,
+        actual_balance=actual_balance,
+        difference=difference,
+        status=status,
+        notes=notes
+    )
+    db.add(db_audit)
+    
+    # Update account's last successful audit date
+    account.last_successful_audit_date = datetime.utcnow()
+    
+    db.commit()
+    db.refresh(db_audit)
+    return db_audit
+
+def get_audit_history(db: Session, account_id: str, limit: int = 20):
+    """Get audit history for an account."""
+    return db.query(models.AccountAudit).filter(
+        models.AccountAudit.account_id == account_id
+    ).order_by(models.AccountAudit.audit_date.desc()).limit(limit).all()
+
