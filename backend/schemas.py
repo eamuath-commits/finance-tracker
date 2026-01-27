@@ -37,6 +37,41 @@ class AccountAlias(AccountAliasBase):
     class Config:
         from_attributes = True
 
+# --- Credit Card Schemas ---
+class CreditCardBase(BaseModel):
+    name: str
+    bank_name: Optional[str] = None
+    last_4_digits: Optional[str] = None
+    credit_limit: float = 0.0
+    statement_day: Optional[int] = None  # Day of month (1-28)
+    due_day: Optional[int] = None        # Day of month (1-28)
+    apr: Optional[float] = None          # Annual Percentage Rate
+    minimum_payment_percent: float = 5.0
+    notes: Optional[str] = None
+
+class CreditCardCreate(CreditCardBase):
+    pass
+
+class CreditCardUpdate(BaseModel):
+    name: Optional[str] = None
+    bank_name: Optional[str] = None
+    credit_limit: Optional[float] = None
+    statement_day: Optional[int] = None
+    due_day: Optional[int] = None
+    apr: Optional[float] = None
+    minimum_payment_percent: Optional[float] = None
+    notes: Optional[str] = None
+
+class CreditCard(CreditCardBase):
+    id: str
+    current_balance: float
+    available_credit: float  # Calculated property
+    utilization_percent: float  # Calculated property
+    bank_logo_url: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
 # --- Transaction Schemas ---
 class TransactionBase(BaseModel):
     amount: float
@@ -53,7 +88,9 @@ class TransactionBase(BaseModel):
 
 class TransactionCreate(TransactionBase):
     account_id: Optional[str] = None
+    credit_card_id: Optional[str] = None  # NEW: For credit card transactions
     raw_sms_content: Optional[str] = None
+    parsed_data: Optional[str] = None  # JSON string of all AI-extracted fields
     timestamp: datetime
 
 class TransactionUpdate(BaseModel):
@@ -71,9 +108,12 @@ class TransactionUpdate(BaseModel):
 
 class Transaction(TransactionBase):
     id: str
-    account_id: str
+    account_id: Optional[str] = None
+    credit_card_id: Optional[str] = None  # NEW
     timestamp: datetime
     balance_after_transaction: Optional[float] = None
+    raw_sms_content: Optional[str] = None  # Include raw SMS in response
+    parsed_data: Optional[str] = None  # JSON string of all AI-extracted fields
 
     class Config:
         from_attributes = True
@@ -94,6 +134,8 @@ class PaymentBase(BaseModel):
     billing_month: Optional[str] = None
     status: str = "PAID"
     note: Optional[str] = None
+    planned_amount: Optional[float] = None
+    transaction_id: Optional[str] = None
 
 class PaymentCreate(PaymentBase):
     pass
@@ -104,6 +146,8 @@ class PaymentUpdate(BaseModel):
     billing_month: Optional[str] = None
     status: Optional[str] = None
     note: Optional[str] = None
+    planned_amount: Optional[float] = None
+    transaction_id: Optional[str] = None
 
 class Payment(PaymentBase):
     id: int
@@ -152,6 +196,7 @@ class AccountBase(BaseModel):
     bank_name: Optional[str] = None
     bank_logo_url: Optional[str] = None
     notes: Optional[str] = None
+    is_income: bool = False
 
 class AccountCreate(AccountBase):
     pass
@@ -164,9 +209,11 @@ class AccountUpdate(BaseModel):
     credit_limit: Optional[float] = None
     bank_name: Optional[str] = None
     notes: Optional[str] = None
+    is_income: Optional[bool] = None
 
 class Account(AccountBase):
     id: str
+    is_income: bool = False
     aliases: List[AccountAlias] = []
     wallets: List[CurrencyWallet] = []
 
@@ -261,10 +308,9 @@ class Loan(LoanBase):
 
 # --- Allocation Rules Schemas ---
 class AllocationRuleBase(BaseModel):
-    keyword: str
-    field: str = "merchant"
-    percentage: float
-    category_group: str
+    rule_type: str  # 'CATEGORY' or 'LOAN'
+    identifier: str  # Category name or Loan name
+    target_account_id: str  # Target envelope account ID
 
 class AllocationRuleCreate(AllocationRuleBase):
     pass
@@ -292,21 +338,25 @@ class AllocationHistory(AllocationHistoryBase):
         from_attributes = True
         
 # --- Allocation Preview Schemas ---
-class AllocationMatch(BaseModel):
-    rule_id: str
-    keyword: str
-    percentage: float
-    category_group: str
-    allocated_amount: float
+class AllocationItem(BaseModel):
+    identifier: str  # Category name or Loan name
+    name: str  # Display name
+    rule_type: str  # 'CATEGORY' or 'LOAN'
+    target_account_id: str
+    target_account_name: str
+    amount: float  # Calculated amount based on obligations
+    required_amount: Optional[float] = None  # Full required if source is short
 
 class AllocationPreviewResponse(BaseModel):
-    transaction_id: str
-    merchant: str
-    amount: float
-    matches: List[AllocationMatch]
-    total_allocated: float
-    remaining: float
+    total_required: float
+    total_amount: float  # What can actually be transferred (min of required, source)
+    allocations: List[AllocationItem]
+    fulfilled_items: List[str] = []  # Items already covered by existing balance
+    skipped_items: List[str] = []  # Items with no rule matched
 
 class AllocationExecuteRequest(BaseModel):
-    transaction_ids: List[str]
-    # Optionally override allocations? For now simple list.
+    source_account_id: str
+    month_offset: int = 0
+    target_account_id: Optional[str] = None  # Specific target, or all if None
+    override_amount: Optional[float] = None  # Override transfer amount
+

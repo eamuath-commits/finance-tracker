@@ -143,8 +143,9 @@ const AccountCard = ({ acc, onEdit = null }) => {
                 {/* Edit Button (Absolute positioned now or next to name?) - Let's keep it consistent layout-wise */}
                 {onEdit && (
                     <button
-                        onClick={() => onEdit(acc)}
-                        className="absolute top-3 right-3 p-1.5 bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-md transition opacity-0 group-hover:opacity-100"
+                        onClick={(e) => { e.stopPropagation(); onEdit(acc); }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        className="absolute top-3 right-3 p-1.5 bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-md transition opacity-0 group-hover:opacity-100 z-20"
                     >
                         <Edit3 size={14} />
                     </button>
@@ -161,7 +162,7 @@ const AccountCard = ({ acc, onEdit = null }) => {
                         </div>
                         <div className="text-right">
                             <p className="text-[10px] uppercase tracking-wider opacity-70 mb-0.5">{acc.account_type}</p>
-                            <p className="font-mono text-sm tracking-widest opacity-90">•••• {acc.last_4_digits}</p>
+                            {acc.last_4_digits && <p className="font-mono text-sm tracking-widest opacity-90">•••• {acc.last_4_digits}</p>}
                         </div>
                     </div>
 
@@ -195,8 +196,11 @@ const SortableAccountCard = ({ acc, onEdit }) => {
     };
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="touch-none h-full">
-            <AccountCard acc={acc} onEdit={onEdit} />
+        <div ref={setNodeRef} style={style} {...attributes} className="h-full">
+            {/* Drag handle wrapper - only this part captures drag events */}
+            <div {...listeners} className="touch-none cursor-grab active:cursor-grabbing h-full">
+                <AccountCard acc={acc} onEdit={onEdit} />
+            </div>
         </div>
     );
 };
@@ -310,6 +314,10 @@ const Accounts = () => {
     const [typeFilter, setTypeFilter] = useState('');
     const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
+    // Bulk Selection State
+    const [selectedTxIds, setSelectedTxIds] = useState(new Set());
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+
     // Order State
     const [accountOrder, setAccountOrder] = useState([]);
 
@@ -351,7 +359,10 @@ const Accounts = () => {
     });
 
     const Categories = ['Food', 'Transport', 'Utilities', 'Entertainment', 'Shopping', 'Housing', 'Health', 'Income', 'Transfer', 'Subscription', 'Obligation', 'Credit Card Payment', 'Deposit', 'Refund'];
-    const CREDIT_CATEGORIES = ['Income', 'Deposit', 'Refund', 'Interest'];
+    // Transaction type (credit/debit) is now determined by tx.type from the Agent, not category
+    // Backward compatibility fallback for legacy transactions without type field
+    const LEGACY_CREDIT_CATEGORIES = ['Income', 'Deposit', 'Refund', 'Interest'];
+    const isCredit = (tx) => tx.type ? tx.type === 'credit' : LEGACY_CREDIT_CATEGORIES.includes(tx.category);
     const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
     const fetchData = async () => {
@@ -418,12 +429,12 @@ const Accounts = () => {
         // Account Filter
         const matchAccount = accountFilter ? tx.account_id === accountFilter : true;
 
-        // Type Filter (Credit vs Debit vs Transfer)
-        const isCredit = CREDIT_CATEGORIES.includes(tx.category);
+        // Type Filter (Credit vs Debit vs Transfer) - uses tx.type from Agent with fallback
+        const txIsCredit = isCredit(tx);
         const isTransfer = tx.category === 'Transfer';
         let matchType = true;
-        if (typeFilter === 'Credit') matchType = isCredit;
-        else if (typeFilter === 'Debit') matchType = !isCredit && !isTransfer;
+        if (typeFilter === 'Credit') matchType = txIsCredit;
+        else if (typeFilter === 'Debit') matchType = !txIsCredit && !isTransfer;
         else if (typeFilter === 'Transfer') matchType = isTransfer;
 
         // Date Range Filter
@@ -596,29 +607,81 @@ const Accounts = () => {
                         <Card title="Recent Transactions" value={transactions.length} color="blue" />
                     </div>
 
-                    <SectionHeader title="Account Summary" />
+                    {/* Group accounts by type */}
+                    {(() => {
+                        const grouped = sortedAccounts.reduce((acc, account) => {
+                            const type = account.account_type || 'Other';
+                            if (!acc[type]) acc[type] = [];
+                            acc[type].push(account);
+                            return acc;
+                        }, {});
 
-                    {/* List of Account Rows */}
-                    {/* List of Account Cards (Grid) */}
-                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
-                            <SortableContext items={accountOrder} strategy={rectSortingStrategy}>
-                                {sortedAccounts.map(acc => (
-                                    <SortableAccountCard key={acc.id} acc={acc} onEdit={openAccountModal} />
-                                ))}
-                            </SortableContext>
-                            {/* Add New Card Button - Not draggable */}
-                            <button
-                                onClick={() => openAccountModal(null)}
-                                className="w-full aspect-[1.586/1] rounded-2xl border-2 border-dashed border-slate-700 hover:border-blue-500/50 hover:bg-slate-800/50 transition-all group flex flex-col items-center justify-center gap-3"
-                            >
-                                <div className="p-4 bg-slate-800 rounded-full group-hover:bg-blue-600 group-hover:text-white transition-colors text-slate-400">
-                                    <Plus size={24} />
+                        // Define order and styling for account types
+                        const typeConfig = {
+                            'Credit Card': { icon: '💳', color: 'text-pink-400', order: 1 },
+                            'Checking': { icon: '🏦', color: 'text-blue-400', order: 2 },
+                            'Savings': { icon: '💰', color: 'text-emerald-400', order: 3 },
+                            'Investment': { icon: '📈', color: 'text-purple-400', order: 4 },
+                            'Loan': { icon: '📋', color: 'text-orange-400', order: 5 },
+                            'Other': { icon: '📁', color: 'text-gray-400', order: 99 }
+                        };
+
+                        // Sort types by order
+                        const sortedTypes = Object.keys(grouped).sort((a, b) => {
+                            const orderA = typeConfig[a]?.order || 99;
+                            const orderB = typeConfig[b]?.order || 99;
+                            return orderA - orderB;
+                        });
+
+                        return sortedTypes.map(type => {
+                            const config = typeConfig[type] || typeConfig['Other'];
+                            const typeAccounts = grouped[type];
+                            const typeTotal = typeAccounts.reduce((sum, acc) => sum + (acc.current_balance || 0), 0);
+
+                            return (
+                                <div key={type} className="mb-8">
+                                    {/* Section Header */}
+                                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-700">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-2xl">{config.icon}</span>
+                                            <h2 className={`text-xl font-bold ${config.color}`}>{type}</h2>
+                                            <span className="bg-slate-800 text-slate-400 text-xs px-2 py-0.5 rounded-full border border-slate-700">
+                                                {typeAccounts.length}
+                                            </span>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="text-xs text-slate-500 uppercase tracking-wider">Total</span>
+                                            <div className={`text-lg font-bold font-mono ${typeTotal >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                {formatCurrency(typeTotal)}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Account Cards Grid */}
+                                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                            <SortableContext items={typeAccounts.map(a => a.id)} strategy={rectSortingStrategy}>
+                                                {typeAccounts.map(acc => (
+                                                    <SortableAccountCard key={acc.id} acc={acc} onEdit={openAccountModal} />
+                                                ))}
+                                            </SortableContext>
+                                        </div>
+                                    </DndContext>
                                 </div>
-                                <span className="text-sm font-medium text-slate-400 group-hover:text-white">Add Account</span>
-                            </button>
+                            );
+                        });
+                    })()}
+
+                    {/* Add New Account Button */}
+                    <button
+                        onClick={() => openAccountModal(null)}
+                        className="w-full max-w-xs mx-auto aspect-[1.586/1] rounded-2xl border-2 border-dashed border-slate-700 hover:border-blue-500/50 hover:bg-slate-800/50 transition-all group flex flex-col items-center justify-center gap-3"
+                    >
+                        <div className="p-4 bg-slate-800 rounded-full group-hover:bg-blue-600 group-hover:text-white transition-colors text-slate-400">
+                            <Plus size={24} />
                         </div>
-                    </DndContext>
+                        <span className="text-sm font-medium text-slate-400 group-hover:text-white">Add Account</span>
+                    </button>
                 </div>
             )}
 
@@ -685,9 +748,39 @@ const Accounts = () => {
                 <div className="animate-fade-in">
                     <div className="flex justify-between items-center mb-6">
                         <SectionHeader title="Transaction Log" />
-                        <button onClick={() => openTxModal(null)} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm transition shadow border border-blue-500">
-                            <Plus size={16} /> Add Transaction
-                        </button>
+                        <div className="flex gap-2">
+                            {isSelectionMode && selectedTxIds.size > 0 && (
+                                <button
+                                    onClick={async () => {
+                                        if (!window.confirm(`Delete ${selectedTxIds.size} transaction(s)?`)) return;
+                                        try {
+                                            await axios.post(`${API_URL}/transactions/bulk-delete`, { ids: Array.from(selectedTxIds) });
+                                            setSelectedTxIds(new Set());
+                                            setIsSelectionMode(false);
+                                            fetchData();
+                                        } catch (e) {
+                                            console.error('Bulk delete failed', e);
+                                            alert('Delete failed');
+                                        }
+                                    }}
+                                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm transition shadow border border-red-500"
+                                >
+                                    <Trash2 size={16} /> Delete Selected ({selectedTxIds.size})
+                                </button>
+                            )}
+                            <button
+                                onClick={() => {
+                                    setIsSelectionMode(!isSelectionMode);
+                                    if (isSelectionMode) setSelectedTxIds(new Set());
+                                }}
+                                className={`px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm transition shadow border ${isSelectionMode ? 'bg-yellow-600 hover:bg-yellow-700 border-yellow-500 text-white' : 'bg-slate-700 hover:bg-slate-600 border-slate-600 text-gray-300'}`}
+                            >
+                                {isSelectionMode ? 'Cancel' : 'Select'}
+                            </button>
+                            <button onClick={() => openTxModal(null)} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm transition shadow border border-blue-500">
+                                <Plus size={16} /> Add Transaction
+                            </button>
+                        </div>
                     </div>
 
                     {/* Filters Bar */}
@@ -771,6 +864,23 @@ const Accounts = () => {
                         <table className="min-w-full divide-y divide-slate-700">
                             <thead className="bg-slate-900">
                                 <tr>
+                                    {isSelectionMode && (
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider w-10">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedTxIds.size === filteredTransactions.length && filteredTransactions.length > 0}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setSelectedTxIds(new Set(filteredTransactions.map(tx => tx.id)));
+                                                    } else {
+                                                        setSelectedTxIds(new Set());
+                                                    }
+                                                }}
+                                                className="w-4 h-4 accent-blue-500 rounded"
+                                                title="Select All"
+                                            />
+                                        </th>
+                                    )}
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Account / Card</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Beneficiary / Source</th>
@@ -783,11 +893,26 @@ const Accounts = () => {
                             <tbody className="bg-slate-800 divide-y divide-slate-700">
                                 {filteredTransactions.map(tx => {
                                     const acc = accounts.find(a => a.id === tx.account_id);
-                                    const isCredit = CREDIT_CATEGORIES.includes(tx.category);
+                                    const txIsCredit = isCredit(tx); // Use helper with fallback
                                     const isTransfer = tx.category === 'Transfer';
 
                                     return (
-                                        <tr key={tx.id} className="hover:bg-slate-700/50 transition-colors">
+                                        <tr key={tx.id} className={`hover:bg-slate-700/50 transition-colors ${selectedTxIds.has(tx.id) ? 'bg-blue-900/20' : ''}`}>
+                                            {isSelectionMode && (
+                                                <td className="px-4 py-4 whitespace-nowrap">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedTxIds.has(tx.id)}
+                                                        onChange={() => {
+                                                            const next = new Set(selectedTxIds);
+                                                            if (next.has(tx.id)) next.delete(tx.id);
+                                                            else next.add(tx.id);
+                                                            setSelectedTxIds(next);
+                                                        }}
+                                                        className="w-4 h-4 accent-blue-500 rounded"
+                                                    />
+                                                </td>
+                                            )}
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                 <div className="flex items-center gap-2">
                                                     {tx.raw_sms_content ? (
@@ -810,14 +935,14 @@ const Accounts = () => {
                                                 ) : <span className="text-gray-500">Unknown Account</span>}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                                                {isTransfer && <span className="text-xs text-blue-400 mr-2 uppercase font-bold tracking-wider">{isCredit ? 'FROM:' : 'TO:'}</span>}
+                                                {isTransfer && <span className="text-xs text-blue-400 mr-2 uppercase font-bold tracking-wider">{txIsCredit ? 'FROM:' : 'TO:'}</span>}
                                                 {tx.merchant}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                                                {tx.category ? <span className={`px-2 py-0.5 rounded text-xs border ${isCredit ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800' : 'bg-slate-700 text-blue-300 border-slate-600'}`}>{tx.category}</span> : '-'}
+                                                {tx.category ? <span className={`px-2 py-0.5 rounded text-xs border ${txIsCredit ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800' : 'bg-slate-700 text-blue-300 border-slate-600'}`}>{tx.category}</span> : '-'}
                                             </td>
-                                            <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${isCredit ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                {isCredit ? '+' : '-'} {formatCurrency(tx.amount)}
+                                            <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${txIsCredit ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                {txIsCredit ? '+' : '-'} {formatCurrency(tx.amount)}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-400 font-mono">
                                                 {tx.balance_after_transaction !== null && tx.balance_after_transaction !== undefined
@@ -844,7 +969,7 @@ const Accounts = () => {
 
             {/* Transaction Modal */}
             {showTxModal && (
-                <Modal title={editingTx ? "Edit Transaction" : "Add Transaction"} onClose={() => setShowTxModal(false)}>
+                <Modal isOpen={true} title={editingTx ? "Edit Transaction" : "Add Transaction"} onClose={() => setShowTxModal(false)}>
                     <form onSubmit={handleSaveTx} className="space-y-4">
                         {/* Transaction Type Indicator */}
                         <div className="flex gap-4 p-1 bg-slate-700 rounded-lg mb-4">
@@ -923,6 +1048,19 @@ const Accounts = () => {
                             />
                         </div>
 
+                        {/* Show Raw SMS if available (read-only) */}
+                        {editingTx?.raw_sms_content && (
+                            <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-600">
+                                <label className="text-xs text-gray-400 uppercase font-bold mb-2 block flex items-center gap-2">
+                                    <img src="/sms-icon.png" alt="SMS" className="w-4 h-4" />
+                                    Original SMS
+                                </label>
+                                <pre className="text-xs text-gray-400 whitespace-pre-wrap font-mono bg-black/30 p-2 rounded max-h-32 overflow-y-auto">
+                                    {editingTx.raw_sms_content}
+                                </pre>
+                            </div>
+                        )}
+
                         <div className="flex justify-end gap-2 mt-6">
                             <button type="button" onClick={() => setShowTxModal(false)} className="px-4 py-2 text-gray-300 hover:text-white transition">Cancel</button>
                             <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition shadow-lg border border-green-500">Save Transaction</button>
@@ -933,7 +1071,7 @@ const Accounts = () => {
 
             {/* --- ACCOUNT MODAL (Shared) --- */}
             {showAccountModal && (
-                <Modal title={editingId ? "Edit Account" : "Add New Account"} onClose={() => setShowAccountModal(false)}>
+                <Modal isOpen={true} title={editingId ? "Edit Account" : "Add New Account"} onClose={() => setShowAccountModal(false)}>
                     <form onSubmit={handleSaveAccount} className="space-y-4">
                         <div className="space-y-4">
                             {/* Bank Name & Logo */}
@@ -1037,6 +1175,21 @@ const Accounts = () => {
                                 />
                             </div>
                         )}
+
+                        {/* Income Account Toggle */}
+                        <div className="flex items-center gap-3 p-3 bg-slate-700/50 rounded border border-slate-600">
+                            <input
+                                type="checkbox"
+                                id="is_income"
+                                checked={accountForm.is_income || false}
+                                onChange={e => setAccountForm({ ...accountForm, is_income: e.target.checked })}
+                                className="w-4 h-4 accent-emerald-500"
+                            />
+                            <label htmlFor="is_income" className="text-sm text-gray-300">
+                                <span className="font-medium">Income Account</span>
+                                <span className="text-gray-500 text-xs block">Use as source for Smart Allocation (e.g., Salary)</span>
+                            </label>
+                        </div>
 
                         <div className="flex justify-between items-center mt-6 gap-3">
                             {editingId && (

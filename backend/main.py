@@ -156,6 +156,17 @@ def run_migrations(engine):
                     conn.execute(text("ALTER TABLE accounts ADD COLUMN is_income BOOLEAN DEFAULT FALSE"))
                     conn.commit()
 
+        # Check allocation_rules table for new schema columns
+        if 'allocation_rules' in inspector.get_table_names():
+            ar_columns = [col['name'] for col in inspector.get_columns('allocation_rules')]
+            if 'rule_type' not in ar_columns:
+                print("Migrating: Recreating allocation_rules with new schema")
+                with engine.connect() as conn:
+                    # Drop and recreate to avoid complex migration
+                    conn.execute(text("DROP TABLE IF EXISTS allocation_rules"))
+                    conn.commit()
+                # Let create_all recreate with new schema
+
     except Exception as e:
         print(f"Migration failed: {e}")
 
@@ -202,6 +213,84 @@ def delete_account(account_id: str, db: Session = Depends(get_db)):
     if not deleted_account:
         raise HTTPException(status_code=404, detail="Account not found")
     return {"message": "Account deleted successfully"}
+
+# --- Credit Card Endpoints ---
+@app.post("/credit-cards/", response_model=schemas.CreditCard)
+def create_credit_card(card: schemas.CreditCardCreate, db: Session = Depends(get_db)):
+    return crud.create_credit_card(db=db, card=card)
+
+@app.get("/credit-cards/", response_model=List[schemas.CreditCard])
+def read_credit_cards(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return crud.get_credit_cards(db, skip=skip, limit=limit)
+
+@app.get("/credit-cards/{card_id}", response_model=schemas.CreditCard)
+def read_credit_card(card_id: str, db: Session = Depends(get_db)):
+    card = crud.get_credit_card(db, card_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="Credit card not found")
+    return card
+
+@app.put("/credit-cards/{card_id}", response_model=schemas.CreditCard)
+def update_credit_card(card_id: str, card_update: schemas.CreditCardUpdate, db: Session = Depends(get_db)):
+    updated_card = crud.update_credit_card(db, card_id, card_update)
+    if not updated_card:
+        raise HTTPException(status_code=404, detail="Credit card not found")
+    return updated_card
+
+@app.delete("/credit-cards/{card_id}")
+def delete_credit_card(card_id: str, db: Session = Depends(get_db)):
+    deleted = crud.delete_credit_card(db, card_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Credit card not found")
+    return {"message": "Credit card deleted successfully"}
+
+@app.get("/credit-cards/{card_id}/transactions", response_model=List[schemas.Transaction])
+def get_credit_card_transactions(card_id: str, db: Session = Depends(get_db)):
+    """Get all transactions for a specific credit card"""
+    card = crud.get_credit_card(db, card_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="Credit card not found")
+    transactions = db.query(models.Transaction).filter(
+        models.Transaction.credit_card_id == card_id
+    ).order_by(models.Transaction.timestamp.desc()).all()
+    return transactions
+
+@app.post("/credit-cards/{card_id}/payment")
+def record_credit_card_payment(card_id: str, amount: float, from_account_id: Optional[str] = None, db: Session = Depends(get_db)):
+    """Record a payment to a credit card (reduces balance)"""
+    card = crud.get_credit_card(db, card_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="Credit card not found")
+    
+    # Create the credit transaction on the card (payment = credit)
+    from datetime import datetime
+    tx_data = schemas.TransactionCreate(
+        credit_card_id=card_id,
+        amount=amount,
+        merchant=f"Payment to {card.name}",
+        category="Payment",
+        type="credit",
+        status="completed",
+        timestamp=datetime.now()
+    )
+    tx = crud.create_transaction(db, tx_data)
+    
+    # If paying from an account, create a corresponding debit there
+    if from_account_id:
+        account = db.query(models.Account).filter(models.Account.id == from_account_id).first()
+        if account:
+            debit_tx = schemas.TransactionCreate(
+                account_id=from_account_id,
+                amount=amount,
+                merchant=f"Credit Card Payment - {card.name}",
+                category="Credit Card Payment",
+                type="debit",
+                status="completed",
+                timestamp=datetime.now()
+            )
+            crud.create_transaction(db, debit_tx)
+    
+    return {"message": f"Payment of {amount} SAR recorded", "new_balance": card.current_balance}
 
 @app.post("/accounts/{account_id}/aliases", response_model=schemas.AccountAlias)
 def create_alias(account_id: str, alias: schemas.AccountAliasCreate, db: Session = Depends(get_db)):
@@ -384,6 +473,153 @@ def update_payment(payment_id: int, payment_update: schemas.PaymentUpdate, db: S
         raise HTTPException(status_code=404, detail="Payment entry not found")
     return updated
 
+# --- Payment-Transaction Linking Endpoints ---
+@app.get("/payments/{payment_id}/suggested-transactions")
+def get_suggested_transactions(payment_id: int, db: Session = Depends(get_db)):
+    """
+    Suggest transactions that might match this payment.
+    Matching criteria:
+    - Date within ±5 days of billing month's due date
+    - Amount within 10% tolerance
+    - Merchant name contains obligation/provider name
+    """
+    # Get the payment
+    payment = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    # Get the related obligation
+    obligation = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == payment.obligation_id).first()
+    if not obligation:
+        return []
+    
+    # Parse billing month (YYYY-MM format)
+    from datetime import datetime, timedelta
+    try:
+        billing_date = datetime.strptime(payment.billing_month + "-01", "%Y-%m-%d")
+    except:
+        return []
+    
+    # Calculate the target due date for this billing month
+    due_day = obligation.due_day or 1
+    try:
+        target_date = billing_date.replace(day=due_day)
+    except ValueError:
+        # Handle months with fewer days
+        import calendar
+        last_day = calendar.monthrange(billing_date.year, billing_date.month)[1]
+        target_date = billing_date.replace(day=min(due_day, last_day))
+    
+    # Search window: ±5 days around due date
+    start_date = target_date - timedelta(days=5)
+    end_date = target_date + timedelta(days=5)
+    
+    # Query transactions in date range
+    transactions = db.query(models.Transaction).filter(
+        models.Transaction.timestamp >= start_date,
+        models.Transaction.timestamp <= end_date,
+        models.Transaction.type == "debit"  # Payments are typically debits
+    ).order_by(models.Transaction.timestamp.desc()).all()
+    
+    # Score and filter suggestions
+    suggestions = []
+    payment_amount = payment.amount or 0
+    search_terms = [obligation.name.lower()]
+    if obligation.provider:
+        search_terms.append(obligation.provider.lower())
+    
+    for tx in transactions:
+        score = 0
+        reasons = []
+        
+        # Amount matching (within 10% tolerance)
+        if payment_amount > 0 and tx.amount:
+            diff_pct = abs(tx.amount - payment_amount) / payment_amount * 100
+            if diff_pct < 1:
+                score += 50
+                reasons.append("exact_amount")
+            elif diff_pct < 10:
+                score += 30
+                reasons.append("similar_amount")
+        
+        # Merchant name matching
+        merchant_lower = (tx.merchant or "").lower()
+        for term in search_terms:
+            if term in merchant_lower:
+                score += 40
+                reasons.append("name_match")
+                break
+        
+        # Date proximity bonus
+        if tx.timestamp:
+            days_diff = abs((tx.timestamp.date() - target_date.date()).days)
+            if days_diff == 0:
+                score += 20
+                reasons.append("exact_date")
+            elif days_diff <= 2:
+                score += 10
+                reasons.append("close_date")
+        
+        # Only include if there's some relevance
+        if score > 0:
+            suggestions.append({
+                "transaction_id": tx.id,
+                "merchant": tx.merchant,
+                "amount": tx.amount,
+                "date": tx.timestamp.isoformat() if tx.timestamp else None,
+                "score": score,
+                "reasons": reasons,
+                "already_linked": tx.id == payment.transaction_id
+            })
+    
+    # Sort by score descending
+    suggestions.sort(key=lambda x: x["score"], reverse=True)
+    
+    return suggestions[:5]  # Return top 5 suggestions
+
+@app.post("/payments/{payment_id}/link-transaction")
+def link_payment_to_transaction(payment_id: int, transaction_id: str, db: Session = Depends(get_db)):
+    """Link a payment to a transaction and mark it as paid."""
+    # Get the payment
+    payment = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    # Verify transaction exists
+    transaction = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    # Update payment
+    payment.transaction_id = transaction_id
+    payment.status = models.PaymentStatus.PAID
+    
+    # Optionally update amount if not set
+    if payment.amount is None or payment.amount == 0:
+        payment.amount = transaction.amount
+    
+    db.commit()
+    db.refresh(payment)
+    
+    return {
+        "message": "Payment linked successfully",
+        "payment_id": payment.id,
+        "transaction_id": transaction_id,
+        "status": payment.status.value
+    }
+
+@app.delete("/payments/{payment_id}/unlink-transaction")
+def unlink_payment_transaction(payment_id: int, db: Session = Depends(get_db)):
+    """Remove the link between a payment and its transaction."""
+    payment = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    payment.transaction_id = None
+    db.commit()
+    
+    return {"message": "Transaction unlinked"}
+
 # --- Transaction Endpoints ---
 @app.get("/transactions/", response_model=List[schemas.Transaction])
 def read_transactions(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
@@ -418,6 +654,82 @@ def bulk_delete_transactions(payload: schemas.BulkDeleteRequest, db: Session = D
         crud.delete_transaction(db, tx_id)
         deleted_count += 1
     return {"message": f"Deleted {deleted_count} transactions"}
+
+@app.post("/transactions/{transaction_id}/complete-transfer")
+def complete_pending_transfer(transaction_id: str, source_account_id: str, db: Session = Depends(get_db)):
+    """
+    Complete a pending internal transfer by specifying the source account.
+    This will:
+    1. Mark the credit transaction as completed
+    2. Create a corresponding debit transaction on the source account
+    """
+    # Get the pending transaction
+    pending_tx = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
+    if not pending_tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    if pending_tx.status != "pending_action":
+        raise HTTPException(status_code=400, detail="Transaction is not pending")
+    
+    # Validate source account
+    source_account = db.query(models.Account).filter(models.Account.id == source_account_id).first()
+    if not source_account:
+        raise HTTPException(status_code=404, detail="Source account not found")
+    
+    # Don't allow selecting the same account as both source and destination
+    if source_account_id == pending_tx.account_id:
+        raise HTTPException(status_code=400, detail="Source and destination accounts cannot be the same")
+    
+    # Get destination account for naming
+    dest_account = db.query(models.Account).filter(models.Account.id == pending_tx.account_id).first()
+    
+    # 1. Create the DEBIT transaction on source account
+    debit_tx = models.Transaction(
+        account_id=source_account_id,
+        amount=pending_tx.amount,
+        original_amount=pending_tx.original_amount,
+        original_currency=pending_tx.original_currency,
+        exchange_rate=pending_tx.exchange_rate,
+        merchant=f"Transfer to {dest_account.name}" if dest_account else "Outgoing Transfer",
+        raw_sms_content=pending_tx.raw_sms_content,
+        parsed_data=pending_tx.parsed_data,
+        timestamp=pending_tx.timestamp,
+        category="Transfer",
+        type="debit",
+        status="completed",
+        fees=pending_tx.fees
+    )
+    
+    # Update source account balance (subtract)
+    source_account.current_balance -= pending_tx.amount
+    debit_tx.balance_after_transaction = source_account.current_balance
+    
+    db.add(debit_tx)
+    
+    # 2. Update the credit transaction: mark as completed and update merchant name
+    pending_tx.status = "completed"
+    pending_tx.merchant = f"Transfer from {source_account.name}"
+    
+    # Update destination account balance (add) - was pending, now apply
+    dest_account.current_balance += pending_tx.amount
+    pending_tx.balance_after_transaction = dest_account.current_balance
+    
+    db.commit()
+    db.refresh(pending_tx)
+    
+    return {
+        "message": "Transfer completed successfully",
+        "credit_transaction": schemas.Transaction.model_validate(pending_tx),
+        "debit_transaction": schemas.Transaction.model_validate(debit_tx)
+    }
+
+@app.get("/transactions/pending")
+def get_pending_transactions(db: Session = Depends(get_db)):
+    """Get all pending transactions that need user action"""
+    pending = db.query(models.Transaction).filter(
+        models.Transaction.status == "pending_action"
+    ).order_by(models.Transaction.timestamp.desc()).all()
+    return pending
 
 # --- Analysis Endpoints ---
 @app.get("/analysis/allocation", response_model=analysis_schema.AllocationResponse)

@@ -6,7 +6,8 @@ import { Calendar, Trash2, LayoutGrid, List, Receipt, Tag, Plus, Edit2, ArrowLef
 import ObligationsOverview from '../components/ObligationsOverview';
 import ObligationsList from '../components/ObligationsList';
 import ObligationsTable from '../components/ObligationsTable';
-import ObligationsHistory from '../components/ObligationsHistory';
+import ObligationsCompact from '../components/ObligationsCompact';
+import ObligationsPayments from '../components/ObligationsHistory';
 import PaymentModal from '../components/PaymentModal';
 
 const Obligations = () => {
@@ -59,7 +60,7 @@ const Obligations = () => {
     const [selectedHistory, setSelectedHistory] = useState([]);
     const [viewingHistoryId, setViewingHistoryId] = useState(null);
 
-    const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_day: '', category: '', notes: '', provider: '' });
+    const [obligationForm, setObligationForm] = useState({ name: '', due_day: '', category: '', notes: '', provider: '' });
     const [paymentForm, setPaymentForm] = useState({ id: null, amount: '', note: '', billing_month: new Date().toISOString().split('T')[0] });
 
     const currentPaymentObligation = React.useMemo(() =>
@@ -252,7 +253,7 @@ const Obligations = () => {
         } else if (obl) {
             setPaymentForm({
                 id: obl.id, historyId: null, name: obl.name,
-                amount: defaultAmount !== null ? defaultAmount : (obl.amount || ''),
+                amount: defaultAmount !== null ? defaultAmount : '',
                 note: "Manual Payment", billing_month: targetMonthStr || new Date().toISOString().split('T')[0], status: "PAID"
             });
         } else {
@@ -308,13 +309,12 @@ const Obligations = () => {
     const openObligationModal = (obl = null) => {
         if (obl) {
             setEditingId(obl.id);
-            setEditingId(obl.id);
             setObligationForm({
-                name: obl.name, amount: obl.amount || '', due_day: obl.due_day, category: obl.category, notes: obl.notes || '', provider: obl.provider || ''
+                name: obl.name, due_day: obl.due_day, category: obl.category, notes: obl.notes || '', provider: obl.provider || ''
             });
         } else {
             setEditingId(null);
-            setObligationForm({ name: '', amount: '', due_day: '', category: '', notes: '', provider: '' });
+            setObligationForm({ name: '', due_day: '', category: '', notes: '', provider: '' });
         }
         setShowObligationModal(true);
     };
@@ -392,13 +392,16 @@ const Obligations = () => {
                             <button onClick={() => setViewMode('manager_new')} className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm transition ${viewMode === 'manager_new' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>
                                 <List size={16} /> Table
                             </button>
-                            <button onClick={() => setViewMode('history')} className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm transition ${viewMode === 'history' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>
-                                <Receipt size={16} /> History
+                            <button onClick={() => setViewMode('compact')} className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm transition ${viewMode === 'compact' ? 'bg-emerald-600 text-white' : 'text-gray-400 hover:text-white'}`}>
+                                <List size={16} /> Manager New
+                            </button>
+                            <button onClick={() => setViewMode('payments')} className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm transition ${viewMode === 'payments' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>
+                                <Receipt size={16} /> Payments
                             </button>
                         </div>
 
                         {/* Month Nav for Overview Mode */}
-                        {viewMode !== 'history' && (
+                        {viewMode !== 'payments' && (
                             <div className="flex items-center gap-2">
                                 {/* Category Filter Dropdown */}
                                 <div className="relative">
@@ -440,11 +443,18 @@ const Obligations = () => {
                     {viewMode === 'manager_new' && (
                         <div>
                             <div className="flex justify-end mb-4"><button onClick={() => openObligationModal(null)} className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded shadow text-sm">+ Add New Obligation</button></div>
-                            <ObligationsTable obligations={filteredObligations} getMonthStatus={getMonthStatus} monthOffset={monthOffset} openPaymentModal={openPaymentModal} handleQuickPay={handleQuickPay} />
+                            <ObligationsTable obligations={filteredObligations} getMonthStatus={getMonthStatus} monthOffset={monthOffset} openPaymentModal={openPaymentModal} handleQuickPay={handleQuickPay} openObligationModal={openObligationModal} />
                         </div>
                     )}
 
-                    {viewMode === 'history' && <ObligationsHistory obligations={filteredObligations} history={payments} onEdit={(item) => { if (item) { const o = obligations.find(x => x.id === item.obligation_id); if (o) openPaymentModal(o, null, null, item); } else { openPaymentModal(null); } }} onDelete={(item) => handleDeleteHistory(item.id)} />}
+                    {viewMode === 'compact' && (
+                        <div>
+                            <div className="flex justify-end mb-4"><button onClick={() => openObligationModal(null)} className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded shadow text-sm">+ Add New Obligation</button></div>
+                            <ObligationsCompact obligations={filteredObligations} getMonthStatus={getMonthStatus} monthOffset={monthOffset} openPaymentModal={openPaymentModal} handleQuickPay={handleQuickPay} openObligationModal={openObligationModal} />
+                        </div>
+                    )}
+
+                    {viewMode === 'payments' && <ObligationsPayments obligations={filteredObligations} history={payments} onEdit={(item) => { if (item) { const o = obligations.find(x => x.id === item.obligation_id); if (o) openPaymentModal(o, null, null, item); } else { openPaymentModal(null); } }} onDelete={(item) => handleDeleteHistory(item.id)} onRefresh={fetchData} />}
                 </div>
             )}
 
@@ -491,15 +501,14 @@ const Obligations = () => {
 
             {/* --- MODALS --- */}
             {showObligationModal && (
-                <Modal title={editingId ? "Edit Obligation" : "Add Obligation"} onClose={() => setShowObligationModal(false)}>
+                <Modal isOpen={true} title={editingId ? "Edit Obligation" : "Add Obligation"} onClose={() => setShowObligationModal(false)}>
                     <form onSubmit={handleSaveObligation} className="space-y-4">
                         <div className="flex gap-4">
                             <input type="text" placeholder="Provider (e.g. STC)" className={`${inputClass} flex-1`} value={obligationForm.provider || ''} onChange={e => setObligationForm({ ...obligationForm, provider: e.target.value })} />
                             <input type="text" placeholder="Name (e.g. Internet)" required className={`${inputClass} flex-1`} value={obligationForm.name} onChange={e => setObligationForm({ ...obligationForm, name: e.target.value })} />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4">
                             <input type="number" placeholder="Due Day (1-31)" min="1" max="31" required className={inputClass} value={obligationForm.due_day} onChange={e => setObligationForm({ ...obligationForm, due_day: e.target.value })} />
-                            <input type="number" placeholder="Amount (Optional)" className={inputClass} value={obligationForm.amount} onChange={e => setObligationForm({ ...obligationForm, amount: e.target.value })} />
                         </div>
                         <div>
                             <label className="text-gray-400 text-xs mb-1 block">Category</label>
@@ -531,7 +540,7 @@ const Obligations = () => {
 
             {/* Payment Modal Logic */}
             {showPaymentModal && !paymentForm.id && (
-                <Modal title="Log New Payment" onClose={() => setShowPaymentModal(false)}>
+                <Modal isOpen={true} title="Log New Payment" onClose={() => setShowPaymentModal(false)}>
                     {/* ... Component reuse ... */}
                     <div className="bg-slate-700/50 p-3 rounded mb-4 border border-slate-600">
                         <label className="text-white text-xs uppercase font-bold mb-1 block">Select Obligation</label>
@@ -553,7 +562,7 @@ const Obligations = () => {
             )}
 
             {showHistoryModal && (
-                <Modal title={`Payment History: ${currentHistoryObligation.name}`} onClose={() => setShowHistoryModal(false)}>
+                <Modal isOpen={true} title={`Payment History: ${currentHistoryObligation.name}`} onClose={() => setShowHistoryModal(false)}>
                     {/* History management logic preserved from original if needed, or using ObligationsHistory component inside modal? The original code had specific form here. I'll omit deep implementation for brevity, assuming standard history view is sufficient or user uses the main 'History' tab. */}
                     <div className="text-center text-gray-400">Please use the "History" tab to manage records.</div>
                 </Modal>

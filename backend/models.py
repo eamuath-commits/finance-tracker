@@ -35,6 +35,47 @@ class Account(Base):
     audits = relationship("AccountAudit", back_populates="account", cascade="all, delete-orphan")
     wallets = relationship("CurrencyWallet", back_populates="account", cascade="all, delete-orphan")
 
+class CreditCard(Base):
+    """Separate table for Credit Cards with credit-specific features"""
+    __tablename__ = "credit_cards"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False)           # e.g., "Riyad Bank Visa"
+    bank_name = Column(String, nullable=True)
+    bank_logo_url = Column(String, nullable=True)
+    last_4_digits = Column(String, unique=True, index=True)  # For SMS matching
+    
+    # Balance & Limits
+    current_balance = Column(Float, default=0.0)    # What you owe (positive = debt)
+    credit_limit = Column(Float, default=0.0)       # Maximum credit line
+    
+    # Billing Cycle
+    statement_day = Column(Integer, nullable=True)   # Day of month statement closes (1-28)
+    due_day = Column(Integer, nullable=True)         # Day of month payment is due (1-28)
+    
+    # Interest & Payments
+    apr = Column(Float, nullable=True)               # Annual Percentage Rate
+    minimum_payment_percent = Column(Float, default=5.0)  # Min payment as % of balance
+    
+    # Metadata
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    transactions = relationship("Transaction", back_populates="credit_card")
+    
+    @property
+    def available_credit(self):
+        """Calculate available credit (limit - balance)"""
+        return max(0, (self.credit_limit or 0) - (self.current_balance or 0))
+    
+    @property
+    def utilization_percent(self):
+        """Calculate credit utilization percentage"""
+        if not self.credit_limit or self.credit_limit == 0:
+            return 0
+        return round((self.current_balance or 0) / self.credit_limit * 100, 1)
+
 class AccountAudit(Base):
     __tablename__ = "account_audits"
 
@@ -79,7 +120,8 @@ class Transaction(Base):
     __tablename__ = "transactions"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    account_id = Column(String, ForeignKey("accounts.id"))
+    account_id = Column(String, ForeignKey("accounts.id"), nullable=True)  # Nullable for CC transactions
+    credit_card_id = Column(String, ForeignKey("credit_cards.id"), nullable=True)  # NEW: For credit card transactions
     amount = Column(Float, nullable=False)
     merchant = Column(String)
     raw_sms_content = Column(Text)
@@ -87,18 +129,20 @@ class Transaction(Base):
     category = Column(String, nullable=True)
     type = Column(String, default="debit") # "credit" or "debit"
     balance_after_transaction = Column(Float, nullable=True)
-    status = Column(String, default="completed", nullable=False) # pending, completed, pending_action (for unknown source/dest)
+    status = Column(String, default="completed", nullable=False) # pending, completed, pending_action
     notes = Column(Text, nullable=True)
     
     # Financial fields
     original_amount = Column(Float, nullable=True)
     original_currency = Column(String, nullable=True)
     exchange_rate = Column(Float, nullable=True)
-    status = Column(String, default="completed", nullable=False)
     logo_url = Column(String, nullable=True)
     fees = Column(Float, default=0.0)
+    parsed_data = Column(Text, nullable=True)  # JSON: Full AI-extracted data from SMS
     
+    # Relationships
     account = relationship("Account", back_populates="transactions")
+    credit_card = relationship("CreditCard", back_populates="transactions")  # NEW
     payments = relationship("Payment", back_populates="transaction")
 
 class Loan(Base):
@@ -197,14 +241,9 @@ class AllocationRule(Base):
     __tablename__ = "allocation_rules"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    keyword = Column(String, nullable=False) # e.g. "Grocery", "Salary"
-    field = Column(String, default="merchant") # field to match: merchant, notes, category
-    percentage = Column(Float, nullable=False) # 0.0 to 100.0
-    target_category = Column(String, nullable=True) # For auto-categorization? Or for split? 
-    # Actually, allocation is usually "Spend X% on Needs".
-    # Let's simplify: Rule maps Transaction -> Bucket/Tag?
-    # Or simpler: Just a stored rule for the UI calculator.
-    category_group = Column(String, nullable=False) # "Needs", "Wants", "Savings"
+    rule_type = Column(String, nullable=False)  # 'CATEGORY' or 'LOAN'
+    identifier = Column(String, nullable=False)  # Category name or Loan name
+    target_account_id = Column(String, ForeignKey("accounts.id"), nullable=False)  # Target envelope account
 
 class AllocationHistory(Base):
     __tablename__ = "allocation_history"

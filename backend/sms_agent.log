@@ -1,0 +1,224 @@
+2026-01-26 21:50:02,513 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-26 21:51:19,551 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-26 21:51:53,763 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-26 21:52:14,187 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-26 21:52:14,206 - sms_agent - INFO - Bot is polling...
+2026-01-26 21:52:14,282 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-26 22:44:10,759 - sms_agent - INFO - Received message from Channel_-1003635708322: Bill Payment
+From:93...
+2026-01-26 22:44:13,867 - sms_agent - INFO - DEBUG: Source Logic -> Extracted: 9384, Account: Liability
+2026-01-26 23:14:01,506 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-26 23:14:03,449 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-26 23:15:21,049 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-26 23:16:40,376 - sms_agent - INFO - Received message from Channel_-1003635708322: Online Purchase
+By:4...
+2026-01-26 23:16:44,201 - sms_agent - INFO - DEBUG: Source Logic -> Extracted: 2104, Account: Grocery
+2026-01-26 23:16:44,366 - sms_agent - INFO - Received message from Channel_-1003635708322: Online Purchase
+By:4...
+2026-01-26 23:16:46,767 - sms_agent - INFO - DEBUG: Source Logic -> Extracted: 2104, Account: Grocery
+2026-01-26 23:17:41,452 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-26 23:18:33,585 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 08:05:25,371 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 08:06:04,025 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 08:06:04,046 - sms_agent - INFO - Bot is polling...
+2026-01-27 08:06:04,146 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 08:20:48,771 - sms_agent - INFO - Received message from Channel_-1003635708322: Credit Transfer Loca...
+2026-01-27 08:20:52,098 - sms_agent - INFO - DEBUG: Source Logic -> Extracted: 8001, Account: Jazira Checking
+2026-01-27 08:20:52,099 - sms_agent - INFO - Incoming Credit detected to own account General. ensure primary.
+2026-01-27 08:20:52,099 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: General
+2026-01-27 08:20:52,101 - sms_agent - INFO - Swapping Primary Account for Credit: Jazira Checking -> General
+2026-01-27 08:55:30,832 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 08:55:59,609 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 09:03:23,696 - sms_agent - INFO - Received message from Channel_-1003635708322: Bill Payment
+From:93...
+2026-01-27 09:03:27,369 - sms_agent - INFO - DEBUG: Source Logic -> Extracted: 9384, Account: Liability
+2026-01-27 09:08:38,018 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 09:09:15,389 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 09:09:16,018 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 09:09:16,039 - sms_agent - INFO - Bot is polling...
+2026-01-27 09:10:15,374 - sms_agent - INFO - Received message from Channel_-1003635708322: Bill Payment
+From:9384
+Amount:SAR 85.01
+Biller:001...
+2026-01-27 09:10:19,091 - sms_agent - INFO - DEBUG: Source Logic -> Extracted: 9384, Account: Liability
+2026-01-27 09:10:19,107 - sms_agent - INFO - Saved training example for: Bill Payment to STC BILL
+2026-01-27 09:20:11,846 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 09:21:52,384 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 09:21:52,999 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 09:21:53,021 - sms_agent - INFO - Bot is polling...
+2026-01-27 09:31:05,286 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 09:31:23,173 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 09:31:41,608 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 09:31:57,141 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 09:39:52,694 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 09:42:07,274 - sms_agent - INFO - Received message from Channel_-1003635708322: Debit Transfer Local
+Bank:SNB
+From:1505
+Amount:SAR...
+2026-01-27 09:42:10,707 - sms_agent - INFO - DEBUG: Source Logic -> Extracted: 1505, Account: Expense
+2026-01-27 09:42:10,725 - sms_agent - INFO - Saved training example for: مؤسسة غاردن كير
+2026-01-27 09:42:54,210 - sms_agent - INFO - Received message from Channel_-1003635708322: Debit Transfer Local
+Bank:SNB
+From:1505
+Amount:SAR...
+2026-01-27 09:42:56,776 - sms_agent - INFO - DEBUG: Source Logic -> Extracted: 1505, Account: Expense
+2026-01-27 09:42:56,782 - sms_agent - INFO - Saved training example for: مؤسسة غاردن كير
+2026-01-27 09:43:34,345 - sms_agent - INFO - Received message from Channel_-1003635708322: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 97
+At:Five G...
+2026-01-27 09:43:36,908 - sms_agent - INFO - DEBUG: Source Logic -> Extracted: 9365, Account: Expense
+2026-01-27 09:43:36,917 - sms_agent - INFO - Saved training example for: Five Guys
+2026-01-27 09:44:17,170 - sms_agent - INFO - Received message from Channel_-1003635708322: Transfer Between Your Accounts
+Amount: SAR 10000
+T...
+2026-01-27 09:44:19,721 - sms_agent - INFO - DEBUG: Source Logic -> Extracted: 1505, Account: Expense
+2026-01-27 09:44:19,721 - sms_agent - INFO - Incoming Credit detected to own account Expense. ensure primary.
+2026-01-27 09:44:19,721 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: Expense
+2026-01-27 09:44:19,725 - sms_agent - INFO - Saved training example for: Transfer from AlRajhiBank
+2026-01-27 09:50:54,813 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 10:48:26,416 - sms_agent - INFO - Received message from Channel_-1003635708322: Online Purchase Apple Pay Credit Card: 4897 at :Ta...
+2026-01-27 10:48:29,440 - sms_agent - INFO - DEBUG: Source Logic -> Extracted: 4897, Account: Ajwa Infinite
+2026-01-27 10:48:29,447 - sms_agent - INFO - Saved training example for: Tamara
+2026-01-27 11:11:01,231 - sms_agent - INFO - Received message from Channel_-1003635708322: Online Purchase
+By:9365;mada-Apple Pay
+From:1505
+A...
+2026-01-27 11:11:03,987 - sms_agent - INFO - DEBUG: Source Logic -> Extracted: 1505, Account: Expense
+2026-01-27 11:11:03,994 - sms_agent - INFO - Saved training example for: STC Bank
+2026-01-27 11:11:50,068 - sms_agent - INFO - Received message from Channel_-1003635708322: 4627 is your OTP
+For: Transfer to contact
+Amount: ...
+2026-01-27 11:11:55,694 - sms_agent - INFO - Received message from Channel_-1003635708322: Internal outward transfer
+Amount:400.00SAR
+To:MOHA...
+2026-01-27 11:15:07,710 - sms_agent - INFO - Received message from Channel_-1003635708322: OTP Code:5363
+Reason:Rajhi Transfer - Mobile App
+A...
+2026-01-27 11:15:19,955 - sms_agent - INFO - Received message from Channel_-1003635708322: Debit Internal Transfer
+From:1505
+Amount:SAR 1500
+...
+2026-01-27 11:15:22,310 - sms_agent - INFO - DEBUG: Source Logic -> Extracted: 1505, Account: Expense
+2026-01-27 11:15:22,318 - sms_agent - INFO - Saved training example for: Transfer to Buckets
+2026-01-27 11:59:20,261 - sms_agent - INFO - Received message from Channel_-1003635708322: PoS
+By:4390;mada-Atheer
+Amount:SAR 531.16
+At:BERAI...
+2026-01-27 11:59:23,230 - sms_agent - INFO - DEBUG: Source Logic -> Extracted: 4390, Account: Grocery
+2026-01-27 11:59:23,239 - sms_agent - INFO - Saved training example for: BERAIN CO
+2026-01-27 12:39:27,930 - sms_agent - INFO - Received message from Channel_-1003635708322: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 7
+At:GOT COO...
+2026-01-27 12:39:30,864 - sms_agent - INFO - DEBUG: Source Logic -> Extracted: 9365, Account: Expense
+2026-01-27 12:39:30,873 - sms_agent - INFO - Saved training example for: GOT COOKI
+2026-01-27 15:22:16,441 - sms_agent - INFO - Received message from Channel_-1003635708322: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 7
+At:GOT COO...
+2026-01-27 15:22:19,668 - sms_agent - INFO - DEBUG: Source Logic -> Fallback to Card Info: 9365, Account: Expense
+2026-01-27 15:22:19,673 - sms_agent - INFO - Saved training example for: GOT COOKI
+2026-01-27 15:23:05,788 - sms_agent - INFO - Received message from Channel_-1003635708322: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 16
+At:CITY F...
+2026-01-27 15:23:08,476 - sms_agent - INFO - DEBUG: Source Logic -> Extracted: 9365, Account: Expense
+2026-01-27 15:23:08,484 - sms_agent - INFO - Saved training example for: CITY FRES
+2026-01-27 20:41:39,737 - sms_agent - INFO - Received message from Channel_-1003635708322: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 50
+At:HABIBA...
+2026-01-27 20:41:42,807 - sms_agent - INFO - DEBUG: Source Logic -> Fallback to Card Info: 9365, Account: Expense
+2026-01-27 20:41:42,816 - sms_agent - INFO - Saved training example for: HABIBAH S
+2026-01-27 21:01:21,684 - sms_agent - INFO - Received message from Channel_-1003635708322: PoS
+By:4390;mada-Apple Pay
+Amount:SAR 36
+At:HABIBA...
+2026-01-27 21:01:25,153 - sms_agent - INFO - DEBUG: Source Logic -> Extracted: 4390, Account: Grocery
+2026-01-27 21:01:25,159 - sms_agent - INFO - Saved training example for: HABIBAH S
+2026-01-27 21:06:59,034 - sms_agent - INFO - Received message from Channel_-1003635708322: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 47.65
+At:Als...
+2026-01-27 21:07:01,739 - sms_agent - INFO - DEBUG: Source Logic -> Extracted: 9365, Account: Expense
+2026-01-27 21:07:01,745 - sms_agent - INFO - Saved training example for: Alsawadi R
+2026-01-27 21:37:18,051 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 21:45:39,587 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 21:45:40,276 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 21:45:40,298 - sms_agent - INFO - Bot is polling...
+2026-01-27 21:46:23,051 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 21:46:44,172 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 21:47:10,991 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 21:47:20,262 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 21:47:38,216 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 21:47:58,999 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 21:48:35,481 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 21:49:10,114 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 21:49:50,172 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 21:50:34,962 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 21:51:50,735 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 21:52:16,657 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 21:57:37,971 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 22:06:42,958 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 22:06:42,975 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 22:06:42,998 - sms_agent - INFO - Bot is polling...
+2026-01-27 22:35:30,329 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 22:44:58,421 - sms_agent - INFO - Received message from Channel_-1003635708322: Credit Card:Payment
+Card:Visa 7868
+Amount:SAR 539....
+2026-01-27 22:45:01,757 - sms_agent - INFO - DEBUG: Source Logic -> Matched CREDIT CARD: 7868, Card: Travel Plus
+2026-01-27 22:45:01,768 - sms_agent - INFO - Saved training example for: Credit Card Payment
+2026-01-27 22:45:01,942 - sms_agent - INFO - Received message from Channel_-1003635708322: Notification : Declined due to insufficient fund
+T...
+2026-01-27 22:45:04,396 - sms_agent - INFO - DEBUG: Source Logic -> Matched CREDIT CARD: 7868, Card: Travel Plus
+2026-01-27 22:45:04,405 - sms_agent - INFO - Saved training example for: Declined due to insufficient fund. Online Purchase at Google On
+2026-01-27 22:45:48,591 - sms_agent - INFO - Received message from Channel_-1003635708322: Credit Card:Payment
+Card:Visa 7868
+Amount:SAR 1
+Ba...
+2026-01-27 22:45:51,163 - sms_agent - INFO - DEBUG: Source Logic -> Matched CREDIT CARD: 7868, Card: Travel Plus
+2026-01-27 22:45:51,172 - sms_agent - INFO - Saved training example for: Credit Card Payment
+2026-01-27 22:46:08,930 - sms_agent - INFO - Received message from Channel_-1003635708322: Notification : Declined due to insufficient fund
+T...
+2026-01-27 22:46:11,448 - sms_agent - INFO - DEBUG: Source Logic -> Matched CREDIT CARD: 7868, Card: Travel Plus
+2026-01-27 22:46:11,454 - sms_agent - INFO - Saved training example for: Online Purchase declined at GOOGLE*GO
+2026-01-27 22:46:11,617 - sms_agent - INFO - Received message from Channel_-1003635708322: Notification : Declined due to insufficient fund
+T...
+2026-01-27 22:46:13,973 - sms_agent - INFO - DEBUG: Source Logic -> Matched CREDIT CARD: 7868, Card: Travel Plus
+2026-01-27 22:46:13,979 - sms_agent - INFO - Saved training example for: Online Purchase declined at Google On
+2026-01-27 22:47:16,688 - sms_agent - INFO - Received message from Channel_-1003635708322: Credit Card:Payment
+Card:Visa 7868
+Amount:SAR 100
+...
+2026-01-27 22:47:19,298 - sms_agent - INFO - DEBUG: Source Logic -> Matched CREDIT CARD: 7868, Card: Travel Plus
+2026-01-27 22:47:19,306 - sms_agent - INFO - Saved training example for: Credit Card Payment
+2026-01-27 22:47:41,442 - sms_agent - INFO - Received message from Channel_-1003635708322: Online Purchase
+Card:7868 ;Visa
+Amount:539.99 SAR
+...
+2026-01-27 22:47:43,809 - sms_agent - INFO - DEBUG: Source Logic -> Matched CREDIT CARD: 7868, Card: Travel Plus
+2026-01-27 22:47:43,817 - sms_agent - INFO - Saved training example for: GOOGLE*GO
+2026-01-27 22:52:41,565 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 22:52:42,216 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 22:52:42,238 - sms_agent - INFO - Bot is polling...
+2026-01-27 22:54:15,363 - sms_agent - INFO - Received message from Channel_-1003635708322: Refund
+Card: 7868; 001
+Amount: 15.35 SAR
+From: GOO...
+2026-01-27 22:54:18,493 - sms_agent - INFO - DEBUG: Source Logic -> Matched CREDIT CARD: 7868, Card: Travel Plus
+2026-01-27 22:54:18,505 - sms_agent - INFO - Saved training example for: Incoming Transfer
+2026-01-27 22:55:04,661 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-27 23:49:00,841 - sms_agent - INFO - Received message from Channel_-1003635708322: Debit: Loan Instalment
+Instalment: SAR 3032.19
+Fro...
+2026-01-27 23:49:04,003 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 5225, Account: Auto Lease
+2026-01-27 23:49:04,012 - sms_agent - INFO - Saved training example for: Loan Instalment
+2026-01-27 23:53:48,528 - sms_agent - INFO - Received message from Channel_-1003635708322: Transfer Between Your Accounts
+Amount: SAR 3032.19...
+2026-01-27 23:53:52,010 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 5225, Account: Auto Lease
+2026-01-27 23:53:52,012 - sms_agent - INFO - Incoming Credit detected to own account Auto Lease. ensure primary.
+2026-01-27 23:53:52,012 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: Auto Lease
+2026-01-28 01:06:38,644 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-28 01:06:51,340 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-28 01:06:59,259 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).

@@ -157,10 +157,39 @@ const Allocation = () => {
         </select>
     );
 
-    // Calculate dynamic total based on edits
-    const currentDistributingTotal = previewData ? previewData.allocations.reduce((sum, item) => {
-        return sum + (editableAmounts[item.identifier] !== undefined ? editableAmounts[item.identifier] : item.amount);
-    }, 0) : 0;
+    // Group allocations by target account
+    const groupedAllocations = React.useMemo(() => {
+        if (!previewData?.allocations) return [];
+
+        const byAccount = {};
+        previewData.allocations.forEach(item => {
+            const accId = item.target_account_id;
+            if (!byAccount[accId]) {
+                byAccount[accId] = {
+                    target_account_id: accId,
+                    target_account_name: item.target_account_name,
+                    items: [],
+                    totalAmount: 0,
+                    totalRequired: 0
+                };
+            }
+            // Use edited amount if available
+            const amount = editableAmounts[item.identifier] !== undefined
+                ? editableAmounts[item.identifier]
+                : item.amount;
+            byAccount[accId].items.push({
+                ...item,
+                editedAmount: amount
+            });
+            byAccount[accId].totalAmount += amount;
+            byAccount[accId].totalRequired += item.required_amount;
+        });
+
+        return Object.values(byAccount);
+    }, [previewData, editableAmounts]);
+
+    // Calculate dynamic total based on grouped allocations
+    const currentDistributingTotal = groupedAllocations.reduce((sum, group) => sum + group.totalAmount, 0);
 
     return (
         <div className="space-y-8 animate-fade-in pb-20">
@@ -261,98 +290,83 @@ const Allocation = () => {
                     {previewData && (
                         <>
                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                                {previewData.allocations.map((item, idx) => {
+                                {groupedAllocations.map((group, idx) => {
                                     const sourceBalance = accounts.find(a => a.id === sourceAccountId)?.current_balance || 0;
-                                    const targetAcc = accounts.find(a => a.id === item.target_account_id);
+                                    const targetAcc = accounts.find(a => a.id === group.target_account_id);
 
-                                    // Determine amount to use (edited or default)
-                                    const currentAmount = editableAmounts[item.identifier] !== undefined
-                                        ? editableAmounts[item.identifier]
-                                        : item.amount;
-
-                                    const shortage = Math.max(0, currentAmount - sourceBalance);
-                                    const willTransfer = Math.max(0, currentAmount - shortage);
+                                    const shortage = Math.max(0, group.totalAmount - sourceBalance);
+                                    const willTransfer = Math.max(0, group.totalAmount - shortage);
                                     const isPartial = shortage > 0;
 
                                     return (
-                                        <div key={idx} className={`relative flex flex-col gap-4 p-5 rounded-2xl border transition-all hover:shadow-lg hover:border-slate-600 ${isPartial ? 'bg-amber-900/10 border-amber-500/30' : 'bg-slate-800/40 border-slate-700'}`}>
+                                        <div key={group.target_account_id} className={`relative flex flex-col gap-4 p-5 rounded-2xl border transition-all hover:shadow-lg hover:border-slate-600 ${isPartial ? 'bg-amber-900/10 border-amber-500/30' : 'bg-slate-800/40 border-slate-700'}`}>
 
-                                            {/* Header: Name & Type */}
+                                            {/* Header: Target Account Name */}
                                             <div className="flex justify-between items-start gap-4">
                                                 <div>
-                                                    <h3 className="font-bold text-lg text-white leading-snug line-clamp-2" title={item.name}>{item.name}</h3>
-                                                    <span className="inline-block mt-1.5 text-[10px] font-bold text-gray-400 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700/50 uppercase tracking-wider">
-                                                        {item.rule_type}
-                                                    </span>
+                                                    <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Transfer To</span>
+                                                    <h3 className="font-bold text-xl text-emerald-400 leading-snug" title={group.target_account_name}>{group.target_account_name}</h3>
                                                 </div>
-                                                <div className="w-8 h-8 rounded-full bg-slate-700/50 flex items-center justify-center text-sm font-mono text-gray-400 shrink-0">
-                                                    {idx + 1}
+                                                <div className="text-right">
+                                                    {targetAcc && (
+                                                        <>
+                                                            <span className="text-[10px] text-gray-500 block">Current Balance</span>
+                                                            <span className="text-sm text-gray-300 font-mono">{formatCurrency(targetAcc.current_balance)}</span>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
 
-                                            {/* Target Account Box */}
-                                            <div className="bg-slate-900/50 rounded-xl p-3 border border-slate-700/50 flex items-center justify-between">
-                                                <div className="flex flex-col">
-                                                    <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Destination</span>
-                                                    <span className="text-emerald-400 font-medium truncate max-w-[150px]">{item.target_account_name}</span>
+                                            {/* Total Amount Display */}
+                                            <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700/50">
+                                                <div className="flex justify-between items-baseline mb-3">
+                                                    <span className="text-sm font-medium text-gray-400">Total Transfer</span>
+                                                    <span className="text-2xl font-bold text-white font-mono">{formatCurrency(group.totalAmount)}</span>
                                                 </div>
-                                                {targetAcc && (
-                                                    <div className="text-right">
-                                                        <span className="text-[10px] text-gray-500 block">Current Bal</span>
-                                                        <span className="text-xs text-gray-300 font-mono">{targetAcc.current_balance.toLocaleString()}</span>
-                                                    </div>
-                                                )}
+
+                                                {/* Breakdown of contributing items */}
+                                                <div className="space-y-2 mt-3 pt-3 border-t border-slate-700/50">
+                                                    <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Breakdown</span>
+                                                    {group.items.map((item, i) => (
+                                                        <div key={item.identifier} className="flex justify-between items-center text-sm">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={`w-2 h-2 rounded-full ${item.rule_type === 'LOAN' ? 'bg-amber-500' : 'bg-blue-500'}`}></span>
+                                                                <span className="text-gray-300 truncate max-w-[140px]" title={item.name}>{item.name}</span>
+                                                            </div>
+                                                            <input
+                                                                type="number"
+                                                                value={item.editedAmount}
+                                                                onChange={(e) => {
+                                                                    const val = parseFloat(e.target.value) || 0;
+                                                                    setEditableAmounts(prev => ({
+                                                                        ...prev,
+                                                                        [item.identifier]: val
+                                                                    }));
+                                                                }}
+                                                                className="w-24 bg-slate-800 text-right font-mono text-sm py-1 px-2 rounded border border-slate-600 focus:border-emerald-500 outline-none text-white"
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
 
-                                            {/* Logic Notes (Gaps/Limits) */}
-                                            {((item.required_amount || 0) - item.amount) > 0.01 && (
-                                                <div className="mb-4 flex items-start gap-2 bg-amber-500/10 p-2.5 rounded-lg border border-amber-500/20">
+                                            {/* Gap Warning */}
+                                            {(group.totalRequired - group.totalAmount) > 0.01 && (
+                                                <div className="flex items-start gap-2 bg-amber-500/10 p-2.5 rounded-lg border border-amber-500/20">
                                                     <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                                                     <div className="flex flex-col">
                                                         <span className="text-xs font-bold text-amber-500 uppercase tracking-wider">Source Limit Reached</span>
                                                         <span className="text-xs text-amber-400/80">
-                                                            Coverage Gap: <span className="text-amber-400 font-bold">{formatCurrency((item.required_amount || 0) - item.amount)}</span>
+                                                            Coverage Gap: <span className="text-amber-400 font-bold">{formatCurrency(group.totalRequired - group.totalAmount)}</span>
                                                         </span>
                                                     </div>
                                                 </div>
                                             )}
 
-                                            {/* Footer: Amount & Action */}
+                                            {/* Execute Button */}
                                             <div className="mt-auto pt-2">
-                                                <div className="relative mb-3">
-                                                    <label className="absolute -top-2 left-2 bg-slate-800 px-1 text-[10px] text-gray-400">Transfer Amount</label>
-                                                    <input
-                                                        type="number"
-                                                        value={currentAmount}
-                                                        onChange={(e) => {
-                                                            const val = parseFloat(e.target.value) || 0;
-                                                            setEditableAmounts(prev => ({
-                                                                ...prev,
-                                                                [item.identifier]: val
-                                                            }));
-                                                        }}
-                                                        className={`w-full bg-slate-900 text-right font-mono text-lg py-3 pl-3 pr-10 rounded-xl border focus:ring-2 outline-none transition-all 
-                                                            ${((item.required_amount || 0) - item.amount) > 0.01
-                                                                ? 'text-amber-500 border-amber-500/50 focus:border-amber-500 ring-amber-500/20'
-                                                                : 'text-white border-slate-600 focus:border-emerald-500'}`}
-                                                    />
-                                                    <span
-                                                        className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 bg-gray-500 pointer-events-none"
-                                                        style={{
-                                                            maskImage: 'url(/riyal-symbol.png)',
-                                                            WebkitMaskImage: 'url(/riyal-symbol.png)',
-                                                            maskSize: 'contain',
-                                                            WebkitMaskSize: 'contain',
-                                                            maskRepeat: 'no-repeat',
-                                                            WebkitMaskRepeat: 'no-repeat',
-                                                            maskPosition: 'center',
-                                                            WebkitMaskPosition: 'center'
-                                                        }}
-                                                    />
-                                                </div>
-
                                                 <button
-                                                    onClick={() => handleExecute(item.target_account_id, currentAmount)}
+                                                    onClick={() => handleExecute(group.target_account_id, group.totalAmount)}
                                                     disabled={distributing || willTransfer <= 0}
                                                     className={`w-full py-3.5 ${isPartial ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'} text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2`}
                                                 >
@@ -418,7 +432,7 @@ const Allocation = () => {
                                         </div>
                                     );
                                 })()}
-                                {previewData.allocations.length === 0 && (
+                                {groupedAllocations.length === 0 && (
                                     <div className="col-span-full text-center py-12 text-gray-500">
                                         <p className="text-lg font-medium">No transfers needed.</p>
                                         <p className="text-sm">All obligations are covered by existing balances or no bills found.</p>

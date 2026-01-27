@@ -1,6 +1,7 @@
 import React from 'react';
-import { Landmark, Zap, Car, CreditCard, Smartphone, Banknote, Home, Utensils, Shield, Clock, Box, TrendingUp, AlertCircle, CheckCircle } from 'lucide-react';
+import { Landmark, Zap, Car, CreditCard, Smartphone, Banknote, Home, Utensils, Shield, Clock, Box, TrendingUp, AlertCircle, CheckCircle, Download } from 'lucide-react';
 import { formatCurrency } from '../components/UI';
+import { exportToCSV } from '../utils/csvExport';
 
 const ObligationsOverview = ({ obligations, getMonthStatus, monthOffset = 0 }) => {
 
@@ -62,6 +63,36 @@ const ObligationsOverview = ({ obligations, getMonthStatus, monthOffset = 0 }) =
             icon: config.icon
         };
     });
+
+    // 4. Get current month label for export
+    const currentDate = new Date();
+    currentDate.setMonth(currentDate.getMonth() + monthOffset);
+    const monthLabel = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+    // 5. Manager Export Handler - Export current month snapshot
+    const handleManagerExport = () => {
+        const exportData = obligations.map(obl => {
+            const status = getMonthStatus(obl, monthOffset);
+            const prevStatus = getMonthStatus(obl, monthOffset - 1);
+            // Smart Default: Use previous month's payment as budget
+            const budgetAmount = prevStatus.amount || 0;
+            return {
+                "Obligation Name": obl.name,
+                "Category": obl.category || "Other",
+                "Provider": obl.provider || "",
+                "Due Day": obl.due_day,
+                "Budget Amount": budgetAmount,
+                "Paid Amount": status.isPaid ? (status.amount || 0) : 0,
+                "Status": status.isPaid ? "Paid" : "Unpaid",
+                "Billing Month": monthLabel,
+                "Notes": obl.notes || ""
+            };
+        });
+
+        const filename = `obligations_${monthLabel.replace(' ', '_')}.csv`;
+        exportToCSV(exportData, filename);
+    };
+
 
     const renderSummaryCard = (title, stats, color, icon, isTotal = false) => {
         const progress = stats.currentBudget > 0 ? (stats.currentPaid / stats.currentBudget) * 100 : 0;
@@ -136,6 +167,21 @@ const ObligationsOverview = ({ obligations, getMonthStatus, monthOffset = 0 }) =
 
     return (
         <div className="animate-fade-in-up">
+            {/* Header with Export Button */}
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">
+                    {monthLabel} Summary
+                </h3>
+                <button
+                    onClick={handleManagerExport}
+                    className="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm flex items-center gap-1.5 transition"
+                    title="Export current month obligations to CSV"
+                >
+                    <Download size={14} />
+                    Export
+                </button>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
                 {/* Total Overview Card */}
                 {renderSummaryCard(

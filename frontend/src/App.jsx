@@ -12,6 +12,8 @@ import Allocation from './pages/Allocation';
 
 import Accounts from './pages/Accounts';
 import Loans from './pages/Loans';
+import CreditCards from './pages/CreditCards';
+import Categories from './pages/Categories';
 
 function App() {
     return (
@@ -20,12 +22,14 @@ function App() {
                 <Route path="/" element={<MainLayout />}>
                     <Route index element={<Dashboard />} />
                     <Route path="accounts" element={<Accounts />} />
+                    <Route path="credit-cards" element={<CreditCards />} />
                     <Route path="allocation" element={<Allocation />} />
                     <Route path="transactions" element={<Transactions />} />
                     <Route path="loans" element={<Loans />} />
                     <Route path="obligations" element={<Obligations />} />
                     <Route path="reports" element={<Reports />} />
                     <Route path="planning" element={<Planning />} />
+                    <Route path="categories" element={<Categories />} />
                 </Route>
             </Routes>
         </Router>
@@ -33,3 +37,4 @@ function App() {
 }
 
 export default App;
+

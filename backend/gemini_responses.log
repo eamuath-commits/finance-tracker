@@ -1,0 +1,179 @@
+2026-01-26 22:44:13,860 - ai_raw_io - INFO - INPUT: Bill Payment
+From:9384
+Amount:SAR 85.01
+Biller:001
+Service:STC BILL
+Bill:05224907461
+Date:26-1-24 13:24+966566985112 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "bill_payment", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "9384", "destination_account_last4": null, "card_info": null, "amount": 85.01, "currency": "SAR", "fees": null, "timestamp": "2026-01-26 13:24", "available_balance": null, "beneficiary": "STC BILL", "merchant": "STC BILL", "sender_name": null, "description": "Bill Payment to STC BILL"}
+2026-01-26 23:16:44,200 - ai_raw_io - INFO - INPUT: Online Purchase
+By:4390;mada-Apple Pay
+From:2104
+Amount:SAR 36
+At:Jahez
+27/1/26 23:16AlRajhiBank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "2104", "destination_account_last4": null, "card_info": "mada-Apple Pay 4390", "amount": 36, "currency": "SAR", "fees": null, "timestamp": "2026-01-27 23:16", "available_balance": null, "beneficiary": null, "merchant": "Jahez", "sender_name": null, "description": "Purchase at Jahez"}
+2026-01-26 23:16:46,765 - ai_raw_io - INFO - INPUT: Online Purchase
+By:4390;mada-Apple Pay
+From:2104
+Amount:SAR 36
+At:Jahez
+27/1/26 23:16AlRajhiBank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "2104", "destination_account_last4": null, "card_info": "mada-Apple Pay 2104", "amount": 36.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-27 23:16", "available_balance": null, "beneficiary": null, "merchant": "Jahez", "sender_name": null, "description": "Purchase at Jahez"}
+2026-01-27 08:20:52,094 - ai_raw_io - INFO - INPUT: Credit Transfer Local
+Via:BJAZ
+Amount:SAR 1000
+To:7772
+From:MUATH AMER MOHAMMED ALASIRI
+From:8001
+26/1/22 20:34+966566985112 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "transfer", "source_bank": null, "destination_bank": "AlRajhiBank", "source_account_last4": "8001", "destination_account_last4": "7772", "card_info": null, "amount": 1000, "currency": "SAR", "fees": null, "timestamp": "2026-01-26 20:34", "available_balance": null, "beneficiary": null, "merchant": "MUATH AMER MOHAMMED ALASIRI", "sender_name": "MUATH AMER MOHAMMED ALASIRI", "description": "Transfer from MUATH AMER MOHAMMED ALASIRI"}
+2026-01-27 09:03:27,367 - ai_raw_io - INFO - INPUT: Bill Payment
+From:9384
+Amount:SAR 85.01
+Biller:001
+Service:STC BILL
+Bill:05224907461
+Date:26-1-24 13:24+966566985112 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "payment", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "9384", "destination_account_last4": null, "card_info": null, "amount": 85.01, "currency": "SAR", "fees": null, "timestamp": "2026-01-26 13:24", "available_balance": null, "beneficiary": "STC BILL", "merchant": "STC BILL", "sender_name": null, "description": "Bill Payment to STC BILL"}
+2026-01-27 09:10:19,085 - ai_raw_io - INFO - INPUT: Bill Payment
+From:9384
+Amount:SAR 85.01
+Biller:001
+Service:STC BILL
+Bill:05224907461
+Date:26-1-24 13:24+966566985112 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "bill_payment", "source_bank": null, "destination_bank": null, "source_account_last4": "9384", "destination_account_last4": null, "card_info": null, "amount": 85.01, "currency": "SAR", "fees": null, "timestamp": "2026-01-26 13:24", "available_balance": null, "beneficiary": null, "merchant": "STC BILL", "sender_name": null, "description": "Bill Payment to STC BILL"}
+2026-01-27 09:42:10,702 - ai_raw_io - INFO - INPUT: Debit Transfer Local
+Bank:SNB
+From:1505
+Amount:SAR 350
+To:مؤسسة غاردن كير
+To:7407
+Fees:SAR 0.29
+26/1/22 03:48+966566985112 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "transfer", "source_bank": "SNB", "destination_bank": null, "source_account_last4": "1505", "destination_account_last4": "7407", "card_info": null, "amount": 350, "currency": "SAR", "fees": 0.29, "timestamp": "2022-01-26 03:48", "available_balance": null, "beneficiary": "\u0645\u0624\u0633\u0633\u0629 \u063a\u0627\u0631\u062f\u0646 \u0643\u064a\u0631", "merchant": "\u0645\u0624\u0633\u0633\u0629 \u063a\u0627\u0631\u062f\u0646 \u0643\u064a\u0631", "sender_name": null, "description": "Transfer to \u0645\u0624\u0633\u0633\u0629 \u063a\u0627\u0631\u062f\u0646 \u0643\u064a\u0631"}
+2026-01-27 09:42:56,772 - ai_raw_io - INFO - INPUT: Debit Transfer Local
+Bank:SNB
+From:1505
+Amount:SAR 350
+To:مؤسسة غاردن كير
+To:7407
+Fees:SAR 0.29
+26/1/22 03:48+966566985112 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "transfer", "source_bank": "SNB", "destination_bank": null, "source_account_last4": "1505", "destination_account_last4": "7407", "card_info": null, "amount": 350.0, "currency": "SAR", "fees": 0.29, "timestamp": "2022-01-26 03:48", "available_balance": null, "beneficiary": "\u0645\u0624\u0633\u0633\u0629 \u063a\u0627\u0631\u062f\u0646 \u0643\u064a\u0631", "merchant": "\u0645\u0624\u0633\u0633\u0629 \u063a\u0627\u0631\u062f\u0646 \u0643\u064a\u0631", "sender_name": null, "description": "Transfer to \u0645\u0624\u0633\u0633\u0629 \u063a\u0627\u0631\u062f\u0646 \u0643\u064a\u0631"}
+2026-01-27 09:43:36,891 - ai_raw_io - INFO - INPUT: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 97
+At:Five Guys
+12/1/26 13:47+966566985112 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": null, "destination_bank": null, "source_account_last4": "9365", "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 97, "currency": "SAR", "fees": null, "timestamp": "2026-01-12 13:47", "available_balance": null, "beneficiary": null, "merchant": "Five Guys", "sender_name": null, "description": "Purchase at Five Guys"}
+2026-01-27 09:44:19,720 - ai_raw_io - INFO - INPUT: Transfer Between Your Accounts
+Amount: SAR 10000
+To: 1505
+26/1/25 17:49+966566985112 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_bank": "AlRajhiBank", "source_account_last4": null, "destination_account_last4": "1505", "card_info": null, "amount": 10000, "currency": "SAR", "fees": null, "timestamp": "2025-01-26 17:49", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "description": "Transfer to 1505"}
+2026-01-27 10:48:29,438 - ai_raw_io - INFO - INPUT: Online Purchase Apple Pay Credit Card: 4897 at :Tamara of : 2533.34 SAR on : 2026-01-27 10:48 Available Balance is: 16559.80 SAR Due Amount: 55842.86 SARJazira Bank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "Jazira Bank", "destination_bank": null, "source_account_last4": "4897", "destination_account_last4": null, "card_info": "Credit Card: 4897", "amount": 2533.34, "currency": "SAR", "fees": 0, "timestamp": "2026-01-27 10:48", "available_balance": 16559.8, "beneficiary": null, "merchant": "Tamara", "sender_name": null, "description": "Online Purchase at Tamara"}
+2026-01-27 11:11:03,985 - ai_raw_io - INFO - INPUT: Online Purchase
+By:9365;mada-Apple Pay
+From:1505
+Amount:SAR 400
+At:STC Bank
+27/1/26 11:11AlRajhiBank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "destination_bank": "STC Bank", "source_account_last4": "1505", "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 400.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-27 11:11", "available_balance": null, "beneficiary": null, "merchant": "STC Bank", "sender_name": null, "description": "Purchase at STC Bank"}
+2026-01-27 11:11:52,366 - ai_raw_io - INFO - INPUT: 4627 is your OTP
+For: Transfer to contact
+Amount: 400.00 SAR
+*Do not share the codeSTC Bank || OUTPUT: {"is_financial_event": true, "is_transaction": false, "transaction_type": null, "sub_type": null, "source_bank": "STC Bank", "destination_bank": null, "source_account_last4": null, "destination_account_last4": null, "card_info": null, "amount": 400.0, "currency": "SAR", "fees": null, "timestamp": null, "available_balance": null, "beneficiary": "contact", "merchant": null, "sender_name": null, "description": "Transfer to contact"}
+2026-01-27 11:11:57,729 - ai_raw_io - INFO - INPUT: Internal outward transfer
+Amount:400.00SAR
+To:MOHAMED ABDELSATTAR
+Acc:3607*
+At:27/01/26 11:12STC Bank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "transfer", "source_bank": null, "destination_bank": null, "source_account_last4": null, "destination_account_last4": null, "card_info": null, "amount": 400.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-27 11:12", "available_balance": null, "beneficiary": "MOHAMED ABDELSATTAR", "merchant": "MOHAMED ABDELSATTAR", "sender_name": null, "description": "Transfer to MOHAMED ABDELSATTAR"}
+2026-01-27 11:15:09,983 - ai_raw_io - INFO - INPUT: OTP Code:5363
+Reason:Rajhi Transfer - Mobile App
+Amount:1,500.00 SARAlRajhiBank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "transfer", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": null, "destination_account_last4": null, "card_info": null, "amount": 1500.0, "currency": "SAR", "fees": null, "timestamp": null, "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "description": "Outgoing Transfer"}
+2026-01-27 11:15:22,309 - ai_raw_io - INFO - INPUT: Debit Internal Transfer
+From:1505
+Amount:SAR 1500
+To:MUHAMMAD AKRAM
+To:1967
+26/1/27 11:15AlRajhiBank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_bank": "AlRajhiBank", "source_account_last4": "1505", "destination_account_last4": "1964", "card_info": null, "amount": 1500.0, "currency": "SAR", "fees": null, "timestamp": "2027-01-26 11:15", "available_balance": null, "beneficiary": "MUHAMMAD AKRAM", "merchant": "MUHAMMAD AKRAM", "sender_name": null, "description": "Transfer to MUHAMMAD AKRAM"}
+2026-01-27 11:59:23,224 - ai_raw_io - INFO - INPUT: PoS
+By:4390;mada-Atheer
+Amount:SAR 531.16
+At:BERAIN CO 
+27/1/26 11:59AlRajhiBank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "4390", "destination_account_last4": null, "card_info": "mada-Atheer 4390", "amount": 531.16, "currency": "SAR", "fees": null, "timestamp": "2026-01-27 11:59", "available_balance": null, "beneficiary": null, "merchant": "BERAIN CO", "sender_name": null, "description": "Purchase at BERAIN CO"}
+2026-01-27 12:39:30,857 - ai_raw_io - INFO - INPUT: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 7
+At:GOT COOKI
+27/1/26 12:39AlRajhiBank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "9365", "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 7.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-27 12:39", "available_balance": null, "beneficiary": null, "merchant": "GOT COOKI", "sender_name": null, "description": "Purchase at GOT COOKI"}
+2026-01-27 15:22:19,664 - ai_raw_io - INFO - INPUT: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 7
+At:GOT COOKI
+27/1/26 15:22AlRajhiBank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": null, "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 7.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-27 15:22", "available_balance": null, "beneficiary": null, "merchant": "GOT COOKI", "sender_name": null, "description": "Purchase at GOT COOKI"}
+2026-01-27 15:23:08,470 - ai_raw_io - INFO - INPUT: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 16
+At:CITY FRES
+27/1/26 15:23AlRajhiBank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "9365", "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 16.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-27 15:23", "available_balance": null, "beneficiary": null, "merchant": "CITY FRES", "sender_name": null, "description": "Purchase at CITY FRES"}
+2026-01-27 20:41:42,801 - ai_raw_io - INFO - INPUT: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 50
+At:HABIBAH S
+28/1/26 20:41AlRajhiBank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": null, "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 50.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-28 20:41", "available_balance": null, "beneficiary": null, "merchant": "HABIBAH S", "sender_name": null, "description": "Purchase at HABIBAH S"}
+2026-01-27 21:01:25,150 - ai_raw_io - INFO - INPUT: PoS
+By:4390;mada-Apple Pay
+Amount:SAR 36
+At:HABIBAH S
+28/1/26 21:01AlRajhiBank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "4390", "destination_account_last4": null, "card_info": "mada-Apple Pay 4390", "amount": 36.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-28 21:01", "available_balance": null, "beneficiary": null, "merchant": "HABIBAH S", "sender_name": null, "description": "Purchase at HABIBAH S"}
+2026-01-27 21:07:01,736 - ai_raw_io - INFO - INPUT: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 47.65
+At:Alsawadi R
+28/1/26 21:07AlRajhiBank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "9365", "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 47.65, "currency": "SAR", "fees": null, "timestamp": "2026-01-28 21:07", "available_balance": null, "beneficiary": null, "merchant": "Alsawadi R", "sender_name": null, "description": "Purchase at Alsawadi R"}
+2026-01-27 22:45:01,752 - ai_raw_io - INFO - INPUT: Credit Card:Payment
+Card:Visa 7868
+Amount:SAR 539.99
+Balance:539.99 SAR
+27/1/26 22:45AlRajhiBank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "payment", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": null, "destination_account_last4": "7868", "card_info": "Visa 7868", "amount": 539.99, "currency": "SAR", "fees": null, "timestamp": "2026-01-27 22:45", "available_balance": 539.99, "beneficiary": null, "merchant": null, "sender_name": null, "description": "Credit Card Payment"}
+2026-01-27 22:45:04,393 - ai_raw_io - INFO - INPUT: Notification : Declined due to insufficient fund
+Transaction : Online Purchase
+Card: 7868
+Amount : SAR 539.99
+Merchant : Google On
+Date : 27/1/26 22:45AlRajhiBank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "decline", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "7868", "destination_account_last4": null, "card_info": "7868", "amount": 539.99, "currency": "SAR", "fees": null, "timestamp": "2026-01-27 22:45", "available_balance": null, "beneficiary": null, "merchant": "Google On", "sender_name": null, "description": "Declined due to insufficient fund. Online Purchase at Google On"}
+2026-01-27 22:45:51,159 - ai_raw_io - INFO - INPUT: Credit Card:Payment
+Card:Visa 7868
+Amount:SAR 1
+Balance:540.99 SAR
+27/1/26 22:46AlRajhiBank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "payment", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": null, "destination_account_last4": "7868", "card_info": "Visa 7868", "amount": 1.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-27 22:46", "available_balance": 540.99, "beneficiary": null, "merchant": null, "sender_name": null, "description": "Credit Card Payment"}
+2026-01-27 22:46:11,446 - ai_raw_io - INFO - INPUT: Notification : Declined due to insufficient fund
+Transaction : Online Purchase
+Card: 7868
+Amount : SAR 539.99
+Merchant : GOOGLE*GO
+Date : 27/1/26 22:46AlRajhiBank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "decline", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "7868", "destination_account_last4": null, "card_info": "7868", "amount": 539.99, "currency": "SAR", "fees": null, "timestamp": "2026-01-27 22:46", "available_balance": null, "beneficiary": null, "merchant": "GOOGLE*GO", "sender_name": null, "description": "Online Purchase declined at GOOGLE*GO"}
+2026-01-27 22:46:13,971 - ai_raw_io - INFO - INPUT: Notification : Declined due to insufficient fund
+Transaction : Online Purchase
+Card: 7868
+Amount : SAR 539.99
+Merchant : Google On
+Date : 27/1/26 22:46AlRajhiBank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "decline", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "7868", "destination_account_last4": null, "card_info": "7868", "amount": 539.99, "currency": "SAR", "fees": null, "timestamp": "2026-01-27 22:46", "available_balance": null, "beneficiary": null, "merchant": "Google On", "sender_name": null, "description": "Online Purchase declined at Google On"}
+2026-01-27 22:47:19,296 - ai_raw_io - INFO - INPUT: Credit Card:Payment
+Card:Visa 7868
+Amount:SAR 100
+Balance:640.99 SAR
+27/1/26 22:47AlRajhiBank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "payment", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": null, "destination_account_last4": "7868", "card_info": "Visa 7868", "amount": 100.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-27 22:47", "available_balance": 640.99, "beneficiary": null, "merchant": null, "sender_name": null, "description": "Credit Card Payment"}
+2026-01-27 22:47:43,807 - ai_raw_io - INFO - INPUT: Online Purchase
+Card:7868 ;Visa
+Amount:539.99 SAR
+At: GOOGLE*GO
+Country:USA
+Balance:88.58 SAR
+27/1/26 22:47AlRajhiBank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "7868", "destination_account_last4": null, "card_info": "Visa 7868", "amount": 539.99, "currency": "SAR", "fees": null, "timestamp": "2026-01-27 22:47", "available_balance": 88.58, "beneficiary": null, "merchant": "GOOGLE*GO", "sender_name": null, "description": "Purchase at GOOGLE*GO"}
+2026-01-27 22:54:18,489 - ai_raw_io - INFO - INPUT: Refund
+Card: 7868; 001
+Amount: 15.35 SAR
+From: GOOGLE*GO
+ 27/1/26 22:54AlRajhiBank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "transfer", "source_bank": null, "destination_bank": "AlRajhiBank", "source_account_last4": null, "destination_account_last4": "7868", "card_info": "7868", "amount": 15.35, "currency": "SAR", "fees": null, "timestamp": "2026-01-27 22:54", "available_balance": null, "beneficiary": "GOOGLE*GO", "merchant": "GOOGLE*GO", "sender_name": null, "description": "Refund from GOOGLE*GO"}
+2026-01-27 23:49:04,001 - ai_raw_io - INFO - INPUT: Debit: Loan Instalment
+Instalment: SAR 3032.19
+From: 5225
+Remaining Amount: SAR 222872.89
+25/1/26 20:27+966566985112 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "payment", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "5225", "destination_account_last4": null, "card_info": null, "amount": 3032.19, "currency": "SAR", "fees": null, "timestamp": "2026-01-25 20:27", "available_balance": 222872.89, "beneficiary": null, "merchant": "Loan Instalment", "sender_name": null, "description": "Loan Instalment"}
+2026-01-27 23:53:52,004 - ai_raw_io - INFO - INPUT: Transfer Between Your Accounts
+Amount: SAR 3032.19
+To: 5225
+26/1/25 17:48+966566985112 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": null, "destination_account_last4": "5225", "card_info": null, "amount": 3032.19, "currency": "SAR", "fees": null, "timestamp": "2025-01-26 17:48", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "description": "Transfer to 5225"}

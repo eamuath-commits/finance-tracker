@@ -22,6 +22,11 @@ export const formatCurrency = (value) => {
     );
 };
 
+// Plain text version for use in <option> elements and other non-JSX contexts
+export const formatCurrencyText = (value) => {
+    return `${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR`;
+};
+
 export const Card = ({ title, value, subtext, color = "blue", children, className = "" }) => {
     // If children are provided, it's a layout card
     if (children) {
@@ -54,17 +59,21 @@ export const SectionHeader = ({ title, onAdd }) => (
     </div>
 );
 
-export const Modal = ({ title, children, onClose }) => (
-    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 backdrop-blur-sm">
-        <div className="bg-slate-800 rounded-lg p-6 w-full max-w-md border border-slate-700 shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-white">{title}</h3>
-                <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">&times;</button>
+export const Modal = ({ isOpen, title, children, onClose }) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 backdrop-blur-sm">
+            <div className="bg-slate-800 rounded-lg p-6 w-full max-w-md border border-slate-700 shadow-2xl">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-bold text-white">{title}</h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">&times;</button>
+                </div>
+                {children}
             </div>
-            {children}
         </div>
-    </div>
-);
+    );
+};
 
 export const EditIcon = ({ onClick }) => (
     <button onClick={onClick} className="text-gray-500 hover:text-blue-400 ml-2">
@@ -238,6 +247,13 @@ export const Button = ({ children, variant = "primary", onClick, className = "",
     );
 };
 
+export const Input = ({ className = "", ...props }) => (
+    <input
+        className={`w-full bg-black/20 border border-white/10 rounded-lg p-3 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors placeholder-gray-500 ${className}`}
+        {...props}
+    />
+);
+
 export const Spinner = () => (
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
 );
@@ -246,11 +262,13 @@ const UI = {
     Card,
     Badge,
     Button,
+    Input,
     Spinner,
     SectionHeader,
     Modal,
     BrandLogo,
     formatCurrency,
+    formatCurrencyText,
     inputClass,
     selectClass,
     EditIcon

@@ -19,6 +19,63 @@ def get_account_by_last_4(db: Session, last_4: str):
         
     return None
 
+# --- Credit Card CRUD ---
+def get_credit_card_by_last4(db: Session, last_4: str):
+    """Find a credit card by last 4 digits"""
+    return db.query(models.CreditCard).filter(models.CreditCard.last_4_digits == last_4).first()
+
+def get_credit_cards(db: Session, skip: int = 0, limit: int = 100):
+    """Get all credit cards"""
+    return db.query(models.CreditCard).offset(skip).limit(limit).all()
+
+def get_credit_card(db: Session, card_id: str):
+    """Get a single credit card by ID"""
+    return db.query(models.CreditCard).filter(models.CreditCard.id == card_id).first()
+
+def create_credit_card(db: Session, card: schemas.CreditCardCreate):
+    """Create a new credit card"""
+    import uuid
+    db_card = models.CreditCard(
+        id=str(uuid.uuid4()),
+        name=card.name,
+        bank_name=card.bank_name,
+        last_4_digits=card.last_4_digits,
+        credit_limit=card.credit_limit,
+        statement_day=card.statement_day,
+        due_day=card.due_day,
+        apr=card.apr,
+        minimum_payment_percent=card.minimum_payment_percent,
+        notes=card.notes,
+        current_balance=0.0
+    )
+    db.add(db_card)
+    db.commit()
+    db.refresh(db_card)
+    return db_card
+
+def update_credit_card(db: Session, card_id: str, card_update: schemas.CreditCardUpdate):
+    """Update a credit card"""
+    db_card = db.query(models.CreditCard).filter(models.CreditCard.id == card_id).first()
+    if not db_card:
+        return None
+    
+    update_data = card_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_card, field, value)
+    
+    db.commit()
+    db.refresh(db_card)
+    return db_card
+
+def delete_credit_card(db: Session, card_id: str):
+    """Delete a credit card"""
+    db_card = db.query(models.CreditCard).filter(models.CreditCard.id == card_id).first()
+    if not db_card:
+        return False
+    db.delete(db_card)
+    db.commit()
+    return True
+
 def get_account_by_name(db: Session, name: str):
     # Try case-insensitive matching if possible, otherwise exact
     return db.query(models.Account).filter(models.Account.name == name).first()
@@ -105,15 +162,18 @@ def find_potential_duplicate(db: Session, account_id: str, amount: float, tx_typ
 def create_transaction(db: Session, transaction: schemas.TransactionCreate):
     # Update Account Balance FIRST so we can record it
     account = None
+    credit_card = None
+    new_balance = 0.0
+    
     if transaction.account_id:
         account = db.query(models.Account).filter(models.Account.id == transaction.account_id).first()
     
-    new_balance = 0.0
+    if transaction.credit_card_id:
+        credit_card = db.query(models.CreditCard).filter(models.CreditCard.id == transaction.credit_card_id).first()
     
+    # Handle Account Balance Update
     if account and transaction.status == "completed":
-        # Logic based on Transaction Type (Agent Driven)
         try:
-             # Try/Catch for Enum vs String comparison safety
              is_credit = transaction.type == "credit" or transaction.type == models.TransactionType.CREDIT
         except:
              is_credit = str(transaction.type).lower() == "credit"
@@ -121,10 +181,8 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate):
         if is_credit:
              account.current_balance += transaction.amount
         else:
-             # DEBIT
              account.current_balance -= transaction.amount
         
-        # Deduct Fees if present (Fees are always a debit)
         if transaction.fees:
             account.current_balance -= transaction.fees
         
@@ -154,16 +212,37 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate):
                 wallet.balance -= (transaction.original_amount or 0.0)
             wallet.last_updated = datetime.utcnow()
             db.add(wallet)
+    
+    # Handle Credit Card Balance Update
+    elif credit_card and transaction.status == "completed":
+        try:
+             is_credit = transaction.type == "credit" or transaction.type == models.TransactionType.CREDIT
+        except:
+             is_credit = str(transaction.type).lower() == "credit"
+        
+        # For credit cards: Credit = payment (reduces balance), Debit = purchase (increases balance)
+        if is_credit:
+            credit_card.current_balance -= transaction.amount  # Payment reduces debt
+        else:
+            credit_card.current_balance += transaction.amount  # Purchase increases debt
+        
+        if transaction.fees:
+            credit_card.current_balance += transaction.fees
+        
+        new_balance = credit_card.current_balance
+        db.add(credit_card)
 
     db_transaction = models.Transaction(
         account_id=transaction.account_id,
+        credit_card_id=transaction.credit_card_id,  # NEW: Support credit card
         amount=transaction.amount,
         merchant=transaction.merchant,
         raw_sms_content=transaction.raw_sms_content,
+        parsed_data=transaction.parsed_data,
         timestamp=transaction.timestamp,
         category=transaction.category,
         type=transaction.type,
-        balance_after_transaction=new_balance if account and transaction.status == "completed" else None,
+        balance_after_transaction=new_balance if (account or credit_card) and transaction.status == "completed" else None,
         status=transaction.status,
         fees=transaction.fees,
         original_amount=transaction.original_amount,
@@ -817,6 +896,32 @@ def create_category(db: Session, category: schemas.CategoryCreate):
     db.refresh(db_cat)
     return db_cat
 
+def get_or_create_category(db: Session, category_name: str, category_type: str = "TRANSACTION"):
+    """
+    Get an existing category by name or create it if it doesn't exist.
+    Used by SMS parsing to auto-record new categories.
+    """
+    if not category_name or category_name.strip() == "" or category_name.lower() == "uncategorized":
+        return None
+    
+    # Check if category exists (case-insensitive)
+    existing = db.query(models.Category).filter(
+        func.lower(models.Category.name) == category_name.lower()
+    ).first()
+    
+    if existing:
+        return existing
+    
+    # Create new category
+    db_cat = models.Category(
+        name=category_name,
+        type=category_type
+    )
+    db.add(db_cat)
+    db.commit()
+    db.refresh(db_cat)
+    return db_cat
+
 def delete_category(db: Session, category_id: str):
     db_cat = db.query(models.Category).filter(models.Category.id == category_id).first()
     if db_cat:
@@ -824,26 +929,89 @@ def delete_category(db: Session, category_id: str):
         db.commit()
     return db_cat
 
+def create_training_example(db: Session, raw_text: str, parsed_json: dict):
+    """
+    Save a successful SMS parse as a training example for future AI learning.
+    Avoids duplicates by checking if similar raw_text already exists.
+    """
+    import json
+    # Check for near-duplicate (exact match or very similar)
+    existing = db.query(models.TrainingExample).filter(
+        models.TrainingExample.raw_text == raw_text
+    ).first()
+    if existing:
+        return existing  # Don't save duplicate
+    
+    db_example = models.TrainingExample(
+        raw_text=raw_text,
+        parsed_json=json.dumps(parsed_json)
+    )
+    db.add(db_example)
+    db.commit()
+    db.refresh(db_example)
+    return db_example
+
 def get_similar_training_examples(db: Session, text: str, limit: int = 3):
     """
-    Naive similarity search. In production, use embeddings (pgvector).
-    Here we just find examples that share significant words.
+    Smart similarity search that prioritizes:
+    1. Same sender/bank (highest priority)
+    2. Same merchant/brand names
+    3. Similar transaction structure
     """
-    # 1. Tokenize Input
-    tokens = set(re.findall(r'\w+', text.lower()))
+    # 1. Extract high-value tokens (sender, bank, merchant patterns)
+    text_lower = text.lower()
     
-    # 2. Score all examples
+    # Common bank names to look for
+    bank_keywords = ['alrajhi', 'rajhi', 'snb', 'ncb', 'alinma', 'albilad', 'riyad', 'sab', 'saib']
+    sender_match = None
+    for bank in bank_keywords:
+        if bank in text_lower:
+            sender_match = bank
+            break
+    
+    # Extract potential merchant (look for patterns like "At:", "Merchant:", etc.)
+    merchant_patterns = [
+        r'at[:\s]+([^\n,]+)',  # At: MERCHANT
+        r'merchant[:\s]+([^\n,]+)',  # Merchant: NAME
+        r'pos[:\s]+([^\n,]+)',  # POS: STORE
+        r'to[:\s]+([^\n,]+)',  # To: BENEFICIARY
+    ]
+    merchant_keywords = []
+    for pattern in merchant_patterns:
+        match = re.search(pattern, text_lower)
+        if match:
+            merchant_keywords.extend(match.group(1).split()[:3])  # First 3 words
+    
+    # 2. Tokenize Input (standard tokens)
+    tokens = set(re.findall(r'\w+', text_lower))
+    
+    # 3. Score all examples with weighted matching
     all_examples = db.query(models.TrainingExample).all()
     scored_examples = []
     
     for ex in all_examples:
-        ex_tokens = set(re.findall(r'\w+', ex.raw_text.lower()))
+        ex_text_lower = ex.raw_text.lower()
+        ex_tokens = set(re.findall(r'\w+', ex_text_lower))
+        
+        score = 0
+        
+        # High priority: Same bank/sender (worth 10 points)
+        if sender_match and sender_match in ex_text_lower:
+            score += 10
+        
+        # Medium priority: Same merchant keywords (worth 5 points each)
+        for kw in merchant_keywords:
+            if kw in ex_text_lower and len(kw) > 3:  # Skip short words
+                score += 5
+        
+        # Standard: Common tokens (1 point each)
         common = tokens.intersection(ex_tokens)
-        score = len(common)
+        score += len(common)
+        
         if score > 0:
             scored_examples.append((score, ex))
     
-    # 3. Sort and Return
+    # 4. Sort by score and return top matches
     scored_examples.sort(key=lambda x: x[0], reverse=True)
     return [x[1] for x in scored_examples[:limit]]
 
@@ -851,3 +1019,139 @@ def get_random_training_examples(db: Session, limit: int = 3):
     return db.query(models.TrainingExample).order_by(func.random()).limit(limit).all()
 
 
+def calculate_allocation_preview(db: Session, source_account_id: str, month_offset: int = 0):
+    """
+    Calculate allocation preview for salary distribution.
+    
+    1. Get all allocation rules (category→account mapping)
+    2. Get all obligations and their expected amounts for the target month
+    3. Aggregate obligation amounts by category
+    4. Match categories to target accounts via rules
+    5. Return preview of transfers
+    """
+    from dateutil.relativedelta import relativedelta
+    
+    # Calculate target month
+    target_date = datetime.now() + relativedelta(months=month_offset)
+    target_month_str = target_date.strftime('%Y-%m')
+    prev_month = target_date - relativedelta(months=1)
+    prev_month_str = prev_month.strftime('%Y-%m')
+    
+    # Get source account balance
+    source_account = get_account(db, source_account_id)
+    source_balance = source_account.current_balance if source_account else 0.0
+    
+    # Get all allocation rules
+    rules = db.query(models.AllocationRule).all()
+    rules_by_identifier = {}
+    for r in rules:
+        key = (r.rule_type, r.identifier)
+        rules_by_identifier[key] = r
+    
+    # Get all accounts for name lookup
+    accounts = db.query(models.Account).all()
+    accounts_by_id = {a.id: a for a in accounts}
+    
+    # Get all obligations
+    obligations = db.query(models.MonthlyObligation).all()
+    
+    # Get all payments for target month to check what's already paid
+    target_payments = db.query(models.Payment).filter(
+        models.Payment.billing_month.like(f"{target_month_str}%")
+    ).all()
+    paid_obligations = {p.obligation_id for p in target_payments if p.status == models.PaymentStatus.PAID}
+    
+    # Get previous month payments for Smart Default amounts
+    prev_payments = db.query(models.Payment).filter(
+        models.Payment.billing_month.like(f"{prev_month_str}%")
+    ).all()
+    prev_amounts_by_obl = {}
+    for p in prev_payments:
+        prev_amounts_by_obl[p.obligation_id] = p.amount
+    
+    # Aggregate obligations by category
+    category_amounts = {}  # category -> amount
+    loan_amounts = {}  # loan_name -> amount (for loans)
+    
+    skipped_items = []
+    fulfilled_items = []
+    
+    for obl in obligations:
+        # Skip already paid obligations
+        if obl.id in paid_obligations:
+            fulfilled_items.append(f"{obl.name} (already paid this month)")
+            continue
+        
+        # Get expected amount: Previous month's payment or 0
+        expected_amount = prev_amounts_by_obl.get(obl.id, 0)
+        
+        if expected_amount <= 0:
+            skipped_items.append(f"{obl.name} (no payment history)")
+            continue
+        
+        category = obl.category or "Other"
+        
+        # Check if this is a Loan category (special handling)
+        if category.lower() == "loan":
+            # Use obligation name as loan identifier
+            loan_amounts[obl.name] = loan_amounts.get(obl.name, 0) + expected_amount
+        else:
+            # Regular category
+            category_amounts[category] = category_amounts.get(category, 0) + expected_amount
+    
+    # Build allocation items
+    allocations = []
+    total_required = 0.0
+    
+    # Process categories
+    for category, amount in category_amounts.items():
+        rule = rules_by_identifier.get(('CATEGORY', category))
+        if rule:
+            target_acc = accounts_by_id.get(rule.target_account_id)
+            allocations.append(schemas.AllocationItem(
+                identifier=category,
+                name=f"{category} Bills",
+                rule_type='CATEGORY',
+                target_account_id=rule.target_account_id,
+                target_account_name=target_acc.name if target_acc else "Unknown",
+                amount=amount,
+                required_amount=amount
+            ))
+            total_required += amount
+        else:
+            skipped_items.append(f"{category} category (no rule)")
+    
+    # Process loans
+    for loan_name, amount in loan_amounts.items():
+        rule = rules_by_identifier.get(('LOAN', loan_name))
+        if rule:
+            target_acc = accounts_by_id.get(rule.target_account_id)
+            allocations.append(schemas.AllocationItem(
+                identifier=loan_name,
+                name=f"{loan_name} Payment",
+                rule_type='LOAN',
+                target_account_id=rule.target_account_id,
+                target_account_name=target_acc.name if target_acc else "Unknown",
+                amount=amount,
+                required_amount=amount
+            ))
+            total_required += amount
+        else:
+            skipped_items.append(f"{loan_name} loan (no rule)")
+    
+    # Limit amounts to source balance (pro-rata if needed)
+    total_amount = min(total_required, source_balance)
+    
+    if total_required > source_balance and total_required > 0:
+        # Pro-rata reduction
+        ratio = source_balance / total_required
+        for alloc in allocations:
+            alloc.amount = round(alloc.amount * ratio, 2)
+    
+    return schemas.AllocationPreviewResponse(
+        total_required=total_required,
+        total_amount=total_amount,
+        allocations=allocations,
+        fulfilled_items=fulfilled_items,
+        skipped_items=skipped_items
+    )

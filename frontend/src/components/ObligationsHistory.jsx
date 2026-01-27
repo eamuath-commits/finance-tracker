@@ -1,11 +1,20 @@
 import React, { useState, useMemo } from 'react';
-import { formatCurrency, selectClass } from '../components/UI';
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download } from 'lucide-react';
+import { formatCurrency, selectClass, Modal } from '../components/UI';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle } from 'lucide-react';
 import { exportToCSV } from '../utils/csvExport';
+import axios from 'axios';
 
-const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
+const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
+
+const ObligationsPayments = ({ obligations, history, onEdit, onDelete, onRefresh }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: 'billing_month', direction: 'desc' });
+
+    // Link Modal State
+    const [showLinkModal, setShowLinkModal] = useState(false);
+    const [linkingPayment, setLinkingPayment] = useState(null);
+    const [suggestedTransactions, setSuggestedTransactions] = useState([]);
+    const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
     const formatMonthDisplay = (dateStr) => {
         if (!dateStr) return '-';
@@ -17,12 +26,12 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
         return `${monthNames[monthNum - 1]}-${year}`;
     };
 
-    // Filters - Default to Current Year and Month to show "Unpaid" immediately
+    // Filters - Default to Current Year and Month
     const currentDate = new Date();
     const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear().toString());
     const [selectedMonth, setSelectedMonth] = useState((currentDate.getMonth() + 1).toString().padStart(2, '0'));
     const [selectedCategory, setSelectedCategory] = useState('All');
-    const [selectedStatus, setSelectedStatus] = useState('All'); // Default to All, can switch to 'Unpaid'
+    const [selectedStatus, setSelectedStatus] = useState('All');
 
     // 1. Flatten Data & Prepare Options
     const { allHistory, years, categories } = useMemo(() => {
@@ -33,7 +42,7 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
 
         obligations.forEach(o => oblMap[o.id] = o);
 
-        // A. Process Actual History (Paid Items)
+        // Process Actual Payment Records
         Object.entries(history).forEach(([oblId, records]) => {
             const obl = oblMap[oblId] || { name: 'Unknown', category: 'Unknown' };
             records.forEach(r => {
@@ -43,6 +52,9 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                 uniqueYears.add(year);
                 if (obl.category) uniqueCategories.add(obl.category);
 
+                // Only include PAID payments, not BUDGET
+                if (r.status === 'BUDGET') return; // Skip budget entries
+
                 flattened.push({
                     ...r,
                     oblName: obl.name,
@@ -50,12 +62,11 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                     billing_month_sort: bMonth,
                     year: year,
                     month: bMonth.split('-')[1],
-                    status: (r.status === 'BUDGET') ? 'BUDGET' : 'Paid'
+                    status: 'Paid'
                 });
             });
         });
 
-        // Add Current Year to uniqueYears if not present
         uniqueYears.add(currentDate.getFullYear().toString());
 
         return {
@@ -67,7 +78,6 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
 
     // 2. Filter
     const filtered = allHistory.filter(item => {
-        // Text Search
         const term = searchTerm.toLowerCase();
         const matchesSearch = (
             item.oblName.toLowerCase().includes(term) ||
@@ -75,7 +85,6 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
             (item.oblCategory && item.oblCategory.toLowerCase().includes(term))
         );
 
-        // Dropdown Filters
         const matchesYear = selectedYear === 'All' || item.year === selectedYear;
         const matchesMonth = selectedMonth === 'All' || item.month === selectedMonth;
         const matchesCategory = selectedCategory === 'All' || item.oblCategory === selectedCategory;
@@ -126,11 +135,14 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
     let totalLabel = "Total Amount";
     let totalDisplay = visiblePaid + visibleBudget;
     let totalSubtext = (
-        <span className="flex items-center gap-1">
-            <span className="text-emerald-400">{formatCurrency(visiblePaid)}</span> <span className="text-slate-500">Paid</span>
-            <span className="mx-1">·</span>
-            <span className="text-blue-400">{formatCurrency(visibleBudget)}</span> <span className="text-slate-500">Budget</span>
-        </span>
+        <div className="flex flex-col gap-0.5 mt-1">
+            <span className="text-white font-semibold">{sorted.length} Records</span>
+            <span className="flex items-center gap-1 text-[10px] opacity-80">
+                <span className="text-emerald-400">{formatCurrency(visiblePaid)} Paid</span>
+                <span>·</span>
+                <span className="text-blue-400">{formatCurrency(visibleBudget)} Budget</span>
+            </span>
+        </div>
     );
 
     if (selectedStatus === 'Paid') {
@@ -141,18 +153,6 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
         totalLabel = "Total Budgeted";
         totalDisplay = visibleBudget;
         totalSubtext = <span className="text-blue-400 font-semibold">{sorted.length} Records</span>;
-    } else {
-        // Fallback for All Status
-        totalSubtext = (
-            <div className="flex flex-col gap-0.5 mt-1">
-                <span className="text-white font-semibold">{sorted.length} Records</span>
-                <span className="flex items-center gap-1 text-[10px] opacity-80">
-                    <span className="text-emerald-400">{formatCurrency(visiblePaid)} Paid</span>
-                    <span>·</span>
-                    <span className="text-blue-400">{formatCurrency(visibleBudget)} Budget</span>
-                </span>
-            </div>
-        );
     }
 
     const handleExport = () => {
@@ -167,11 +167,54 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
             "Budget Amount": item.status === 'BUDGET' ? (item.amount || 0) : 0,
             "Status": item.status,
             "Paid Date": item.payment_date,
-            "Note": item.note
+            "Note": item.note,
+            "Transaction ID": item.transaction_id || ''
         }));
 
-        const filename = `history_export_${selectedYear}_${selectedStatus}.csv`;
+        const filename = `payments_export_${selectedYear}_${selectedStatus}.csv`;
         exportToCSV(exportData, filename);
+    };
+
+    // --- Link Transaction Functions ---
+    const openLinkModal = async (payment) => {
+        setLinkingPayment(payment);
+        setShowLinkModal(true);
+        setLoadingSuggestions(true);
+        setSuggestedTransactions([]);
+
+        try {
+            const res = await axios.get(`${API_URL}/payments/${payment.id}/suggested-transactions`);
+            setSuggestedTransactions(res.data);
+        } catch (err) {
+            console.error("Error fetching suggestions:", err);
+        } finally {
+            setLoadingSuggestions(false);
+        }
+    };
+
+    const handleLinkTransaction = async (transactionId) => {
+        if (!linkingPayment) return;
+
+        try {
+            await axios.post(`${API_URL}/payments/${linkingPayment.id}/link-transaction?transaction_id=${transactionId}`);
+            setShowLinkModal(false);
+            setLinkingPayment(null);
+            if (onRefresh) onRefresh();
+        } catch (err) {
+            console.error("Error linking transaction:", err);
+            alert("Failed to link transaction");
+        }
+    };
+
+    const handleUnlinkTransaction = async (paymentId) => {
+        if (!confirm("Remove the link to this transaction?")) return;
+
+        try {
+            await axios.delete(`${API_URL}/payments/${paymentId}/unlink-transaction`);
+            if (onRefresh) onRefresh();
+        } catch (err) {
+            console.error("Error unlinking:", err);
+        }
     };
 
     return (
@@ -189,7 +232,7 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                 <div className="md:col-span-3 bg-slate-800/50 border border-slate-700/50 p-4 rounded-xl flex flex-col justify-between">
                     <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2 text-slate-400 text-xs uppercase font-bold">
-                            <Filter size={14} /> Filter History
+                            <Filter size={14} /> Filter Payments
                         </div>
                         <div className="flex gap-2">
                             <button
@@ -270,51 +313,72 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                     <table className="w-full text-left text-sm">
                         <thead className="bg-slate-900/80 text-slate-400 text-xs uppercase font-bold backdrop-blur-sm">
                             <tr>
-                                <th className="px-6 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('billing_month_sort')}>
+                                <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('billing_month_sort')}>
                                     <div className="flex items-center gap-1">Month {getSortIcon('billing_month_sort')}</div>
                                 </th>
-                                <th className="px-6 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('oblName')}>
+                                <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('oblName')}>
                                     <div className="flex items-center gap-1">Name {getSortIcon('oblName')}</div>
                                 </th>
-                                <th className="px-6 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('status')}>
+                                <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('status')}>
                                     <div className="flex items-center gap-1">Status {getSortIcon('status')}</div>
                                 </th>
-                                <th className="px-6 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('payment_date')}>
-                                    <div className="flex items-center gap-1">Paid On {getSortIcon('payment_date')}</div>
-                                </th>
-                                <th className="px-6 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('amount')}>
+                                <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('amount')}>
                                     <div className="flex items-center gap-1">Amount {getSortIcon('amount')}</div>
                                 </th>
-                                <th className="px-6 py-4 border-b border-slate-700">Note</th>
-                                <th className="px-6 py-4 border-b border-slate-700 text-right">Actions</th>
+                                <th className="px-4 py-4 border-b border-slate-700">Linked Transaction</th>
+                                <th className="px-4 py-4 border-b border-slate-700 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-700/50">
                             {sorted.length > 0 ? sorted.map((item, idx) => (
                                 <tr key={`${item.id}-${idx}`} className="hover:bg-slate-700/30 transition text-slate-300">
-                                    <td className="px-6 py-3 text-blue-300 font-mono text-xs">
+                                    <td className="px-4 py-3 text-blue-300 font-mono text-xs">
                                         {formatMonthDisplay(item.billing_month)}
                                     </td>
-                                    <td className="px-6 py-3 font-semibold text-white">{item.oblName}</td>
+                                    <td className="px-4 py-3">
+                                        <div className="font-semibold text-white">{item.oblName}</div>
+                                        {item.note && <div className="text-[10px] text-slate-500 italic truncate max-w-[150px]">{item.note}</div>}
+                                    </td>
 
-                                    <td className="px-6 py-3">
+                                    <td className="px-4 py-3">
                                         {item.status === 'Paid' ? (
                                             <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded border border-emerald-500/30 font-bold uppercase tracking-wider">Paid</span>
                                         ) : (
-                                            <span className="bg-amber-500/20 text-amber-400 text-[10px] px-2 py-1 rounded border border-amber-500/30 font-bold uppercase tracking-wider">Pending</span>
+                                            <span className="bg-blue-500/20 text-blue-400 text-[10px] px-2 py-1 rounded border border-blue-500/30 font-bold uppercase tracking-wider">Budget</span>
                                         )}
                                     </td>
 
-                                    <td className="px-6 py-3 text-xs text-slate-500">
-                                        {item.payment_date ? new Date(item.payment_date).toLocaleDateString() : '-'}
-                                    </td>
-                                    <td className="px-6 py-3 font-mono text-emerald-400 font-medium">
+                                    <td className="px-4 py-3 font-mono text-emerald-400 font-medium">
                                         {formatCurrency(item.amount)}
                                     </td>
-                                    <td className="px-6 py-3 text-xs italic text-slate-500 max-w-xs truncate">
-                                        {item.note || '-'}
+
+                                    {/* Linked Transaction Column */}
+                                    <td className="px-4 py-3">
+                                        {item.transaction_id ? (
+                                            <div className="flex items-center gap-2">
+                                                <span className="bg-purple-500/20 text-purple-400 text-[10px] px-2 py-1 rounded border border-purple-500/30 font-mono flex items-center gap-1">
+                                                    <Link2 size={10} />
+                                                    {item.transaction_id.substring(0, 8)}...
+                                                </span>
+                                                <button
+                                                    onClick={() => handleUnlinkTransaction(item.id)}
+                                                    className="text-slate-500 hover:text-red-400 transition"
+                                                    title="Unlink transaction"
+                                                >
+                                                    <Unlink size={14} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => openLinkModal(item)}
+                                                className="bg-slate-700/50 hover:bg-purple-600/50 text-slate-400 hover:text-purple-300 text-[10px] px-2 py-1 rounded border border-slate-600 hover:border-purple-500 font-bold uppercase tracking-wider transition flex items-center gap-1"
+                                            >
+                                                <LinkIcon size={10} /> Link
+                                            </button>
+                                        )}
                                     </td>
-                                    <td className="px-6 py-3 text-right flex justify-end gap-2">
+
+                                    <td className="px-4 py-3 text-right flex justify-end gap-2">
                                         <button
                                             onClick={() => onEdit(item)}
                                             className="bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white p-1.5 rounded transition-all duration-200"
@@ -333,10 +397,9 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                                 </tr>
                             )) : (
                                 <tr>
-                                    <td colSpan="7" className="px-6 py-12 text-center text-slate-500 flex flex-col items-center gap-2">
+                                    <td colSpan="6" className="px-6 py-12 text-center text-slate-500 flex flex-col items-center gap-2">
                                         <Filter className="opacity-20" size={48} />
-                                        <span>No history found matching your filters.</span>
-                                        {selectedYear === 'All' && <span className="text-xs text-slate-600 block mt-1">Please select a Year to see Unpaid history.</span>}
+                                        <span>No payments found matching your filters.</span>
                                     </td>
                                 </tr>
                             )}
@@ -344,8 +407,87 @@ const ObligationsHistory = ({ obligations, history, onEdit, onDelete }) => {
                     </table>
                 </div>
             </div>
+
+            {/* Link Transaction Modal */}
+            <Modal isOpen={showLinkModal} title="Link to Transaction" onClose={() => setShowLinkModal(false)}>
+                <div className="space-y-4">
+                    {linkingPayment && (
+                        <div className="bg-slate-700/50 p-3 rounded-lg text-sm">
+                            <div className="text-slate-400 text-xs uppercase font-bold mb-1">Payment</div>
+                            <div className="text-white font-semibold">{linkingPayment.oblName}</div>
+                            <div className="text-emerald-400 font-mono">{formatCurrency(linkingPayment.amount)}</div>
+                            <div className="text-slate-500 text-xs">{formatMonthDisplay(linkingPayment.billing_month)}</div>
+                        </div>
+                    )}
+
+                    <div className="text-slate-400 text-xs uppercase font-bold">Suggested Transactions</div>
+
+                    {loadingSuggestions ? (
+                        <div className="text-center py-8 text-slate-500">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                            Finding matching transactions...
+                        </div>
+                    ) : suggestedTransactions.length > 0 ? (
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {suggestedTransactions.map(tx => (
+                                <div
+                                    key={tx.transaction_id}
+                                    className={`p-3 rounded-lg border cursor-pointer transition ${tx.already_linked
+                                        ? 'bg-emerald-500/10 border-emerald-500/30'
+                                        : 'bg-slate-700/50 border-slate-600 hover:border-purple-500 hover:bg-purple-500/10'
+                                        }`}
+                                    onClick={() => !tx.already_linked && handleLinkTransaction(tx.transaction_id)}
+                                >
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <div className="text-white font-semibold text-sm">{tx.merchant || 'Unknown'}</div>
+                                            <div className="text-slate-400 text-xs">
+                                                {tx.date ? new Date(tx.date).toLocaleDateString() : '-'}
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-emerald-400 font-mono text-sm">{formatCurrency(tx.amount)}</div>
+                                            {tx.already_linked ? (
+                                                <span className="text-emerald-400 text-[10px] flex items-center gap-1 justify-end">
+                                                    <CheckCircle size={10} /> Linked
+                                                </span>
+                                            ) : (
+                                                <div className="text-[10px] text-purple-400">
+                                                    Score: {tx.score}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {tx.reasons && tx.reasons.length > 0 && (
+                                        <div className="flex gap-1 mt-2 flex-wrap">
+                                            {tx.reasons.map(r => (
+                                                <span key={r} className="bg-slate-600/50 text-slate-400 text-[9px] px-1.5 py-0.5 rounded">
+                                                    {r.replace('_', ' ')}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-8 text-slate-500">
+                            <LinkIcon className="mx-auto mb-2 opacity-30" size={32} />
+                            <div>No matching transactions found.</div>
+                            <div className="text-xs mt-1">Try adjusting the payment date or amount.</div>
+                        </div>
+                    )}
+
+                    <button
+                        onClick={() => setShowLinkModal(false)}
+                        className="w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm font-medium transition"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </Modal>
         </div>
     );
 };
 
-export default ObligationsHistory;
+export default ObligationsPayments;

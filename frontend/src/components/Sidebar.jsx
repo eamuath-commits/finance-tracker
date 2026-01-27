@@ -1,15 +1,17 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Wallet, CreditCard, Receipt, FileBarChart, Settings, TrendingDown, Layers } from 'lucide-react';
+import { LayoutDashboard, Wallet, CreditCard, Receipt, FileBarChart, Settings, TrendingDown, Layers, Tags } from 'lucide-react';
 
 const Sidebar = () => {
     const navItems = [
         { path: '/', label: 'Overview', icon: LayoutDashboard },
         { path: '/accounts', label: 'Accounts', icon: Wallet },
+        { path: '/credit-cards', label: 'Credit Cards', icon: CreditCard },
         { path: '/allocation', label: 'Allocation', icon: Layers },
         { path: '/transactions', label: 'Transactions', icon: Receipt },
-        { path: '/obligations', label: 'Obligations', icon: CreditCard },
-        { path: '/loans', label: 'Loans', icon: FileBarChart /* Reusing icon or pick better one */ },
+        { path: '/obligations', label: 'Obligations', icon: FileBarChart },
+        { path: '/categories', label: 'Categories', icon: Tags },
+        { path: '/loans', label: 'Loans', icon: TrendingDown },
         { path: '/reports', label: 'Reports', icon: FileBarChart },
         { path: '/planning', label: 'Planning', icon: TrendingDown },
     ];

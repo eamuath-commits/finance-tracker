@@ -144,7 +144,7 @@ const ObligationCard = ({ obl, getMonthStatus, monthOffset, openHistory, openObl
                         <div className="text-center">
                             <span className="font-mono text-gray-500 block mb-1">{prevMonth.amount !== null ? formatCurrency(prevMonth.amount) : "-"}</span>
                             <button
-                                onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, prevMonth.billingDateStr, prevMonth.amount || obl.amount); }}
+                                onClick={(e) => { e.stopPropagation(); openPaymentModal(obl, prevMonth.billingDateStr, prevMonth.amount || null); }}
                                 className="text-[9px] bg-blue-900/40 text-blue-300 px-1.5 py-0.5 rounded hover:bg-blue-800 transition"
                             >
                                 Pay
@@ -590,7 +590,7 @@ const ObligationsList = ({
             </DndContext>
 
             {verifyMatch && (
-                <Modal title={`Verify Match (${1 + verifyMatch.allMatches.indexOf(verifyMatch.tx)}/${verifyMatch.allMatches.length})`} onClose={() => setVerifyMatch(null)}>
+                <Modal isOpen={true} title={`Verify Match (${1 + verifyMatch.allMatches.indexOf(verifyMatch.tx)}/${verifyMatch.allMatches.length})`} onClose={() => setVerifyMatch(null)}>
                     <div className="space-y-4">
                         <p className="text-gray-300 text-sm">Do you want to link this transaction to the obligation?</p>
 

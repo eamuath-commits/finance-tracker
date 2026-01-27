@@ -34,7 +34,7 @@ const PaymentModal = ({ isOpen, onClose, obligation, initialDate, initialAmount,
                 // Create Mode
                 setForm({
                     id: null,
-                    amount: initialAmount !== null ? initialAmount : (obligation.amount || ''),
+                    amount: initialAmount !== null ? initialAmount : '',
                     note: '',
                     status: 'PAID',
                     billing_month: initialDate || new Date().toISOString().split('T')[0]
@@ -67,7 +67,7 @@ const PaymentModal = ({ isOpen, onClose, obligation, initialDate, initialAmount,
     };
 
     return (
-        <Modal title={form.id ? `Edit Payment: ${obligation.name}` : `Pay: ${obligation.name}`} onClose={onClose}>
+        <Modal isOpen={true} title={form.id ? `Edit Payment: ${obligation.name}` : `Pay: ${obligation.name}`} onClose={onClose}>
             <form onSubmit={handleSubmit} className="space-y-4">
 
                 {/* Summary / Tip */}
@@ -133,7 +133,7 @@ const PaymentModal = ({ isOpen, onClose, obligation, initialDate, initialAmount,
                         onChange={e => setForm({ ...form, status: e.target.value })}
                     >
                         <option value="PAID">PAID</option>
-                        <option value="PENDING">PENDING</option>
+                        <option value="BUDGET">BUDGET</option>
                     </select>
                 </div>
 
