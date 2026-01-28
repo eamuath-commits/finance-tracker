@@ -38,6 +38,56 @@ sms_file_handler = logging.FileHandler(os.path.join(current_dir, "sms_messages.l
 sms_file_handler.setFormatter(logging.Formatter('%(asctime)s | %(message)s'))
 sms_logger.addHandler(sms_file_handler)
 
+def extract_sms_sender(msg_text: str) -> str:
+    """
+    Extract the SMS sender name from the end of the message text.
+    
+    Messages typically end with a timestamp followed by the sender name, e.g.:
+    - "28/1/26 11:03AlRajhiBank"
+    - "2026-01-27 10:48Jazira Bank"
+    - "28/1/26 11:05+966566985112"
+    
+    Returns the extracted sender name or "Unknown" if not found.
+    """
+    import re
+    
+    # Known bank/sender patterns to look for at the end of message
+    known_senders = [
+        'AlRajhiBank', 'Rajhi Bank', 'Al Rajhi Bank',
+        'SNB', 'Saudi National Bank', 'Alahli Bank', 'Al Ahli Bank',
+        'Jazira Bank', 'Bank AlJazira', 'Al Jazira Bank',
+        'STC Bank', 'stc bank', 'STC Pay', 'stc pay',
+        'Riyad Bank', 'SABB', 'Banque Saudi Fransi', 'BSF',
+        'Alinma Bank', 'Al Bilad Bank', 'Bank Albilad',
+        'Gulf Bank', 'ANB', 'Arab National Bank'
+    ]
+    
+    # Check if message ends with a known sender (after timestamp)
+    for sender in known_senders:
+        if msg_text.rstrip().endswith(sender):
+            return sender
+    
+    # Pattern 1: Match timestamp followed by sender at end of message
+    # e.g., "28/1/26 11:03AlRajhiBank" or "27/1/26 22:54AlRajhiBank"
+    pattern1 = r'\d{1,2}/\d{1,2}/\d{2,4}\s+\d{1,2}:\d{2}([A-Za-z][A-Za-z\s]+(?:Bank)?)\s*$'
+    match = re.search(pattern1, msg_text)
+    if match:
+        return match.group(1).strip()
+    
+    # Pattern 2: Match phone number at end (e.g., "+966566985112")
+    pattern2 = r'(\+\d{10,15})\s*$'
+    match = re.search(pattern2, msg_text)
+    if match:
+        return match.group(1).strip()
+    
+    # Pattern 3: Bank name at very end after any text (more flexible)
+    pattern3 = r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s*Bank)\s*$'
+    match = re.search(pattern3, msg_text)
+    if match:
+        return match.group(1).strip()
+    
+    return "Unknown"
+
 # --- Configuration ---
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -335,6 +385,32 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Could not send reply (likely channel restriction): {e}")
 
+    # --- Parse Sender and Body from structured format ---
+    # Expected format: "SENDER\n---\nBODY" or just "BODY" (legacy)
+    sms_sender = None
+    sms_body = msg_text
+    
+    if '\n---\n' in msg_text:
+        # New structured format: sender first, then body
+        parts = msg_text.split('\n---\n', 1)
+        if len(parts) == 2:
+            sms_sender = parts[0].strip()
+            sms_body = parts[1].strip()
+            logger.info(f"Parsed structured message - Sender: {sms_sender}")
+    elif '---' in msg_text:
+        # Also support single line separator
+        parts = msg_text.split('---', 1)
+        if len(parts) == 2 and len(parts[0].strip()) < 50:  # Sender should be short
+            sms_sender = parts[0].strip()
+            sms_body = parts[1].strip()
+            logger.info(f"Parsed structured message (single line) - Sender: {sms_sender}")
+    
+    # Fallback: try to extract sender from end of message text
+    if not sms_sender:
+        sms_sender = extract_sms_sender(msg_text)
+        if sms_sender != "Unknown":
+            logger.info(f"Extracted sender from message text: {sms_sender}")
+
     try:
         db = database.SessionLocal()
         
@@ -352,8 +428,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         #      return
 
         raw_msg = models.RawMessage(
-            sender=f"Telegram-{user_id}",
-            body=msg_text,
+            sender=sms_sender or "Unknown",
+            body=sms_body,
             status=models.MessageStatus.PENDING,
             timestamp=datetime.now()
         )
@@ -367,8 +443,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if 'db' in locals(): db.close()
         return
 
-    # 1. AI Parse
-    result = await parse_with_ai(db, msg_text)
+    # 1. AI Parse (use cleaned body, not full message with sender prefix)
+    result = await parse_with_ai(db, sms_body)
 
     if "error" in result:
          try: await message.reply_text(f"❌ AI Error: {result['error']}")

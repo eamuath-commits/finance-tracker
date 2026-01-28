@@ -293,3 +293,12 @@ Amount:SAR 90
 At:IQFAL ...
 2026-01-28 12:26:12,618 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 9365, Account: Expense
 2026-01-28 12:26:12,624 - sms_agent - INFO - Saved training example for: IQFAL ALA
+2026-01-28 12:28:03,650 - sms_agent - INFO - Received message from Channel_-1003635708322: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 90
+At:IQFAL ...
+2026-01-28 12:28:05,611 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 9365, Account: Expense
+2026-01-28 12:28:05,618 - sms_agent - INFO - Saved training example for: IQFAL ALA
+2026-01-28 12:31:59,179 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 12:35:48,458 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 12:36:12,940 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).

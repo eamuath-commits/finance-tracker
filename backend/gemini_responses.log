@@ -197,3 +197,8 @@ By:9365;mada-Apple Pay
 Amount:SAR 90
 At:IQFAL ALA
 28/1/26 11:05+966566985112 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": null, "destination_bank": null, "source_account_last4": "9365", "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 90, "currency": "SAR", "fees": null, "timestamp": "2026-01-28 11:05", "available_balance": null, "beneficiary": null, "merchant": "IQFAL ALA", "sender_name": null, "description": "Purchase at IQFAL ALA"}
+2026-01-28 12:28:05,607 - ai_raw_io - INFO - INPUT: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 90
+At:IQFAL ALA
+28/1/26 11:05+966566985112 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": null, "destination_bank": null, "source_account_last4": "9365", "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 90, "currency": "SAR", "fees": null, "timestamp": "2026-01-28 11:05", "available_balance": null, "beneficiary": null, "merchant": "IQFAL ALA", "sender_name": null, "description": "Purchase at IQFAL ALA"}
