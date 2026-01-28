@@ -805,7 +805,7 @@ async def receive_sms(request: Request, db: Session = Depends(get_db)):
 
     # 4. Create Transaction Logic (Handles Conversion, Credit/Debit, etc.)
     try:
-        await sms_agent._create_transaction_logic(db, result, account, body, reply_target=None)
+        await sms_agent._create_transaction_logic(db, result, account, None, body, reply_target=None)
         raw_msg.status = models.MessageStatus.PARSED
         raw_msg.error_log = None
         db.commit()
@@ -874,7 +874,7 @@ async def retry_message(message_id: str, db: Session = Depends(get_db)):
 
     # 3. Create Logic
     try:
-        await sms_agent._create_transaction_logic(db, result, account, msg.body, reply_target=None)
+        await sms_agent._create_transaction_logic(db, result, account, None, msg.body, reply_target=None)
         msg.status = models.MessageStatus.PARSED
         msg.error_log = None
         db.commit()

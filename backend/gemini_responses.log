@@ -177,3 +177,8 @@ Remaining Amount: SAR 222872.89
 Amount: SAR 3032.19
 To: 5225
 26/1/25 17:48+966566985112 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": null, "destination_account_last4": "5225", "card_info": null, "amount": 3032.19, "currency": "SAR", "fees": null, "timestamp": "2025-01-26 17:48", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "description": "Transfer to 5225"}
+2026-01-28 12:06:56,205 - ai_raw_io - INFO - INPUT: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 96
+At:IQFAL ALA
+28/1/26 11:03AlRajhiBank || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "9365", "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 96, "currency": "SAR", "fees": null, "timestamp": "2026-01-28 11:03", "available_balance": null, "beneficiary": null, "merchant": "IQFAL ALA", "sender_name": null, "description": "Purchase at IQFAL ALA"}

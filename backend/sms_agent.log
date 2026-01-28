@@ -265,3 +265,7 @@ At:IQFAL ...
 2026-01-28 12:03:38,926 - sms_agent - ERROR - AI Parse Error: 404 models/gemini-2.0-flash-exp is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
 2026-01-28 12:05:31,648 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-01-28 12:05:51,465 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 12:06:45,399 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 12:06:45,422 - sms_agent - INFO - Bot is polling...
+2026-01-28 12:06:45,514 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 12:08:15,753 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
