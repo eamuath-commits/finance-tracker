@@ -795,12 +795,33 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
         
         tx = crud.create_transaction(db, transaction_data)
         
+        # Build inline keyboard with source account options (excluding destination)
         if reply_target:
-            response_txt = f"❓ **Unknown Source Account**\n"
-            response_txt += f"Credit of {sar_amount} SAR logged to {source_account.name} as PENDING.\n\n"
-            response_txt += f"➡️ Open the app and select the **Source Account** to complete this transfer."
-            try: await reply_target.reply_text(response_txt)
-            except: pass
+            accounts = crud.get_accounts(db)
+            keyboard = []
+            
+            for acc in accounts[:10]:
+                # Skip the destination account - we're asking for SOURCE
+                if acc.id == source_account.id:
+                    continue
+                    
+                label = f"💳 {acc.name}"
+                if acc.last_4_digits:
+                    label += f" •{acc.last_4_digits}"
+                keyboard.append([InlineKeyboardButton(label, callback_data=f"assign_source:{tx.id}:{acc.id}")])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+            
+            response_txt = (
+                f"💸 **Transfer to {source_account.name}**\n"
+                f"Amount: {sar_amount} SAR\n\n"
+                f"**Select the SOURCE account:**"
+            )
+            
+            try: 
+                await reply_target.reply_text(response_txt, reply_markup=reply_markup)
+            except: 
+                pass
         
         return tx
     
