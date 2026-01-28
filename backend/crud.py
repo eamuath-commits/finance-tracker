@@ -1140,9 +1140,13 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     
     # Get this month's payment amounts for already-paid obligations
     target_payment_amounts = {}
+    # Also track BUDGET entries for this month
+    target_budget_amounts = {}
     for p in target_payments:
         if p.status == models.PaymentStatus.PAID:
             target_payment_amounts[p.obligation_id] = p.amount
+        elif p.status == models.PaymentStatus.BUDGET:
+            target_budget_amounts[p.obligation_id] = p.amount
     
     # Get previous month payments for Smart Default amounts (for pending obligations)
     prev_payments = db.query(models.Payment).filter(
@@ -1163,9 +1167,14 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     for obl in obligations:
         is_paid = obl.id in paid_obligations
         
-        # Get expected amount from payment history or current month payment
+        # Get expected amount - priority:
+        # 1. If PAID this month, use payment amount
+        # 2. If BUDGET entry exists for this month, use that
+        # 3. Otherwise, use previous month's payment as estimate
         if is_paid:
             expected_amount = target_payment_amounts.get(obl.id, 0)
+        elif obl.id in target_budget_amounts:
+            expected_amount = target_budget_amounts[obl.id]
         else:
             expected_amount = prev_amounts_by_obl.get(obl.id, 0)
         
