@@ -770,6 +770,31 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
     account_id = source_account.id if source_account else None
     credit_card_id = source_credit_card.id if source_credit_card else None
     
+    # --- PENDING TRANSFER DETECTION (Cross-Bank Transfers) ---
+    # If this is a CREDIT transfer, check if it matches a pending debit (completes the transfer)
+    ai_source_last4 = result.get('source_account_last4')
+    ai_dest_last4 = result.get('destination_account_last4')
+    
+    if sub_type in ['transfer', 'internal_transfer'] and tx_type_str == 'credit':
+        # Look for a matching pending_transfer
+        pending_debit = crud.find_pending_transfer(db, ai_source_last4, ai_dest_last4, sar_amount)
+        if pending_debit:
+            # Found a matching pending transfer - confirm it
+            crud.confirm_pending_transfer(db, pending_debit.id)
+            logger.info(f"Confirmed pending transfer: {pending_debit.id} (matched with credit)")
+    
+    # Determine transaction status
+    tx_status = "completed"  # Default
+    
+    # If this is a DEBIT transfer TO your own account at another bank, mark as pending_transfer
+    if sub_type in ['transfer', 'internal_transfer'] and tx_type_str == 'debit':
+        if ai_dest_last4:
+            # Check if destination is ALSO your account (cross-bank internal transfer)
+            dest_is_yours = crud.get_account_by_last_4(db, str(ai_dest_last4))
+            if dest_is_yours:
+                tx_status = "pending_transfer"
+                logger.info(f"Cross-bank transfer detected: {source_account.name if source_account else 'Unknown'} -> {dest_is_yours.name}")
+    
     transaction_data = schemas.TransactionCreate(
         account_id=account_id,
         credit_card_id=credit_card_id,  # NEW: Credit card support
@@ -783,7 +808,7 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
         timestamp=datetime.now(),
         category=category,
         type=tx_type_str,
-        status="completed",
+        status=tx_status,
         fees=result.get('fees', 0.0)
     )
     
@@ -802,14 +827,20 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
         source_name = source_credit_card.name if source_credit_card else (source_account.name if source_account else "Unknown")
         source_type = "Credit Card" if source_credit_card else "Account"
         
-        response_txt = f"✅ **Success!**\n"
-        response_txt += f"{source_type}: {source_name}\n"
-        response_txt += f"Amount: {sar_amount} SAR\n"
-        if original_currency != 'SAR':
-             response_txt += f"(Original: {original_amount} {original_currency})\n"
-        response_txt += f"Merchant: {merchant_raw}\n"
-        if tx.balance_after_transaction is not None:
-            response_txt += f"Balance: {tx.balance_after_transaction:.2f} SAR"
+        if tx_status == "pending_transfer":
+            response_txt = f"⏳ **Pending Transfer**\n"
+            response_txt += f"From: {source_name}\n"
+            response_txt += f"Amount: {sar_amount} SAR\n"
+            response_txt += f"Waiting for credit confirmation from destination bank.\n"
+        else:
+            response_txt = f"✅ **Success!**\n"
+            response_txt += f"{source_type}: {source_name}\n"
+            response_txt += f"Amount: {sar_amount} SAR\n"
+            if original_currency != 'SAR':
+                 response_txt += f"(Original: {original_amount} {original_currency})\n"
+            response_txt += f"Merchant: {merchant_raw}\n"
+            if tx.balance_after_transaction is not None:
+                response_txt += f"Balance: {tx.balance_after_transaction:.2f} SAR"
         
         try: await reply_target.reply_text(response_txt)
         except: pass

@@ -206,7 +206,8 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate):
         credit_card = db.query(models.CreditCard).filter(models.CreditCard.id == transaction.credit_card_id).first()
     
     # Handle Account Balance Update
-    if account and transaction.status == "completed":
+    # Note: pending_transfer also affects balance (debit happened, waiting for credit confirmation)
+    if account and transaction.status in ["completed", "pending_transfer"]:
         try:
              is_credit = transaction.type == "credit" or transaction.type == models.TransactionType.CREDIT
         except:
@@ -276,7 +277,7 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate):
         timestamp=transaction.timestamp,
         category=transaction.category,
         type=transaction.type,
-        balance_after_transaction=new_balance if (account or credit_card) and transaction.status == "completed" else None,
+        balance_after_transaction=new_balance if (account or credit_card) and transaction.status in ["completed", "pending_transfer"] else None,
         status=transaction.status,
         fees=transaction.fees,
         original_amount=transaction.original_amount,
@@ -291,6 +292,48 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate):
 
 def get_transaction(db: Session, transaction_id: str):
     return db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
+
+def find_pending_transfer(db: Session, source_last4: str, dest_last4: str, amount: float):
+    """
+    Find a pending transfer that matches the source account, destination account, and amount.
+    Used to link cross-bank transfers (Debit from Bank A → Credit to Bank B).
+    """
+    if not source_last4 or not dest_last4:
+        return None
+    
+    # Find pending_transfer transactions with matching criteria
+    # We need to search in parsed_data JSON for account info
+    pending_txs = db.query(models.Transaction).filter(
+        models.Transaction.status == "pending_transfer",
+        models.Transaction.amount == amount,
+        models.Transaction.type == "debit"
+    ).all()
+    
+    import json
+    for tx in pending_txs:
+        if tx.parsed_data:
+            try:
+                parsed = json.loads(tx.parsed_data)
+                tx_source = parsed.get('source_account_last4')
+                tx_dest = parsed.get('destination_account_last4')
+                
+                # Match: Debit's source = Credit's source, Debit's dest = Credit's dest
+                if str(tx_source) == str(source_last4) and str(tx_dest) == str(dest_last4):
+                    return tx
+            except:
+                continue
+    
+    return None
+
+def confirm_pending_transfer(db: Session, transaction_id: str):
+    """Mark a pending transfer as confirmed after the credit SMS arrives"""
+    tx = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
+    if tx and tx.status == "pending_transfer":
+        tx.status = "confirmed"
+        db.commit()
+        db.refresh(tx)
+    return tx
+
 
 def confirm_transaction(db: Session, transaction_id: str):
     tx = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()

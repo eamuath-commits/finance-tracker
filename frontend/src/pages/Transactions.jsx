@@ -513,6 +513,12 @@ function Transactions() {
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                                                 {isTransfer && <span className="text-xs text-blue-400 mr-2 uppercase font-bold tracking-wider">{txIsCredit ? 'FROM:' : 'TO:'}</span>}
                                                 {tx.merchant || 'Unknown'}
+                                                {tx.status === 'pending_transfer' && (
+                                                    <span className="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-900/40 text-amber-400 border border-amber-700">⏳ Pending</span>
+                                                )}
+                                                {tx.status === 'confirmed' && (
+                                                    <span className="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-emerald-900/40 text-emerald-400 border border-emerald-700">✓ Confirmed</span>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
                                                 {tx.category ? <span className={`px-2 py-0.5 rounded text-xs border ${txIsCredit ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800' : 'bg-slate-700 text-blue-300 border-slate-600'}`}>{tx.category}</span> : '-'}

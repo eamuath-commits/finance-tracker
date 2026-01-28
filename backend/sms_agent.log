@@ -753,3 +753,11 @@ Amo...
 2026-01-28 18:51:59,218 - sms_agent - INFO - Saved training example for: PADDLE.NE
 2026-01-28 19:08:30,991 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-01-28 19:08:52,117 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 21:39:30,782 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 21:39:30,802 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-28 21:39:30,885 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:02:02,489 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:02:24,097 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:02:42,068 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:03:20,682 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:03:45,399 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
