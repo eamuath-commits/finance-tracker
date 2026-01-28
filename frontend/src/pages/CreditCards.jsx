@@ -59,22 +59,23 @@ const CreditCardVisual = ({ card, onEdit, onPayment }) => {
             {/* Content */}
             <div className="relative z-10 flex flex-col h-full justify-between">
 
-                {/* Header - Card name only (no bank logo) */}
-                <div className="flex justify-between items-start">
+                {/* Top section - empty for spacing */}
+                <div></div>
+
+                {/* Middle section - Card name (center-left aligned) */}
+                <div className="flex items-center">
                     {hasCustomBackground ? (
                         // Custom background - just show card name
-                        <div className="flex flex-col">
-                            <span className="font-bold tracking-wide text-lg drop-shadow-md">{card.name}</span>
-                        </div>
+                        <span className="font-bold tracking-wide text-xl drop-shadow-md">{card.name}</span>
                     ) : (
-                        // Fallback - show icon and names (no bank logo)
+                        // Fallback - show icon and names
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-white/10 rounded-xl backdrop-blur-md shadow-inner border border-white/5">
                                 <CreditCardIcon className="w-5 h-5 text-violet-200" />
                             </div>
                             <div className="flex flex-col">
                                 {card.bank_name && <span className="text-[10px] uppercase tracking-wider opacity-75 leading-tight">{card.bank_name}</span>}
-                                <span className="font-bold tracking-wide text-base">{card.name}</span>
+                                <span className="font-bold tracking-wide text-lg">{card.name}</span>
                             </div>
                         </div>
                     )}

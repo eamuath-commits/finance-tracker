@@ -94,27 +94,26 @@ const AccountCard = ({ acc, onEdit = null }) => {
             {/* Content */}
             <div className="relative z-10 flex flex-col h-full justify-between">
 
-                {/* Header - Account name only (no bank logo) */}
-                <div className="flex justify-between items-start">
+                {/* Top section - empty for spacing */}
+                <div></div>
+
+                {/* Middle section - Account name (center-left aligned) */}
+                <div className="flex items-center">
                     {hasCustomBackground ? (
-                        // Custom background - just show account name at top-left
-                        <div className="flex flex-col">
-                            <span className="font-bold tracking-wide text-lg drop-shadow-md">{acc.name}</span>
-                        </div>
+                        // Custom background - just show account name
+                        <span className="font-bold tracking-wide text-xl drop-shadow-md">{acc.name}</span>
                     ) : (
-                        // Fallback - show icon and names (no bank logo)
+                        // Fallback - show icon and names
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-white/10 rounded-xl backdrop-blur-md shadow-inner border border-white/5">
                                 {theme.icon}
                             </div>
                             <div className="flex flex-col">
                                 {acc.bank_name && <span className="text-[10px] uppercase tracking-wider opacity-75 leading-tight">{acc.bank_name}</span>}
-                                <span className="font-bold tracking-wide text-base">{acc.name}</span>
+                                <span className="font-bold tracking-wide text-lg">{acc.name}</span>
                             </div>
                         </div>
                     )}
-
-                    {/* Empty space for balance on top-right reserved below */}
                 </div>
 
                 {/* Edit Button */}

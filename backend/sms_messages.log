@@ -26,3 +26,4 @@
 2026-01-27 22:54:15,363 | FROM: Channel_-1003635708322 | SMS: Refund | Card: 7868; 001 | Amount: 15.35 SAR | From: GOOGLE*GO |  27/1/26 22:54AlRajhiBank
 2026-01-27 23:49:00,843 | FROM: Channel_-1003635708322 | SMS: Debit: Loan Instalment | Instalment: SAR 3032.19 | From: 5225 | Remaining Amount: SAR 222872.89 | 25/1/26 20:27+966566985112
 2026-01-27 23:53:48,528 | FROM: Channel_-1003635708322 | SMS: Transfer Between Your Accounts | Amount: SAR 3032.19 | To: 5225 | 26/1/25 17:48+966566985112
+2026-01-28 11:03:23,969 | FROM: Channel_-1003635708322 | SMS: PoS | By:9365;mada-Apple Pay | Amount:SAR 96 | At:IQFAL ALA | 28/1/26 11:03AlRajhiBank
