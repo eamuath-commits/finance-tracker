@@ -350,8 +350,17 @@ const ObligationsTable = ({ obligations, getMonthStatus, monthOffset, openPaymen
         const prevStatus = getMonthStatus(obl, monthOffset - 1);
         const currStatus = getMonthStatus(obl, monthOffset);
 
-        // Budget = previous month's payment (smart default)
-        if (prevStatus.amount) totalBudget += prevStatus.amount;
+        // Budget calculation: 
+        // 1. If current month has a BUDGET entry, use that amount
+        // 2. If current month is PAID, use that amount as budget
+        // 3. Otherwise, fall back to previous month's amount as estimate
+        if (currStatus.status === 'BUDGET' && currStatus.amount) {
+            totalBudget += currStatus.amount;
+        } else if (currStatus.isPaid && currStatus.amount) {
+            totalBudget += currStatus.amount;
+        } else if (prevStatus.amount) {
+            totalBudget += prevStatus.amount;
+        }
 
         // Paid = current month if paid
         if (currStatus.isPaid && currStatus.amount) {

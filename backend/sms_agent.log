@@ -944,3 +944,6 @@ Am...
 2026-01-28 23:04:32,539 - sms_agent - INFO - DEBUG: Created transaction cd91079c-0dc8-4758-9b34-a68e0085ee3b with status pending_action
 2026-01-28 23:04:32,539 - sms_agent - INFO - DEBUG: Sending inline buttons to user - 9 accounts
 2026-01-28 23:04:32,792 - sms_agent - INFO - DEBUG: Inline buttons sent successfully
+2026-01-29 00:08:50,361 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 00:08:50,385 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-29 00:08:50,478 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
