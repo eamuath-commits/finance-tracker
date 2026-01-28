@@ -479,3 +479,20 @@ By:9365;mada-Apple Pay
 Amount:SAR 900
 At:Test
 28/1/26 11:05 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 900, "currency": "SAR", "fees": null, "timestamp": "2026-01-28 11:05", "available_balance": null, "beneficiary": null, "merchant": "Test", "sender_name": null, "description": "Purchase at Test"}
+2026-01-28 17:45:47,844 - ai_raw_io - INFO - INPUT: AlRajhiBank —— PoS
+By:9365;mada-Apple Pay
+Amount:SAR 119.27
+At:BERAIN CO
+28/1/26 17:46 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "9365", "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 119.27, "currency": "SAR", "fees": null, "timestamp": "2026-01-28 17:46", "available_balance": null, "beneficiary": null, "merchant": "BERAIN CO", "sender_name": null, "description": "Purchase at BERAIN CO"}
+2026-01-28 18:51:27,738 - ai_raw_io - INFO - INPUT: AlRajhiBank —— Credit Card:Payment
+Card:Visa 7868
+Amount:USD 50
+Balance:51 USD
+28/1/26 18:51 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "payment", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": null, "destination_account_last4": "7868", "card_info": "Visa 7868", "amount": 50, "currency": "USD", "fees": null, "timestamp": "2026-01-28 18:51", "available_balance": 51, "beneficiary": null, "merchant": null, "sender_name": null, "description": "Credit Card Payment"}
+2026-01-28 18:51:59,205 - ai_raw_io - INFO - INPUT: AlRajhiBank —— Online Purchase
+Card:7868 ;Visa
+Amount:49.99 USD
+At: PADDLE.NE
+Country:UK
+Balance:1.01 USD
+28/1/26 18:52 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "7868", "destination_account_last4": null, "card_info": "Visa 7868", "amount": 49.99, "currency": "USD", "fees": null, "timestamp": "2026-01-28 18:52", "available_balance": 1.01, "beneficiary": null, "merchant": "PADDLE.NE", "sender_name": null, "description": "Purchase at PADDLE.NE"}

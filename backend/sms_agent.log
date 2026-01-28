@@ -734,3 +734,22 @@ By:9365;mada-Apple Pay
 Amount...
 2026-01-28 16:01:09,354 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 9365, Account: Expense
 2026-01-28 16:01:09,358 - sms_agent - INFO - Saved training example for: Test
+2026-01-28 17:45:44,998 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— PoS
+By:9365;mada-Apple Pay
+Amount:S...
+2026-01-28 17:45:47,848 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 9365, Account: Expense
+2026-01-28 17:45:47,854 - sms_agent - INFO - Saved training example for: BERAIN CO
+2026-01-28 18:51:25,196 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— Credit Card:Payment
+Card:Visa 7868
+...
+2026-01-28 18:51:27,742 - sms_agent - INFO - DEBUG: Source Logic -> Matched CREDIT CARD: 7868, Card: Travel Plus
+2026-01-28 18:51:27,745 - sms_agent - INFO - Converted 50 USD to 189.5 SAR using rate 3.79
+2026-01-28 18:51:27,758 - sms_agent - INFO - Saved training example for: Credit Card Payment
+2026-01-28 18:51:56,902 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— Online Purchase
+Card:7868 ;Visa
+Amo...
+2026-01-28 18:51:59,209 - sms_agent - INFO - DEBUG: Source Logic -> Matched CREDIT CARD: 7868, Card: Travel Plus
+2026-01-28 18:51:59,209 - sms_agent - INFO - Converted 49.99 USD to 189.46 SAR using rate 3.79
+2026-01-28 18:51:59,218 - sms_agent - INFO - Saved training example for: PADDLE.NE
+2026-01-28 19:08:30,991 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 19:08:52,117 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).

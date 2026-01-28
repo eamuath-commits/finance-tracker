@@ -150,3 +150,6 @@
 2026-01-28 14:54:25,539 | FROM: 5519767199 | SMS: @userinfobot
 2026-01-28 15:58:35,406 | FROM: Channel_-1003635708322 | SMS: +966566985112 —— PoS | By:9365;mada-Apple Pay | Amount:SAR 900 | At:Test | 28/1/26 11:05
 2026-01-28 16:01:07,103 | FROM: Channel_-1003635708322 | SMS: +966566985112 —— PoS | By:9365;mada-Apple Pay | Amount:SAR 900 | At:Test | 28/1/26 11:05
+2026-01-28 17:45:44,999 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— PoS | By:9365;mada-Apple Pay | Amount:SAR 119.27 | At:BERAIN CO | 28/1/26 17:46
+2026-01-28 18:51:25,197 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— Credit Card:Payment | Card:Visa 7868 | Amount:USD 50 | Balance:51 USD | 28/1/26 18:51
+2026-01-28 18:51:56,903 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— Online Purchase | Card:7868 ;Visa | Amount:49.99 USD | At: PADDLE.NE | Country:UK | Balance:1.01 USD | 28/1/26 18:52

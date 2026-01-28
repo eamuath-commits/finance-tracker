@@ -143,163 +143,156 @@ async def parse_with_ai(db: Session, text: str):
     accounts_json_str = json.dumps(accounts_context, indent=2)
 
     prompt = f"""
-    You are a highly intelligent financial AI assistant. Your task is to extract structured banking transaction data from SMS messages.
+    You are a highly intelligent financial AI assistant for Saudi Arabian banking SMS. Extract structured transaction data.
     
-    **CRITICAL CONTEXT: USER'S EXISTING ACCOUNTS**
-    You must use this list to determine if a mentioned account is INTERNAL (User's own) or EXTERNAL.
+    **USER'S ACCOUNTS (Internal Detection)**:
     {accounts_json_str}
 
     **Input SMS**: "{text}"
-    **Current Context**: Date={today_date}, Year={current_year}, Location=Saudi Arabia.
-    **Input Format**: Message might start with "Sender: [BankName]". Use this to strictly identify the SOURCE BANK.
+    **Context**: Date={today_date}, Year={current_year}, Location=Saudi Arabia.
 
-    **EXTRACTION RULES (Strict Logic)**:
-    1.  **Identify Transaction Type**:
-        -   **Transfer**: Movement of funds between accounts. Includes "Credit Transfer" (Incoming) and "Outgoing Transfer" (Outgoing).
-        -   **Purchase**: POS, Online Purchase (Card Usage).
-        -   **Bill Payment**: SADAD, Utility bills.
-        -   **Withdrawal**: Cash from ATM.
-        -   **Deposit**: Cash/Check deposit.
-        -   **Decline**: Failed transaction.
+    **BANK-SPECIFIC PATTERNS**:
     
-    2.  **Strict Field Extraction**:
-        -   **Source Bank**: The bank sending the money. Usually identified by "Sender: [Name]" or matching known account bank names.
-        -   **Destination Bank**: The bank receiving the money.
-        -   **Source Account**: The account money is LEAVING. 
-            -   Matches `last_4_digits` in User Accounts List? -> **Type: INTERNAL**.
-            -   Extracted digits (e.g. 8001)? 
-            -   **Tip**: If SMS says "By: 9365" or "Card: 9365", then 9365 IS the Source Account. 
-        -   **Destination Account**: The account money is ENTERING.
-            -   Matches `last_4_digits` in User Accounts List? -> **Type: INTERNAL**.
-            -   Extracted Digits/IBAN (e.g. 7772)?
-        -   **Beneficiary**: The NAME of the person/entity receiving money (External).
-        -   **Merchant**: The store/service name (for Purchases).
-        -   **Sender Name**: The NAME of the person sending money (for Incoming Transfers).
+    **AlRajhiBank**:
+    - "PoS" / "Online Purchase" = Purchase (DEBIT)
+    - "By:XXXX;mada-Apple Pay" = Card XXXX used
+    - "Transfer Between Your Accounts" + "To:XXXX" = Internal transfer TO account XXXX (CREDIT to XXXX)
+    - "Debit Internal Transfer" / "Debit Transfer Local" = Outgoing transfer (DEBIT)
+    - "Credit Transfer Local/Internal" = Incoming transfer (CREDIT)
+    - "Credit Card:Payment" = Paying credit card bill (CREDIT to card - reduces debt)
+    - "Credit Card:transfer" = Refund from credit card to account (CREDIT to account)
+    - "Bill Payment" = SADAD payment (DEBIT)
+    - "Notification : Declined" = Failed transaction (sub_type: decline, is_transaction: false)
+    - "Debit: Loan Instalment" = Loan payment (DEBIT, sub_type: loan)
+    - "Refund" = Money returned (CREDIT)
+    
+    **STC Bank**:
+    - "Internal outward transfer" = Outgoing to STC user (DEBIT)
+    - "Internal incoming transfer" = Incoming from STC user (CREDIT)
+    - "Adding money to account" = Top-up (CREDIT, sub_type: deposit)
+    - "Debit Transfer Sponsored" = Musaned worker payment (DEBIT)
+    - "Inward transfer (SARIE)" = Local bank transfer incoming (CREDIT)
+    
+    **Jazira Bank (BJAZ)**:
+    - "POS Purchase (Apple Pay)" = Card purchase (DEBIT)
+    - "Internet Purchase" / "Online Purchase Apple Pay" = Online purchase (DEBIT)
+    - "Outgoing Funds Transfer Approved" = Transfer out (DEBIT)
+    - "Credit transfer: Local" / "Credit transfer Internal" = Incoming (CREDIT)
+    - "Debit transfer: Loan Instalment" = Loan payment (DEBIT, sub_type: loan)
+    - "Credit Card Payment Confirmation" = Paying card bill (CREDIT to card)
+    - "Internet Purchase Reversal" = Refund (CREDIT)
 
-    3.  **Logical Rules**:
-        -   **To/From Logic (CRITICAL)**:
-            -   "To: 1234" -> 1234 is **Destination Account**.
-            -   "From: 1234" -> 1234 is **Source Account**.
-            -   **Ambiguous Internal Transfer**: If text says "Transfer Between Your Accounts" and ONLY "To: 1234" is found (where 1234 is a User Account):
-                -   Treat as **CREDIT** (Incoming to 1234).
-                -   Source is Unknown.
-        -   **Internal Detection**: If an extracted account number (Source/Dest) matches the "User's Existing Accounts" list, mark it as INTERNAL.
-        -   **Direction**: 
-            -   "Outgoing" / "Debit" / "Purchase" -> Money LEAVES Source Account. (Transaction Type: DEBIT).
-            -   "Credit" / "Deposit" / "Credit Card Payment" -> Money ENTERS Destination Account. (Transaction Type: CREDIT).
-            -   **NOTE**: A "Credit Card Payment" or "Payment to Card" is money being PAID into the card, thus it is a **CREDIT**. It is a repayment of debt, NOT a purchase.
-        -   **Merchant/Counterparty Logic for UI**:
-            -   If Purchase: Merchant = Store Name.
-            -   If Transfer TO Output (Debit): Merchant = Beneficiary Name OR Destination Account Digits.
-            -   If Transfer FROM Input (Credit): Merchant = Sender Name OR Source Account Digits.
-            -   **Internal Transfer**: If BOTH Source and Dest are INTERNAL (found in DB list), set `sub_type`="internal_transfer".
+    **EXTRACTION RULES**:
+    1. "By:XXXX" or "Card:XXXX" = Source Account (card being used)
+    2. "From:XXXX" = Source Account
+    3. "To:XXXX" = Destination Account
+    4. Match account numbers to User's Accounts list for INTERNAL detection
+    5. Credit Card Payment/Repayment = CREDIT (reduces debt, money going INTO card)
+    6. Purchase/PoS = DEBIT (money leaving)
+    7. Declined = NOT a transaction (is_transaction: false)
+    8. Loan Instalment = DEBIT with sub_type "loan"
 
-    **OUTPUT JSON SCHEMA (Strict)**:
+    **CATEGORY INFERENCE**:
+    - Starbucks, GOT COOKI, restaurants = "Food & Dining"
+    - PETROMIN, ALDREES, Fuel = "Transport"
+    - STC BILL, NWC, ELECTRICITY = "Bills"
+    - AMAZON, GOOGLE = "Shopping"
+    - HUNGERSTATION, Food delivery = "Food & Dining"
+    - COURSERA, ADOBE = "Subscriptions"
+    - PHARMACY = "Health"
+    - BARBER = "Personal Care"
+    - Transfer to person = "Transfer"
+
+    **OUTPUT JSON**:
     {{
       "is_financial_event": boolean,
       "is_transaction": boolean,
       "transaction_type": "debit" | "credit",
-      "sub_type": "purchase" | "transfer" | "payment" | "withdrawal" | "deposit" | "internal_transfer" | "decline",
+      "sub_type": "purchase" | "transfer" | "payment" | "withdrawal" | "deposit" | "internal_transfer" | "decline" | "loan" | "refund",
       "source_bank": stringOrNull,
       "destination_bank": stringOrNull,
       "source_account_last4": stringOrNull,
       "destination_account_last4": stringOrNull,
-      "card_info": stringOrNull, (e.g. "mada x8438"),
+      "card_info": stringOrNull,
       "amount": number,
-      "currency": string, (e.g. "USD", "SAR", "EUR"),
-      "fees": number,
+      "currency": string,
+      "fees": numberOrNull,
       "timestamp": "YYYY-MM-DD HH:MM",
       "available_balance": numberOrNull,
-      "beneficiary": stringOrNull, (Person receiving money),
-      "merchant": stringOrNull, (Store or Entity),
-      "sender_name": stringOrNull, (Person sending money),
-      "description": stringOrNull, (A logical summary e.g. "Transfer to Muath")
+      "beneficiary": stringOrNull,
+      "merchant": stringOrNull,
+      "sender_name": stringOrNull,
+      "category": stringOrNull,
+      "description": stringOrNull
     }}
     
     Respond ONLY with valid JSON.
     
-    **Examples**:
-    1. Input:
-       AlrajhiBank
-       Transfer Between Your Accounts
-       Amount: SAR 22
-       To: 1505
-       26/1/24 2:19
-       
-       Output:
-       {{
-         "is_financial_event": true,
-         "is_transaction": true,
-         "transaction_type": "credit",
-         "sub_type": "internal_transfer",
-         "source_bank": "AlRajhiBank",
-         "source_account_last4": null,
-         "destination_account_last4": "1505",
-         "amount": 22,
-         "currency": "SAR",
-         "description": "Transfer to 1505"
-       }}
-
-    2. Input:
-       Credit Card:Payment
-       Card:Visa 1234
-       Amount:USD 800
-       Balance:800 USD
-       26/1/26 10:10
-
-       Output:
-       {{
-         "is_financial_event": true,
-         "is_transaction": true,
-         "transaction_type": "credit",
-         "sub_type": "payment",
-         "source_bank": null,
-         "destination_account_last4": "1234",
-         "amount": 800,
-         "currency": "USD",
-         "description": "Credit Card Payment"
-       }}
-
-    3. Input:
-       Credit Card:Payment
-       Card:Visa 1234
-       Amount:EUR 800
-       Balance:800 EUR
-       26/1/26 10:10
-
-       Output:
-       {{
-         "is_financial_event": true,
-         "is_transaction": true,
-         "transaction_type": "credit",
-         "sub_type": "payment",
-         "source_bank": null,
-         "destination_account_last4": "1234",
-         "amount": 800,
-         "currency": "EUR",
-         "description": "Credit Card Payment"
-       }}
-
-    4. Input:
-       PoS
-       By:4390;mada-Atheer
-       Amount:SAR 131
-       At:SASCO Qen 
-       26/1/26 10:52+966566985112
-
-       Output:
-       {{
-         "is_financial_event": true,
-         "is_transaction": true,
-         "transaction_type": "debit",
-         "sub_type": "purchase",
-         "source_account_last4": "4390",
-         "card_info": "mada-Atheer 4390",
-         "amount": 131,
-         "currency": "SAR",
-         "merchant": "SASCO Qen",
-         "description": "Purchase at SASCO Qen"
-       }}
+    **EXAMPLES**:
+    
+    1. AlRajhi PoS Purchase:
+       Input: "PoS\\nBy:9365;mada-Apple Pay\\nAmount:SAR 7\\nAt:GOT COOKI\\n27/1/26 12:39"
+       Output: {{"is_financial_event":true,"is_transaction":true,"transaction_type":"debit","sub_type":"purchase","source_bank":"AlRajhiBank","source_account_last4":"9365","card_info":"mada-Apple Pay 9365","amount":7,"currency":"SAR","merchant":"GOT COOKI","category":"Food & Dining","timestamp":"2026-01-27 12:39","description":"Purchase at GOT COOKI"}}
+    
+    2. AlRajhi Internal Transfer (Credit to destination):
+       Input: "Transfer Between Your Accounts\\nAmount: SAR 1000\\nTo: 1505\\n26/1/25 17:49"
+       Output: {{"is_financial_event":true,"is_transaction":true,"transaction_type":"credit","sub_type":"internal_transfer","source_bank":"AlRajhiBank","destination_account_last4":"1505","amount":1000,"currency":"SAR","timestamp":"2026-01-25 17:49","description":"Transfer to 1505"}}
+    
+    3. AlRajhi Debit Internal Transfer:
+       Input: "Debit Internal Transfer\\nFrom:1505\\nAmount:SAR 440\\nTo:MOHAMMED ISLAM\\nTo:0477\\n26/1/26 15:03"
+       Output: {{"is_financial_event":true,"is_transaction":true,"transaction_type":"debit","sub_type":"transfer","source_bank":"AlRajhiBank","source_account_last4":"1505","destination_account_last4":"0477","amount":440,"currency":"SAR","beneficiary":"MOHAMMED ISLAM","category":"Transfer","timestamp":"2026-01-26 15:03","description":"Transfer to MOHAMMED ISLAM"}}
+    
+    4. AlRajhi Credit Card Payment (Paying bill = CREDIT):
+       Input: "Credit Card:Payment\\nCard:Visa 7868\\nAmount:SAR 100\\nBalance:640.99 SAR\\nDate:27-01-2026 22:47"
+       Output: {{"is_financial_event":true,"is_transaction":true,"transaction_type":"credit","sub_type":"payment","source_bank":"AlRajhiBank","destination_account_last4":"7868","card_info":"Visa 7868","amount":100,"currency":"SAR","available_balance":640.99,"timestamp":"2026-01-27 22:47","description":"Credit Card Payment"}}
+    
+    5. AlRajhi Online Purchase (Credit Card):
+       Input: "Online Purchase\\nCard:7868 ;Visa\\nAmount:539.99 SAR\\nAt: GOOGLE*GO\\nCountry:USA\\nBalance:88.58 SAR\\n27/1/26 22:47"
+       Output: {{"is_financial_event":true,"is_transaction":true,"transaction_type":"debit","sub_type":"purchase","source_bank":"AlRajhiBank","source_account_last4":"7868","card_info":"Visa 7868","amount":539.99,"currency":"SAR","merchant":"GOOGLE*GO","category":"Subscriptions","available_balance":88.58,"timestamp":"2026-01-27 22:47","description":"Purchase at GOOGLE"}}
+    
+    6. AlRajhi Bill Payment:
+       Input: "Bill Payment\\nFrom:1505\\nAmount:SAR 973.76\\nBiller:001\\nService:STC BILL\\nBill:00100215438\\n26-1-6 15:40"
+       Output: {{"is_financial_event":true,"is_transaction":true,"transaction_type":"debit","sub_type":"payment","source_bank":"AlRajhiBank","source_account_last4":"1505","amount":973.76,"currency":"SAR","merchant":"STC BILL","category":"Bills","timestamp":"2026-01-06 15:40","description":"Bill Payment - STC"}}
+    
+    7. AlRajhi Declined (not a transaction):
+       Input: "Notification : Declined due to insufficient fund\\nTransaction : Online Purchase\\nCard: 7868\\nAmount : USD 79\\nMerchant : COURSERA.\\nDate : 18/1/26 21:04"
+       Output: {{"is_financial_event":true,"is_transaction":false,"transaction_type":"debit","sub_type":"decline","source_bank":"AlRajhiBank","source_account_last4":"7868","card_info":"7868","amount":79,"currency":"USD","merchant":"COURSERA","timestamp":"2026-01-18 21:04","description":"Declined - Insufficient funds"}}
+    
+    8. AlRajhi Credit Transfer Incoming:
+       Input: "Credit Transfer Local\\nVia:BJAZ\\nAmount:SAR 7000\\nTo:7772\\nFrom:MUATH AMER MOHAMMED ALASIRI\\nFrom:8001\\n26-1-7 13:23"
+       Output: {{"is_financial_event":true,"is_transaction":true,"transaction_type":"credit","sub_type":"transfer","source_bank":"BJAZ","destination_bank":"AlRajhiBank","source_account_last4":"8001","destination_account_last4":"7772","amount":7000,"currency":"SAR","sender_name":"MUATH AMER MOHAMMED ALASIRI","category":"Transfer","timestamp":"2026-01-07 13:23","description":"Incoming transfer from BJAZ"}}
+    
+    9. AlRajhi Loan Instalment:
+       Input: "Debit: Loan Instalment\\nInstalment: SAR 3032.19\\nFrom: 5225\\nRemaining Amount: SAR 222872.89\\n25/1/26 20:27"
+       Output: {{"is_financial_event":true,"is_transaction":true,"transaction_type":"debit","sub_type":"loan","source_bank":"AlRajhiBank","source_account_last4":"5225","amount":3032.19,"currency":"SAR","category":"Loan","timestamp":"2026-01-25 20:27","description":"Loan Instalment Payment"}}
+    
+    10. AlRajhi Refund:
+        Input: "Refund\\nCard: 7868; 001\\nAmount: 15.35 SAR\\nFrom: GOOGLE*GO\\n 27/1/26 22:54"
+        Output: {{"is_financial_event":true,"is_transaction":true,"transaction_type":"credit","sub_type":"refund","destination_bank":"AlRajhiBank","destination_account_last4":"7868","amount":15.35,"currency":"SAR","sender_name":"GOOGLE*GO","category":"Refund","timestamp":"2026-01-27 22:54","description":"Refund from GOOGLE"}}
+    
+    11. AlRajhi Salary (Credit Transfer from Company):
+        Input: "Credit Transfer Local\\nVia:SAUDI AWWAL BANK\\nAmount:SAR 110095.73\\nTo:3264\\nFrom:DELL TECHNOLOGIES SINGLE LLC\\nFrom:\\n26/1/25 09:50"
+        Output: {{"is_financial_event":true,"is_transaction":true,"transaction_type":"credit","sub_type":"transfer","source_bank":"SAUDI AWWAL BANK","destination_bank":"AlRajhiBank","destination_account_last4":"3264","amount":110095.73,"currency":"SAR","sender_name":"DELL TECHNOLOGIES SINGLE LLC","category":"Salary","timestamp":"2026-01-25 09:50","description":"Salary from DELL TECHNOLOGIES"}}
+    
+    12. STC Bank Internal Outward:
+        Input: "Internal outward transfer\\nAmount:400.00SAR\\nTo:MOHAMED ABDELSATTAR\\nAcc:3607*\\nAt:27/01/26 11:12"
+        Output: {{"is_financial_event":true,"is_transaction":true,"transaction_type":"debit","sub_type":"transfer","source_bank":"STC Bank","destination_account_last4":"3607","amount":400,"currency":"SAR","beneficiary":"MOHAMED ABDELSATTAR","category":"Transfer","timestamp":"2026-01-27 11:12","description":"Transfer to MOHAMED ABDELSATTAR"}}
+    
+    13. STC Bank Incoming:
+        Input: "Inward transfer (SARIE)\\n4800.00 SAR\\nFrom MUATH ALASIRI\\nFrom AL RAJHI BANK\\nAccount *863\\n25-01-2026 17:05\\nRef. No. *XZN9"
+        Output: {{"is_financial_event":true,"is_transaction":true,"transaction_type":"credit","sub_type":"transfer","source_bank":"AL RAJHI BANK","destination_bank":"STC Bank","destination_account_last4":"0863","amount":4800,"currency":"SAR","sender_name":"MUATH ALASIRI","category":"Transfer","timestamp":"2026-01-25 17:05","description":"Incoming from AL RAJHI"}}
+    
+    14. Jazira POS Purchase:
+        Input: "POS Purchase (Apple Pay)\\nCredit Card: 4897\\nat :Starbucks\\nof: 86.00 SAR\\non : 2026-01-22 22:46\\nAvailable Balance: 21753.24 SAR\\nDue Amount: 51896.96 SAR"
+        Output: {{"is_financial_event":true,"is_transaction":true,"transaction_type":"debit","sub_type":"purchase","source_bank":"Jazira Bank","source_account_last4":"4897","card_info":"Credit Card 4897","amount":86,"currency":"SAR","merchant":"Starbucks","category":"Food & Dining","available_balance":21753.24,"timestamp":"2026-01-22 22:46","description":"Purchase at Starbucks"}}
+    
+    15. Jazira Loan Instalment:
+        Input: "Debit transfer: Loan Instalment\\nFrom: 8001\\nInstalment: SAR 19,099.85\\nRemaining Amount: SAR 744,894.15\\nFor: Personal Loan\\nDate: 2026-01-26 17:23"
+        Output: {{"is_financial_event":true,"is_transaction":true,"transaction_type":"debit","sub_type":"loan","source_bank":"Jazira Bank","source_account_last4":"8001","amount":19099.85,"currency":"SAR","category":"Loan","timestamp":"2026-01-26 17:23","description":"Personal Loan Instalment"}}
+    
+    16. Jazira Outgoing Transfer:
+        Input: "Outgoing Funds Transfer Approved\\nDebited from Account: 8001\\nTo: MUATH ALAS**\\nAmount: SAR 2,000.00\\nIBAN/Alias: 7772\\n[AlRajhi Bank]\\nat 2026-01-17 14:19"
+        Output: {{"is_financial_event":true,"is_transaction":true,"transaction_type":"debit","sub_type":"transfer","source_bank":"Jazira Bank","source_account_last4":"8001","destination_bank":"AlRajhi Bank","destination_account_last4":"7772","amount":2000,"currency":"SAR","beneficiary":"MUATH ALASIRI","category":"Transfer","timestamp":"2026-01-17 14:19","description":"Transfer to AlRajhi"}}
     """
 
     MAX_RETRIES = 5
@@ -665,11 +658,22 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
     tx_type_str = result.get('transaction_type', 'debit').lower()
     sub_type = result.get('sub_type', 'purchase').lower()
     
-    category = result.get('category') or "Uncategorized"
-    if sub_type in ['transfer', 'internal_transfer']:
-        category = "Transfer"
-    elif sub_type == 'payment':
-        category = "Bills"
+    # Use AI-suggested category, with fallback defaults
+    category = result.get('category')
+    if not category or category.lower() == "uncategorized":
+        # Assign default categories based on sub_type if AI didn't suggest one
+        if sub_type in ['transfer', 'internal_transfer']:
+            category = "Transfer"
+        elif sub_type == 'payment':
+            category = "Bills"
+        elif sub_type == 'loan':
+            category = "Loan"
+        elif sub_type == 'refund':
+            category = "Refund"
+        elif sub_type == 'deposit':
+            category = "Deposit"
+        else:
+            category = "Uncategorized"
     
     # --- 2b. Auto-record category to Categories table ---
     if category and category.lower() != "uncategorized":
