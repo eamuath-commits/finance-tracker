@@ -823,8 +823,9 @@ def run_bot():
     # Handlers
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
     
-    logger.info("Bot is polling...")
-    application.run_polling()
+    logger.info("Bot is polling (dropping pending updates to skip old messages)...")
+    # drop_pending_updates=True ensures we only process NEW messages, not old queued ones
+    application.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
     run_bot()
