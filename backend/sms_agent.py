@@ -561,14 +561,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             is_credit = result.get('transaction_type') == 'credit'
             
+            # Check if destination is known (from the SMS)
+            dest_last4 = result.get('destination_account_last4')
+            dest_account = crud.get_account_by_last_4(db, str(dest_last4)) if dest_last4 else None
+            
+            # For transfers with known destination, this is a DEBIT from source (unknown) to destination (known)
+            # The transaction should be stored with the DESTINATION account for now, marked as pending
+            target_account_id = dest_account.id if dest_account else None
+            
             tx_data = schemas.TransactionCreate(
-                account_id=None, # UNKNOWN - will be assigned via button/UI
+                account_id=target_account_id,  # Store with destination (will be adjusted after source selection)
                 amount=result['amount'],
-                merchant=result.get('merchant') or "Unknown Source",
+                merchant=f"Transfer to {dest_account.name}" if dest_account else (result.get('merchant') or "Unknown Source"),
                 raw_sms_content=msg_text,
                 parsed_data=json.dumps(result),
-                category=result.get('category') or "Uncategorized", 
-                type="credit" if is_credit else "debit",
+                category="Transfer" if dest_account else (result.get('category') or "Uncategorized"), 
+                type="credit" if dest_account else ("credit" if is_credit else "debit"),  # Credit to destination
                 status="pending_action",
                 timestamp=datetime.strptime(result['timestamp'], "%Y-%m-%d %H:%M") if result.get('timestamp') else datetime.now()
             )
@@ -580,7 +588,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # Create the pending transaction
             pending_tx = crud.create_transaction(db, tx_data)
-            logger.info(f"Created pending_action transaction: {pending_tx.id}")
+            logger.info(f"Created pending_action transaction: {pending_tx.id} (dest: {dest_account.name if dest_account else 'unknown'})")
             
             # Build inline keyboard with account options
             accounts = crud.get_accounts(db)
@@ -588,33 +596,46 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             keyboard = []
             
-            # Add accounts
-            for acc in accounts[:10]:  # Limit to 10 to avoid too many buttons
+            # Add accounts (excluding destination if known)
+            for acc in accounts[:10]:
+                # Skip the destination account - we're asking for SOURCE
+                if dest_account and acc.id == dest_account.id:
+                    continue
+                    
                 label = f"💳 {acc.name}"
                 if acc.last_4_digits:
                     label += f" •{acc.last_4_digits}"
-                keyboard.append([InlineKeyboardButton(label, callback_data=f"assign_acc:{pending_tx.id}:{acc.id}")])
+                keyboard.append([InlineKeyboardButton(label, callback_data=f"assign_source:{pending_tx.id}:{acc.id}")])
             
-            # Add credit cards
-            for cc in credit_cards[:5]:
-                label = f"💎 {cc.name}"
-                if cc.last_4_digits:
-                    label += f" •{cc.last_4_digits}"
-                keyboard.append([InlineKeyboardButton(label, callback_data=f"assign_cc:{pending_tx.id}:{cc.id}")])
+            # Add credit cards (for non-transfer scenarios)
+            if not dest_account:
+                for cc in credit_cards[:5]:
+                    label = f"💎 {cc.name}"
+                    if cc.last_4_digits:
+                        label += f" •{cc.last_4_digits}"
+                    keyboard.append([InlineKeyboardButton(label, callback_data=f"assign_cc:{pending_tx.id}:{cc.id}")])
             
             reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
             
-            response_txt = (
-                f"❓ **Unknown Account/Card**\n"
-                f"Amount: {result.get('amount')} {result.get('currency', 'SAR')}\n"
-                f"Type: {result.get('transaction_type')}\n\n"
-                f"**Select the account:**"
-            )
+            # Build response message
+            if dest_account:
+                response_txt = (
+                    f"💸 **Transfer to {dest_account.name}**\n"
+                    f"Amount: {result.get('amount')} {result.get('currency', 'SAR')}\n\n"
+                    f"**Select the SOURCE account:**"
+                )
+            else:
+                response_txt = (
+                    f"❓ **Unknown Account/Card**\n"
+                    f"Amount: {result.get('amount')} {result.get('currency', 'SAR')}\n"
+                    f"Type: {result.get('transaction_type')}\n\n"
+                    f"**Select the account:**"
+                )
             
             await message.reply_text(response_txt, reply_markup=reply_markup)
             
             raw_msg.status = models.MessageStatus.PENDING
-            raw_msg.error_log = "Waiting for account selection"
+            raw_msg.error_log = "Waiting for source account selection" if dest_account else "Waiting for account selection"
             db.commit()
             db.close()
             return
@@ -871,8 +892,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     data = query.data
     
-    if data.startswith("assign_acc:") or data.startswith("assign_cc:"):
-        # Parse callback data: "assign_acc:{tx_id}:{account_id}" or "assign_cc:{tx_id}:{cc_id}"
+    if data.startswith("assign_source:") or data.startswith("assign_acc:") or data.startswith("assign_cc:"):
+        # Parse callback data: "assign_source:{tx_id}:{source_account_id}"
         parts = data.split(":")
         if len(parts) != 3:
             await query.edit_message_text("❌ Invalid selection")
@@ -893,8 +914,57 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 db.close()
                 return
             
-            if action == "assign_acc":
-                # Assign to account
+            if action == "assign_source":
+                # SOURCE ACCOUNT SELECTION (for transfers with known destination)
+                # The pending_tx is stored as CREDIT to destination
+                # Now we know the source, create DEBIT from source and complete credit
+                
+                source_account = db.query(models.Account).filter(models.Account.id == target_id).first()
+                if not source_account:
+                    await query.edit_message_text("❌ Account not found")
+                    db.close()
+                    return
+                
+                dest_account = db.query(models.Account).filter(models.Account.id == tx.account_id).first()
+                
+                # 1. Create DEBIT transaction from source
+                debit_tx = models.Transaction(
+                    account_id=source_account.id,
+                    amount=tx.amount,
+                    merchant=f"Transfer to {dest_account.name}" if dest_account else "Outgoing Transfer",
+                    raw_sms_content=tx.raw_sms_content,
+                    parsed_data=tx.parsed_data,
+                    timestamp=tx.timestamp,
+                    category="Transfer",
+                    type="debit",
+                    status="completed"
+                )
+                
+                # Update source balance (subtract)
+                source_account.current_balance -= tx.amount
+                debit_tx.balance_after_transaction = source_account.current_balance
+                db.add(debit_tx)
+                
+                # 2. Update credit transaction: mark as completed, update merchant
+                tx.status = "completed"
+                tx.merchant = f"Transfer from {source_account.name}"
+                
+                # Update destination balance (add)
+                if dest_account:
+                    dest_account.current_balance += tx.amount
+                    tx.balance_after_transaction = dest_account.current_balance
+                
+                db.commit()
+                
+                await query.edit_message_text(
+                    f"✅ **Transfer Complete!**\n\n"
+                    f"From: {source_account.name} (-{tx.amount} SAR)\n"
+                    f"To: {dest_account.name if dest_account else 'Unknown'} (+{tx.amount} SAR)"
+                )
+                logger.info(f"Completed transfer: {source_account.name} -> {dest_account.name if dest_account else 'Unknown'}")
+                
+            elif action == "assign_acc":
+                # Simple account assignment (for non-transfer transactions)
                 account = db.query(models.Account).filter(models.Account.id == target_id).first()
                 if not account:
                     await query.edit_message_text("❌ Account not found")

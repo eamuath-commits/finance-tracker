@@ -783,3 +783,26 @@ Am...
 2026-01-28 22:13:37,960 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-01-28 22:14:14,741 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-01-28 22:14:47,603 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:24:03,351 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— Credit Card:Payment
+Card:Visa 7868
+...
+2026-01-28 22:24:03,797 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-01-28 22:24:05,658 - sms_agent - INFO - DEBUG: Source Logic -> Matched CREDIT CARD: 7868, Card: Travel Plus
+2026-01-28 22:24:05,673 - sms_agent - INFO - Saved training example for: Credit Card Payment
+2026-01-28 22:24:15,117 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— Online Purchase
+By:7868 ;Visa
+Amoun...
+2026-01-28 22:24:15,580 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-01-28 22:24:17,276 - sms_agent - INFO - DEBUG: Source Logic -> Matched CREDIT CARD: 7868, Card: Travel Plus
+2026-01-28 22:24:17,284 - sms_agent - INFO - Saved training example for: Amazon SA
+2026-01-28 22:25:00,146 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:25:00,166 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-28 22:25:00,242 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:25:36,075 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112 —— Transfer Between Your Accounts
+Am...
+2026-01-28 22:25:36,430 - sms_agent - INFO - Parsed structured message - Sender: +966566985112 (separator: '——')
+2026-01-28 22:25:38,698 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 1505, Account: Expense
+2026-01-28 22:25:38,698 - sms_agent - INFO - Incoming Credit detected to own account Expense. ensure primary.
+2026-01-28 22:25:38,698 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: Expense
+2026-01-28 22:30:14,829 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:31:09,463 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
