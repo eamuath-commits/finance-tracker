@@ -504,8 +504,8 @@ function Transactions() {
                                                             const accountId = e.target.value;
                                                             if (!accountId) return;
                                                             try {
-                                                                await fetch(`${API_BASE}/transactions/${tx.id}/complete-transfer?source_account_id=${accountId}`, { method: 'POST' });
-                                                                fetchTransactions();
+                                                                await fetch(`${API_URL}/transactions/${tx.id}/complete-transfer?source_account_id=${accountId}`, { method: 'POST' });
+                                                                fetchData();
                                                             } catch (err) {
                                                                 console.error('Failed to assign account:', err);
                                                             }

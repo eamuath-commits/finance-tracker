@@ -806,3 +806,18 @@ Am...
 2026-01-28 22:25:38,698 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: Expense
 2026-01-28 22:30:14,829 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-01-28 22:31:09,463 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:34:08,605 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:34:08,628 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-28 22:34:08,707 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:34:28,976 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112 —— Transfer Between Your Accounts
+Am...
+2026-01-28 22:34:29,347 - sms_agent - INFO - Parsed structured message - Sender: +966566985112 (separator: '——')
+2026-01-28 22:34:31,202 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 1505, Account: Expense
+2026-01-28 22:34:31,203 - sms_agent - INFO - Incoming Credit detected to own account Expense. ensure primary.
+2026-01-28 22:34:31,203 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: Expense
+2026-01-28 22:35:02,594 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112 —— Transfer Between Your Accounts
+Am...
+2026-01-28 22:35:02,956 - sms_agent - INFO - Parsed structured message - Sender: +966566985112 (separator: '——')
+2026-01-28 22:35:04,564 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 7772, Account: General
+2026-01-28 22:35:04,566 - sms_agent - INFO - Incoming Credit detected to own account General. ensure primary.
+2026-01-28 22:35:04,566 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: General
