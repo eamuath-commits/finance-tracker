@@ -23,6 +23,10 @@ file_handler = logging.FileHandler(os.path.join(current_dir, "sms_agent.log"))
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
+# Also log to stdout for Docker visibility
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+logger.addHandler(stream_handler)
 
 # Special Logger for raw Gemini I/O
 ai_logger = logging.getLogger("ai_raw_io")

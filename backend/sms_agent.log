@@ -840,3 +840,24 @@ Am...
 2026-01-28 22:43:52,734 - sms_agent - INFO - Incoming Credit detected to own account General. ensure primary.
 2026-01-28 22:43:52,734 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: General
 2026-01-28 22:45:36,984 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:46:23,647 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112 —— Transfer Between Your Accounts
+Am...
+2026-01-28 22:46:24,012 - sms_agent - INFO - Parsed structured message - Sender: +966566985112 (separator: '——')
+2026-01-28 22:46:25,800 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 7772, Account: General
+2026-01-28 22:46:25,801 - sms_agent - INFO - Incoming Credit detected to own account General. ensure primary.
+2026-01-28 22:46:25,801 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: General
+2026-01-28 22:46:59,662 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:46:59,683 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-28 22:46:59,755 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:47:20,617 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112 —— Transfer Between Your Accounts
+Am...
+2026-01-28 22:47:20,943 - sms_agent - INFO - Parsed structured message - Sender: +966566985112 (separator: '——')
+2026-01-28 22:47:23,175 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 7772, Account: General
+2026-01-28 22:47:23,176 - sms_agent - INFO - Incoming Credit detected to own account General. ensure primary.
+2026-01-28 22:47:23,176 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: General
+2026-01-28 22:49:46,522 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:50:04,997 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:50:05,016 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-28 22:51:06,311 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:51:16,251 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:51:16,274 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...

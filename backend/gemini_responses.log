@@ -546,3 +546,11 @@ Ref: 2BTMS11336096857 || OUTPUT: {"is_financial_event": true, "is_transaction": 
 Amount: SAR 200
 To: 7772
 26-1-14 22:42 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_bank": "AlRajhiBank", "destination_account_last4": "7772", "amount": 200, "currency": "SAR", "fees": null, "timestamp": "2026-01-14 22:42", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Transfer to 7772"}
+2026-01-28 22:46:25,797 - ai_raw_io - INFO - INPUT: Transfer Between Your Accounts
+Amount: SAR 200
+To: 7772
+26-1-14 22:42 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_bank": "AlRajhiBank", "source_account_last4": null, "destination_account_last4": "7772", "card_info": null, "amount": 200, "currency": "SAR", "fees": null, "timestamp": "2026-01-26 22:42", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Transfer to 7772"}
+2026-01-28 22:47:23,165 - ai_raw_io - INFO - INPUT: Transfer Between Your Accounts
+Amount: SAR 200
+To: 7772
+26-1-14 22:42 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_bank": "AlRajhiBank", "destination_account_last4": "7772", "card_info": null, "amount": 200, "currency": "SAR", "fees": null, "timestamp": "2026-01-26 22:42", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Transfer to 7772"}
