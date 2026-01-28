@@ -173,15 +173,17 @@ const Allocation = () => {
                     pendingAmount: 0,
                     allocatedAmount: 0,
                     transferredAmount: 0,
+                    coveredAmount: 0,
                     totalRequired: 0
                 };
             }
 
             const isAllocated = item.status === 'allocated';
             const isTransferred = item.status === 'transferred';
+            const isCovered = item.status === 'covered';
 
             // Use edited amount if available (only for pending items)
-            const amount = (!isAllocated && !isTransferred && editableAmounts[item.identifier] !== undefined)
+            const amount = (!isAllocated && !isTransferred && !isCovered && editableAmounts[item.identifier] !== undefined)
                 ? editableAmounts[item.identifier]
                 : item.amount;
 
@@ -194,6 +196,8 @@ const Allocation = () => {
                 byAccount[accId].allocatedAmount += amount;
             } else if (isTransferred) {
                 byAccount[accId].transferredAmount += amount;
+            } else if (isCovered) {
+                byAccount[accId].coveredAmount += item.required_amount;  // Track required amount for display
             } else {
                 byAccount[accId].pendingAmount += amount;
             }
@@ -330,9 +334,10 @@ const Allocation = () => {
                                     const hasAllocated = group.allocatedAmount > 0;
                                     const hasPending = group.pendingAmount > 0;
                                     const hasTransferred = group.transferredAmount > 0;
+                                    const hasCovered = group.coveredAmount > 0;
 
-                                    // Card color: green if fully transferred, amber if partial, default otherwise
-                                    const cardClass = hasTransferred && !hasPending
+                                    // Card color: green if fully transferred/covered, amber if partial, default otherwise
+                                    const cardClass = (hasTransferred || hasCovered) && !hasPending
                                         ? 'bg-emerald-900/20 border-emerald-500/40'
                                         : isPartial
                                             ? 'bg-amber-900/10 border-amber-500/30'
@@ -370,12 +375,18 @@ const Allocation = () => {
                                                 </div>
 
                                                 {/* Status badges */}
-                                                {(hasAllocated || hasPending || hasTransferred) && (
+                                                {(hasAllocated || hasPending || hasTransferred || hasCovered) && (
                                                     <div className="flex gap-2 mb-3 flex-wrap">
                                                         {hasTransferred && (
                                                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/30">
                                                                 <CheckCircle size={10} />
                                                                 {formatCurrency(group.transferredAmount)} Transferred This Month
+                                                            </span>
+                                                        )}
+                                                        {hasCovered && (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-cyan-400 bg-cyan-500/20 px-2 py-0.5 rounded border border-cyan-500/30">
+                                                                <CheckCircle size={10} />
+                                                                {formatCurrency(group.coveredAmount)} Covered by Balance
                                                             </span>
                                                         )}
                                                         {hasAllocated && (
@@ -386,7 +397,7 @@ const Allocation = () => {
                                                         )}
                                                         {hasPending && (
                                                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-400 bg-amber-500/20 px-2 py-0.5 rounded">
-                                                                {formatCurrency(group.pendingAmount)} Pending
+                                                                {formatCurrency(group.pendingAmount)} To Transfer
                                                             </span>
                                                         )}
                                                     </div>
@@ -398,12 +409,15 @@ const Allocation = () => {
                                                     {group.items.map((item, i) => {
                                                         const isAllocated = item.status === 'allocated';
                                                         const isTransferred = item.status === 'transferred';
-                                                        const isDisabled = isAllocated || isTransferred;
+                                                        const isCovered = item.status === 'covered';
+                                                        const isDisabled = isAllocated || isTransferred || isCovered;
                                                         return (
                                                             <div key={item.identifier} className={`flex justify-between items-center text-sm ${isDisabled ? 'opacity-60' : ''}`}>
                                                                 <div className="flex items-center gap-2">
                                                                     {isTransferred ? (
                                                                         <CheckCircle size={12} className="text-emerald-500" />
+                                                                    ) : isCovered ? (
+                                                                        <CheckCircle size={12} className="text-cyan-500" />
                                                                     ) : isAllocated ? (
                                                                         <CheckCircle size={12} className="text-blue-500" />
                                                                     ) : (
@@ -412,10 +426,13 @@ const Allocation = () => {
                                                                     <span className={`truncate max-w-[140px] ${isDisabled ? 'text-gray-500' : 'text-gray-300'}`} title={item.name}>
                                                                         {item.name}
                                                                         {isTransferred && <span className="text-[9px] text-emerald-400 ml-1">(done)</span>}
+                                                                        {isCovered && <span className="text-[9px] text-cyan-400 ml-1">(covered)</span>}
                                                                     </span>
                                                                 </div>
                                                                 {isDisabled ? (
-                                                                    <span className={`font-mono text-sm ${isTransferred ? 'text-emerald-500' : 'text-blue-500'}`}>{formatCurrency(item.amount)}</span>
+                                                                    <span className={`font-mono text-sm ${isTransferred ? 'text-emerald-500' : isCovered ? 'text-cyan-500' : 'text-blue-500'}`}>
+                                                                        {isCovered ? formatCurrency(item.required_amount) : formatCurrency(item.amount)}
+                                                                    </span>
                                                                 ) : (
                                                                     <input
                                                                         type="number"
