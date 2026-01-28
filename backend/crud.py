@@ -1129,6 +1129,14 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     accounts = db.query(models.Account).all()
     accounts_by_id = {a.id: a for a in accounts}
     
+    # Get existing PayrollTransfers for this month to prevent duplicates
+    existing_transfers = db.query(models.PayrollTransfer).filter(
+        models.PayrollTransfer.billing_month == target_month_str,
+        models.PayrollTransfer.source_account_id == source_account_id
+    ).all()
+    # Build set of (target_account_id) that already have transfers this month
+    transferred_targets = {t.target_account_id: t for t in existing_transfers}
+    
     # Get all obligations
     obligations = db.query(models.MonthlyObligation).all()
     
@@ -1209,19 +1217,35 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
             pending_amount = amounts['pending']
             allocated_amount = amounts['allocated']
             
+            # Check if transfer already exists for this target account
+            existing_transfer = transferred_targets.get(rule.target_account_id)
+            
             # Add pending allocation if any
             if pending_amount > 0:
-                allocations.append(schemas.AllocationItem(
-                    identifier=category,
-                    name=category,
-                    rule_type='CATEGORY',
-                    target_account_id=rule.target_account_id,
-                    target_account_name=target_acc.name if target_acc else "Unknown",
-                    amount=pending_amount,
-                    required_amount=pending_amount,
-                    status='pending'
-                ))
-                total_required += pending_amount
+                if existing_transfer:
+                    # Already transferred this month - show as transferred
+                    allocations.append(schemas.AllocationItem(
+                        identifier=category,
+                        name=category,
+                        rule_type='CATEGORY',
+                        target_account_id=rule.target_account_id,
+                        target_account_name=target_acc.name if target_acc else "Unknown",
+                        amount=existing_transfer.amount,
+                        required_amount=pending_amount,
+                        status='transferred'
+                    ))
+                else:
+                    allocations.append(schemas.AllocationItem(
+                        identifier=category,
+                        name=category,
+                        rule_type='CATEGORY',
+                        target_account_id=rule.target_account_id,
+                        target_account_name=target_acc.name if target_acc else "Unknown",
+                        amount=pending_amount,
+                        required_amount=pending_amount,
+                        status='pending'
+                    ))
+                    total_required += pending_amount
             
             # Add allocated items if any
             if allocated_amount > 0:
@@ -1246,19 +1270,35 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
             pending_amount = amounts['pending']
             allocated_amount = amounts['allocated']
             
+            # Check if transfer already exists for this target account
+            existing_transfer = transferred_targets.get(rule.target_account_id)
+            
             # Add pending allocation if any
             if pending_amount > 0:
-                allocations.append(schemas.AllocationItem(
-                    identifier=loan_name,
-                    name=loan_name,
-                    rule_type='LOAN',
-                    target_account_id=rule.target_account_id,
-                    target_account_name=target_acc.name if target_acc else "Unknown",
-                    amount=pending_amount,
-                    required_amount=pending_amount,
-                    status='pending'
-                ))
-                total_required += pending_amount
+                if existing_transfer:
+                    # Already transferred this month - show as transferred
+                    allocations.append(schemas.AllocationItem(
+                        identifier=loan_name,
+                        name=loan_name,
+                        rule_type='LOAN',
+                        target_account_id=rule.target_account_id,
+                        target_account_name=target_acc.name if target_acc else "Unknown",
+                        amount=existing_transfer.amount,
+                        required_amount=pending_amount,
+                        status='transferred'
+                    ))
+                else:
+                    allocations.append(schemas.AllocationItem(
+                        identifier=loan_name,
+                        name=loan_name,
+                        rule_type='LOAN',
+                        target_account_id=rule.target_account_id,
+                        target_account_name=target_acc.name if target_acc else "Unknown",
+                        amount=pending_amount,
+                        required_amount=pending_amount,
+                        status='pending'
+                    ))
+                    total_required += pending_amount
             
             # Add allocated items if any
             if allocated_amount > 0:

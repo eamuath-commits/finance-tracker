@@ -1113,6 +1113,7 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
             amount=-transfer_amount, 
             merchant=f"Transfer to {item.target_account_name}",
             category="Transfer",
+            type="debit",
             timestamp=datetime.now()
         )
         crud.create_transaction(db, t_out)
@@ -1122,6 +1123,7 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
             amount=transfer_amount,
             merchant=f"Transfer from {source_acc.name}",
             category="Transfer",
+            type="credit",
             timestamp=datetime.now()
         )
         tx_in = crud.create_transaction(db, t_in)

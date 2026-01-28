@@ -172,14 +172,16 @@ const Allocation = () => {
                     items: [],
                     pendingAmount: 0,
                     allocatedAmount: 0,
+                    transferredAmount: 0,
                     totalRequired: 0
                 };
             }
 
             const isAllocated = item.status === 'allocated';
+            const isTransferred = item.status === 'transferred';
 
             // Use edited amount if available (only for pending items)
-            const amount = (!isAllocated && editableAmounts[item.identifier] !== undefined)
+            const amount = (!isAllocated && !isTransferred && editableAmounts[item.identifier] !== undefined)
                 ? editableAmounts[item.identifier]
                 : item.amount;
 
@@ -190,6 +192,8 @@ const Allocation = () => {
 
             if (isAllocated) {
                 byAccount[accId].allocatedAmount += amount;
+            } else if (isTransferred) {
+                byAccount[accId].transferredAmount += amount;
             } else {
                 byAccount[accId].pendingAmount += amount;
             }
@@ -325,9 +329,17 @@ const Allocation = () => {
                                     const isPartial = shortage > 0;
                                     const hasAllocated = group.allocatedAmount > 0;
                                     const hasPending = group.pendingAmount > 0;
+                                    const hasTransferred = group.transferredAmount > 0;
+
+                                    // Card color: green if fully transferred, amber if partial, default otherwise
+                                    const cardClass = hasTransferred && !hasPending
+                                        ? 'bg-emerald-900/20 border-emerald-500/40'
+                                        : isPartial
+                                            ? 'bg-amber-900/10 border-amber-500/30'
+                                            : 'bg-slate-800/40 border-slate-700';
 
                                     return (
-                                        <div key={group.target_account_id} className={`relative flex flex-col gap-4 p-5 rounded-2xl border transition-all hover:shadow-lg hover:border-slate-600 ${isPartial ? 'bg-amber-900/10 border-amber-500/30' : 'bg-slate-800/40 border-slate-700'}`}>
+                                        <div key={group.target_account_id} className={`relative flex flex-col gap-4 p-5 rounded-2xl border transition-all hover:shadow-lg hover:border-slate-600 ${cardClass}`}>
 
                                             {/* Header: Target Account Name */}
                                             <div className="flex justify-between items-start gap-4">
@@ -350,20 +362,26 @@ const Allocation = () => {
                                                 {/* Main totals */}
                                                 <div className="flex justify-between items-baseline mb-3">
                                                     <span className="text-sm font-medium text-gray-400">
-                                                        {hasPending ? 'Pending Transfer' : 'Allocated'}
+                                                        {hasTransferred && !hasPending ? 'Already Transferred' : hasPending ? 'Pending Transfer' : 'Allocated'}
                                                     </span>
-                                                    <span className="text-2xl font-bold text-white font-mono">
-                                                        {formatCurrency(group.pendingAmount + group.allocatedAmount)}
+                                                    <span className={`text-2xl font-bold font-mono ${hasTransferred && !hasPending ? 'text-emerald-400' : 'text-white'}`}>
+                                                        {formatCurrency(group.pendingAmount + group.allocatedAmount + group.transferredAmount)}
                                                     </span>
                                                 </div>
 
                                                 {/* Status badges */}
-                                                {(hasAllocated || hasPending) && (
-                                                    <div className="flex gap-2 mb-3">
-                                                        {hasAllocated && (
-                                                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded">
+                                                {(hasAllocated || hasPending || hasTransferred) && (
+                                                    <div className="flex gap-2 mb-3 flex-wrap">
+                                                        {hasTransferred && (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/30">
                                                                 <CheckCircle size={10} />
-                                                                {formatCurrency(group.allocatedAmount)} Transferred
+                                                                {formatCurrency(group.transferredAmount)} Transferred This Month
+                                                            </span>
+                                                        )}
+                                                        {hasAllocated && (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-400 bg-blue-500/20 px-2 py-0.5 rounded">
+                                                                <CheckCircle size={10} />
+                                                                {formatCurrency(group.allocatedAmount)} Paid
                                                             </span>
                                                         )}
                                                         {hasPending && (
@@ -379,20 +397,25 @@ const Allocation = () => {
                                                     <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Breakdown</span>
                                                     {group.items.map((item, i) => {
                                                         const isAllocated = item.status === 'allocated';
+                                                        const isTransferred = item.status === 'transferred';
+                                                        const isDisabled = isAllocated || isTransferred;
                                                         return (
-                                                            <div key={item.identifier} className={`flex justify-between items-center text-sm ${isAllocated ? 'opacity-60' : ''}`}>
+                                                            <div key={item.identifier} className={`flex justify-between items-center text-sm ${isDisabled ? 'opacity-60' : ''}`}>
                                                                 <div className="flex items-center gap-2">
-                                                                    {isAllocated ? (
+                                                                    {isTransferred ? (
                                                                         <CheckCircle size={12} className="text-emerald-500" />
+                                                                    ) : isAllocated ? (
+                                                                        <CheckCircle size={12} className="text-blue-500" />
                                                                     ) : (
                                                                         <span className={`w-2 h-2 rounded-full ${item.rule_type === 'LOAN' ? 'bg-amber-500' : 'bg-blue-500'}`}></span>
                                                                     )}
-                                                                    <span className={`truncate max-w-[140px] ${isAllocated ? 'text-gray-500 line-through' : 'text-gray-300'}`} title={item.name}>
+                                                                    <span className={`truncate max-w-[140px] ${isDisabled ? 'text-gray-500' : 'text-gray-300'}`} title={item.name}>
                                                                         {item.name}
+                                                                        {isTransferred && <span className="text-[9px] text-emerald-400 ml-1">(done)</span>}
                                                                     </span>
                                                                 </div>
-                                                                {isAllocated ? (
-                                                                    <span className="text-emerald-500 font-mono text-sm">{formatCurrency(item.amount)}</span>
+                                                                {isDisabled ? (
+                                                                    <span className={`font-mono text-sm ${isTransferred ? 'text-emerald-500' : 'text-blue-500'}`}>{formatCurrency(item.amount)}</span>
                                                                 ) : (
                                                                     <input
                                                                         type="number"
