@@ -92,29 +92,7 @@ const AccountCard = ({ acc, onEdit = null }) => {
             )}
 
             {/* Content */}
-            <div className="relative z-10 flex flex-col h-full justify-between">
-
-                {/* Top section - empty for spacing */}
-                <div></div>
-
-                {/* Middle section - Account name (center-left aligned) */}
-                <div className="flex items-center">
-                    {hasCustomBackground ? (
-                        // Custom background - just show account name
-                        <span className="font-bold tracking-wide text-xl drop-shadow-md">{acc.name}</span>
-                    ) : (
-                        // Fallback - show icon and names
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-white/10 rounded-xl backdrop-blur-md shadow-inner border border-white/5">
-                                {theme.icon}
-                            </div>
-                            <div className="flex flex-col">
-                                {acc.bank_name && <span className="text-[10px] uppercase tracking-wider opacity-75 leading-tight">{acc.bank_name}</span>}
-                                <span className="font-bold tracking-wide text-lg">{acc.name}</span>
-                            </div>
-                        </div>
-                    )}
-                </div>
+            <div className="relative z-10 flex flex-col h-full justify-end">
 
                 {/* Edit Button */}
                 {onEdit && (
@@ -127,22 +105,23 @@ const AccountCard = ({ acc, onEdit = null }) => {
                     </button>
                 )}
 
-                {/* Footer (Balance, Type, and Payment Network Logo) */}
+                {/* Footer (Balance and Payment Network Logo) */}
                 <div>
+                    {/* Balance Row - Account name as label above balance */}
                     <div className="flex justify-between items-end mb-1">
                         <div>
-                            <p className="text-[10px] uppercase tracking-wider opacity-70 mb-0.5 drop-shadow-sm">Current Balance</p>
+                            <p className="text-[10px] uppercase tracking-wider opacity-70 mb-0.5 drop-shadow-sm">{acc.name}</p>
                             <p className="text-2xl font-bold tracking-tight text-white drop-shadow-md">{formatCurrency(acc.current_balance)}</p>
                         </div>
 
-                        {/* Right side: Payment Network Logo (Mada/Visa) + Account Type */}
+                        {/* Right side: Payment Network Logo (Mada/Visa) */}
                         <div className="text-right flex flex-col items-end gap-1">
                             {/* Mada or Visa Logo */}
                             {showVisa && (
                                 <img src="/visa-logo.png" alt="Visa" className="h-6 w-auto object-contain drop-shadow-md" />
                             )}
                             {showMada && (
-                                <img src="/mada-logo.png" alt="Mada" className="h-6 w-auto object-contain drop-shadow-md" />
+                                <img src="/mada-logo.png" alt="Mada" className="h-8 w-auto object-contain drop-shadow-md" />
                             )}
 
                             {/* Card digits if available */}
@@ -219,7 +198,7 @@ const OverviewAccountRow = ({ acc, allTransactions }) => {
                     {acc.account_type === 'Credit Card' ? (
                         <img src="/visa-logo.png" alt="Visa" className="w-6 h-auto object-contain" />
                     ) : (
-                        <img src="/mada-logo.png" alt="Mada" className="h-6 w-auto object-contain drop-shadow-md" />
+                        <img src="/mada-logo.png" alt="Mada" className="h-8 w-auto object-contain drop-shadow-md" />
                     )}
                 </div>
             </div>

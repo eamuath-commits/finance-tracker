@@ -57,29 +57,7 @@ const CreditCardVisual = ({ card, onEdit, onPayment }) => {
             )}
 
             {/* Content */}
-            <div className="relative z-10 flex flex-col h-full justify-between">
-
-                {/* Top section - empty for spacing */}
-                <div></div>
-
-                {/* Middle section - Card name (center-left aligned) */}
-                <div className="flex items-center">
-                    {hasCustomBackground ? (
-                        // Custom background - just show card name
-                        <span className="font-bold tracking-wide text-xl drop-shadow-md">{card.name}</span>
-                    ) : (
-                        // Fallback - show icon and names
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-white/10 rounded-xl backdrop-blur-md shadow-inner border border-white/5">
-                                <CreditCardIcon className="w-5 h-5 text-violet-200" />
-                            </div>
-                            <div className="flex flex-col">
-                                {card.bank_name && <span className="text-[10px] uppercase tracking-wider opacity-75 leading-tight">{card.bank_name}</span>}
-                                <span className="font-bold tracking-wide text-lg">{card.name}</span>
-                            </div>
-                        </div>
-                    )}
-                </div>
+            <div className="relative z-10 flex flex-col h-full justify-end">
 
                 {/* Action Buttons (hover) */}
                 <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition z-20">
@@ -101,9 +79,10 @@ const CreditCardVisual = ({ card, onEdit, onPayment }) => {
 
                 {/* Footer (Balance & Utilization with Visa Logo) */}
                 <div>
+                    {/* Balance Row - Card name as label above balance */}
                     <div className="flex justify-between items-end mb-1">
                         <div>
-                            <p className="text-[10px] uppercase tracking-wider opacity-70 mb-0.5 drop-shadow-sm">Balance Owed</p>
+                            <p className="text-[10px] uppercase tracking-wider opacity-70 mb-0.5 drop-shadow-sm">{card.name}</p>
                             <p className="text-2xl font-bold tracking-tight text-white drop-shadow-md">{formatCurrency(card.current_balance)}</p>
                         </div>
 
