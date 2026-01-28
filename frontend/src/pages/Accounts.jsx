@@ -110,7 +110,7 @@ const AccountCard = ({ acc, onEdit = null }) => {
                     {/* Balance Row - Account name as label above balance */}
                     <div className="flex justify-between items-end mb-1">
                         <div>
-                            <p className="text-[10px] uppercase tracking-wider opacity-70 mb-0.5 drop-shadow-sm">{acc.name}</p>
+                            <p className="text-[10px] uppercase tracking-wider opacity-90 mb-0.5 drop-shadow-sm font-bold">{acc.name}</p>
                             <p className="text-2xl font-bold tracking-tight text-white drop-shadow-md">{formatCurrency(acc.current_balance)}</p>
                         </div>
 
@@ -121,7 +121,7 @@ const AccountCard = ({ acc, onEdit = null }) => {
                                 <img src="/visa-logo.png" alt="Visa" className="h-6 w-auto object-contain drop-shadow-md" />
                             )}
                             {showMada && (
-                                <img src="/mada-logo.png" alt="Mada" className="h-8 w-auto object-contain drop-shadow-md" />
+                                <img src="/mada-logo.png" alt="Mada" className="h-10 w-auto object-contain drop-shadow-md" />
                             )}
 
                             {/* Card digits if available */}
@@ -198,7 +198,7 @@ const OverviewAccountRow = ({ acc, allTransactions }) => {
                     {acc.account_type === 'Credit Card' ? (
                         <img src="/visa-logo.png" alt="Visa" className="w-6 h-auto object-contain" />
                     ) : (
-                        <img src="/mada-logo.png" alt="Mada" className="h-8 w-auto object-contain drop-shadow-md" />
+                        <img src="/mada-logo.png" alt="Mada" className="h-10 w-auto object-contain drop-shadow-md" />
                     )}
                 </div>
             </div>

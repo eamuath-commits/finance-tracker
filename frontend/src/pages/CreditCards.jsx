@@ -82,7 +82,7 @@ const CreditCardVisual = ({ card, onEdit, onPayment }) => {
                     {/* Balance Row - Card name as label above balance */}
                     <div className="flex justify-between items-end mb-1">
                         <div>
-                            <p className="text-[10px] uppercase tracking-wider opacity-70 mb-0.5 drop-shadow-sm">{card.name}</p>
+                            <p className="text-[10px] uppercase tracking-wider opacity-90 mb-0.5 drop-shadow-sm font-bold">{card.name}</p>
                             <p className="text-2xl font-bold tracking-tight text-white drop-shadow-md">{formatCurrency(card.current_balance)}</p>
                         </div>
 
