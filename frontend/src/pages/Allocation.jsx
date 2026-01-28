@@ -92,7 +92,7 @@ const Allocation = () => {
     };
 
     const handleExecute = async (targetAccountId, overrideAmount) => {
-        if (!confirm(`Execute transfer of ${overrideAmount?.toLocaleString()} SAR?`)) return;
+        if (!confirm(`Execute transfer of ${formatCurrency(overrideAmount)} ?`)) return;
 
         setDistributing(true);
         try {
@@ -108,7 +108,7 @@ const Allocation = () => {
                 const partials = res.data.details.filter(d => d.shortage > 0);
                 if (partials.length > 0) {
                     const msg = partials.map(p =>
-                        `Partial Transfer to ${p.target}: Transferred ${p.transferred.toLocaleString()} (Shortage: ${p.shortage.toLocaleString()})`
+                        `Partial Transfer to ${p.target}: Transferred ${formatCurrency(p.transferred)} (Shortage: ${formatCurrency(p.shortage)})`
                     ).join('\n');
                     alert(`⚠️ Source Account Shortage Detected:\n\n${msg}\n\nTransferred available balance.`);
                 }
