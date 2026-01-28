@@ -821,3 +821,12 @@ Am...
 2026-01-28 22:35:04,564 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 7772, Account: General
 2026-01-28 22:35:04,566 - sms_agent - INFO - Incoming Credit detected to own account General. ensure primary.
 2026-01-28 22:35:04,566 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: General
+2026-01-28 22:35:50,636 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:35:50,660 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-28 22:35:50,749 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:40:46,383 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112 —— Outgoing Funds Transfer Approved
+...
+2026-01-28 22:40:46,736 - sms_agent - INFO - Parsed structured message - Sender: +966566985112 (separator: '——')
+2026-01-28 22:40:49,581 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 8001, Account: Jazira Checking
+2026-01-28 22:40:49,585 - sms_agent - INFO - Cross-bank transfer detected: Jazira Checking -> General
+2026-01-28 22:40:49,594 - sms_agent - INFO - Saved training example for: Transfer to General

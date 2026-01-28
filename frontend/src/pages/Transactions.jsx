@@ -375,52 +375,17 @@ function Transactions() {
                         )}
                     </div>
 
-                    {/* Pending Transactions Section */}
+                    {/* Pending Transactions Banner - just a simple notification */}
                     {pendingTransactions.length > 0 && (
-                        <div className="bg-amber-900/20 border border-amber-600/50 rounded-xl p-4 mb-6">
-                            <div className="flex items-center gap-2 mb-4">
-                                <span className="text-2xl">❓</span>
-                                <h3 className="text-lg font-bold text-amber-400">Pending Transfers ({pendingTransactions.length})</h3>
-                            </div>
-                            <p className="text-amber-200/70 text-sm mb-4">
-                                These transfers are missing source account information. Select the source account to complete each transfer.
-                            </p>
-                            <div className="space-y-3">
-                                {pendingTransactions.map(tx => {
-                                    const destAcc = accounts.find(a => a.id === tx.account_id);
-                                    return (
-                                        <div key={tx.id} className="bg-slate-800/80 rounded-lg p-4 border border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-3 mb-2">
-                                                    <span className="text-emerald-400 font-bold">+{formatCurrency(tx.amount)}</span>
-                                                    <span className="text-gray-400">→</span>
-                                                    <span className="text-white font-medium">{destAcc?.name || 'Unknown'}</span>
-                                                    <span className="text-xs text-gray-500 font-mono">
-                                                        {new Date(tx.timestamp).toLocaleDateString()}
-                                                    </span>
-                                                </div>
-                                                <div className="text-sm text-gray-400">{tx.merchant}</div>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <label className="text-sm text-gray-400 whitespace-nowrap">Source Account:</label>
-                                                <select
-                                                    className="p-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
-                                                    defaultValue=""
-                                                    onChange={(e) => {
-                                                        if (e.target.value) {
-                                                            completePendingTransfer(tx.id, e.target.value);
-                                                        }
-                                                    }}
-                                                >
-                                                    <option value="">Select account...</option>
-                                                    {accounts.filter(a => a.id !== tx.account_id).map(acc => (
-                                                        <option key={acc.id} value={acc.id}>{acc.name}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                        <div className="bg-amber-900/20 border border-amber-600/50 rounded-xl p-4 mb-6 flex items-center gap-3">
+                            <span className="text-2xl">❓</span>
+                            <div>
+                                <h3 className="text-lg font-bold text-amber-400">
+                                    {pendingTransactions.length} Pending Transfer{pendingTransactions.length > 1 ? 's' : ''}
+                                </h3>
+                                <p className="text-amber-200/70 text-sm">
+                                    Select the source account in the table below to complete {pendingTransactions.length > 1 ? 'these transfers' : 'this transfer'}.
+                                </p>
                             </div>
                         </div>
                     )}
@@ -495,31 +460,14 @@ function Transactions() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                                                {tx.status === 'pending_action' ? (
-                                                    /* Show account selection dropdown for pending transactions */
-                                                    <select
-                                                        className="bg-slate-700 border border-amber-600 text-amber-400 rounded px-2 py-1 text-xs cursor-pointer"
-                                                        defaultValue=""
-                                                        onChange={async (e) => {
-                                                            const accountId = e.target.value;
-                                                            if (!accountId) return;
-                                                            try {
-                                                                await fetch(`${API_URL}/transactions/${tx.id}/complete-transfer?source_account_id=${accountId}`, { method: 'POST' });
-                                                                fetchData();
-                                                            } catch (err) {
-                                                                console.error('Failed to assign account:', err);
-                                                            }
-                                                        }}
-                                                    >
-                                                        <option value="">⚠️ Select Account...</option>
-                                                        {accounts.map(a => (
-                                                            <option key={a.id} value={a.id}>{a.name} {a.last_4_digits ? `•${a.last_4_digits}` : ''}</option>
-                                                        ))}
-                                                    </select>
+                                                {/* For pending_action transfers with known destination, show the destination account */}
+                                                {tx.status === 'pending_action' && !acc && !cc ? (
+                                                    <span className="text-amber-400 text-xs">⚠️ Unknown</span>
                                                 ) : acc ? (
                                                     <div className="flex flex-col">
                                                         <span>{acc.name}</span>
                                                         {acc.last_4_digits && <span className="text-xs text-gray-500 font-mono">•••• {acc.last_4_digits}</span>}
+                                                        {tx.status === 'pending_action' && <span className="text-[10px] text-amber-400">📥 Receiving</span>}
                                                     </div>
                                                 ) : cc ? (
                                                     <div className="flex flex-col">
@@ -532,13 +480,41 @@ function Transactions() {
                                                 ) : <span className="text-gray-500">Unknown</span>}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                                                {isTransfer && <span className="text-xs text-blue-400 mr-2 uppercase font-bold tracking-wider">{txIsCredit ? 'FROM:' : 'TO:'}</span>}
-                                                {tx.merchant || 'Unknown'}
-                                                {tx.status === 'pending_transfer' && (
-                                                    <span className="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-900/40 text-amber-400 border border-amber-700">⏳ Pending</span>
-                                                )}
-                                                {tx.status === 'confirmed' && (
-                                                    <span className="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-emerald-900/40 text-emerald-400 border border-emerald-700">✓ Confirmed</span>
+                                                {/* For pending_action transfers, show source selection dropdown */}
+                                                {tx.status === 'pending_action' && acc ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs text-amber-400 uppercase font-bold tracking-wider">FROM:</span>
+                                                        <select
+                                                            className="bg-slate-700 border border-amber-600 text-amber-400 rounded px-2 py-1 text-xs cursor-pointer"
+                                                            defaultValue=""
+                                                            onChange={async (e) => {
+                                                                const accountId = e.target.value;
+                                                                if (!accountId) return;
+                                                                try {
+                                                                    await fetch(`${API_URL}/transactions/${tx.id}/complete-transfer?source_account_id=${accountId}`, { method: 'POST' });
+                                                                    fetchData();
+                                                                } catch (err) {
+                                                                    console.error('Failed to assign account:', err);
+                                                                }
+                                                            }}
+                                                        >
+                                                            <option value="">Select source...</option>
+                                                            {accounts.filter(a => a.id !== tx.account_id).map(a => (
+                                                                <option key={a.id} value={a.id}>{a.name} {a.last_4_digits ? `•${a.last_4_digits}` : ''}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        {isTransfer && <span className="text-xs text-blue-400 mr-2 uppercase font-bold tracking-wider">{txIsCredit ? 'FROM:' : 'TO:'}</span>}
+                                                        {tx.merchant || 'Unknown'}
+                                                        {tx.status === 'pending_transfer' && (
+                                                            <span className="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-900/40 text-amber-400 border border-amber-700">⏳ Pending</span>
+                                                        )}
+                                                        {tx.status === 'confirmed' && (
+                                                            <span className="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-emerald-900/40 text-emerald-400 border border-emerald-700">✓ Confirmed</span>
+                                                        )}
+                                                    </>
                                                 )}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
