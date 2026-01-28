@@ -202,3 +202,50 @@ By:9365;mada-Apple Pay
 Amount:SAR 90
 At:IQFAL ALA
 28/1/26 11:05+966566985112 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": null, "destination_bank": null, "source_account_last4": "9365", "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 90, "currency": "SAR", "fees": null, "timestamp": "2026-01-28 11:05", "available_balance": null, "beneficiary": null, "merchant": "IQFAL ALA", "sender_name": null, "description": "Purchase at IQFAL ALA"}
+2026-01-28 12:39:12,303 - ai_raw_io - INFO - INPUT: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 90
+At:IQFAL ALA
+28/1/26 11:05 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": null, "destination_bank": null, "source_account_last4": "9365", "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 90, "currency": "SAR", "fees": null, "timestamp": "2026-01-28 11:05", "available_balance": null, "beneficiary": null, "merchant": "IQFAL ALA", "sender_name": null, "description": "Purchase at IQFAL ALA"}
+2026-01-28 12:40:27,961 - ai_raw_io - INFO - INPUT: +966566985112 || OUTPUT: {"is_financial_event": false, "is_transaction": false, "transaction_type": null, "sub_type": null, "source_bank": null, "destination_bank": null, "source_account_last4": null, "destination_account_last4": null, "card_info": null, "amount": null, "currency": null, "fees": null, "timestamp": null, "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "description": null}
+2026-01-28 12:44:12,255 - ai_raw_io - INFO - INPUT: +966566985112 --- || OUTPUT: {"is_financial_event": false, "is_transaction": false, "transaction_type": null, "sub_type": null, "source_bank": null, "destination_bank": null, "source_account_last4": null, "destination_account_last4": null, "card_info": null, "amount": null, "currency": null, "fees": null, "timestamp": null, "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "description": null}
+2026-01-28 12:44:54,450 - ai_raw_io - INFO - INPUT: +966566985112 || OUTPUT: {"is_financial_event": false, "is_transaction": false, "transaction_type": null, "sub_type": null, "source_bank": null, "destination_bank": null, "source_account_last4": null, "destination_account_last4": null, "card_info": null, "amount": null, "currency": null, "fees": null, "timestamp": null, "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "description": null}
+2026-01-28 12:48:02,555 - ai_raw_io - INFO - INPUT: +966566985112 --- PoS
+By:9365;mada-Apple Pay
+Amount:SAR 90
+At:IQFAL ALA
+28/1/26 11:05 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 90, "currency": "SAR", "merchant": "IQFAL ALA", "description": "Purchase at IQFAL ALA", "source_bank": null, "destination_bank": null, "fees": null, "timestamp": "2026-01-28 11:05", "available_balance": null, "beneficiary": null, "sender_name": null}
+2026-01-28 12:52:12,205 - ai_raw_io - INFO - INPUT: +966566985112
+---
+PoS
+By:9365;mada-Apple Pay
+Amount:SAR 90
+At:Test
+28/1/26 11:05 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": null, "destination_bank": null, "source_account_last4": "9365", "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 90, "currency": "SAR", "fees": null, "timestamp": "2026-01-28 11:05", "available_balance": null, "beneficiary": null, "merchant": "Test", "sender_name": null, "description": "Purchase at Test"}
+2026-01-28 12:54:04,120 - ai_raw_io - INFO - INPUT: --- || OUTPUT: {"is_financial_event": false, "is_transaction": false, "transaction_type": null, "sub_type": null, "source_bank": null, "destination_bank": null, "source_account_last4": null, "destination_account_last4": null, "card_info": null, "amount": null, "currency": null, "fees": null, "timestamp": null, "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "description": null}
+2026-01-28 12:55:11,350 - ai_raw_io - INFO - INPUT: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 90
+At:Test
+28/1/26 11:05 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": null, "destination_bank": null, "source_account_last4": "9365", "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 90, "currency": "SAR", "fees": null, "timestamp": "2026-01-28 11:05", "available_balance": null, "beneficiary": null, "merchant": "Test", "sender_name": null, "description": "Purchase at Test"}
+2026-01-28 12:56:23,171 - ai_raw_io - INFO - INPUT: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 90
+At:Test
+28/1/26 11:05 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": null, "destination_bank": null, "source_account_last4": "9365", "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 90, "currency": "SAR", "fees": null, "timestamp": "2026-01-28 11:05", "available_balance": null, "beneficiary": null, "merchant": "Test", "sender_name": null, "description": "Purchase at Test"}
+2026-01-28 13:00:35,805 - ai_raw_io - INFO - INPUT:  || OUTPUT: {"is_financial_event": false, "is_transaction": false, "transaction_type": null, "sub_type": null, "source_bank": null, "destination_bank": null, "source_account_last4": null, "destination_account_last4": null, "card_info": null, "amount": null, "currency": null, "fees": null, "timestamp": null, "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "description": null}
+2026-01-28 13:00:54,723 - ai_raw_io - INFO - INPUT:  || OUTPUT: {"is_financial_event": false, "is_transaction": false, "transaction_type": null, "sub_type": null, "source_bank": null, "destination_bank": null, "source_account_last4": null, "destination_account_last4": null, "card_info": null, "amount": null, "currency": null, "fees": null, "timestamp": null, "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "description": null}
+2026-01-28 13:01:06,411 - ai_raw_io - INFO - INPUT:  || OUTPUT: {"is_financial_event": false, "is_transaction": false, "transaction_type": null, "sub_type": null, "source_bank": null, "destination_bank": null, "source_account_last4": null, "destination_account_last4": null, "card_info": null, "amount": null, "currency": null, "fees": null, "timestamp": null, "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "description": null}
+2026-01-28 13:01:08,082 - ai_raw_io - INFO - INPUT:  || OUTPUT: {"is_financial_event": false, "is_transaction": false, "transaction_type": null, "sub_type": null, "source_bank": null, "destination_bank": null, "source_account_last4": null, "destination_account_last4": null, "card_info": null, "amount": null, "currency": null, "fees": null, "timestamp": null, "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "description": null}
+2026-01-28 13:06:29,987 - ai_raw_io - INFO - INPUT:  || OUTPUT: {"is_financial_event": false, "is_transaction": false, "transaction_type": null, "sub_type": null, "source_bank": null, "destination_bank": null, "source_account_last4": null, "destination_account_last4": null, "card_info": null, "amount": null, "currency": null, "fees": null, "timestamp": null, "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "description": null}
+2026-01-28 13:06:31,721 - ai_raw_io - INFO - INPUT:  || OUTPUT: {"is_financial_event": false, "is_transaction": false, "transaction_type": null, "sub_type": null, "source_bank": null, "destination_bank": null, "source_account_last4": null, "destination_account_last4": null, "card_info": null, "amount": null, "currency": null, "fees": null, "timestamp": null, "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "description": null}
+2026-01-28 13:17:21,089 - ai_raw_io - INFO - INPUT: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 90
+At:Test
+28/1/26 11:05 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": null, "destination_bank": null, "source_account_last4": "9365", "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 90.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-28 11:05", "available_balance": null, "beneficiary": null, "merchant": "Test", "sender_name": null, "description": "Purchase at Test"}
+2026-01-28 13:17:45,266 - ai_raw_io - INFO - INPUT: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 90
+At:Test
+28/1/26 11:05 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": null, "destination_bank": null, "source_account_last4": "9365", "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 90, "currency": "SAR", "fees": null, "timestamp": "2026-01-28 11:05", "available_balance": null, "beneficiary": null, "merchant": "Test", "sender_name": null, "description": "Purchase at Test"}

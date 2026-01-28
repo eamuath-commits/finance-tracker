@@ -302,3 +302,76 @@ At:IQFAL ...
 2026-01-28 12:31:59,179 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-01-28 12:35:48,458 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-01-28 12:36:12,940 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 12:39:09,873 - sms_agent - INFO - Received message from Channel_-1003635708322: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 90
+At:IQFAL ...
+2026-01-28 12:39:12,311 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 9365, Account: Expense
+2026-01-28 12:39:12,321 - sms_agent - INFO - Saved training example for: IQFAL ALA
+2026-01-28 12:40:25,996 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112...
+2026-01-28 12:44:10,009 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112 ---...
+2026-01-28 12:44:52,719 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112...
+2026-01-28 12:48:00,557 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112 --- PoS
+By:9365;mada-Apple Pay
+Amoun...
+2026-01-28 12:48:02,559 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 9365, Account: Expense
+2026-01-28 12:48:02,566 - sms_agent - INFO - Saved training example for: IQFAL ALA
+2026-01-28 12:52:09,226 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112
+---
+PoS
+By:9365;mada-Apple Pay
+Amoun...
+2026-01-28 12:52:12,207 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 9365, Account: Expense
+2026-01-28 12:52:12,212 - sms_agent - INFO - Saved training example for: Test
+2026-01-28 12:54:02,320 - sms_agent - INFO - Received message from Channel_-1003635708322: ---...
+2026-01-28 12:54:59,624 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 12:54:59,653 - sms_agent - INFO - Bot is polling...
+2026-01-28 12:54:59,726 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 12:55:08,857 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112
+---
+PoS
+By:9365;mada-Apple Pay
+Amoun...
+2026-01-28 12:55:09,195 - sms_agent - INFO - Parsed structured message - Sender: +966566985112
+2026-01-28 12:55:11,360 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 9365, Account: Expense
+2026-01-28 12:55:11,366 - sms_agent - INFO - Saved training example for: Test
+2026-01-28 12:56:21,156 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112
+---
+PoS
+By:9365;mada-Apple Pay
+Amoun...
+2026-01-28 12:56:21,513 - sms_agent - INFO - Parsed structured message - Sender: +966566985112
+2026-01-28 12:56:23,176 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 9365, Account: Expense
+2026-01-28 12:56:23,183 - sms_agent - INFO - Saved training example for: Test
+2026-01-28 13:00:33,805 - sms_agent - INFO - Received message from Channel_-1003635708322: ---...
+2026-01-28 13:00:34,139 - sms_agent - INFO - Parsed structured message (single line) - Sender: 
+2026-01-28 13:00:53,085 - sms_agent - INFO - Received message from Channel_-1003635708322: ---...
+2026-01-28 13:00:53,405 - sms_agent - INFO - Parsed structured message (single line) - Sender: 
+2026-01-28 13:01:04,704 - sms_agent - INFO - Received message from Channel_-1003635708322: ---...
+2026-01-28 13:01:05,073 - sms_agent - INFO - Parsed structured message (single line) - Sender: 
+2026-01-28 13:01:06,581 - sms_agent - INFO - Received message from Channel_-1003635708322: ---...
+2026-01-28 13:01:06,724 - sms_agent - INFO - Parsed structured message (single line) - Sender: 
+2026-01-28 13:06:27,794 - sms_agent - INFO - Received message from Channel_-1003635708322: ---...
+2026-01-28 13:06:28,154 - sms_agent - INFO - Parsed structured message (single line) - Sender: 
+2026-01-28 13:06:30,141 - sms_agent - INFO - Received message from Channel_-1003635708322: ---...
+2026-01-28 13:06:30,285 - sms_agent - INFO - Parsed structured message (single line) - Sender: 
+2026-01-28 13:17:18,853 - sms_agent - INFO - Received message from Channel_-1003635708322: PoS
+---
+PoS
+By:9365;mada-Apple Pay
+Amount:SAR 90
+A...
+2026-01-28 13:17:19,200 - sms_agent - INFO - Parsed structured message - Sender: PoS
+2026-01-28 13:17:21,093 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 9365, Account: Expense
+2026-01-28 13:17:21,100 - sms_agent - INFO - Saved training example for: Test
+2026-01-28 13:17:43,388 - sms_agent - INFO - Received message from Channel_-1003635708322: PoS
+---
+PoS
+By:9365;mada-Apple Pay
+Amount:SAR 90
+A...
+2026-01-28 13:17:43,713 - sms_agent - INFO - Parsed structured message - Sender: PoS
+2026-01-28 13:17:45,270 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 9365, Account: Expense
+2026-01-28 13:17:45,275 - sms_agent - INFO - Saved training example for: Test
+2026-01-28 13:29:10,766 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 13:29:57,903 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).

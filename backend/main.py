@@ -893,6 +893,92 @@ def bulk_delete_messages(payload: schemas.BulkDeleteRequest, db: Session = Depen
         deleted_count += 1
     return {"message": f"Deleted {deleted_count} messages"}
 
+# --- Direct SMS Ingest (for iPhone Shortcuts) ---
+@app.post("/api/sms/ingest")
+async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
+    """
+    Direct SMS ingest endpoint for iPhone Shortcuts.
+    Accepts separate 'sender' and 'body' fields.
+    
+    Example request:
+    {
+        "sender": "AlRajhiBank",
+        "body": "PoS | By:9365;mada-Apple Pay | Amount:SAR 96..."
+    }
+    """
+    logger.info(f"[SMS-INGEST] Received from: {payload.sender}")
+    
+    # 1. Create Raw Message record
+    raw_msg = models.RawMessage(
+        sender=payload.sender,
+        body=payload.body,
+        status=models.MessageStatus.PENDING,
+        timestamp=datetime.now()
+    )
+    db.add(raw_msg)
+    db.commit()
+    db.refresh(raw_msg)
+    
+    # 2. AI Parse
+    try:
+        result = await sms_agent.parse_with_ai(db, payload.body)
+        logger.info(f"[SMS-INGEST] AI Response: {result}")
+    except Exception as e:
+        logger.error(f"[SMS-INGEST] AI Error: {str(e)}")
+        raw_msg.status = models.MessageStatus.FAILED
+        raw_msg.error_log = f"AI Error: {str(e)}"
+        db.commit()
+        return {"status": "failed", "reason": str(e)}
+    
+    # 3. Check for errors
+    if result and result.get("error"):
+        raw_msg.status = models.MessageStatus.FAILED
+        raw_msg.error_log = result.get("error")
+        db.commit()
+        return {"status": "failed", "reason": result.get("error")}
+    
+    if not result or not result.get("is_financial_event"):
+        reason = result.get("reason", "Not a financial event") if result else "No response"
+        raw_msg.status = models.MessageStatus.FAILED
+        raw_msg.error_log = reason
+        db.commit()
+        return {"status": "ignored", "reason": reason}
+    
+    # 4. Find account
+    last_4 = result.get("destination_account_last4") or result.get("source_account_last4")
+    if not last_4 and result.get("card_info"):
+        card_match = re.search(r"(\d{4})", result["card_info"])
+        if card_match:
+            last_4 = card_match.group(1)
+    
+    account = None
+    if last_4:
+        account = crud.get_account_by_last_4(db, str(last_4))
+        if not account:
+            # Try credit card
+            credit_card = crud.get_credit_card_by_last_4(db, str(last_4))
+            if credit_card:
+                account = credit_card
+    
+    if not account:
+        raw_msg.status = models.MessageStatus.FAILED
+        raw_msg.error_log = f"Account not found for: {last_4}"
+        db.commit()
+        return {"status": "warning", "reason": f"Account {last_4} not found", "parsed": result}
+    
+    # 5. Create transaction
+    try:
+        await sms_agent._create_transaction_logic(db, result, account, None, payload.body, reply_target=None)
+        raw_msg.status = models.MessageStatus.PARSED
+        raw_msg.error_log = None
+        db.commit()
+        return {"status": "success", "message": "Transaction logged", "parsed": result}
+    except Exception as e:
+        raw_msg.status = models.MessageStatus.FAILED
+        raw_msg.error_log = f"Transaction Error: {str(e)}"
+        db.commit()
+        return {"status": "failed", "reason": str(e)}
+
 # --- Savings Goal Endpoints ---
 @app.post("/goals/", response_model=schemas.SavingsGoal)
 def create_goal(goal: schemas.SavingsGoalCreate, db: Session = Depends(get_db)):

@@ -231,6 +231,11 @@ class RawMessage(BaseModel):
     class Config:
         from_attributes = True
 
+# Schema for direct SMS ingest from iPhone
+class SMSIngest(BaseModel):
+    sender: str
+    body: str
+
 class CategoryBase(BaseModel):
     name: str
     type: str
