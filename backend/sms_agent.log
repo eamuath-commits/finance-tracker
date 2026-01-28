@@ -269,3 +269,27 @@ At:IQFAL ...
 2026-01-28 12:06:45,422 - sms_agent - INFO - Bot is polling...
 2026-01-28 12:06:45,514 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-01-28 12:08:15,753 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 12:08:55,033 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 12:08:55,056 - sms_agent - INFO - Bot is polling...
+2026-01-28 12:08:55,144 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 12:09:02,616 - sms_agent - ERROR - AI Parse Error: 403 Your API key was reported as leaked. Please use another API key.
+2026-01-28 12:12:04,811 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-28 12:12:04,832 - sms_agent - INFO - Bot is polling...
+2026-01-28 12:12:04,915 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-28 12:13:38,809 - sms_agent - ERROR - AI Parse Error: 404 models/gemini-2.0-flash-exp is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2026-01-28 12:23:03,132 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 12:23:03,154 - sms_agent - INFO - Bot is polling...
+2026-01-28 12:23:03,218 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 12:23:22,828 - sms_agent - INFO - Saved training example for: IQFAL ALA
+2026-01-28 12:23:45,214 - sms_agent - INFO - Received message from Channel_-1003635708322: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 96
+At:IQFAL ...
+2026-01-28 12:23:47,521 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 9365, Account: Expense
+2026-01-28 12:23:47,534 - sms_agent - INFO - Saved training example for: IQFAL ALA
+2026-01-28 12:26:10,618 - sms_agent - INFO - Received message from Channel_-1003635708322: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 90
+At:IQFAL ...
+2026-01-28 12:26:12,618 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 9365, Account: Expense
+2026-01-28 12:26:12,624 - sms_agent - INFO - Saved training example for: IQFAL ALA

@@ -625,92 +625,90 @@ function Transactions() {
             )}
 
             {/* Transaction Modal */}
-            {showTxModal && (
-                <Modal title={editingTx ? "Edit Transaction" : "Add Transaction"} onClose={() => setShowTxModal(false)}>
-                    <form onSubmit={handleSaveTx} className="space-y-4">
-                        {/* Transaction Type */}
-                        <div className="grid grid-cols-2 gap-2 mb-4">
-                            <button
-                                type="button"
-                                onClick={() => setTxForm({ ...txForm, type: 'debit' })}
-                                className={`py-2 px-4 rounded-lg font-medium transition ${txForm.type === 'debit' ? 'bg-red-600 text-white' : 'bg-slate-700 text-gray-400'}`}
-                            >
-                                Expense
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setTxForm({ ...txForm, type: 'credit' })}
-                                className={`py-2 px-4 rounded-lg font-medium transition ${txForm.type === 'credit' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-gray-400'}`}
-                            >
-                                Income
-                            </button>
-                        </div>
+            <Modal isOpen={showTxModal} title={editingTx ? "Edit Transaction" : "Add Transaction"} onClose={() => setShowTxModal(false)}>
+                <form onSubmit={handleSaveTx} className="space-y-4">
+                    {/* Transaction Type */}
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                        <button
+                            type="button"
+                            onClick={() => setTxForm({ ...txForm, type: 'debit' })}
+                            className={`py-2 px-4 rounded-lg font-medium transition ${txForm.type === 'debit' ? 'bg-red-600 text-white' : 'bg-slate-700 text-gray-400'}`}
+                        >
+                            Expense
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setTxForm({ ...txForm, type: 'credit' })}
+                            className={`py-2 px-4 rounded-lg font-medium transition ${txForm.type === 'credit' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-gray-400'}`}
+                        >
+                            Income
+                        </button>
+                    </div>
 
-                        {/* Account */}
-                        <div>
-                            <label className="text-gray-400 text-xs mb-1 block">Account</label>
-                            <select className={selectClass} value={txForm.account_id} onChange={e => setTxForm({ ...txForm, account_id: e.target.value })} required>
-                                <option value="">Select Account</option>
-                                {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
-                            </select>
-                        </div>
+                    {/* Account */}
+                    <div>
+                        <label className="text-gray-400 text-xs mb-1 block">Account</label>
+                        <select className={selectClass} value={txForm.account_id} onChange={e => setTxForm({ ...txForm, account_id: e.target.value })} required>
+                            <option value="">Select Account</option>
+                            {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                        </select>
+                    </div>
 
-                        {/* Merchant */}
-                        <div>
-                            <label className="text-gray-400 text-xs mb-1 block">Merchant / Description</label>
-                            <input className={inputClass} value={txForm.merchant} onChange={e => setTxForm({ ...txForm, merchant: e.target.value })} placeholder="e.g. Starbucks" required />
-                        </div>
+                    {/* Merchant */}
+                    <div>
+                        <label className="text-gray-400 text-xs mb-1 block">Merchant / Description</label>
+                        <input className={inputClass} value={txForm.merchant} onChange={e => setTxForm({ ...txForm, merchant: e.target.value })} placeholder="e.g. Starbucks" required />
+                    </div>
 
-                        {/* Amount */}
-                        <div>
-                            <label className="text-gray-400 text-xs mb-1 block">Amount (SAR)</label>
-                            <input type="number" step="0.01" className={inputClass} value={txForm.amount} onChange={e => setTxForm({ ...txForm, amount: e.target.value })} placeholder="0.00" required />
-                        </div>
+                    {/* Amount */}
+                    <div>
+                        <label className="text-gray-400 text-xs mb-1 block">Amount (SAR)</label>
+                        <input type="number" step="0.01" className={inputClass} value={txForm.amount} onChange={e => setTxForm({ ...txForm, amount: e.target.value })} placeholder="0.00" required />
+                    </div>
 
-                        {/* Category */}
-                        <div>
-                            <label className="text-gray-400 text-xs mb-1 block">Category</label>
-                            <select className={selectClass} value={txForm.category} onChange={e => setTxForm({ ...txForm, category: e.target.value })}>
-                                <option value="">Select Category</option>
-                                {Categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                            </select>
-                        </div>
+                    {/* Category */}
+                    <div>
+                        <label className="text-gray-400 text-xs mb-1 block">Category</label>
+                        <select className={selectClass} value={txForm.category} onChange={e => setTxForm({ ...txForm, category: e.target.value })}>
+                            <option value="">Select Category</option>
+                            {Categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        </select>
+                    </div>
 
-                        {/* Timestamp */}
-                        <div>
-                            <label className="text-gray-400 text-xs mb-1 block">Date & Time</label>
-                            <input type="datetime-local" className={inputClass} value={txForm.timestamp} onChange={e => setTxForm({ ...txForm, timestamp: e.target.value })} />
-                        </div>
+                    {/* Timestamp */}
+                    <div>
+                        <label className="text-gray-400 text-xs mb-1 block">Date & Time</label>
+                        <input type="datetime-local" className={inputClass} value={txForm.timestamp} onChange={e => setTxForm({ ...txForm, timestamp: e.target.value })} />
+                    </div>
 
-                        {/* Notes */}
-                        <div>
-                            <label className="text-gray-400 text-xs mb-1 block">Notes</label>
-                            <textarea className={`${inputClass} h-20 resize-none`} value={txForm.notes} onChange={e => setTxForm({ ...txForm, notes: e.target.value })} placeholder="Optional notes..." />
-                        </div>
+                    {/* Notes */}
+                    <div>
+                        <label className="text-gray-400 text-xs mb-1 block">Notes</label>
+                        <textarea className={`${inputClass} h-20 resize-none`} value={txForm.notes} onChange={e => setTxForm({ ...txForm, notes: e.target.value })} placeholder="Optional notes..." />
+                    </div>
 
-                        {/* Raw SMS (if editing SMS transaction) */}
-                        {editingTx?.raw_sms_content && (
-                            <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-600">
-                                <label className="text-xs text-gray-400 uppercase font-bold mb-2 block flex items-center gap-2">
-                                    <img src="/sms-icon.png" alt="SMS" className="w-4 h-4" />
-                                    Original SMS
-                                </label>
-                                <pre className="text-xs text-gray-400 whitespace-pre-wrap font-mono bg-black/30 p-2 rounded max-h-32 overflow-y-auto">{editingTx.raw_sms_content}</pre>
-                            </div>
-                        )}
-
-                        {/* Actions */}
-                        <div className="flex gap-2 pt-4">
-                            <button type="button" onClick={() => setShowTxModal(false)} className="flex-1 bg-slate-700 text-white py-2.5 rounded-lg font-medium hover:bg-slate-600 transition">
-                                Cancel
-                            </button>
-                            <button type="submit" className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg font-medium hover:bg-blue-500 transition">
-                                {editingTx ? 'Save Changes' : 'Create Transaction'}
-                            </button>
+                    {/* Raw SMS (if editing SMS transaction) */}
+                    {editingTx?.raw_sms_content && (
+                        <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-600">
+                            <label className="text-xs text-gray-400 uppercase font-bold mb-2 block flex items-center gap-2">
+                                <img src="/sms-icon.png" alt="SMS" className="w-4 h-4" />
+                                Original SMS
+                            </label>
+                            <pre className="text-xs text-gray-400 whitespace-pre-wrap font-mono bg-black/30 p-2 rounded max-h-32 overflow-y-auto">{editingTx.raw_sms_content}</pre>
                         </div>
-                    </form>
-                </Modal>
-            )}
+                    )}
+
+                    {/* Actions */}
+                    <div className="flex gap-2 pt-4">
+                        <button type="button" onClick={() => setShowTxModal(false)} className="flex-1 bg-slate-700 text-white py-2.5 rounded-lg font-medium hover:bg-slate-600 transition">
+                            Cancel
+                        </button>
+                        <button type="submit" className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg font-medium hover:bg-blue-500 transition">
+                            {editingTx ? 'Save Changes' : 'Create Transaction'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 }
