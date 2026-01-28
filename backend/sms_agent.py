@@ -609,7 +609,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 label = f"💳 {acc.name}"
                 if acc.last_4_digits:
                     label += f" •{acc.last_4_digits}"
-                keyboard.append([InlineKeyboardButton(label, callback_data=f"assign_source:{pending_tx.id}:{acc.id}")])
+                # Short callback: "src:{tx_id8}:{acc_id8}" to fit 64 byte limit
+                keyboard.append([InlineKeyboardButton(label, callback_data=f"src:{pending_tx.id[:8]}:{acc.id[:8]}")])
             
             # Add credit cards (for non-transfer scenarios)
             if not dest_account:
@@ -617,7 +618,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     label = f"💎 {cc.name}"
                     if cc.last_4_digits:
                         label += f" •{cc.last_4_digits}"
-                    keyboard.append([InlineKeyboardButton(label, callback_data=f"assign_cc:{pending_tx.id}:{cc.id}")])
+                    keyboard.append([InlineKeyboardButton(label, callback_data=f"cc:{pending_tx.id[:8]}:{cc.id[:8]}")])
             
             reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
             
@@ -780,7 +781,10 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
         not ai_source_last4
     )
     
+    logger.info(f"DEBUG: is_internal_transfer_missing_source={is_internal_transfer_missing_source}, source_account={source_account.name if source_account else None}")
+    
     if is_internal_transfer_missing_source and source_account:
+        logger.info(f"DEBUG: Creating pending_action transaction for internal transfer to {source_account.name}")
         transaction_data = schemas.TransactionCreate(
             account_id=source_account.id,
             amount=sar_amount,
@@ -798,6 +802,7 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
         )
         
         tx = crud.create_transaction(db, transaction_data)
+        logger.info(f"DEBUG: Created transaction {tx.id} with status pending_action")
         
         # Build inline keyboard with source account options (excluding destination)
         if reply_target:
@@ -812,7 +817,9 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
                 label = f"💳 {acc.name}"
                 if acc.last_4_digits:
                     label += f" •{acc.last_4_digits}"
-                keyboard.append([InlineKeyboardButton(label, callback_data=f"assign_source:{tx.id}:{acc.id}")])
+                # Use shortened callback: "src:{tx_id_short}:{acc_id_short}" to stay under 64 bytes
+                callback = f"src:{tx.id[:8]}:{acc.id[:8]}"
+                keyboard.append([InlineKeyboardButton(label, callback_data=callback)])
             
             reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
             
@@ -822,10 +829,12 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
                 f"**Select the SOURCE account:**"
             )
             
+            logger.info(f"DEBUG: Sending inline buttons to user - {len(keyboard)} accounts")
             try: 
                 await reply_target.reply_text(response_txt, reply_markup=reply_markup)
-            except: 
-                pass
+                logger.info("DEBUG: Inline buttons sent successfully")
+            except Exception as e:
+                logger.error(f"ERROR sending inline buttons: {e}")
         
         return tx
     
@@ -917,18 +926,20 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     data = query.data
     
-    if data.startswith("assign_source:") or data.startswith("assign_acc:") or data.startswith("assign_cc:"):
-        # Parse callback data: "assign_source:{tx_id}:{source_account_id}"
+    # Handle short callback format: src, acc, cc (for 64-byte limit)
+    if data.startswith("src:") or data.startswith("acc:") or data.startswith("cc:"):
+        # Parse callback data: "src:{tx_id8}:{target_id8}"
         parts = data.split(":")
         if len(parts) != 3:
             await query.edit_message_text("❌ Invalid selection")
             return
         
-        action, tx_id, target_id = parts
+        action, tx_id_short, target_id_short = parts
         
         db = database.SessionLocal()
         try:
-            tx = db.query(models.Transaction).filter(models.Transaction.id == tx_id).first()
+            # Query by ID prefix since we only have first 8 chars
+            tx = db.query(models.Transaction).filter(models.Transaction.id.like(f"{tx_id_short}%")).first()
             if not tx:
                 await query.edit_message_text("❌ Transaction not found")
                 db.close()
@@ -939,12 +950,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 db.close()
                 return
             
-            if action == "assign_source":
+            if action == "src":
                 # SOURCE ACCOUNT SELECTION (for transfers with known destination)
                 # The pending_tx is stored as CREDIT to destination
                 # Now we know the source, create DEBIT from source and complete credit
                 
-                source_account = db.query(models.Account).filter(models.Account.id == target_id).first()
+                source_account = db.query(models.Account).filter(models.Account.id.like(f"{target_id_short}%")).first()
                 if not source_account:
                     await query.edit_message_text("❌ Account not found")
                     db.close()

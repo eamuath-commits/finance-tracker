@@ -861,3 +861,86 @@ Am...
 2026-01-28 22:51:06,311 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-01-28 22:51:16,251 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-01-28 22:51:16,274 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-28 22:52:09,016 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112 —— Transfer Between Your Accounts
+Am...
+2026-01-28 22:52:09,365 - sms_agent - INFO - Parsed structured message - Sender: +966566985112 (separator: '——')
+2026-01-28 22:52:11,641 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 7772, Account: General
+2026-01-28 22:52:11,642 - sms_agent - INFO - Incoming Credit detected to own account General. ensure primary.
+2026-01-28 22:52:11,642 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: General
+2026-01-28 22:54:07,883 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:54:18,994 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:54:19,012 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-28 22:56:38,330 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112 —— Transfer Between Your Accounts
+Am...
+2026-01-28 22:56:38,691 - sms_agent - INFO - Parsed structured message - Sender: +966566985112 (separator: '——')
+2026-01-28 22:56:41,618 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 7772, Account: General
+2026-01-28 22:56:41,619 - sms_agent - INFO - Incoming Credit detected to own account General. ensure primary.
+2026-01-28 22:56:41,619 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: General
+2026-01-28 22:56:41,621 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=General
+2026-01-28 22:56:41,621 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to General
+2026-01-28 22:56:41,627 - sms_agent - INFO - DEBUG: Created transaction 603c79b5-072d-4079-bc3d-9d9c081a0ce7 with status pending_action
+2026-01-28 22:57:42,902 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:57:54,001 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:57:54,019 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-28 22:58:54,176 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112 —— Transfer Between Your Accounts
+Am...
+2026-01-28 22:58:54,583 - sms_agent - INFO - Parsed structured message - Sender: +966566985112 (separator: '——')
+2026-01-28 22:58:56,521 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 7772, Account: General
+2026-01-28 22:58:56,522 - sms_agent - INFO - Incoming Credit detected to own account General. ensure primary.
+2026-01-28 22:58:56,522 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: General
+2026-01-28 22:58:56,524 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=General
+2026-01-28 22:58:56,524 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to General
+2026-01-28 22:58:56,528 - sms_agent - INFO - DEBUG: Created transaction b28a493c-1279-4b72-a67a-feaf1b861c42 with status pending_action
+2026-01-28 22:58:56,529 - sms_agent - INFO - DEBUG: Sending inline buttons to user - 9 accounts
+2026-01-28 22:58:56,662 - sms_agent - ERROR - ERROR sending inline buttons: Button_data_invalid
+2026-01-28 22:59:34,542 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 23:00:21,528 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 23:00:30,184 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 23:00:30,206 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-28 23:02:52,891 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112 —— Transfer Between Your Accounts
+Am...
+2026-01-28 23:02:53,567 - sms_agent - INFO - Parsed structured message - Sender: +966566985112 (separator: '——')
+2026-01-28 23:02:56,529 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 7772, Account: General
+2026-01-28 23:02:56,529 - sms_agent - INFO - Incoming Credit detected to own account General. ensure primary.
+2026-01-28 23:02:56,529 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: General
+2026-01-28 23:02:56,531 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=General
+2026-01-28 23:02:56,531 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to General
+2026-01-28 23:02:56,536 - sms_agent - INFO - DEBUG: Created transaction cb00a286-25c1-4dda-9c61-9f2972f24b20 with status pending_action
+2026-01-28 23:02:56,537 - sms_agent - INFO - DEBUG: Sending inline buttons to user - 9 accounts
+2026-01-28 23:02:56,725 - sms_agent - INFO - DEBUG: Inline buttons sent successfully
+2026-01-28 23:03:03,596 - sms_agent - INFO - Completed transfer: Payroll -> General
+2026-01-28 23:03:03,943 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112 —— Transfer Between Your Accounts
+Am...
+2026-01-28 23:03:04,123 - sms_agent - INFO - Parsed structured message - Sender: +966566985112 (separator: '——')
+2026-01-28 23:03:05,858 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 7772, Account: General
+2026-01-28 23:03:05,859 - sms_agent - INFO - Incoming Credit detected to own account General. ensure primary.
+2026-01-28 23:03:05,859 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: General
+2026-01-28 23:03:05,861 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=General
+2026-01-28 23:03:05,862 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to General
+2026-01-28 23:03:05,865 - sms_agent - INFO - DEBUG: Created transaction 1b748c0c-ec6a-4558-a5f6-7e63f81bc509 with status pending_action
+2026-01-28 23:03:05,866 - sms_agent - INFO - DEBUG: Sending inline buttons to user - 9 accounts
+2026-01-28 23:03:06,042 - sms_agent - INFO - DEBUG: Inline buttons sent successfully
+2026-01-28 23:03:30,330 - sms_agent - INFO - Completed transfer: Wallet -> General
+2026-01-28 23:03:48,928 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112 —— Transfer Between Your Accounts
+Am...
+2026-01-28 23:03:49,273 - sms_agent - INFO - Parsed structured message - Sender: +966566985112 (separator: '——')
+2026-01-28 23:03:51,018 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 7772, Account: General
+2026-01-28 23:03:51,020 - sms_agent - INFO - Incoming Credit detected to own account General. ensure primary.
+2026-01-28 23:03:51,020 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: General
+2026-01-28 23:03:51,022 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=General
+2026-01-28 23:03:51,022 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to General
+2026-01-28 23:03:51,027 - sms_agent - INFO - DEBUG: Created transaction e0adffdb-9183-4eca-b96e-5b70109ab026 with status pending_action
+2026-01-28 23:03:51,029 - sms_agent - INFO - DEBUG: Sending inline buttons to user - 9 accounts
+2026-01-28 23:03:51,221 - sms_agent - INFO - DEBUG: Inline buttons sent successfully
+2026-01-28 23:04:04,457 - sms_agent - INFO - Completed transfer: Expense -> General
+2026-01-28 23:04:30,050 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112 —— Transfer Between Your Accounts
+Am...
+2026-01-28 23:04:30,500 - sms_agent - INFO - Parsed structured message - Sender: +966566985112 (separator: '——')
+2026-01-28 23:04:32,532 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 7772, Account: General
+2026-01-28 23:04:32,534 - sms_agent - INFO - Incoming Credit detected to own account General. ensure primary.
+2026-01-28 23:04:32,534 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: General
+2026-01-28 23:04:32,536 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=General
+2026-01-28 23:04:32,536 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to General
+2026-01-28 23:04:32,539 - sms_agent - INFO - DEBUG: Created transaction cd91079c-0dc8-4758-9b34-a68e0085ee3b with status pending_action
+2026-01-28 23:04:32,539 - sms_agent - INFO - DEBUG: Sending inline buttons to user - 9 accounts
+2026-01-28 23:04:32,792 - sms_agent - INFO - DEBUG: Inline buttons sent successfully
