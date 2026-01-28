@@ -246,7 +246,7 @@ const Allocation = () => {
 
             {/* --- TAB 3: PAYROLL TRANSFERS --- */}
             {activeTab === 'transfers' && (
-                <PayrollTransfers accounts={accounts} currentMonth={new Date().toISOString().slice(0, 7)} />
+                <PayrollTransfers accounts={accounts} />
             )}
 
             {/* --- TAB 2: DISTRIBUTOR --- */}
