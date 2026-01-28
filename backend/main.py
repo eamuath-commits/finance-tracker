@@ -5,6 +5,11 @@ from sqlalchemy import text, inspect
 from typing import List, Optional
 from datetime import datetime
 import re
+import logging
+
+# Setup logger for API
+logger = logging.getLogger("api")
+logging.basicConfig(level=logging.INFO)
 
 import models
 import schemas
@@ -823,20 +828,34 @@ async def retry_message(message_id: str, db: Session = Depends(get_db)):
     if not msg:
         raise HTTPException(status_code=404, detail="Message not found")
 
+    logger.info(f"[RETRY] Starting retry for message {message_id}: {msg.body[:100]}...")
+
     # 1. Re-Run AI Parse
     try:
         result = await sms_agent.parse_with_ai(db, msg.body)
+        logger.info(f"[RETRY] AI Response: {result}")
     except Exception as e:
+        logger.error(f"[RETRY] AI Parse Exception: {str(e)}")
         msg.status = models.MessageStatus.FAILED
         msg.error_log = f"Retry AI Error: {str(e)}"
         db.commit()
         return {"status": "failed", "reason": str(e)}
+    
+    # Check for AI errors
+    if result and result.get("error"):
+        logger.warning(f"[RETRY] AI returned error: {result.get('error')}")
+        msg.status = models.MessageStatus.FAILED
+        msg.error_log = f"Retry AI Error: {result.get('error')}"
+        db.commit()
+        return {"status": "failed", "reason": result.get("error")}
         
     if not result or not result.get("is_financial_event"):
+        reason = result.get("reason", "Unknown") if result else "No response"
+        logger.warning(f"[RETRY] AI said not financial. Reason: {reason}, Full response: {result}")
         msg.status = models.MessageStatus.FAILED
-        msg.error_log = "Retry: AI said not financial"
+        msg.error_log = f"Retry: AI said not financial - {reason}"
         db.commit()
-        return {"status": "ignored", "reason": "Not financial"}
+        return {"status": "ignored", "reason": f"Not financial: {reason}"}
 
     # 2. Find Account logic (Unified)
     last_4 = result.get("destination_account_last4") or result.get("source_account_last4")

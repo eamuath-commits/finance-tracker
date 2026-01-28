@@ -247,3 +247,15 @@ By:9365;mada-Apple Pay
 Amount:SAR 96
 At:IQFAL ...
 2026-01-28 11:03:25,074 - sms_agent - ERROR - AI Parse Error: 404 models/gemini-2.0-flash-exp is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2026-01-28 11:55:45,267 - sms_agent - ERROR - AI Parse Error: 404 models/gemini-2.0-flash-exp is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2026-01-28 11:55:55,552 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-28 11:55:56,199 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-28 11:55:56,221 - sms_agent - INFO - Bot is polling...
+2026-01-28 11:56:22,953 - sms_agent - ERROR - AI Parse Error: 404 models/gemini-2.0-flash-exp is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2026-01-28 11:56:29,866 - sms_agent - ERROR - AI Parse Error: 404 models/gemini-2.0-flash-exp is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2026-01-28 11:56:38,068 - sms_agent - ERROR - AI Parse Error: 404 models/gemini-2.0-flash-exp is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2026-01-28 11:56:39,610 - sms_agent - ERROR - AI Parse Error: 404 models/gemini-2.0-flash-exp is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2026-01-28 11:58:39,505 - sms_agent - ERROR - AI Parse Error: 404 models/gemini-2.0-flash-exp is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2026-01-28 11:58:47,429 - sms_agent - ERROR - AI Parse Error: 404 models/gemini-2.0-flash-exp is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2026-01-28 12:01:43,260 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
+2026-01-28 12:02:30,562 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).
