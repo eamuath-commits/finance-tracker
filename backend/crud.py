@@ -1381,3 +1381,105 @@ def get_audit_history(db: Session, account_id: str, limit: int = 20):
         models.AccountAudit.account_id == account_id
     ).order_by(models.AccountAudit.audit_date.desc()).limit(limit).all()
 
+
+# --- Payroll Transfer CRUD ---
+
+def create_payroll_transfer(db: Session, transfer: schemas.PayrollTransferCreate):
+    """Create a payroll transfer record."""
+    db_transfer = models.PayrollTransfer(
+        source_account_id=transfer.source_account_id,
+        target_account_id=transfer.target_account_id,
+        amount=transfer.amount,
+        billing_month=transfer.billing_month,
+        note=transfer.note,
+        transaction_id=transfer.transaction_id
+    )
+    db.add(db_transfer)
+    db.commit()
+    db.refresh(db_transfer)
+    return db_transfer
+
+def get_payroll_transfers(db: Session, billing_month: str = None, source_account_id: str = None):
+    """Get payroll transfers, optionally filtered by month or source account."""
+    query = db.query(models.PayrollTransfer)
+    
+    if billing_month:
+        query = query.filter(models.PayrollTransfer.billing_month == billing_month)
+    if source_account_id:
+        query = query.filter(models.PayrollTransfer.source_account_id == source_account_id)
+    
+    return query.order_by(models.PayrollTransfer.created_at.desc()).all()
+
+def get_payroll_transfer(db: Session, transfer_id: str):
+    """Get a single payroll transfer by ID."""
+    return db.query(models.PayrollTransfer).filter(
+        models.PayrollTransfer.id == transfer_id
+    ).first()
+
+def update_payroll_transfer(db: Session, transfer_id: str, update: schemas.PayrollTransferUpdate):
+    """Update a payroll transfer."""
+    db_transfer = get_payroll_transfer(db, transfer_id)
+    if not db_transfer:
+        return None
+    
+    update_data = update.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_transfer, key, value)
+    
+    db.commit()
+    db.refresh(db_transfer)
+    return db_transfer
+
+def delete_payroll_transfer(db: Session, transfer_id: str):
+    """Delete a payroll transfer."""
+    db_transfer = get_payroll_transfer(db, transfer_id)
+    if not db_transfer:
+        return False
+    db.delete(db_transfer)
+    db.commit()
+    return True
+
+def get_payroll_transfer_matches(db: Session, transfer_id: str):
+    """Find matching transactions for a payroll transfer (similar to obligation matching)."""
+    transfer = get_payroll_transfer(db, transfer_id)
+    if not transfer:
+        return []
+    
+    # Look for transfer transactions in the same month
+    # Match by: amount (within tolerance), type='credit', to target account
+    tolerance = transfer.amount * 0.1  # 10% tolerance
+    min_amount = transfer.amount - tolerance
+    max_amount = transfer.amount + tolerance
+    
+    # Parse billing month to get date range
+    try:
+        year, month = transfer.billing_month.split('-')
+        from dateutil.relativedelta import relativedelta
+        start_date = datetime(int(year), int(month), 1)
+        end_date = start_date + relativedelta(months=1)
+    except:
+        return []
+    
+    # Find transactions: credits to target account, matching amount, in the month
+    matches = db.query(models.Transaction).filter(
+        models.Transaction.account_id == transfer.target_account_id,
+        models.Transaction.type == 'credit',
+        models.Transaction.amount >= min_amount,
+        models.Transaction.amount <= max_amount,
+        models.Transaction.timestamp >= start_date,
+        models.Transaction.timestamp < end_date,
+        models.Transaction.category.in_(['Transfer', 'Internal Transfer', None])
+    ).order_by(models.Transaction.timestamp.desc()).limit(5).all()
+    
+    return matches
+
+def link_payroll_transfer_to_transaction(db: Session, transfer_id: str, transaction_id: str):
+    """Link a payroll transfer to a transaction."""
+    db_transfer = get_payroll_transfer(db, transfer_id)
+    if not db_transfer:
+        return None
+    
+    db_transfer.transaction_id = transaction_id
+    db.commit()
+    db.refresh(db_transfer)
+    return db_transfer

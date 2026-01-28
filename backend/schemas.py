@@ -400,3 +400,30 @@ class Audit(AuditBase):
 
     class Config:
         from_attributes = True
+
+# --- Payroll Transfer Schemas ---
+class PayrollTransferBase(BaseModel):
+    source_account_id: str
+    target_account_id: str
+    amount: float
+    billing_month: str
+    note: Optional[str] = None
+    transaction_id: Optional[str] = None
+
+class PayrollTransferCreate(PayrollTransferBase):
+    pass
+
+class PayrollTransferUpdate(BaseModel):
+    amount: Optional[float] = None
+    note: Optional[str] = None
+    transaction_id: Optional[str] = None
+
+class PayrollTransfer(PayrollTransferBase):
+    id: str
+    created_at: datetime
+    source_account_name: Optional[str] = None
+    target_account_name: Optional[str] = None
+    linked_transaction: Optional[Transaction] = None
+
+    class Config:
+        from_attributes = True

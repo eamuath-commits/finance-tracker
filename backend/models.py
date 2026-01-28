@@ -257,3 +257,22 @@ class AllocationHistory(Base):
     wants_actual = Column(Float, default=0.0)
     savings_planned = Column(Float, default=0.0)
     savings_actual = Column(Float, default=0.0)
+
+class PayrollTransfer(Base):
+    """Track payroll/salary distribution transfers with transaction linking"""
+    __tablename__ = "payroll_transfers"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    source_account_id = Column(String, ForeignKey("accounts.id"), nullable=False)
+    target_account_id = Column(String, ForeignKey("accounts.id"), nullable=False)
+    amount = Column(Float, nullable=False)
+    billing_month = Column(String, nullable=False)  # "2026-01"
+    note = Column(String, nullable=True)
+    transaction_id = Column(String, ForeignKey("transactions.id"), nullable=True)  # Linked transaction
+    created_at = Column(DateTime, default=datetime.now)
+    
+    # Relationships
+    source_account = relationship("Account", foreign_keys=[source_account_id])
+    target_account = relationship("Account", foreign_keys=[target_account_id])
+    linked_transaction = relationship("Transaction", foreign_keys=[transaction_id])
+

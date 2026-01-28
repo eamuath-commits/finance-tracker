@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { ArrowRight, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { ArrowRight, CheckCircle, AlertCircle, RefreshCw, Receipt } from 'lucide-react';
 import { SectionHeader, formatCurrency } from '../components/UI';
 import AllocationRules from '../components/AllocationRules';
+import PayrollTransfers from '../components/PayrollTransfers';
 
 const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
 const Allocation = () => {
-    const [activeTab, setActiveTab] = useState('manager'); // 'manager' or 'distributor'
+    const [activeTab, setActiveTab] = useState('manager'); // 'manager', 'distributor', or 'transfers'
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -225,12 +226,27 @@ const Allocation = () => {
                     >
                         Payday Distributor
                     </button>
+                    <button
+                        onClick={() => setActiveTab('transfers')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${activeTab === 'transfers'
+                            ? 'bg-purple-600 text-white shadow-sm'
+                            : 'text-gray-400 hover:text-white'
+                            }`}
+                    >
+                        <Receipt size={14} />
+                        Payroll Transfers
+                    </button>
                 </div>
             </div>
 
             {/* --- TAB 1: RULES MANAGER --- */}
             {activeTab === 'manager' && (
                 <AllocationRules accounts={accounts} />
+            )}
+
+            {/* --- TAB 3: PAYROLL TRANSFERS --- */}
+            {activeTab === 'transfers' && (
+                <PayrollTransfers accounts={accounts} currentMonth={new Date().toISOString().slice(0, 7)} />
             )}
 
             {/* --- TAB 2: DISTRIBUTOR --- */}

@@ -1075,6 +1075,11 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
     if not source_acc:
         raise HTTPException(status_code=404, detail="Source account not found")
 
+    # Calculate billing month for payroll transfer records
+    from dateutil.relativedelta import relativedelta
+    target_date = datetime.now() + relativedelta(months=req.month_offset)
+    billing_month = target_date.strftime('%Y-%m')
+
     executed_transfers = []
     
     for item in preview.allocations:
@@ -1119,7 +1124,18 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
             category="Transfer",
             timestamp=datetime.now()
         )
-        crud.create_transaction(db, t_in)
+        tx_in = crud.create_transaction(db, t_in)
+        
+        # Auto-create PayrollTransfer record and link to incoming transaction
+        payroll_transfer = schemas.PayrollTransferCreate(
+            source_account_id=source_acc.id,
+            target_account_id=item.target_account_id,
+            amount=transfer_amount,
+            billing_month=billing_month,
+            note=f"Auto-created from Payday Distributor - {item.name}",
+            transaction_id=tx_in.id  # Link to the incoming transaction
+        )
+        crud.create_payroll_transfer(db, payroll_transfer)
         
         # Track execution details
         executed_transfers.append({
@@ -1201,3 +1217,106 @@ def confirm_audit(request: schemas.AuditConfirmRequest, db: Session = Depends(ge
 def get_audit_history(account_id: str, limit: int = 20, db: Session = Depends(get_db)):
     """Get audit history for an account."""
     return crud.get_audit_history(db, account_id, limit)
+
+
+# --- Payroll Transfer Endpoints ---
+
+@app.post("/payroll-transfers", response_model=schemas.PayrollTransfer)
+def create_payroll_transfer(transfer: schemas.PayrollTransferCreate, db: Session = Depends(get_db)):
+    """Create a payroll transfer record."""
+    db_transfer = crud.create_payroll_transfer(db, transfer)
+    
+    # Enrich with account names
+    source = crud.get_account(db, db_transfer.source_account_id)
+    target = crud.get_account(db, db_transfer.target_account_id)
+    
+    return {
+        **db_transfer.__dict__,
+        "source_account_name": source.name if source else None,
+        "target_account_name": target.name if target else None,
+        "linked_transaction": None
+    }
+
+@app.get("/payroll-transfers", response_model=List[schemas.PayrollTransfer])
+def get_payroll_transfers(
+    billing_month: str = None,
+    source_account_id: str = None,
+    db: Session = Depends(get_db)
+):
+    """Get payroll transfers, optionally filtered by month or source account."""
+    transfers = crud.get_payroll_transfers(db, billing_month, source_account_id)
+    
+    # Enrich with account names and linked transactions
+    result = []
+    for t in transfers:
+        source = crud.get_account(db, t.source_account_id)
+        target = crud.get_account(db, t.target_account_id)
+        linked_tx = None
+        if t.transaction_id:
+            linked_tx = crud.get_transaction(db, t.transaction_id)
+        
+        result.append({
+            **t.__dict__,
+            "source_account_name": source.name if source else None,
+            "target_account_name": target.name if target else None,
+            "linked_transaction": linked_tx
+        })
+    
+    return result
+
+@app.get("/payroll-transfers/{transfer_id}", response_model=schemas.PayrollTransfer)
+def get_payroll_transfer(transfer_id: str, db: Session = Depends(get_db)):
+    """Get a single payroll transfer by ID."""
+    t = crud.get_payroll_transfer(db, transfer_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Payroll transfer not found")
+    
+    source = crud.get_account(db, t.source_account_id)
+    target = crud.get_account(db, t.target_account_id)
+    linked_tx = crud.get_transaction(db, t.transaction_id) if t.transaction_id else None
+    
+    return {
+        **t.__dict__,
+        "source_account_name": source.name if source else None,
+        "target_account_name": target.name if target else None,
+        "linked_transaction": linked_tx
+    }
+
+@app.get("/payroll-transfers/{transfer_id}/matches", response_model=List[schemas.Transaction])
+def get_payroll_transfer_matches(transfer_id: str, db: Session = Depends(get_db)):
+    """Find matching transactions for a payroll transfer."""
+    matches = crud.get_payroll_transfer_matches(db, transfer_id)
+    return matches
+
+@app.post("/payroll-transfers/{transfer_id}/link")
+def link_payroll_transfer(transfer_id: str, transaction_id: str, db: Session = Depends(get_db)):
+    """Link a payroll transfer to a transaction."""
+    result = crud.link_payroll_transfer_to_transaction(db, transfer_id, transaction_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Payroll transfer not found")
+    return {"status": "linked", "transfer_id": transfer_id, "transaction_id": transaction_id}
+
+@app.put("/payroll-transfers/{transfer_id}", response_model=schemas.PayrollTransfer)
+def update_payroll_transfer(transfer_id: str, update: schemas.PayrollTransferUpdate, db: Session = Depends(get_db)):
+    """Update a payroll transfer."""
+    result = crud.update_payroll_transfer(db, transfer_id, update)
+    if not result:
+        raise HTTPException(status_code=404, detail="Payroll transfer not found")
+    
+    source = crud.get_account(db, result.source_account_id)
+    target = crud.get_account(db, result.target_account_id)
+    
+    return {
+        **result.__dict__,
+        "source_account_name": source.name if source else None,
+        "target_account_name": target.name if target else None,
+        "linked_transaction": None
+    }
+
+@app.delete("/payroll-transfers/{transfer_id}")
+def delete_payroll_transfer(transfer_id: str, db: Session = Depends(get_db)):
+    """Delete a payroll transfer."""
+    success = crud.delete_payroll_transfer(db, transfer_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Payroll transfer not found")
+    return {"status": "deleted"}
