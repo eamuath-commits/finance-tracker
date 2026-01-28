@@ -761,3 +761,25 @@ Amo...
 2026-01-28 22:02:42,068 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-01-28 22:03:20,682 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-01-28 22:03:45,399 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:06:10,178 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:06:10,203 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-28 22:06:10,272 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:07:29,218 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112 —— Outgoing Funds Transfer Approved
+...
+2026-01-28 22:07:29,564 - sms_agent - INFO - Parsed structured message - Sender: +966566985112 (separator: '——')
+2026-01-28 22:07:32,108 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 8001, Account: Jazira Checking
+2026-01-28 22:07:32,114 - sms_agent - INFO - Cross-bank transfer detected: Jazira Checking -> General
+2026-01-28 22:07:32,126 - sms_agent - INFO - Saved training example for: Transfer to General
+2026-01-28 22:08:24,132 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112 —— Credit Transfer Local
+Via:BJAZ
+Am...
+2026-01-28 22:08:24,594 - sms_agent - INFO - Parsed structured message - Sender: +966566985112 (separator: '——')
+2026-01-28 22:08:26,314 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 8001, Account: Jazira Checking
+2026-01-28 22:08:26,316 - sms_agent - INFO - Incoming Credit detected to own account General. ensure primary.
+2026-01-28 22:08:26,316 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: General
+2026-01-28 22:08:26,318 - sms_agent - INFO - Swapping Primary Account for Credit: Jazira Checking -> General
+2026-01-28 22:08:26,327 - sms_agent - INFO - Confirmed pending transfer: 545470ad-476b-46b5-bd64-42dfadf29f11 (matched with credit)
+2026-01-28 22:08:26,333 - sms_agent - INFO - Saved training example for: Transfer from Jazira Checking
+2026-01-28 22:13:37,960 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:14:14,741 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 22:14:47,603 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).

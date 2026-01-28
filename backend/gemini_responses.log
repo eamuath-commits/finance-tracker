@@ -496,3 +496,18 @@ At: PADDLE.NE
 Country:UK
 Balance:1.01 USD
 28/1/26 18:52 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "7868", "destination_account_last4": null, "card_info": "Visa 7868", "amount": 49.99, "currency": "USD", "fees": null, "timestamp": "2026-01-28 18:52", "available_balance": 1.01, "beneficiary": null, "merchant": "PADDLE.NE", "sender_name": null, "description": "Purchase at PADDLE.NE"}
+2026-01-28 22:07:32,100 - ai_raw_io - INFO - INPUT: Outgoing Funds Transfer Approved
+Debited from Account: 8001
+To: MUATH ALAS**
+Amount: SAR 2,000.00
+IBAN/Alias: 7772
+[AlRajhi Bank]
+at 2026-01-13 13:36
+Ref: 2BTMS11336096857 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "transfer", "source_bank": "Jazira Bank", "destination_bank": "AlRajhi Bank", "source_account_last4": "8001", "destination_account_last4": "7772", "card_info": null, "amount": 2000.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-13 13:36", "available_balance": null, "beneficiary": "MUATH ALAS**", "merchant": null, "sender_name": null, "category": "Transfer", "description": "Transfer to AlRajhi"}
+2026-01-28 22:08:26,309 - ai_raw_io - INFO - INPUT: Credit Transfer Local
+Via:BJAZ
+Amount:SAR 2000
+To:7772
+From:MUATH AMER MOHAMMED ALASIRI
+From:8001
+26-1-13 13:36 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "transfer", "source_bank": "Jazira Bank", "destination_bank": "AlRajhiBank", "source_account_last4": "8001", "destination_account_last4": "7772", "amount": 2000, "currency": "SAR", "sender_name": "MUATH AMER MOHAMMED ALASIRI", "category": "Transfer", "timestamp": "2026-01-26 13:36", "description": "Incoming transfer from Jazira Bank"}

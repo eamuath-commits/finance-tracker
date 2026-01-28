@@ -4,8 +4,8 @@ import json
 import re
 import asyncio
 from datetime import datetime, timedelta
-from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from sqlalchemy.orm import Session
 import google.generativeai as genai
 
@@ -557,47 +557,65 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                  logger.info(f"DEBUG: Credit Logic Applied. Primary Account: {source_account.name}")
         
         if not source_account and not source_credit_card:
-            # INTERACTIVE FALLBACK (Now creates a PENDING_ACTION transaction)
+            # INTERACTIVE FALLBACK - Create PENDING_ACTION transaction with inline buttons
             
-            # 1. Create the Transaction first as PENDING_ACTION
-            # We treat it as a DEBIT by default if unknown, or infer from context
             is_credit = result.get('transaction_type') == 'credit'
             
             tx_data = schemas.TransactionCreate(
-                account_id=None, # UNKNOWN
+                account_id=None, # UNKNOWN - will be assigned via button/UI
                 amount=result['amount'],
                 merchant=result.get('merchant') or "Unknown Source",
                 raw_sms_content=msg_text,
-                category="Uncategorized", 
+                parsed_data=json.dumps(result),
+                category=result.get('category') or "Uncategorized", 
                 type="credit" if is_credit else "debit",
                 status="pending_action",
                 timestamp=datetime.strptime(result['timestamp'], "%Y-%m-%d %H:%M") if result.get('timestamp') else datetime.now()
             )
             
-            # Add multi-currency info to pending transaction too
+            # Add multi-currency info
             if result.get('currency') and result.get('currency').upper() != 'SAR':
                 tx_data.original_amount = result['amount']
                 tx_data.original_currency = result.get('currency')
             
-            db.close() # Close DB before async wait
+            # Create the pending transaction
+            pending_tx = crud.create_transaction(db, tx_data)
+            logger.info(f"Created pending_action transaction: {pending_tx.id}")
             
-            await message.reply_text(
+            # Build inline keyboard with account options
+            accounts = crud.get_accounts(db)
+            credit_cards = crud.get_credit_cards(db)
+            
+            keyboard = []
+            
+            # Add accounts
+            for acc in accounts[:10]:  # Limit to 10 to avoid too many buttons
+                label = f"💳 {acc.name}"
+                if acc.last_4_digits:
+                    label += f" •{acc.last_4_digits}"
+                keyboard.append([InlineKeyboardButton(label, callback_data=f"assign_acc:{pending_tx.id}:{acc.id}")])
+            
+            # Add credit cards
+            for cc in credit_cards[:5]:
+                label = f"💎 {cc.name}"
+                if cc.last_4_digits:
+                    label += f" •{cc.last_4_digits}"
+                keyboard.append([InlineKeyboardButton(label, callback_data=f"assign_cc:{pending_tx.id}:{cc.id}")])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+            
+            response_txt = (
                 f"❓ **Unknown Account/Card**\n"
-                f"I parsed this as: {result.get('transaction_type')} of {result.get('amount')} {result.get('currency', 'SAR')}.\n"
-                f"But I couldn't match it to any linked account or credit card.\n\n"
-                f"Please add the account/card ending in relevant digits, or forward a clearer message."
+                f"Amount: {result.get('amount')} {result.get('currency', 'SAR')}\n"
+                f"Type: {result.get('transaction_type')}\n\n"
+                f"**Select the account:**"
             )
             
-            raw_msg.status = models.MessageStatus.FAILED
-            raw_msg.error_log = "Unknown Account/Card - pending user action"
+            await message.reply_text(response_txt, reply_markup=reply_markup)
             
-            # Re-open DB to save status
-            db = database.SessionLocal()
-            db_msg = db.query(models.RawMessage).filter(models.RawMessage.id == raw_msg.id).first()
-            if db_msg:
-                db_msg.status = models.MessageStatus.FAILED
-                db_msg.error_log = "Unknown Account/Card"
-                db.commit()
+            raw_msg.status = models.MessageStatus.PENDING
+            raw_msg.error_log = "Waiting for account selection"
+            db.commit()
             db.close()
             return
 
@@ -845,6 +863,91 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
         try: await reply_target.reply_text(response_txt)
         except: pass
 
+# --- Callback Query Handler (for inline buttons) ---
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle inline button callbacks for account selection"""
+    query = update.callback_query
+    await query.answer()  # Acknowledge the callback
+    
+    data = query.data
+    
+    if data.startswith("assign_acc:") or data.startswith("assign_cc:"):
+        # Parse callback data: "assign_acc:{tx_id}:{account_id}" or "assign_cc:{tx_id}:{cc_id}"
+        parts = data.split(":")
+        if len(parts) != 3:
+            await query.edit_message_text("❌ Invalid selection")
+            return
+        
+        action, tx_id, target_id = parts
+        
+        db = database.SessionLocal()
+        try:
+            tx = db.query(models.Transaction).filter(models.Transaction.id == tx_id).first()
+            if not tx:
+                await query.edit_message_text("❌ Transaction not found")
+                db.close()
+                return
+            
+            if tx.status != "pending_action":
+                await query.edit_message_text("ℹ️ This transaction was already processed")
+                db.close()
+                return
+            
+            if action == "assign_acc":
+                # Assign to account
+                account = db.query(models.Account).filter(models.Account.id == target_id).first()
+                if not account:
+                    await query.edit_message_text("❌ Account not found")
+                    db.close()
+                    return
+                
+                # Use existing assign function
+                crud.assign_account_to_transaction(db, tx_id, target_id)
+                
+                await query.edit_message_text(
+                    f"✅ **Transaction Assigned!**\n\n"
+                    f"Account: {account.name}\n"
+                    f"Amount: {tx.amount} SAR\n"
+                    f"Type: {tx.type}"
+                )
+                logger.info(f"Assigned transaction {tx_id} to account {account.name}")
+                
+            elif action == "assign_cc":
+                # Assign to credit card
+                cc = db.query(models.CreditCard).filter(models.CreditCard.id == target_id).first()
+                if not cc:
+                    await query.edit_message_text("❌ Credit card not found")
+                    db.close()
+                    return
+                
+                # Update transaction with credit card
+                tx.credit_card_id = target_id
+                tx.status = "completed"
+                
+                # Update credit card balance
+                if tx.type == "credit":
+                    cc.current_balance -= tx.amount  # Credits reduce balance owed
+                else:
+                    cc.current_balance += tx.amount  # Debits increase balance owed
+                
+                tx.balance_after_transaction = cc.current_balance
+                db.commit()
+                
+                await query.edit_message_text(
+                    f"✅ **Transaction Assigned!**\n\n"
+                    f"Credit Card: {cc.name}\n"
+                    f"Amount: {tx.amount} SAR\n"
+                    f"Type: {tx.type}\n"
+                    f"Balance: {cc.current_balance:.2f} SAR"
+                )
+                logger.info(f"Assigned transaction {tx_id} to credit card {cc.name}")
+                
+        except Exception as e:
+            logger.error(f"Callback error: {e}")
+            await query.edit_message_text(f"❌ Error: {str(e)}")
+        finally:
+            db.close()
+
 def run_bot():
     if not TELEGRAM_TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN not found. Exiting.")
@@ -854,6 +957,7 @@ def run_bot():
     
     # Handlers
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+    application.add_handler(CallbackQueryHandler(handle_callback))  # For inline button clicks
     
     logger.info("Bot is polling (dropping pending updates to skip old messages)...")
     # drop_pending_updates=True ensures we only process NEW messages, not old queued ones

@@ -495,7 +495,28 @@ function Transactions() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                                                {acc ? (
+                                                {tx.status === 'pending_action' ? (
+                                                    /* Show account selection dropdown for pending transactions */
+                                                    <select
+                                                        className="bg-slate-700 border border-amber-600 text-amber-400 rounded px-2 py-1 text-xs cursor-pointer"
+                                                        defaultValue=""
+                                                        onChange={async (e) => {
+                                                            const accountId = e.target.value;
+                                                            if (!accountId) return;
+                                                            try {
+                                                                await fetch(`${API_BASE}/transactions/${tx.id}/complete-transfer?source_account_id=${accountId}`, { method: 'POST' });
+                                                                fetchTransactions();
+                                                            } catch (err) {
+                                                                console.error('Failed to assign account:', err);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <option value="">⚠️ Select Account...</option>
+                                                        {accounts.map(a => (
+                                                            <option key={a.id} value={a.id}>{a.name} {a.last_4_digits ? `•${a.last_4_digits}` : ''}</option>
+                                                        ))}
+                                                    </select>
+                                                ) : acc ? (
                                                     <div className="flex flex-col">
                                                         <span>{acc.name}</span>
                                                         {acc.last_4_digits && <span className="text-xs text-gray-500 font-mono">•••• {acc.last_4_digits}</span>}

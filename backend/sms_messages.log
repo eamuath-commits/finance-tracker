@@ -153,3 +153,5 @@
 2026-01-28 17:45:44,999 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— PoS | By:9365;mada-Apple Pay | Amount:SAR 119.27 | At:BERAIN CO | 28/1/26 17:46
 2026-01-28 18:51:25,197 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— Credit Card:Payment | Card:Visa 7868 | Amount:USD 50 | Balance:51 USD | 28/1/26 18:51
 2026-01-28 18:51:56,903 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— Online Purchase | Card:7868 ;Visa | Amount:49.99 USD | At: PADDLE.NE | Country:UK | Balance:1.01 USD | 28/1/26 18:52
+2026-01-28 22:07:29,219 | FROM: Channel_-1003635708322 | SMS: +966566985112 —— Outgoing Funds Transfer Approved | Debited from Account: 8001 | To: MUATH ALAS** | Amount: SAR 2,000.00 | IBAN/Alias: 7772 | [AlRajhi Bank] | at 2026-01-13 13:36 | Ref: 2BTMS11336096857
+2026-01-28 22:08:24,134 | FROM: Channel_-1003635708322 | SMS: +966566985112 —— Credit Transfer Local | Via:BJAZ | Amount:SAR 2000 | To:7772 | From:MUATH AMER MOHAMMED ALASIRI | From:8001 | 26-1-13 13:36
