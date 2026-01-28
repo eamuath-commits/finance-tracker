@@ -386,24 +386,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Could not send reply (likely channel restriction): {e}")
 
     # --- Parse Sender and Body from structured format ---
-    # Expected format: "SENDER\n---\nBODY" or just "BODY" (legacy)
+    # Expected format: "SENDER --- BODY" or "SENDER —— BODY" (supports various dash types)
     sms_sender = None
     sms_body = msg_text
     
-    if '\n---\n' in msg_text:
-        # New structured format: sender first, then body
-        parts = msg_text.split('\n---\n', 1)
-        if len(parts) == 2:
-            sms_sender = parts[0].strip()
-            sms_body = parts[1].strip()
-            logger.info(f"Parsed structured message - Sender: {sms_sender}")
-    elif '---' in msg_text:
-        # Also support single line separator
-        parts = msg_text.split('---', 1)
-        if len(parts) == 2 and len(parts[0].strip()) < 50:  # Sender should be short
-            sms_sender = parts[0].strip()
-            sms_body = parts[1].strip()
-            logger.info(f"Parsed structured message (single line) - Sender: {sms_sender}")
+    # List of separators to try (regular dashes, em-dashes, etc.)
+    separators = ['\n---\n', ' --- ', '---', '\n——\n', ' —— ', '——', '\n--\n', ' -- ', '--']
+    
+    for sep in separators:
+        if sep in msg_text:
+            parts = msg_text.split(sep, 1)
+            if len(parts) == 2 and len(parts[0].strip()) < 50:  # Sender should be short
+                sms_sender = parts[0].strip()
+                sms_body = parts[1].strip()
+                logger.info(f"Parsed structured message - Sender: {sms_sender} (separator: '{sep.strip()}')")
+                break
     
     # Fallback: try to extract sender from end of message text
     if not sms_sender:

@@ -468,3 +468,9 @@ Account: Grocery
 Amount: 52.45 SAR
 Merchant: Keemart
 Balance: 327.94 SAR || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "2104", "destination_account_last4": null, "card_info": null, "amount": 52.45, "currency": "SAR", "fees": null, "timestamp": "2026-01-28 00:00", "available_balance": 327.94, "beneficiary": null, "merchant": "Keemart", "sender_name": null, "description": "Purchase at Keemart"}
+2026-01-28 14:54:28,389 - ai_raw_io - INFO - INPUT: @userinfobot || OUTPUT: {"is_financial_event": false, "is_transaction": false, "transaction_type": null, "sub_type": null, "source_bank": null, "destination_bank": null, "source_account_last4": null, "destination_account_last4": null, "card_info": null, "amount": null, "currency": null, "fees": null, "timestamp": null, "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "description": null}
+2026-01-28 15:58:39,143 - ai_raw_io - INFO - INPUT: +966566985112 —— PoS
+By:9365;mada-Apple Pay
+Amount:SAR 900
+At:Test
+28/1/26 11:05 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": null, "destination_bank": null, "source_account_last4": "9365", "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 900, "currency": "SAR", "fees": null, "timestamp": "2026-01-28 11:05", "available_balance": null, "beneficiary": null, "merchant": "Test", "sender_name": null, "description": "Purchase at Test"}

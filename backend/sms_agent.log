@@ -716,3 +716,16 @@ Amount: 52.45 SAR
 2026-01-28 14:37:02,518 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 2104, Account: Grocery
 2026-01-28 14:37:02,524 - sms_agent - INFO - Saved training example for: Keemart
 2026-01-28 14:37:30,671 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 14:39:00,653 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 14:39:00,676 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-28 14:39:00,766 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 14:39:42,724 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 14:39:42,748 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-28 14:39:42,831 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 14:54:25,538 - sms_agent - INFO - Received message from 5519767199: @userinfobot...
+2026-01-28 15:58:35,404 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112 —— PoS
+By:9365;mada-Apple Pay
+Amount...
+2026-01-28 15:58:39,152 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 9365, Account: Expense
+2026-01-28 15:58:39,159 - sms_agent - INFO - Saved training example for: Test
+2026-01-28 15:59:38,086 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
