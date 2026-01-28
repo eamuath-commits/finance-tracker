@@ -9,11 +9,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 logger = logging.getLogger(__name__)
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-flash-latest')
+    model = genai.GenerativeModel(GEMINI_MODEL)
+    logger.info(f"AI Parser Configured (Model: {GEMINI_MODEL}).")
 else:
     logger.warning("GEMINI_API_KEY not found. AI parsing will fail.")
     model = None

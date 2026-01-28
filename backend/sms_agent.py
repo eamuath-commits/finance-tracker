@@ -41,13 +41,14 @@ sms_logger.addHandler(sms_file_handler)
 # --- Configuration ---
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
 # Gemini Setup
 if GEMINI_API_KEY:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
-        logger.info("Gemini AI Configured Successfully (Model: gemini-2.0-flash-exp).")
+        model = genai.GenerativeModel(GEMINI_MODEL)
+        logger.info(f"Gemini AI Configured Successfully (Model: {GEMINI_MODEL}).")
     except Exception as e:
         logger.error(f"Failed to configure Gemini AI: {e}")
         model = None
