@@ -426,7 +426,7 @@ function Transactions() {
                     )}
 
                     {/* Transaction Table */}
-                    <div className="bg-slate-800 rounded-xl shadow-lg border border-slate-700 overflow-hidden">
+                    <div className="bg-slate-800 rounded-xl shadow-lg border border-slate-700 overflow-x-auto">
                         <table className="min-w-full divide-y divide-slate-700">
                             <thead className="bg-slate-900">
                                 <tr>
@@ -530,8 +530,8 @@ function Transactions() {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                                                 <div className="flex justify-end gap-2">
-                                                    <button onClick={() => openTxModal(tx)} className="text-blue-400 hover:text-blue-300 p-1"><Edit3 size={16} /></button>
-                                                    <button onClick={() => handleDeleteTx(tx.id)} className="text-red-400 hover:text-red-300 p-1"><Trash2 size={16} /></button>
+                                                    <button type="button" onClick={() => openTxModal(tx)} className="text-blue-400 hover:text-blue-300 p-1"><Edit3 size={16} /></button>
+                                                    <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteTx(tx.id); }} className="text-red-400 hover:text-red-300 p-1"><Trash2 size={16} /></button>
                                                 </div>
                                             </td>
                                         </tr>

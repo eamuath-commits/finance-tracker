@@ -729,3 +729,8 @@ Amount...
 2026-01-28 15:58:39,152 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 9365, Account: Expense
 2026-01-28 15:58:39,159 - sms_agent - INFO - Saved training example for: Test
 2026-01-28 15:59:38,086 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-28 16:01:07,103 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112 —— PoS
+By:9365;mada-Apple Pay
+Amount...
+2026-01-28 16:01:09,354 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 9365, Account: Expense
+2026-01-28 16:01:09,358 - sms_agent - INFO - Saved training example for: Test
