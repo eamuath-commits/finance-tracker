@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useSearchParams } from 'react-router-dom';
 import { Modal, formatCurrency, inputClass, selectClass } from '../components/UI';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { Calendar, Trash2, LayoutGrid, List, Receipt, Tag, Plus, Edit2, ArrowLeft, ArrowRight, Filter, X } from 'lucide-react';
 import ObligationsOverview from '../components/ObligationsOverview';
 import ObligationsList from '../components/ObligationsList';
@@ -62,6 +63,22 @@ const Obligations = () => {
 
     const [obligationForm, setObligationForm] = useState({ name: '', due_day: '', category: '', notes: '', provider: '' });
     const [paymentForm, setPaymentForm] = useState({ id: null, amount: '', note: '', billing_month: new Date().toISOString().split('T')[0] });
+
+    // Confirmation Dialog State
+    const [confirmDialog, setConfirmDialog] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: null
+    });
+
+    const showConfirm = (title, message, onConfirm) => {
+        setConfirmDialog({ isOpen: true, title, message, onConfirm });
+    };
+
+    const closeConfirm = () => {
+        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null });
+    };
 
     const currentPaymentObligation = React.useMemo(() =>
         obligations.find(o => o.id === paymentForm.id),
@@ -197,13 +214,19 @@ const Obligations = () => {
 
     const handleDeleteObligation = async () => {
         if (!editingId) return;
-        if (!confirm("Are you sure?")) return;
-        try {
-            await axios.delete(`${API_URL}/obligations/${editingId}`);
-            setShowObligationModal(false);
-            setEditingId(null);
-            fetchData();
-        } catch (err) { alert('Error deleting'); }
+        showConfirm(
+            "Delete Obligation?",
+            "This will permanently remove this obligation and all its payment history.",
+            async () => {
+                try {
+                    await axios.delete(`${API_URL}/obligations/${editingId}`);
+                    setShowObligationModal(false);
+                    setEditingId(null);
+                    fetchData();
+                } catch (err) { alert('Error deleting'); }
+                closeConfirm();
+            }
+        );
     };
 
     const handleReorder = async (newOrderedObligations) => {
@@ -235,11 +258,17 @@ const Obligations = () => {
     };
 
     const handleDeleteCategory = async (id) => {
-        if (!confirm("Delete this category? Associated obligations will become Uncategorized.")) return;
-        try {
-            await axios.delete(`${API_URL}/categories/${id}`);
-            fetchData();
-        } catch (error) { alert("Failed to delete category"); }
+        showConfirm(
+            "Delete Category?",
+            "Associated obligations will become Uncategorized.",
+            async () => {
+                try {
+                    await axios.delete(`${API_URL}/categories/${id}`);
+                    fetchData();
+                } catch (error) { alert("Failed to delete category"); }
+                closeConfirm();
+            }
+        );
     };
 
     // --- Payment Handlers ---
@@ -294,15 +323,21 @@ const Obligations = () => {
     };
 
     const handleDeleteHistory = async (historyId) => {
-        if (!confirm("Delete this payment record?")) return;
-        try {
-            await axios.delete(`${API_URL}/obligations/history/${historyId}`);
-            if (viewingHistoryId) {
-                const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/payments`);
-                setSelectedHistory(hRes.data);
+        showConfirm(
+            "Delete Payment?",
+            "This payment record will be permanently removed.",
+            async () => {
+                try {
+                    await axios.delete(`${API_URL}/obligations/history/${historyId}`);
+                    if (viewingHistoryId) {
+                        const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/payments`);
+                        setSelectedHistory(hRes.data);
+                    }
+                    fetchData();
+                } catch (err) { alert("Error deleting payment"); }
+                closeConfirm();
             }
-            fetchData();
-        } catch (err) { alert("Error deleting payment"); }
+        );
     };
 
     // --- View Helpers ---
@@ -567,6 +602,16 @@ const Obligations = () => {
                     <div className="text-center text-gray-400">Please use the "History" tab to manage records.</div>
                 </Modal>
             )}
+
+            {/* Confirmation Dialog */}
+            <ConfirmDialog
+                isOpen={confirmDialog.isOpen}
+                title={confirmDialog.title}
+                message={confirmDialog.message}
+                confirmText="Delete"
+                onConfirm={confirmDialog.onConfirm}
+                onCancel={closeConfirm}
+            />
         </div>
     );
 };

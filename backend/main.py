@@ -456,9 +456,38 @@ def pay_obligation(obligation_id: str, payment: schemas.PaymentCreate, db: Sessi
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.get("/obligations/{obligation_id}/payments", response_model=List[schemas.Payment])
+@app.get("/obligations/{obligation_id}/payments")
 def read_obligation_payments(obligation_id: str, db: Session = Depends(get_db)):
-    return crud.get_payments(db, obligation_id)
+    payments = crud.get_payments(db, obligation_id)
+    result = []
+    for p in payments:
+        payment_dict = {
+            "id": p.id,
+            "obligation_id": p.obligation_id,
+            "amount": p.amount,
+            "payment_date": p.payment_date,
+            "billing_month": p.billing_month,
+            "note": p.note,
+            "status": p.status,
+            "transaction_id": p.transaction_id,
+            "linked_transaction": None
+        }
+        if p.transaction_id:
+            tx = crud.get_transaction(db, p.transaction_id)
+            if tx:
+                payment_dict["linked_transaction"] = {
+                    "id": tx.id,
+                    "merchant": tx.merchant,
+                    "amount": tx.amount,
+                    "type": tx.type,
+                    "category": tx.category,
+                    "timestamp": tx.timestamp.isoformat() if tx.timestamp else None,
+                    "account_id": tx.account_id,
+                    "account_name": crud.get_account(db, tx.account_id).name if tx.account_id else None,
+                    "notes": tx.notes
+                }
+        result.append(payment_dict)
+    return result
 
 @app.get("/obligations/{obligation_id}/history", response_model=List[schemas.Payment]) # Keep deprecated endpoint for safety temporarily?
 def read_obligation_history_legacy(obligation_id: str, db: Session = Depends(get_db)):
@@ -1109,69 +1138,35 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
             requested_amount = req.override_amount
 
         transfer_amount = requested_amount
-        shortage = 0.0
         
-        if source_acc.current_balance < transfer_amount:
-            # Partial Transfer Logic
-            transfer_amount = max(0, source_acc.current_balance)
-            shortage = requested_amount - transfer_amount
-            
-            if transfer_amount <= 0:
-                # Skip if source is empty
-                continue
-
-        # Create ONE outgoing transaction
-        t_out = schemas.TransactionCreate(
-            account_id=source_acc.id,
-            amount=-transfer_amount, 
-            merchant=f"Transfer to {data['target_account_name']}",
-            category="Internal Transfer",
-            type="debit",
-            timestamp=datetime.now()
-        )
-        crud.create_transaction(db, t_out)
-        
-        # Create ONE incoming transaction
-        t_in = schemas.TransactionCreate(
-            account_id=target_account_id,
-            amount=transfer_amount,
-            merchant=f"Transfer from {source_acc.name}",
-            category="Internal Transfer",
-            type="credit",
-            timestamp=datetime.now()
-        )
-        tx_in = crud.create_transaction(db, t_in)
-        
-        # Create ONE PayrollTransfer record per target account
-        # Note: Don't auto-link transaction_id - user will link via suggestions
+        # Create Distribution record only (NO transaction creation)
+        # Distributions are tracking records - balances only change via SMS/manual transactions
         items_summary = ", ".join(data['items'][:3])
         if len(data['items']) > 3:
             items_summary += f" +{len(data['items']) - 3} more"
             
-        payroll_transfer = schemas.PayrollTransferCreate(
+        distribution = schemas.DistributionCreate(
             source_account_id=source_acc.id,
             target_account_id=target_account_id,
             amount=transfer_amount,
             billing_month=billing_month,
             note=f"Payday Distributor: {items_summary}"
         )
-        crud.create_payroll_transfer(db, payroll_transfer)
-        
-        # Update source balance for next iteration
-        source_acc.current_balance -= transfer_amount
+        crud.create_distribution(db, distribution)
         
         # Track execution details
         executed_transfers.append({
             "target": data['target_account_name'],
             "requested": requested_amount,
             "transferred": transfer_amount,
-            "shortage": shortage
+            "shortage": 0.0  # No shortage check since we're not moving money
         })
         
     return {
         "status": "success", 
         "transfers_count": len(executed_transfers),
-        "details": executed_transfers
+        "details": executed_transfers,
+        "note": "Distribution records created. Link to real transactions when they occur."
     }
 
 # --- Category Endpoints ---
@@ -1242,44 +1237,44 @@ def get_audit_history(account_id: str, limit: int = 20, db: Session = Depends(ge
     return crud.get_audit_history(db, account_id, limit)
 
 
-# --- Payroll Transfer Endpoints ---
+# --- Distribution Endpoints ---
 
-@app.post("/payroll-transfers", response_model=schemas.PayrollTransfer)
-def create_payroll_transfer(transfer: schemas.PayrollTransferCreate, db: Session = Depends(get_db)):
-    """Create a payroll transfer record."""
-    db_transfer = crud.create_payroll_transfer(db, transfer)
+@app.post("/distributions", response_model=schemas.Distribution)
+def create_distribution(distribution: schemas.DistributionCreate, db: Session = Depends(get_db)):
+    """Create a distribution record."""
+    db_distribution = crud.create_distribution(db, distribution)
     
     # Enrich with account names
-    source = crud.get_account(db, db_transfer.source_account_id)
-    target = crud.get_account(db, db_transfer.target_account_id)
+    source = crud.get_account(db, db_distribution.source_account_id)
+    target = crud.get_account(db, db_distribution.target_account_id)
     
     return {
-        **db_transfer.__dict__,
+        **db_distribution.__dict__,
         "source_account_name": source.name if source else None,
         "target_account_name": target.name if target else None,
         "linked_transaction": None
     }
 
-@app.get("/payroll-transfers", response_model=List[schemas.PayrollTransfer])
-def get_payroll_transfers(
+@app.get("/distributions", response_model=List[schemas.Distribution])
+def get_distributions(
     billing_month: str = None,
     source_account_id: str = None,
     db: Session = Depends(get_db)
 ):
-    """Get payroll transfers, optionally filtered by month or source account."""
-    transfers = crud.get_payroll_transfers(db, billing_month, source_account_id)
+    """Get distributions, optionally filtered by month or source account."""
+    distributions = crud.get_distributions(db, billing_month, source_account_id)
     
     # Enrich with account names and linked transactions
     result = []
-    for t in transfers:
-        source = crud.get_account(db, t.source_account_id)
-        target = crud.get_account(db, t.target_account_id)
+    for d in distributions:
+        source = crud.get_account(db, d.source_account_id)
+        target = crud.get_account(db, d.target_account_id)
         linked_tx = None
-        if t.transaction_id:
-            linked_tx = crud.get_transaction(db, t.transaction_id)
+        if d.transaction_id:
+            linked_tx = crud.get_transaction(db, d.transaction_id)
         
         result.append({
-            **t.__dict__,
+            **d.__dict__,
             "source_account_name": source.name if source else None,
             "target_account_name": target.name if target else None,
             "linked_transaction": linked_tx
@@ -1287,44 +1282,44 @@ def get_payroll_transfers(
     
     return result
 
-@app.get("/payroll-transfers/{transfer_id}", response_model=schemas.PayrollTransfer)
-def get_payroll_transfer(transfer_id: str, db: Session = Depends(get_db)):
-    """Get a single payroll transfer by ID."""
-    t = crud.get_payroll_transfer(db, transfer_id)
-    if not t:
-        raise HTTPException(status_code=404, detail="Payroll transfer not found")
+@app.get("/distributions/{distribution_id}", response_model=schemas.Distribution)
+def get_distribution(distribution_id: str, db: Session = Depends(get_db)):
+    """Get a single distribution by ID."""
+    d = crud.get_distribution(db, distribution_id)
+    if not d:
+        raise HTTPException(status_code=404, detail="Distribution not found")
     
-    source = crud.get_account(db, t.source_account_id)
-    target = crud.get_account(db, t.target_account_id)
-    linked_tx = crud.get_transaction(db, t.transaction_id) if t.transaction_id else None
+    source = crud.get_account(db, d.source_account_id)
+    target = crud.get_account(db, d.target_account_id)
+    linked_tx = crud.get_transaction(db, d.transaction_id) if d.transaction_id else None
     
     return {
-        **t.__dict__,
+        **d.__dict__,
         "source_account_name": source.name if source else None,
         "target_account_name": target.name if target else None,
         "linked_transaction": linked_tx
     }
 
-@app.get("/payroll-transfers/{transfer_id}/matches", response_model=List[schemas.Transaction])
-def get_payroll_transfer_matches(transfer_id: str, db: Session = Depends(get_db)):
-    """Find matching transactions for a payroll transfer."""
-    matches = crud.get_payroll_transfer_matches(db, transfer_id)
+@app.get("/distributions/{distribution_id}/matches", response_model=List[schemas.Transaction])
+def get_distribution_matches(distribution_id: str, db: Session = Depends(get_db)):
+    """Find matching transactions for a distribution."""
+    matches = crud.get_distribution_matches(db, distribution_id)
     return matches
 
-@app.post("/payroll-transfers/{transfer_id}/link")
-def link_payroll_transfer(transfer_id: str, transaction_id: str, db: Session = Depends(get_db)):
-    """Link a payroll transfer to a transaction."""
-    result = crud.link_payroll_transfer_to_transaction(db, transfer_id, transaction_id)
+@app.post("/distributions/{distribution_id}/link")
+def link_distribution(distribution_id: str, transaction_id: str, db: Session = Depends(get_db)):
+    """Link a distribution to a transaction."""
+    result = crud.link_distribution_to_transaction(db, distribution_id, transaction_id)
     if not result:
-        raise HTTPException(status_code=404, detail="Payroll transfer not found")
-    return {"status": "linked", "transfer_id": transfer_id, "transaction_id": transaction_id}
+        raise HTTPException(status_code=404, detail="Distribution not found")
+    return {"status": "linked", "distribution_id": distribution_id, "transaction_id": transaction_id}
 
-@app.put("/payroll-transfers/{transfer_id}", response_model=schemas.PayrollTransfer)
-def update_payroll_transfer(transfer_id: str, update: schemas.PayrollTransferUpdate, db: Session = Depends(get_db)):
-    """Update a payroll transfer."""
-    result = crud.update_payroll_transfer(db, transfer_id, update)
+@app.put("/distributions/{distribution_id}", response_model=schemas.Distribution)
+def update_distribution(distribution_id: str, update: schemas.DistributionUpdate, db: Session = Depends(get_db)):
+    """Update a distribution."""
+    result = crud.update_distribution(db, distribution_id, update)
     if not result:
-        raise HTTPException(status_code=404, detail="Payroll transfer not found")
+        raise HTTPException(status_code=404, detail="Distribution not found")
     
     source = crud.get_account(db, result.source_account_id)
     target = crud.get_account(db, result.target_account_id)
@@ -1336,10 +1331,225 @@ def update_payroll_transfer(transfer_id: str, update: schemas.PayrollTransferUpd
         "linked_transaction": None
     }
 
-@app.delete("/payroll-transfers/{transfer_id}")
-def delete_payroll_transfer(transfer_id: str, db: Session = Depends(get_db)):
-    """Delete a payroll transfer."""
-    success = crud.delete_payroll_transfer(db, transfer_id)
+@app.delete("/distributions/{distribution_id}")
+def delete_distribution(distribution_id: str, db: Session = Depends(get_db)):
+    """Delete a distribution."""
+    success = crud.delete_distribution(db, distribution_id)
     if not success:
-        raise HTTPException(status_code=404, detail="Payroll transfer not found")
+        raise HTTPException(status_code=404, detail="Distribution not found")
     return {"status": "deleted"}
+
+
+# --- Transaction Linking Endpoints ---
+
+@app.get("/payments/{payment_id}/transactions")
+def get_payment_linked_transactions(payment_id: int, db: Session = Depends(get_db)):
+    """Get all transactions linked to a payment."""
+    links = db.query(models.PaymentTransaction).filter(
+        models.PaymentTransaction.payment_id == payment_id
+    ).all()
+    tx_ids = [link.transaction_id for link in links]
+    
+    payment = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
+    if payment and payment.transaction_id and payment.transaction_id not in tx_ids:
+        tx_ids.append(payment.transaction_id)
+    
+    transactions = db.query(models.Transaction).filter(
+        models.Transaction.id.in_(tx_ids)
+    ).all() if tx_ids else []
+    
+    return transactions
+
+
+@app.post("/payments/{payment_id}/transactions")
+def link_transactions_to_payment(
+    payment_id: int,
+    request: schemas.LinkTransactionsRequest,
+    db: Session = Depends(get_db)
+):
+    """Link multiple transactions to a payment."""
+    payment = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    linked = []
+    for tx_id in request.transaction_ids:
+        existing = db.query(models.PaymentTransaction).filter(
+            models.PaymentTransaction.payment_id == payment_id,
+            models.PaymentTransaction.transaction_id == tx_id
+        ).first()
+        
+        if not existing:
+            link = models.PaymentTransaction(payment_id=payment_id, transaction_id=tx_id)
+            db.add(link)
+            linked.append(tx_id)
+    
+    db.commit()
+    return {"linked": linked, "count": len(linked)}
+
+
+@app.delete("/payments/{payment_id}/transactions/{transaction_id}")
+def unlink_transaction_from_payment(payment_id: int, transaction_id: str, db: Session = Depends(get_db)):
+    """Unlink a transaction from a payment."""
+    link = db.query(models.PaymentTransaction).filter(
+        models.PaymentTransaction.payment_id == payment_id,
+        models.PaymentTransaction.transaction_id == transaction_id
+    ).first()
+    
+    if link:
+        db.delete(link)
+        db.commit()
+        return {"status": "unlinked"}
+    
+    payment = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
+    if payment and payment.transaction_id == transaction_id:
+        payment.transaction_id = None
+        db.commit()
+        return {"status": "unlinked"}
+    
+    raise HTTPException(status_code=404, detail="Link not found")
+
+
+@app.get("/distributions/{distribution_id}/transactions")
+def get_distribution_linked_transactions(distribution_id: str, db: Session = Depends(get_db)):
+    """Get all transactions linked to a distribution."""
+    links = db.query(models.DistributionTransaction).filter(
+        models.DistributionTransaction.distribution_id == distribution_id
+    ).all()
+    tx_ids = [link.transaction_id for link in links]
+    
+    dist = db.query(models.Distribution).filter(models.Distribution.id == distribution_id).first()
+    if dist and dist.transaction_id and dist.transaction_id not in tx_ids:
+        tx_ids.append(dist.transaction_id)
+    
+    transactions = db.query(models.Transaction).filter(
+        models.Transaction.id.in_(tx_ids)
+    ).all() if tx_ids else []
+    
+    return transactions
+
+
+@app.post("/distributions/{distribution_id}/transactions")
+def link_transactions_to_distribution(
+    distribution_id: str,
+    request: schemas.LinkTransactionsRequest,
+    db: Session = Depends(get_db)
+):
+    """Link multiple transactions to a distribution."""
+    dist = db.query(models.Distribution).filter(models.Distribution.id == distribution_id).first()
+    if not dist:
+        raise HTTPException(status_code=404, detail="Distribution not found")
+    
+    linked = []
+    for tx_id in request.transaction_ids:
+        existing = db.query(models.DistributionTransaction).filter(
+            models.DistributionTransaction.distribution_id == distribution_id,
+            models.DistributionTransaction.transaction_id == tx_id
+        ).first()
+        
+        if not existing:
+            link = models.DistributionTransaction(distribution_id=distribution_id, transaction_id=tx_id)
+            db.add(link)
+            linked.append(tx_id)
+    
+    db.commit()
+    return {"linked": linked, "count": len(linked)}
+
+
+@app.delete("/distributions/{distribution_id}/transactions/{transaction_id}")
+def unlink_transaction_from_distribution(distribution_id: str, transaction_id: str, db: Session = Depends(get_db)):
+    """Unlink a transaction from a distribution."""
+    link = db.query(models.DistributionTransaction).filter(
+        models.DistributionTransaction.distribution_id == distribution_id,
+        models.DistributionTransaction.transaction_id == transaction_id
+    ).first()
+    
+    if link:
+        db.delete(link)
+        db.commit()
+        return {"status": "unlinked"}
+    
+    dist = db.query(models.Distribution).filter(models.Distribution.id == distribution_id).first()
+    if dist and dist.transaction_id == transaction_id:
+        dist.transaction_id = None
+        db.commit()
+        return {"status": "unlinked"}
+    
+    raise HTTPException(status_code=404, detail="Link not found")
+
+
+@app.get("/transactions/search")
+def search_transactions(
+    query: Optional[str] = None,
+    account_id: Optional[str] = None,
+    category: Optional[str] = None,
+    min_amount: Optional[float] = None,
+    max_amount: Optional[float] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    type: Optional[str] = None,
+    limit: int = 50,
+    db: Session = Depends(get_db)
+):
+    """Search transactions with filters for the transaction selector modal."""
+    q = db.query(models.Transaction)
+    
+    if query:
+        q = q.filter(
+            (models.Transaction.merchant.ilike(f"%{query}%")) |
+            (models.Transaction.notes.ilike(f"%{query}%"))
+        )
+    
+    if account_id:
+        q = q.filter(models.Transaction.account_id == account_id)
+    
+    if category:
+        q = q.filter(models.Transaction.category == category)
+    
+    if min_amount is not None:
+        q = q.filter(models.Transaction.amount >= min_amount)
+    
+    if max_amount is not None:
+        q = q.filter(models.Transaction.amount <= max_amount)
+    
+    if start_date:
+        q = q.filter(models.Transaction.timestamp >= start_date)
+    
+    if end_date:
+        q = q.filter(models.Transaction.timestamp <= end_date)
+    
+    if type:
+        q = q.filter(models.Transaction.type == type)
+    
+    q = q.order_by(models.Transaction.timestamp.desc())
+    transactions = q.limit(limit).all()
+    
+    result = []
+    for tx in transactions:
+        tx_dict = {
+            "id": tx.id,
+            "account_id": tx.account_id,
+            "amount": tx.amount,
+            "merchant": tx.merchant,
+            "category": tx.category,
+            "type": str(tx.type.value) if hasattr(tx.type, 'value') else str(tx.type),
+            "timestamp": tx.timestamp,
+            "linked_to_payment_id": None,
+            "linked_to_distribution_id": None
+        }
+        
+        payment_link = db.query(models.PaymentTransaction).filter(
+            models.PaymentTransaction.transaction_id == tx.id
+        ).first()
+        if payment_link:
+            tx_dict["linked_to_payment_id"] = payment_link.payment_id
+        
+        dist_link = db.query(models.DistributionTransaction).filter(
+            models.DistributionTransaction.transaction_id == tx.id
+        ).first()
+        if dist_link:
+            tx_dict["linked_to_distribution_id"] = dist_link.distribution_id
+        
+        result.append(tx_dict)
+    
+    return result

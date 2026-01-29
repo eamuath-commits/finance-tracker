@@ -3,7 +3,7 @@ import axios from 'axios';
 import { ArrowRight, CheckCircle, AlertCircle, RefreshCw, Receipt, Link2 } from 'lucide-react';
 import { SectionHeader, formatCurrency, Modal } from '../components/UI';
 import AllocationRules from '../components/AllocationRules';
-import PayrollTransfers from '../components/PayrollTransfers';
+import Distributions from '../components/Distributions';
 
 const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
@@ -133,34 +133,8 @@ const Allocation = () => {
             const accRes = await axios.get(`${API_URL}/accounts/`);
             setAccounts(accRes.data);
 
-            // Fetch latest payroll transfers and show suggestion modal for linking
-            // Get the most recent transfer for this target account
-            const transfersRes = await axios.get(`${API_URL}/payroll-transfers`);
-            const recentTransfer = transfersRes.data.find(t =>
-                t.target_account_id === targetAccountId &&
-                !t.transaction_id // Not yet linked
-            );
-
-            if (recentTransfer) {
-                // Show suggestion modal
-                setLinkingTransferId(recentTransfer.id);
-                setLinkingTransferInfo({
-                    target: recentTransfer.target_account_name,
-                    amount: recentTransfer.amount
-                });
-                setLoadingSuggestions(true);
-                setShowLinkModal(true);
-
-                try {
-                    const suggestRes = await axios.get(`${API_URL}/payroll-transfers/${recentTransfer.id}/matches`);
-                    setSuggestedTransactions(suggestRes.data);
-                } catch (err) {
-                    console.error("Error fetching suggestions:", err);
-                    setSuggestedTransactions([]);
-                } finally {
-                    setLoadingSuggestions(false);
-                }
-            }
+            // Note: Don't show suggestion modal here - the transactions created by
+            // the distributor are internal records, not SMS-parsed transactions to link
 
         } catch (error) {
             console.error("Execution failed:", error);
@@ -298,7 +272,7 @@ const Allocation = () => {
                                 }`}
                         >
                             <Receipt size={14} />
-                            Payroll Transfers
+                            Distributions
                         </button>
                     </div>
                 </div>
@@ -310,7 +284,7 @@ const Allocation = () => {
 
                 {/* --- TAB 3: PAYROLL TRANSFERS --- */}
                 {activeTab === 'transfers' && (
-                    <PayrollTransfers accounts={accounts} />
+                    <Distributions accounts={accounts} />
                 )}
 
                 {/* --- TAB 2: DISTRIBUTOR --- */}
@@ -555,9 +529,9 @@ const Allocation = () => {
                                                             {isFullShortage ? (
                                                                 <><AlertCircle size={18} /><span>No Funds Available</span></>
                                                             ) : isPartial ? (
-                                                                <><span>Transfer {formatCurrency(willTransfer)}</span><ArrowRight size={18} /></>
+                                                                <><span>Distribute {formatCurrency(willTransfer)}</span><ArrowRight size={18} /></>
                                                             ) : (
-                                                                <><span>Transfer {formatCurrency(group.pendingAmount)}</span><ArrowRight size={18} /></>
+                                                                <><span>Distribute {formatCurrency(group.pendingAmount)}</span><ArrowRight size={18} /></>
                                                             )}
                                                         </button>
                                                     </div>
@@ -609,7 +583,7 @@ const Allocation = () => {
                                                             surplusTargetId,
                                                             setSurplusTargetId,
                                                             "Select Savings Account",
-                                                            acc => acc.account_type === 'SAVINGS' || acc.account_type === 'INVESTMENT'
+                                                            acc => acc.account_type === 'Savings' || acc.account_type === 'Investment'
                                                         )}
                                                     </div>
 
@@ -736,7 +710,7 @@ const Allocation = () => {
                         <div className="text-center py-8 text-slate-500">
                             <Link2 className="mx-auto mb-2 opacity-30" size={32} />
                             <div>No matching transactions found.</div>
-                            <div className="text-xs mt-1">You can link later from the Payroll Transfers tab.</div>
+                            <div className="text-xs mt-1">You can link later from the Distributions tab.</div>
                         </div>
                     )}
 

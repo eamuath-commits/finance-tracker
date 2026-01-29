@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { formatCurrency, selectClass, Modal } from './UI';
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Trash2 } from 'lucide-react';
+import TransactionDetailModal from './TransactionDetailModal';
+import TransactionSelectorModal from './TransactionSelectorModal';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Trash2, Eye, List } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
-const PayrollTransfers = ({ accounts }) => {
+const Distributions = ({ accounts }) => {
     const [transfers, setTransfers] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -21,9 +23,15 @@ const PayrollTransfers = ({ accounts }) => {
 
     // Link Modal State
     const [showLinkModal, setShowLinkModal] = useState(false);
+    const [showMultiLinkModal, setShowMultiLinkModal] = useState(false);
     const [linkingTransfer, setLinkingTransfer] = useState(null);
     const [suggestedTransactions, setSuggestedTransactions] = useState([]);
     const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+    const [linkedTransactionIds, setLinkedTransactionIds] = useState([]);
+
+    // Transaction Detail Modal State
+    const [showTransactionDetail, setShowTransactionDetail] = useState(false);
+    const [selectedTransaction, setSelectedTransaction] = useState(null);
 
     useEffect(() => {
         fetchTransfers();
@@ -32,7 +40,7 @@ const PayrollTransfers = ({ accounts }) => {
     const fetchTransfers = async () => {
         setLoading(true);
         try {
-            const res = await axios.get(`${API_URL}/payroll-transfers`);
+            const res = await axios.get(`${API_URL}/distributions`);
             setTransfers(res.data);
         } catch (error) {
             console.error("Failed to fetch payroll transfers:", error);
@@ -144,8 +152,12 @@ const PayrollTransfers = ({ accounts }) => {
         setSuggestedTransactions([]);
 
         try {
-            const res = await axios.get(`${API_URL}/payroll-transfers/${transfer.id}/matches`);
-            setSuggestedTransactions(res.data);
+            const [suggestRes, linkedRes] = await Promise.all([
+                axios.get(`${API_URL}/distributions/${transfer.id}/matches`).catch(() => ({ data: [] })),
+                axios.get(`${API_URL}/distributions/${transfer.id}/transactions`).catch(() => ({ data: [] }))
+            ]);
+            setSuggestedTransactions(suggestRes.data);
+            setLinkedTransactionIds(linkedRes.data.map(tx => tx.id));
         } catch (err) {
             console.error("Error fetching suggestions:", err);
         } finally {
@@ -153,11 +165,16 @@ const PayrollTransfers = ({ accounts }) => {
         }
     };
 
+    const openMultiLinkModal = () => {
+        setShowLinkModal(false);
+        setShowMultiLinkModal(true);
+    };
+
     const handleLinkTransaction = async (transactionId) => {
         if (!linkingTransfer) return;
 
         try {
-            await axios.post(`${API_URL}/payroll-transfers/${linkingTransfer.id}/link?transaction_id=${transactionId}`);
+            await axios.post(`${API_URL}/distributions/${linkingTransfer.id}/link?transaction_id=${transactionId}`);
             setShowLinkModal(false);
             setLinkingTransfer(null);
             fetchTransfers();
@@ -167,11 +184,27 @@ const PayrollTransfers = ({ accounts }) => {
         }
     };
 
+    const handleMultiLink = async (transactionIds) => {
+        if (!linkingTransfer || !transactionIds.length) return;
+
+        try {
+            await axios.post(`${API_URL}/distributions/${linkingTransfer.id}/transactions`, {
+                transaction_ids: transactionIds
+            });
+            setShowMultiLinkModal(false);
+            setLinkingTransfer(null);
+            fetchTransfers();
+        } catch (err) {
+            console.error("Error linking transactions:", err);
+            alert("Failed to link transactions");
+        }
+    };
+
     const handleUnlinkTransaction = async (transferId) => {
         if (!confirm("Remove the link to this transaction?")) return;
 
         try {
-            await axios.put(`${API_URL}/payroll-transfers/${transferId}`, { transaction_id: null });
+            await axios.put(`${API_URL}/distributions/${transferId}`, { transaction_id: null });
             fetchTransfers();
         } catch (err) {
             console.error("Error unlinking:", err);
@@ -179,9 +212,9 @@ const PayrollTransfers = ({ accounts }) => {
     };
 
     const handleDelete = async (transferId) => {
-        if (!confirm("Delete this payroll transfer record?")) return;
+        if (!confirm("Delete this distribution record?")) return;
         try {
-            await axios.delete(`${API_URL}/payroll-transfers/${transferId}`);
+            await axios.delete(`${API_URL}/distributions/${transferId}`);
             fetchTransfers();
         } catch (error) {
             console.error("Failed to delete transfer:", error);
@@ -191,7 +224,7 @@ const PayrollTransfers = ({ accounts }) => {
     if (loading) {
         return (
             <div className="bg-slate-800/50 rounded-xl p-8 text-center border border-slate-700">
-                <div className="animate-pulse text-gray-400">Loading payroll transfers...</div>
+                <div className="animate-pulse text-gray-400">Loading distributions...</div>
             </div>
         );
     }
@@ -327,10 +360,17 @@ const PayrollTransfers = ({ accounts }) => {
                                     <td className="px-4 py-3">
                                         {item.transaction_id ? (
                                             <div className="flex items-center gap-2">
-                                                <span className="bg-purple-500/20 text-purple-400 text-[10px] px-2 py-1 rounded border border-purple-500/30 font-mono flex items-center gap-1">
-                                                    <Link2 size={10} />
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedTransaction(item.linked_transaction);
+                                                        setShowTransactionDetail(true);
+                                                    }}
+                                                    className="bg-purple-500/20 text-purple-400 text-[10px] px-2 py-1 rounded border border-purple-500/30 font-mono flex items-center gap-1 hover:bg-purple-500/30 hover:border-purple-400 transition cursor-pointer"
+                                                    title="View transaction details"
+                                                >
+                                                    <Eye size={10} />
                                                     {item.transaction_id.substring(0, 8)}...
-                                                </span>
+                                                </button>
                                                 <button
                                                     onClick={() => handleUnlinkTransaction(item.id)}
                                                     className="text-slate-500 hover:text-red-400 transition"
@@ -364,7 +404,7 @@ const PayrollTransfers = ({ accounts }) => {
                                     <td colSpan="6" className="px-6 py-12 text-center text-slate-500">
                                         <div className="flex flex-col items-center gap-2">
                                             <Filter className="opacity-20" size={48} />
-                                            <span>No payroll transfers found matching your filters.</span>
+                                            <span>No distributions found matching your filters.</span>
                                             <span className="text-xs">Use the Payday Distributor to execute transfers.</span>
                                         </div>
                                     </td>
@@ -380,7 +420,7 @@ const PayrollTransfers = ({ accounts }) => {
                 <div className="space-y-4">
                     {linkingTransfer && (
                         <div className="bg-slate-700/50 p-3 rounded-lg text-sm">
-                            <div className="text-slate-400 text-xs uppercase font-bold mb-1">Payroll Transfer</div>
+                            <div className="text-slate-400 text-xs uppercase font-bold mb-1">Distribution</div>
                             <div className="text-white font-semibold">{linkingTransfer.target_account_name}</div>
                             <div className="text-emerald-400 font-mono">{formatCurrency(linkingTransfer.amount)}</div>
                             <div className="text-slate-500 text-xs">{formatMonthDisplay(linkingTransfer.billing_month)}</div>
@@ -424,16 +464,46 @@ const PayrollTransfers = ({ accounts }) => {
                         </div>
                     )}
 
-                    <button
-                        onClick={() => setShowLinkModal(false)}
-                        className="w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm font-medium transition"
-                    >
-                        Cancel
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={openMultiLinkModal}
+                            className="flex-1 bg-purple-600 hover:bg-purple-500 text-white py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2"
+                        >
+                            <List size={14} /> Browse All Transactions
+                        </button>
+                        <button
+                            onClick={() => setShowLinkModal(false)}
+                            className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm font-medium transition"
+                        >
+                            Cancel
+                        </button>
+                    </div>
                 </div>
             </Modal>
+
+            {/* Multi-Select Transaction Linking Modal */}
+            <TransactionSelectorModal
+                isOpen={showMultiLinkModal}
+                onClose={() => {
+                    setShowMultiLinkModal(false);
+                    setLinkingTransfer(null);
+                }}
+                onSelect={handleMultiLink}
+                currentLinked={linkedTransactionIds}
+                title={`Link Transactions to ${linkingTransfer?.target_account_name || 'Distribution'}`}
+            />
+
+            {/* Transaction Detail Modal */}
+            <TransactionDetailModal
+                isOpen={showTransactionDetail}
+                onClose={() => {
+                    setShowTransactionDetail(false);
+                    setSelectedTransaction(null);
+                }}
+                transaction={selectedTransaction}
+            />
         </div>
     );
 };
 
-export default PayrollTransfers;
+export default Distributions;

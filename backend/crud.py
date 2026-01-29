@@ -1129,10 +1129,10 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     accounts = db.query(models.Account).all()
     accounts_by_id = {a.id: a for a in accounts}
     
-    # Get existing PayrollTransfers for this month to prevent duplicates
-    existing_transfers = db.query(models.PayrollTransfer).filter(
-        models.PayrollTransfer.billing_month == target_month_str,
-        models.PayrollTransfer.source_account_id == source_account_id
+    # Get existing Distributions for this month to prevent duplicates
+    existing_transfers = db.query(models.Distribution).filter(
+        models.Distribution.billing_month == target_month_str,
+        models.Distribution.source_account_id == source_account_id
     ).all()
     # Build set of (target_account_id) that already have transfers this month
     transferred_targets = {t.target_account_id: t for t in existing_transfers}
@@ -1419,78 +1419,78 @@ def get_audit_history(db: Session, account_id: str, limit: int = 20):
     ).order_by(models.AccountAudit.audit_date.desc()).limit(limit).all()
 
 
-# --- Payroll Transfer CRUD ---
+# --- Distribution CRUD ---
 
-def create_payroll_transfer(db: Session, transfer: schemas.PayrollTransferCreate):
-    """Create a payroll transfer record."""
-    db_transfer = models.PayrollTransfer(
-        source_account_id=transfer.source_account_id,
-        target_account_id=transfer.target_account_id,
-        amount=transfer.amount,
-        billing_month=transfer.billing_month,
-        note=transfer.note,
-        transaction_id=transfer.transaction_id
+def create_distribution(db: Session, distribution: schemas.DistributionCreate):
+    """Create a distribution record."""
+    db_distribution = models.Distribution(
+        source_account_id=distribution.source_account_id,
+        target_account_id=distribution.target_account_id,
+        amount=distribution.amount,
+        billing_month=distribution.billing_month,
+        note=distribution.note,
+        transaction_id=distribution.transaction_id
     )
-    db.add(db_transfer)
+    db.add(db_distribution)
     db.commit()
-    db.refresh(db_transfer)
-    return db_transfer
+    db.refresh(db_distribution)
+    return db_distribution
 
-def get_payroll_transfers(db: Session, billing_month: str = None, source_account_id: str = None):
-    """Get payroll transfers, optionally filtered by month or source account."""
-    query = db.query(models.PayrollTransfer)
+def get_distributions(db: Session, billing_month: str = None, source_account_id: str = None):
+    """Get distributions, optionally filtered by month or source account."""
+    query = db.query(models.Distribution)
     
     if billing_month:
-        query = query.filter(models.PayrollTransfer.billing_month == billing_month)
+        query = query.filter(models.Distribution.billing_month == billing_month)
     if source_account_id:
-        query = query.filter(models.PayrollTransfer.source_account_id == source_account_id)
+        query = query.filter(models.Distribution.source_account_id == source_account_id)
     
-    return query.order_by(models.PayrollTransfer.created_at.desc()).all()
+    return query.order_by(models.Distribution.created_at.desc()).all()
 
-def get_payroll_transfer(db: Session, transfer_id: str):
-    """Get a single payroll transfer by ID."""
-    return db.query(models.PayrollTransfer).filter(
-        models.PayrollTransfer.id == transfer_id
+def get_distribution(db: Session, distribution_id: str):
+    """Get a single distribution by ID."""
+    return db.query(models.Distribution).filter(
+        models.Distribution.id == distribution_id
     ).first()
 
-def update_payroll_transfer(db: Session, transfer_id: str, update: schemas.PayrollTransferUpdate):
-    """Update a payroll transfer."""
-    db_transfer = get_payroll_transfer(db, transfer_id)
-    if not db_transfer:
+def update_distribution(db: Session, distribution_id: str, update: schemas.DistributionUpdate):
+    """Update a distribution."""
+    db_distribution = get_distribution(db, distribution_id)
+    if not db_distribution:
         return None
     
     update_data = update.dict(exclude_unset=True)
     for key, value in update_data.items():
-        setattr(db_transfer, key, value)
+        setattr(db_distribution, key, value)
     
     db.commit()
-    db.refresh(db_transfer)
-    return db_transfer
+    db.refresh(db_distribution)
+    return db_distribution
 
-def delete_payroll_transfer(db: Session, transfer_id: str):
-    """Delete a payroll transfer."""
-    db_transfer = get_payroll_transfer(db, transfer_id)
-    if not db_transfer:
+def delete_distribution(db: Session, distribution_id: str):
+    """Delete a distribution."""
+    db_distribution = get_distribution(db, distribution_id)
+    if not db_distribution:
         return False
-    db.delete(db_transfer)
+    db.delete(db_distribution)
     db.commit()
     return True
 
-def get_payroll_transfer_matches(db: Session, transfer_id: str):
-    """Find matching transactions for a payroll transfer (similar to obligation matching)."""
-    transfer = get_payroll_transfer(db, transfer_id)
-    if not transfer:
+def get_distribution_matches(db: Session, distribution_id: str):
+    """Find matching transactions for a distribution (similar to obligation matching)."""
+    distribution = get_distribution(db, distribution_id)
+    if not distribution:
         return []
     
     # Look for transfer transactions in the same month
     # Match by: amount (within tolerance), type='credit', to target account
-    tolerance = transfer.amount * 0.1  # 10% tolerance
-    min_amount = transfer.amount - tolerance
-    max_amount = transfer.amount + tolerance
+    tolerance = distribution.amount * 0.1  # 10% tolerance
+    min_amount = distribution.amount - tolerance
+    max_amount = distribution.amount + tolerance
     
     # Parse billing month to get date range
     try:
-        year, month = transfer.billing_month.split('-')
+        year, month = distribution.billing_month.split('-')
         from dateutil.relativedelta import relativedelta
         start_date = datetime(int(year), int(month), 1)
         end_date = start_date + relativedelta(months=1)
@@ -1499,7 +1499,7 @@ def get_payroll_transfer_matches(db: Session, transfer_id: str):
     
     # Find transactions: credits to target account, matching amount, in the month
     matches = db.query(models.Transaction).filter(
-        models.Transaction.account_id == transfer.target_account_id,
+        models.Transaction.account_id == distribution.target_account_id,
         models.Transaction.type == 'credit',
         models.Transaction.amount >= min_amount,
         models.Transaction.amount <= max_amount,
@@ -1510,13 +1510,13 @@ def get_payroll_transfer_matches(db: Session, transfer_id: str):
     
     return matches
 
-def link_payroll_transfer_to_transaction(db: Session, transfer_id: str, transaction_id: str):
-    """Link a payroll transfer to a transaction."""
-    db_transfer = get_payroll_transfer(db, transfer_id)
-    if not db_transfer:
+def link_distribution_to_transaction(db: Session, distribution_id: str, transaction_id: str):
+    """Link a distribution to a transaction."""
+    db_distribution = get_distribution(db, distribution_id)
+    if not db_distribution:
         return None
     
-    db_transfer.transaction_id = transaction_id
+    db_distribution.transaction_id = transaction_id
     db.commit()
-    db.refresh(db_transfer)
-    return db_transfer
+    db.refresh(db_distribution)
+    return db_distribution

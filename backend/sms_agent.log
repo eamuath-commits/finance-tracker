@@ -1018,3 +1018,59 @@ Amount:S...
 2026-01-29 14:10:41,395 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-01-29 14:14:40,879 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-01-29 14:14:53,177 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 14:56:29,301 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 14:57:14,146 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 14:58:27,611 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 14:59:27,996 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 14:59:52,517 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 15:33:01,898 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— OTP Code:0404
+Reason:Local Transfer...
+2026-01-29 15:33:01,900 - sms_agent - INFO - Skipping OTP/verification message from Channel_-1003635708322
+2026-01-29 15:33:24,778 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— Debit Transfer Local
+Bank:INMA
+From...
+2026-01-29 15:33:25,140 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-01-29 15:33:28,497 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 1505, Account: Expense
+2026-01-29 15:33:28,502 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-29 15:33:28,509 - sms_agent - INFO - Saved training example for: أكاديمية فارس رياضية
+2026-01-29 16:14:21,255 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— Online Purchase
+By:9365;mada-Apple ...
+2026-01-29 16:14:21,612 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-01-29 16:14:23,807 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 1505, Account: Expense
+2026-01-29 16:14:23,813 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-29 16:14:23,816 - sms_agent - INFO - Saved training example for: HUNGERSTA
+2026-01-29 17:38:33,953 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— Credit Transfer Internal
+Amount:SAR...
+2026-01-29 17:38:34,297 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-01-29 17:38:36,456 - sms_agent - INFO - Incoming Credit detected to own account General. ensure primary.
+2026-01-29 17:38:36,456 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: General
+2026-01-29 17:38:36,458 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=General
+2026-01-29 17:38:36,462 - sms_agent - INFO - Saved training example for: Transfer from 3053
+2026-01-29 20:14:00,793 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 20:14:11,271 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 20:21:23,938 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 20:21:23,968 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-29 20:21:24,027 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 20:22:19,781 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 20:22:28,048 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 20:54:20,316 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 20:54:30,516 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 20:59:04,939 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112 —— Debit: Loan Instalment
+Instalment...
+2026-01-29 20:59:05,296 - sms_agent - INFO - Parsed structured message - Sender: +966566985112 (separator: '——')
+2026-01-29 20:59:08,817 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 5225, Account: Auto Lease
+2026-01-29 20:59:08,821 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Auto Lease
+2026-01-29 20:59:08,834 - sms_agent - INFO - Saved training example for: Loan Instalment Payment
+2026-01-29 21:52:41,929 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 21:52:41,955 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-29 21:52:42,047 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 22:25:27,604 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 22:27:03,475 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 22:27:03,497 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-29 22:27:03,563 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 22:47:28,381 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 22:48:31,400 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 22:48:54,147 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 22:49:46,885 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 22:52:49,652 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 22:53:10,360 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).

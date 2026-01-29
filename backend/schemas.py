@@ -401,8 +401,8 @@ class Audit(AuditBase):
     class Config:
         from_attributes = True
 
-# --- Payroll Transfer Schemas ---
-class PayrollTransferBase(BaseModel):
+# --- Distribution Schemas ---
+class DistributionBase(BaseModel):
     source_account_id: str
     target_account_id: str
     amount: float
@@ -410,15 +410,15 @@ class PayrollTransferBase(BaseModel):
     note: Optional[str] = None
     transaction_id: Optional[str] = None
 
-class PayrollTransferCreate(PayrollTransferBase):
+class DistributionCreate(DistributionBase):
     pass
 
-class PayrollTransferUpdate(BaseModel):
+class DistributionUpdate(BaseModel):
     amount: Optional[float] = None
     note: Optional[str] = None
     transaction_id: Optional[str] = None
 
-class PayrollTransfer(PayrollTransferBase):
+class Distribution(DistributionBase):
     id: str
     created_at: datetime
     source_account_name: Optional[str] = None
@@ -427,3 +427,28 @@ class PayrollTransfer(PayrollTransferBase):
 
     class Config:
         from_attributes = True
+
+
+# --- Transaction Linking Schemas ---
+class LinkTransactionsRequest(BaseModel):
+    """Request to link multiple transactions to a payment or distribution"""
+    transaction_ids: List[str]
+
+
+class TransactionSearchParams(BaseModel):
+    """Search parameters for transaction search endpoint"""
+    query: Optional[str] = None  # Search in merchant/notes
+    account_id: Optional[str] = None
+    category: Optional[str] = None
+    min_amount: Optional[float] = None
+    max_amount: Optional[float] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    type: Optional[str] = None  # credit/debit
+    limit: int = 50
+
+
+class TransactionWithLinkInfo(Transaction):
+    """Transaction with additional linking info"""
+    linked_to_payment_id: Optional[int] = None
+    linked_to_distribution_id: Optional[str] = None

@@ -258,9 +258,9 @@ class AllocationHistory(Base):
     savings_planned = Column(Float, default=0.0)
     savings_actual = Column(Float, default=0.0)
 
-class PayrollTransfer(Base):
-    """Track payroll/salary distribution transfers with transaction linking"""
-    __tablename__ = "payroll_transfers"
+class Distribution(Base):
+    """Track salary distribution records with transaction linking"""
+    __tablename__ = "distributions"
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     source_account_id = Column(String, ForeignKey("accounts.id"), nullable=False)
@@ -276,3 +276,30 @@ class PayrollTransfer(Base):
     target_account = relationship("Account", foreign_keys=[target_account_id])
     linked_transaction = relationship("Transaction", foreign_keys=[transaction_id])
 
+
+# Junction Tables for Many-to-Many Transaction Linking
+
+class PaymentTransaction(Base):
+    """Junction table for linking multiple transactions to a payment"""
+    __tablename__ = "payment_transactions"
+    
+    payment_id = Column(Integer, ForeignKey("payments.id", ondelete="CASCADE"), primary_key=True)
+    transaction_id = Column(String, ForeignKey("transactions.id", ondelete="CASCADE"), primary_key=True)
+    created_at = Column(DateTime, default=datetime.now)
+    
+    # Relationships
+    payment = relationship("Payment", backref="linked_transactions")
+    transaction = relationship("Transaction", backref="payment_links")
+
+
+class DistributionTransaction(Base):
+    """Junction table for linking multiple transactions to a distribution"""
+    __tablename__ = "distribution_transactions"
+    
+    distribution_id = Column(String, ForeignKey("distributions.id", ondelete="CASCADE"), primary_key=True)
+    transaction_id = Column(String, ForeignKey("transactions.id", ondelete="CASCADE"), primary_key=True)
+    created_at = Column(DateTime, default=datetime.now)
+    
+    # Relationships
+    distribution = relationship("Distribution", backref="linked_transactions")
+    transaction = relationship("Transaction", backref="distribution_links")

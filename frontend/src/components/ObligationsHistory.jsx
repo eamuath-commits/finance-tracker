@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { formatCurrency, selectClass, Modal } from '../components/UI';
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle } from 'lucide-react';
+import TransactionDetailModal from '../components/TransactionDetailModal';
+import TransactionSelectorModal from '../components/TransactionSelectorModal';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Eye, List } from 'lucide-react';
 import { exportToCSV } from '../utils/csvExport';
 import axios from 'axios';
 
@@ -12,9 +14,15 @@ const ObligationsPayments = ({ obligations, history, onEdit, onDelete, onRefresh
 
     // Link Modal State
     const [showLinkModal, setShowLinkModal] = useState(false);
+    const [showMultiLinkModal, setShowMultiLinkModal] = useState(false); // New multi-select modal
     const [linkingPayment, setLinkingPayment] = useState(null);
     const [suggestedTransactions, setSuggestedTransactions] = useState([]);
     const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+    const [linkedTransactionIds, setLinkedTransactionIds] = useState([]); // Already linked tx IDs
+
+    // Transaction Detail Modal State
+    const [showTransactionDetail, setShowTransactionDetail] = useState(false);
+    const [selectedTransaction, setSelectedTransaction] = useState(null);
 
     const formatMonthDisplay = (dateStr) => {
         if (!dateStr) return '-';
@@ -183,13 +191,24 @@ const ObligationsPayments = ({ obligations, history, onEdit, onDelete, onRefresh
         setSuggestedTransactions([]);
 
         try {
-            const res = await axios.get(`${API_URL}/payments/${payment.id}/suggested-transactions`);
-            setSuggestedTransactions(res.data);
+            // Fetch suggestions AND existing linked transactions
+            const [suggestRes, linkedRes] = await Promise.all([
+                axios.get(`${API_URL}/payments/${payment.id}/suggested-transactions`).catch(() => ({ data: [] })),
+                axios.get(`${API_URL}/payments/${payment.id}/transactions`).catch(() => ({ data: [] }))
+            ]);
+            setSuggestedTransactions(suggestRes.data);
+            setLinkedTransactionIds(linkedRes.data.map(tx => tx.id));
         } catch (err) {
             console.error("Error fetching suggestions:", err);
         } finally {
             setLoadingSuggestions(false);
         }
+    };
+
+    // Open the multi-select modal from suggested modal
+    const openMultiLinkModal = () => {
+        setShowLinkModal(false);
+        setShowMultiLinkModal(true);
     };
 
     const handleLinkTransaction = async (transactionId) => {
@@ -203,6 +222,23 @@ const ObligationsPayments = ({ obligations, history, onEdit, onDelete, onRefresh
         } catch (err) {
             console.error("Error linking transaction:", err);
             alert("Failed to link transaction");
+        }
+    };
+
+    // Handle multi-link from TransactionSelectorModal
+    const handleMultiLink = async (transactionIds) => {
+        if (!linkingPayment || !transactionIds.length) return;
+
+        try {
+            await axios.post(`${API_URL}/payments/${linkingPayment.id}/transactions`, {
+                transaction_ids: transactionIds
+            });
+            setShowMultiLinkModal(false);
+            setLinkingPayment(null);
+            if (onRefresh) onRefresh();
+        } catch (err) {
+            console.error("Error linking transactions:", err);
+            alert("Failed to link transactions");
         }
     };
 
@@ -356,10 +392,17 @@ const ObligationsPayments = ({ obligations, history, onEdit, onDelete, onRefresh
                                     <td className="px-4 py-3">
                                         {item.transaction_id ? (
                                             <div className="flex items-center gap-2">
-                                                <span className="bg-purple-500/20 text-purple-400 text-[10px] px-2 py-1 rounded border border-purple-500/30 font-mono flex items-center gap-1">
-                                                    <Link2 size={10} />
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedTransaction(item.linked_transaction);
+                                                        setShowTransactionDetail(true);
+                                                    }}
+                                                    className="bg-purple-500/20 text-purple-400 text-[10px] px-2 py-1 rounded border border-purple-500/30 font-mono flex items-center gap-1 hover:bg-purple-500/30 hover:border-purple-400 transition cursor-pointer"
+                                                    title="View transaction details"
+                                                >
+                                                    <Eye size={10} />
                                                     {item.transaction_id.substring(0, 8)}...
-                                                </span>
+                                                </button>
                                                 <button
                                                     onClick={() => handleUnlinkTransaction(item.id)}
                                                     className="text-slate-500 hover:text-red-400 transition"
@@ -478,14 +521,44 @@ const ObligationsPayments = ({ obligations, history, onEdit, onDelete, onRefresh
                         </div>
                     )}
 
-                    <button
-                        onClick={() => setShowLinkModal(false)}
-                        className="w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm font-medium transition"
-                    >
-                        Cancel
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={openMultiLinkModal}
+                            className="flex-1 bg-purple-600 hover:bg-purple-500 text-white py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2"
+                        >
+                            <List size={14} /> Browse All Transactions
+                        </button>
+                        <button
+                            onClick={() => setShowLinkModal(false)}
+                            className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm font-medium transition"
+                        >
+                            Cancel
+                        </button>
+                    </div>
                 </div>
             </Modal>
+
+            {/* Multi-Select Transaction Linking Modal */}
+            <TransactionSelectorModal
+                isOpen={showMultiLinkModal}
+                onClose={() => {
+                    setShowMultiLinkModal(false);
+                    setLinkingPayment(null);
+                }}
+                onSelect={handleMultiLink}
+                currentLinked={linkedTransactionIds}
+                title={`Link Transactions to ${linkingPayment?.oblName || 'Payment'}`}
+            />
+
+            {/* Transaction Detail Modal */}
+            <TransactionDetailModal
+                isOpen={showTransactionDetail}
+                onClose={() => {
+                    setShowTransactionDetail(false);
+                    setSelectedTransaction(null);
+                }}
+                transaction={selectedTransaction}
+            />
         </div>
     );
 };

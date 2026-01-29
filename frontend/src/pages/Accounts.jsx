@@ -16,12 +16,17 @@ const getBankCardTheme = (bankName, accountType) => {
 
     // STC Bank
     if (n.includes('stc')) {
-        return { backgroundImage: '/banks/stc-card.png', textColor: 'text-white' };
+        return {
+            backgroundImage: '/banks/stc-card.png',
+            fallbackGradient: 'linear-gradient(135deg, #7c3aed 0%, #581c87 100%)',
+            textColor: 'text-white'
+        };
     }
     // Alrajhi Bank
     if (n.includes('rajhi') || n.includes('alrajhi')) {
         return {
             backgroundImage: isCreditCard ? '/banks/alrajhi-credit.png' : '/banks/alrajhi-card.png',
+            fallbackGradient: 'linear-gradient(135deg, #1e3a5f 0%, #0d2137 100%)',
             textColor: 'text-white'
         };
     }
@@ -29,6 +34,7 @@ const getBankCardTheme = (bankName, accountType) => {
     if (n.includes('jazira') || n.includes('ajb')) {
         return {
             backgroundImage: isCreditCard ? '/banks/jazira-credit.png' : '/banks/jazira-card.png',
+            fallbackGradient: 'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
             textColor: 'text-white'
         };
     }
@@ -40,17 +46,19 @@ const getBankCardTheme = (bankName, accountType) => {
 const getAccountTheme = (type) => {
     switch (type) {
         case 'Savings': return {
-            gradient: 'from-emerald-600 to-teal-900',
+            // CSS gradient for Safari compatibility (Tailwind classes don't always work)
+            backgroundGradient: 'linear-gradient(to bottom right, #059669, #134e4a)',
             icon: <PiggyBank className="w-5 h-5 text-emerald-200" />,
             text: 'text-emerald-100'
         };
         case 'Credit Card': return {
-            gradient: 'from-violet-600 to-purple-900',
+            backgroundGradient: 'linear-gradient(to bottom right, #7c3aed, #581c87)',
             icon: <CreditCard className="w-5 h-5 text-violet-200" />,
             text: 'text-violet-100'
         };
         default: return {
-            gradient: 'from-slate-600 to-slate-900',
+            // Default for Checking and other account types
+            backgroundGradient: 'linear-gradient(to bottom right, #475569, #0f172a)',
             icon: <Wallet className="w-5 h-5 text-slate-200" />,
             text: 'text-slate-100'
         };
@@ -73,81 +81,85 @@ const AccountCard = ({ acc, onEdit = null }) => {
     const showMada = hasLinkedCard;
     const cardDigits = isCreditCard ? acc.last_4_digits : (hasLinkedCard ? acc.aliases[0].last_4_digits : null);
 
+    // Calculate padding percentage for 1.586:1 aspect ratio = 100 / 1.586 = 63.05%
     return (
-        <div
-            className={`relative w-full aspect-[1.586/1] rounded-xl p-5 shadow-lg text-white overflow-hidden group hover:scale-[1.02] transition-all duration-300 border border-white/10 ${!hasCustomBackground ? `bg-gradient-to-br ${theme.gradient}` : ''}`}
-            style={hasCustomBackground ? {
-                backgroundImage: `url(${bankTheme.backgroundImage})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center'
-            } : {}}
-        >
+        <div className="relative w-full" style={{ paddingBottom: '63.05%' }}>
+            <div
+                className="absolute inset-0 rounded-xl p-5 shadow-lg text-white overflow-hidden group hover:scale-[1.02] transition-all duration-300 border border-white/10"
+                style={{
+                    // Background styling
+                    backgroundImage: hasCustomBackground
+                        ? `url(${bankTheme.backgroundImage})`
+                        : 'none',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                    // Apply gradient when no custom background image
+                    ...(hasCustomBackground ? {} : { background: bankTheme?.fallbackGradient || theme.backgroundGradient })
+                }}
+            >
+                {/* Background Decor - decorative blur circles */}
+                <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white/5 blur-3xl"></div>
+                <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 rounded-full bg-black/20 blur-3xl"></div>
 
-            {/* Background Decor - only show for non-custom backgrounds */}
-            {!hasCustomBackground && (
-                <>
-                    <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white/5 blur-3xl"></div>
-                    <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 rounded-full bg-black/20 blur-3xl"></div>
-                </>
-            )}
+                {/* Content */}
+                <div className="relative z-10 flex flex-col h-full justify-end">
 
-            {/* Content */}
-            <div className="relative z-10 flex flex-col h-full justify-end">
-
-                {/* Edit Button */}
-                {onEdit && (
-                    <button
-                        onClick={(e) => { e.stopPropagation(); onEdit(acc); }}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        className="absolute top-3 right-3 p-1.5 bg-black/30 hover:bg-black/50 rounded-full backdrop-blur-md transition opacity-0 group-hover:opacity-100 z-20"
-                    >
-                        <Edit3 size={14} />
-                    </button>
-                )}
-
-                {/* Footer (Balance and Payment Network Logo) */}
-                <div>
-                    {/* Balance Row - Account name as label above balance */}
-                    <div className="flex justify-between items-end mb-1">
-                        <div>
-                            <p className="text-[10px] uppercase tracking-wider opacity-90 mb-0.5 drop-shadow-sm font-bold">{acc.name}</p>
-                            <p className="text-2xl font-bold tracking-tight text-white drop-shadow-md">{formatCurrency(acc.current_balance)}</p>
-                        </div>
-
-                        {/* Right side: Payment Network Logo (Mada/Visa) */}
-                        <div className="text-right flex flex-col items-end gap-1">
-                            {/* Mada or Visa Logo */}
-                            {showVisa && (
-                                <img src="/visa-logo.png" alt="Visa" className="h-6 w-auto object-contain drop-shadow-md" />
-                            )}
-                            {showMada && (
-                                <img src="/mada-logo.png" alt="Mada" className="h-10 w-auto object-contain drop-shadow-md" />
-                            )}
-
-                            {/* Card digits if available */}
-                            {cardDigits && (
-                                <span className="text-xs font-mono font-bold tracking-wider text-white/90 drop-shadow-sm">
-                                    •••• {cardDigits}
-                                </span>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Utilization Bar for Credit Cards */}
-                    {hasLimit && (
-                        <div className="mt-2">
-                            <div className="flex justify-between text-[10px] opacity-70 mb-0.5 drop-shadow-sm">
-                                <span>Credit Limit: {formatCurrency(acc.credit_limit)}</span>
-                                <span>{utilPercent.toFixed(0)}% Used</span>
-                            </div>
-                            <div className="w-full bg-black/30 h-1 rounded-full overflow-hidden backdrop-blur-sm">
-                                <div
-                                    className={`h-full rounded-full shadow-sm transition-all duration-1000 ${utilPercent > 90 ? 'bg-red-400' : utilPercent > 50 ? 'bg-yellow-400' : 'bg-emerald-400'}`}
-                                    style={{ width: `${utilPercent}%` }}
-                                />
-                            </div>
-                        </div>
+                    {/* Edit Button */}
+                    {onEdit && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onEdit(acc); }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="absolute top-3 right-3 p-1.5 bg-black/30 hover:bg-black/50 rounded-full backdrop-blur-md transition opacity-0 group-hover:opacity-100 z-20"
+                        >
+                            <Edit3 size={14} />
+                        </button>
                     )}
+
+                    {/* Footer (Balance and Payment Network Logo) */}
+                    <div>
+                        {/* Balance Row - Account name as label above balance */}
+                        <div className="flex justify-between items-end mb-1">
+                            <div>
+                                <p className="text-[10px] uppercase tracking-wider opacity-90 mb-0.5 drop-shadow-sm font-bold">{acc.name}</p>
+                                <p className="text-2xl font-bold tracking-tight text-white drop-shadow-md">{formatCurrency(acc.current_balance)}</p>
+                            </div>
+
+                            {/* Right side: Payment Network Logo (Mada/Visa) */}
+                            <div className="text-right flex flex-col items-end gap-1">
+                                {/* Mada or Visa Logo */}
+                                {showVisa && (
+                                    <img src="/visa-logo.png" alt="Visa" className="h-6 w-auto object-contain drop-shadow-md" />
+                                )}
+                                {showMada && (
+                                    <img src="/mada-logo.png" alt="Mada" className="h-10 w-auto object-contain drop-shadow-md" />
+                                )}
+
+                                {/* Card digits if available */}
+                                {cardDigits && (
+                                    <span className="text-xs font-mono font-bold tracking-wider text-white/90 drop-shadow-sm">
+                                        •••• {cardDigits}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Utilization Bar for Credit Cards */}
+                        {hasLimit && (
+                            <div className="mt-2">
+                                <div className="flex justify-between text-[10px] opacity-70 mb-0.5 drop-shadow-sm">
+                                    <span>Credit Limit: {formatCurrency(acc.credit_limit)}</span>
+                                    <span>{utilPercent.toFixed(0)}% Used</span>
+                                </div>
+                                <div className="w-full bg-black/30 h-1 rounded-full overflow-hidden backdrop-blur-sm">
+                                    <div
+                                        className={`h-full rounded-full shadow-sm transition-all duration-1000 ${utilPercent > 90 ? 'bg-red-400' : utilPercent > 50 ? 'bg-yellow-400' : 'bg-emerald-400'}`}
+                                        style={{ width: `${utilPercent}%` }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
