@@ -1217,13 +1217,6 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
             pending_amount = amounts['pending']
             allocated_amount = amounts['allocated']
             
-            # Get target account's current balance
-            target_balance = target_acc.current_balance if target_acc else 0.0
-            
-            # Calculate net transfer needed: required - what target already has
-            # If target already has enough, no transfer needed
-            net_transfer_needed = max(0, pending_amount - target_balance)
-            
             # Check if transfer already exists for this target account
             existing_transfer = transferred_targets.get(rule.target_account_id)
             
@@ -1241,31 +1234,19 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
                         required_amount=pending_amount,
                         status='transferred'
                     ))
-                elif net_transfer_needed > 0:
-                    # Need to transfer (net of target balance)
+                else:
+                    # Transfer full required amount
                     allocations.append(schemas.AllocationItem(
                         identifier=category,
                         name=category,
                         rule_type='CATEGORY',
                         target_account_id=rule.target_account_id,
                         target_account_name=target_acc.name if target_acc else "Unknown",
-                        amount=net_transfer_needed,
+                        amount=pending_amount,
                         required_amount=pending_amount,
                         status='pending'
                     ))
-                    total_required += net_transfer_needed
-                else:
-                    # Target already has enough balance - show as covered
-                    allocations.append(schemas.AllocationItem(
-                        identifier=category,
-                        name=category,
-                        rule_type='CATEGORY',
-                        target_account_id=rule.target_account_id,
-                        target_account_name=target_acc.name if target_acc else "Unknown",
-                        amount=0,
-                        required_amount=pending_amount,
-                        status='covered'  # New status: target balance covers requirement
-                    ))
+                    total_required += pending_amount
             
             # Add allocated items if any
             if allocated_amount > 0:
@@ -1290,12 +1271,6 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
             pending_amount = amounts['pending']
             allocated_amount = amounts['allocated']
             
-            # Get target account's current balance
-            target_balance = target_acc.current_balance if target_acc else 0.0
-            
-            # Calculate net transfer needed: required - what target already has
-            net_transfer_needed = max(0, pending_amount - target_balance)
-            
             # Check if transfer already exists for this target account
             existing_transfer = transferred_targets.get(rule.target_account_id)
             
@@ -1313,31 +1288,19 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
                         required_amount=pending_amount,
                         status='transferred'
                     ))
-                elif net_transfer_needed > 0:
-                    # Need to transfer (net of target balance)
+                else:
+                    # Transfer full required amount
                     allocations.append(schemas.AllocationItem(
                         identifier=loan_name,
                         name=loan_name,
                         rule_type='LOAN',
                         target_account_id=rule.target_account_id,
                         target_account_name=target_acc.name if target_acc else "Unknown",
-                        amount=net_transfer_needed,
+                        amount=pending_amount,
                         required_amount=pending_amount,
                         status='pending'
                     ))
-                    total_required += net_transfer_needed
-                else:
-                    # Target already has enough balance - show as covered
-                    allocations.append(schemas.AllocationItem(
-                        identifier=loan_name,
-                        name=loan_name,
-                        rule_type='LOAN',
-                        target_account_id=rule.target_account_id,
-                        target_account_name=target_acc.name if target_acc else "Unknown",
-                        amount=0,
-                        required_amount=pending_amount,
-                        status='covered'
-                    ))
+                    total_required += pending_amount
             
             # Add allocated items if any
             if allocated_amount > 0:

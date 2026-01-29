@@ -986,3 +986,8 @@ A...
 2026-01-29 07:52:17,110 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 1505, Account: Expense
 2026-01-29 07:52:17,114 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
 2026-01-29 07:52:17,121 - sms_agent - INFO - Saved training example for: MUZAMAL HUSSAIN
+2026-01-29 10:21:35,022 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 10:22:30,618 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 10:22:48,764 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 10:22:48,788 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-29 10:22:48,879 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
