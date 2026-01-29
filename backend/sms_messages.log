@@ -180,3 +180,7 @@
 2026-01-29 16:14:21,256 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— Online Purchase | By:9365;mada-Apple Pay | From:1505 | Amount:SAR 37.44 | At:HUNGERSTA | 29/1/26 16:14
 2026-01-29 17:38:33,954 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— Credit Transfer Internal | Amount:SAR 5000 | To:7772 | From:Executive Craft | From:3053 | 26/1/29 17:38
 2026-01-29 20:59:04,939 | FROM: Channel_-1003635708322 | SMS: +966566985112 —— Debit: Loan Instalment | Instalment: SAR 3032.19 | From: 5225 | Remaining Amount: SAR 222872.89 | 25/1/26 20:27
+2026-01-29 23:27:26,234 | FROM: Channel_-1003635708322 | SMS: +966504730091 —— POS Purchase (Apple Pay)  | Credit Card: 4897  | at :S155 TAMIMI MARKETS  | of: 211.80 SAR  | on : 2026-01-16 17:04  | Available Balance: 23103.04 SAR  | Due Amount: 50508.68 SAR
+2026-01-29 23:36:46,933 | FROM: Channel_-1003635708322 | SMS: +966545213634—— POS Purchase (Apple Pay)  | Credit Card: 4390  | at :S155 TAMIMI MARKETS  | of: 211.80 SAR  | on : 2026-01-16 17:04  | Available Balance: 23103.04 SAR  | Due Amount: 50508.68 SAR
+2026-01-29 23:54:55,062 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— Online Purchase | By:4390;mada-Apple Pay | From:2104 | Amount:SAR 121 | At:Jahez | 30/1/26 23:55
+2026-01-29 23:54:57,428 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— Online Purchase | By:4390;mada-Apple Pay | From:2104 | Amount:SAR 121 | At:Jahez | 30/1/26 23:55

@@ -1076,3 +1076,30 @@ Instalment...
 2026-01-29 22:53:10,360 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-01-29 23:08:36,969 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-01-29 23:10:25,388 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 23:27:26,233 - sms_agent - INFO - Received message from Channel_-1003635708322: +966504730091 —— POS Purchase (Apple Pay) 
+Credit ...
+2026-01-29 23:27:26,694 - sms_agent - INFO - Parsed structured message - Sender: +966504730091 (separator: '——')
+2026-01-29 23:27:28,988 - sms_agent - INFO - DEBUG: Source Logic -> Matched CREDIT CARD: 4897, Card: Ajwa Infinite
+2026-01-29 23:27:28,992 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-01-29 23:27:29,002 - sms_agent - INFO - Saved training example for: S155 TAMIMI MARKETS
+2026-01-29 23:36:46,932 - sms_agent - INFO - Received message from Channel_-1003635708322: +966545213634—— POS Purchase (Apple Pay) 
+Credit C...
+2026-01-29 23:36:47,283 - sms_agent - INFO - Parsed structured message - Sender: +966545213634 (separator: '——')
+2026-01-29 23:36:50,026 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 4390, Account: Grocery
+2026-01-29 23:36:50,028 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-01-29 23:36:50,034 - sms_agent - INFO - Saved training example for: S155 TAMIMI MARKETS
+2026-01-29 23:54:55,061 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank—— Online Purchase
+By:4390;mada-Apple P...
+2026-01-29 23:54:55,428 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-01-29 23:54:57,245 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 2104, Account: Grocery
+2026-01-29 23:54:57,247 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-01-29 23:54:57,253 - sms_agent - INFO - Saved training example for: Jahez
+2026-01-29 23:54:57,428 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank—— Online Purchase
+By:4390;mada-Apple P...
+2026-01-29 23:54:57,601 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-01-29 23:54:59,175 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 2104, Account: Grocery
+2026-01-29 23:54:59,178 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-01-29 23:54:59,181 - sms_agent - INFO - Saved training example for: Jahez
+2026-01-30 02:06:19,913 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 02:06:19,938 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-30 02:06:20,020 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).

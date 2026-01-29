@@ -97,7 +97,7 @@ const Distributions = ({ accounts }) => {
         const matchesMonth = selectedMonth === 'All' || itemMonth === selectedMonth;
         const matchesTarget = selectedTarget === 'All' || item.target_account_name === selectedTarget;
 
-        const isLinked = item.transaction_id != null;
+        const isLinked = item.transaction_id != null || (item.linked_transactions && item.linked_transactions.length > 0);
         const matchesStatus = selectedStatus === 'All' ||
             (selectedStatus === 'Linked' && isLinked) ||
             (selectedStatus === 'Pending' && !isLinked);
@@ -208,6 +208,19 @@ const Distributions = ({ accounts }) => {
             fetchTransfers();
         } catch (err) {
             console.error("Error unlinking:", err);
+        }
+    };
+
+    // Unlink a single transaction from a distribution (for multi-link junction table)
+    const handleUnlinkSingleTransaction = async (distributionId, transactionId) => {
+        if (!confirm("Remove the link to this transaction?")) return;
+
+        try {
+            await axios.delete(`${API_URL}/distributions/${distributionId}/transactions/${transactionId}`);
+            fetchTransfers();
+        } catch (err) {
+            console.error("Error unlinking transaction:", err);
+            alert("Failed to unlink transaction");
         }
     };
 
@@ -345,7 +358,7 @@ const Distributions = ({ accounts }) => {
                                     </td>
 
                                     <td className="px-4 py-3">
-                                        {item.transaction_id ? (
+                                        {(item.linked_transactions && item.linked_transactions.length > 0) || item.transaction_id ? (
                                             <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded border border-emerald-500/30 font-bold uppercase tracking-wider">Linked</span>
                                         ) : (
                                             <span className="bg-amber-500/20 text-amber-400 text-[10px] px-2 py-1 rounded border border-amber-500/30 font-bold uppercase tracking-wider">Pending</span>
@@ -358,7 +371,40 @@ const Distributions = ({ accounts }) => {
 
                                     {/* Linked Transaction Column */}
                                     <td className="px-4 py-3">
-                                        {item.transaction_id ? (
+                                        {/* Check for new multi-link first, fallback to legacy single-link */}
+                                        {item.linked_transactions && item.linked_transactions.length > 0 ? (
+                                            <div className="flex flex-wrap gap-1">
+                                                {item.linked_transactions.map(tx => (
+                                                    <div key={tx.id} className="flex items-center gap-1 bg-purple-500/20 text-purple-400 text-[10px] px-2 py-1 rounded border border-purple-500/30">
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedTransaction(tx);
+                                                                setShowTransactionDetail(true);
+                                                            }}
+                                                            className="font-mono hover:text-purple-200 flex items-center gap-1"
+                                                            title="View transaction details"
+                                                        >
+                                                            <Eye size={10} />
+                                                            {tx.merchant?.substring(0, 12) || tx.id.substring(0, 8)}...
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleUnlinkSingleTransaction(item.id, tx.id)}
+                                                            className="text-purple-500 hover:text-red-400 transition ml-1"
+                                                            title="Unlink this transaction"
+                                                        >
+                                                            <Unlink size={10} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                <button
+                                                    onClick={() => openLinkModal(item)}
+                                                    className="text-slate-500 hover:text-purple-400 text-[10px] px-1 py-1 transition"
+                                                    title="Link more transactions"
+                                                >
+                                                    + Add
+                                                </button>
+                                            </div>
+                                        ) : item.transaction_id ? (
                                             <div className="flex items-center gap-2">
                                                 <button
                                                     onClick={() => {
