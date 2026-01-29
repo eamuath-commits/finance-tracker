@@ -59,12 +59,20 @@ export const SectionHeader = ({ title, onAdd }) => (
     </div>
 );
 
-export const Modal = ({ isOpen, title, children, onClose }) => {
+export const Modal = ({ isOpen, title, children, onClose, size = "md" }) => {
     if (!isOpen) return null;
+
+    const sizeClasses = {
+        sm: "max-w-sm",
+        md: "max-w-md",
+        lg: "max-w-lg",
+        xl: "max-w-2xl",
+        "2xl": "max-w-4xl"
+    };
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 backdrop-blur-sm">
-            <div className="bg-slate-800 rounded-lg p-6 w-full max-w-md border border-slate-700 shadow-2xl">
+            <div className={`bg-slate-800 rounded-lg p-6 w-full ${sizeClasses[size] || sizeClasses.md} border border-slate-700 shadow-2xl max-h-[90vh] overflow-auto`}>
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-bold text-white">{title}</h3>
                     <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">&times;</button>
@@ -227,7 +235,7 @@ export const Badge = ({ children, variant = "neutral", className = "" }) => {
     );
 };
 
-export const Button = ({ children, variant = "primary", onClick, className = "", icon: Icon, ...props }) => {
+export const Button = ({ children, variant = "primary", onClick, className = "", icon: Icon, disabled = false, ...props }) => {
     const variants = {
         primary: "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20",
         secondary: "bg-slate-700 hover:bg-slate-600 text-white",
@@ -235,10 +243,13 @@ export const Button = ({ children, variant = "primary", onClick, className = "",
         ghost: "hover:bg-white/5 text-slate-400 hover:text-white"
     };
 
+    const disabledClasses = disabled ? "opacity-50 cursor-not-allowed pointer-events-none" : "";
+
     return (
         <button
-            onClick={onClick}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 active:scale-95 ${variants[variant] || variants.primary} ${className}`}
+            onClick={disabled ? undefined : onClick}
+            disabled={disabled}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 active:scale-95 ${variants[variant] || variants.primary} ${disabledClasses} ${className}`}
             {...props}
         >
             {Icon && <Icon size={18} />}
