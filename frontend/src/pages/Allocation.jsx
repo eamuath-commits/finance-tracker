@@ -115,28 +115,14 @@ const Allocation = () => {
                 }
             }
 
-            // Update Preview Data locally by removing the executed item
-            if (previewData) {
-                const remaining = previewData.allocations.filter(item => item.target_account_id !== targetAccountId);
-                const newTotal = remaining.reduce((sum, item) => sum + item.amount, 0);
+            // Re-fetch preview to show updated status (transferred items)
+            const previewRes = await axios.get(`${API_URL}/allocation/preview?source_account_id=${sourceAccountId}&month_offset=${monthOffset}`);
+            setPreviewData(previewRes.data);
 
-                if (remaining.length === 0) {
-                    setDistributionResult(res.data);
-                    setPreviewData(null);
-                    // Refresh Account Balances
-                    const accRes = await axios.get(`${API_URL}/accounts/`);
-                    setAccounts(accRes.data);
-                } else {
-                    setPreviewData({
-                        ...previewData,
-                        total_amount: newTotal,
-                        allocations: remaining
-                    });
-                    // Refresh Account Balances quietly
-                    const accRes = await axios.get(`${API_URL}/accounts/`);
-                    setAccounts(accRes.data);
-                }
-            }
+            // Refresh Account Balances
+            const accRes = await axios.get(`${API_URL}/accounts/`);
+            setAccounts(accRes.data);
+
         } catch (error) {
             console.error("Execution failed:", error);
             alert("Transfer execution failed.");

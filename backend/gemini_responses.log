@@ -582,3 +582,15 @@ To: 7772
 Amount: SAR 300
 To: 7772
 26-1-14 22:42 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_bank": "AlRajhiBank", "source_account_last4": null, "destination_account_last4": "7772", "card_info": null, "amount": 300, "currency": "SAR", "fees": null, "timestamp": "2026-01-26 22:42", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Transfer to 7772"}
+2026-01-29 04:51:15,815 - ai_raw_io - INFO - INPUT: Notification : Declined due to insufficient fund
+Transaction : Online Purchase
+Card: 7868
+Amount : USD 14.99
+Merchant : AMAZON PR
+Date : 29/1/26 4:51 || OUTPUT: {"is_financial_event": true, "is_transaction": false, "transaction_type": "debit", "sub_type": "decline", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "7868", "destination_account_last4": null, "card_info": "7868", "amount": 14.99, "currency": "USD", "fees": null, "timestamp": "2026-01-29 04:51", "available_balance": null, "beneficiary": null, "merchant": "AMAZON PR", "sender_name": null, "category": "Shopping", "description": "Declined - Insufficient funds"}
+2026-01-29 07:52:17,103 - ai_raw_io - INFO - INPUT: Debit Internal Transfer
+From:1505
+Amount:SAR 1500
+To:MUZAMAL HUSSAIN
+To:1539
+26/1/29 07:52 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "transfer", "source_bank": "AlRajhiBank", "source_account_last4": "1505", "destination_account_last4": "1539", "amount": 1500, "currency": "SAR", "beneficiary": "MUZAMAL HUSSAIN", "category": "Transfer", "timestamp": "2026-01-26 07:52", "description": "Transfer to MUZAMAL HUSSAIN"}
