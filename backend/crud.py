@@ -1235,34 +1235,18 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
                         status='transferred'
                     ))
                 else:
-                    # Calculate transfer amount = required - target_account_balance
-                    target_balance = target_acc.current_balance if target_acc else 0
-                    transfer_amount = max(0, pending_amount - target_balance)
-                    
-                    if transfer_amount > 0:
-                        allocations.append(schemas.AllocationItem(
-                            identifier=category,
-                            name=category,
-                            rule_type='CATEGORY',
-                            target_account_id=rule.target_account_id,
-                            target_account_name=target_acc.name if target_acc else "Unknown",
-                            amount=transfer_amount,
-                            required_amount=pending_amount,
-                            status='pending'
-                        ))
-                        total_required += transfer_amount
-                    elif pending_amount > 0:
-                        # Target already has enough - show as covered
-                        allocations.append(schemas.AllocationItem(
-                            identifier=category,
-                            name=category,
-                            rule_type='CATEGORY',
-                            target_account_id=rule.target_account_id,
-                            target_account_name=target_acc.name if target_acc else "Unknown",
-                            amount=0,
-                            required_amount=pending_amount,
-                            status='covered'
-                        ))
+                    # Transfer full required amount
+                    allocations.append(schemas.AllocationItem(
+                        identifier=category,
+                        name=category,
+                        rule_type='CATEGORY',
+                        target_account_id=rule.target_account_id,
+                        target_account_name=target_acc.name if target_acc else "Unknown",
+                        amount=pending_amount,
+                        required_amount=pending_amount,
+                        status='pending'
+                    ))
+                    total_required += pending_amount
             
             # Add allocated items if any
             if allocated_amount > 0:
@@ -1305,34 +1289,18 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
                         status='transferred'
                     ))
                 else:
-                    # Calculate transfer amount = required - target_account_balance
-                    target_balance = target_acc.current_balance if target_acc else 0
-                    transfer_amount = max(0, pending_amount - target_balance)
-                    
-                    if transfer_amount > 0:
-                        allocations.append(schemas.AllocationItem(
-                            identifier=loan_name,
-                            name=loan_name,
-                            rule_type='LOAN',
-                            target_account_id=rule.target_account_id,
-                            target_account_name=target_acc.name if target_acc else "Unknown",
-                            amount=transfer_amount,
-                            required_amount=pending_amount,
-                            status='pending'
-                        ))
-                        total_required += transfer_amount
-                    elif pending_amount > 0:
-                        # Target already has enough - show as covered
-                        allocations.append(schemas.AllocationItem(
-                            identifier=loan_name,
-                            name=loan_name,
-                            rule_type='LOAN',
-                            target_account_id=rule.target_account_id,
-                            target_account_name=target_acc.name if target_acc else "Unknown",
-                            amount=0,
-                            required_amount=pending_amount,
-                            status='covered'
-                        ))
+                    # Transfer full required amount
+                    allocations.append(schemas.AllocationItem(
+                        identifier=loan_name,
+                        name=loan_name,
+                        rule_type='LOAN',
+                        target_account_id=rule.target_account_id,
+                        target_account_name=target_acc.name if target_acc else "Unknown",
+                        amount=pending_amount,
+                        required_amount=pending_amount,
+                        status='pending'
+                    ))
+                    total_required += pending_amount
             
             # Add allocated items if any
             if allocated_amount > 0:
