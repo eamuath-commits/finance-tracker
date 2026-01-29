@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useSearchParams } from 'react-router-dom';
 import { ArrowRight, CheckCircle, AlertCircle, RefreshCw, Receipt, Link2 } from 'lucide-react';
 import { SectionHeader, formatCurrency, Modal } from '../components/UI';
 import AllocationRules from '../components/AllocationRules';
@@ -8,7 +9,12 @@ import Distributions from '../components/Distributions';
 const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
 const Allocation = () => {
-    const [activeTab, setActiveTab] = useState('manager'); // 'manager', 'distributor', or 'transfers'
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeTab = searchParams.get('tab') || 'manager';
+
+    const setActiveTab = (tab) => {
+        setSearchParams({ tab });
+    };
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
 

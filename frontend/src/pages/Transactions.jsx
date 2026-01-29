@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
+import { useSearchParams } from 'react-router-dom';
 import { format } from "date-fns";
 import { Search, Edit3, Trash2, Plus, User, Calendar, Filter, X, MessageSquare } from "lucide-react";
 import { Modal, formatCurrency, inputClass, selectClass } from "../components/UI";
@@ -14,7 +15,12 @@ const Categories = [
 ];
 
 function Transactions() {
-    const [activeTab, setActiveTab] = useState("all");
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeTab = searchParams.get('tab') || 'all';
+
+    const setActiveTab = (tab) => {
+        setSearchParams({ tab });
+    };
     const [transactions, setTransactions] = useState([]);
     const [pendingTransactions, setPendingTransactions] = useState([]);
     const [accounts, setAccounts] = useState([]);

@@ -1,12 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { inputClass } from '../components/UI';
 
 const Categories = () => {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeTab = searchParams.get('tab') || 'OBLIGATION';
+
+    const setActiveTab = (tab) => {
+        setSearchParams({ tab });
+    };
+
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('OBLIGATION'); // 'OBLIGATION' or 'TRANSACTION'
     const [newCategoryName, setNewCategoryName] = useState('');
     const [editingCategory, setEditingCategory] = useState(null);
 
