@@ -130,25 +130,40 @@ export default function TransactionSelectorModal({
                                 placeholder="Search by merchant or notes..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500"
+                                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-600 bg-slate-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             />
                         </div>
+                        {/* Amount filters always visible */}
+                        <input
+                            type="number"
+                            placeholder="Min ر.س"
+                            value={filters.minAmount}
+                            onChange={(e) => setFilters(f => ({ ...f, minAmount: e.target.value }))}
+                            className="w-24 px-3 py-2 rounded-lg border border-slate-600 bg-slate-800 text-white focus:ring-2 focus:ring-blue-500"
+                        />
+                        <input
+                            type="number"
+                            placeholder="Max ر.س"
+                            value={filters.maxAmount}
+                            onChange={(e) => setFilters(f => ({ ...f, maxAmount: e.target.value }))}
+                            className="w-24 px-3 py-2 rounded-lg border border-slate-600 bg-slate-800 text-white focus:ring-2 focus:ring-blue-500"
+                        />
                         <Button
                             variant={showFilters ? "primary" : "secondary"}
                             onClick={() => setShowFilters(!showFilters)}
                         >
                             <Filter className="w-4 h-4 mr-1" />
-                            Filters
+                            More
                         </Button>
                     </div>
 
                     {/* Expandable Filters */}
                     {showFilters && (
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-2">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
                             <select
                                 value={filters.accountId}
                                 onChange={(e) => setFilters(f => ({ ...f, accountId: e.target.value }))}
-                                className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                                className="px-3 py-2 rounded-lg border border-slate-600 bg-slate-800 text-white"
                             >
                                 <option value="">All Accounts</option>
                                 {accounts.map(acc => (
@@ -159,42 +174,25 @@ export default function TransactionSelectorModal({
                             <select
                                 value={filters.type}
                                 onChange={(e) => setFilters(f => ({ ...f, type: e.target.value }))}
-                                className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                                className="px-3 py-2 rounded-lg border border-slate-600 bg-slate-800 text-white"
                             >
                                 <option value="">All Types</option>
-                                <option value="credit">Credit</option>
-                                <option value="debit">Debit</option>
+                                <option value="credit">Credit (Income)</option>
+                                <option value="debit">Debit (Expense)</option>
                             </select>
-
-                            <div className="flex gap-2">
-                                <input
-                                    type="number"
-                                    placeholder="Min ر.س"
-                                    value={filters.minAmount}
-                                    onChange={(e) => setFilters(f => ({ ...f, minAmount: e.target.value }))}
-                                    className="w-1/2 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
-                                />
-                                <input
-                                    type="number"
-                                    placeholder="Max ر.س"
-                                    value={filters.maxAmount}
-                                    onChange={(e) => setFilters(f => ({ ...f, maxAmount: e.target.value }))}
-                                    className="w-1/2 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
-                                />
-                            </div>
 
                             <input
                                 type="date"
                                 value={filters.startDate}
                                 onChange={(e) => setFilters(f => ({ ...f, startDate: e.target.value }))}
-                                className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                                className="px-3 py-2 rounded-lg border border-slate-600 bg-slate-800 text-white"
                             />
 
                             <input
                                 type="date"
                                 value={filters.endDate}
                                 onChange={(e) => setFilters(f => ({ ...f, endDate: e.target.value }))}
-                                className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                                className="px-3 py-2 rounded-lg border border-slate-600 bg-slate-800 text-white"
                             />
 
                             <Button
@@ -208,7 +206,7 @@ export default function TransactionSelectorModal({
                                     type: ''
                                 })}
                             >
-                                Clear Filters
+                                Clear All Filters
                             </Button>
                         </div>
                     )}
