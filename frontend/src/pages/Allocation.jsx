@@ -433,7 +433,7 @@ const Allocation = () => {
                                                     </div>
 
                                                     {/* Status badges */}
-                                                    {(hasAllocated || hasPending || hasTransferred || hasCovered) && (
+                                                    {(hasAllocated || hasPending || hasTransferred || hasCovered || shortage > 0) && (
                                                         <div className="flex gap-2 mb-3 flex-wrap">
                                                             {hasTransferred && (
                                                                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/30">
@@ -453,9 +453,16 @@ const Allocation = () => {
                                                                     {formatCurrency(group.allocatedAmount)} Paid
                                                                 </span>
                                                             )}
-                                                            {hasPending && (
-                                                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-400 bg-amber-500/20 px-2 py-0.5 rounded">
-                                                                    {formatCurrency(group.pendingAmount)} To Transfer
+                                                            {hasPending && !isFullShortage && (
+                                                                <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${isPartial ? 'text-amber-400 bg-amber-500/20' : 'text-emerald-400 bg-emerald-500/20'} px-2 py-0.5 rounded`}>
+                                                                    {isPartial ? formatCurrency(willTransfer) : formatCurrency(group.pendingAmount)} Can Transfer
+                                                                </span>
+                                                            )}
+                                                            {/* Shortage warning */}
+                                                            {shortage > 0 && (
+                                                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-400 bg-red-500/20 px-2 py-0.5 rounded border border-red-500/30">
+                                                                    <AlertCircle size={10} />
+                                                                    {formatCurrency(shortage)} Shortage
                                                                 </span>
                                                             )}
                                                         </div>
@@ -528,12 +535,22 @@ const Allocation = () => {
                                                 {hasPending ? (
                                                     <div className="mt-auto pt-2">
                                                         <button
-                                                            onClick={() => handleExecute(group.target_account_id, group.pendingAmount)}
-                                                            disabled={distributing || willTransfer <= 0}
-                                                            className={`w-full py-3.5 ${isPartial ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'} text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2`}
+                                                            onClick={() => handleExecute(group.target_account_id, willTransfer > 0 ? willTransfer : group.pendingAmount)}
+                                                            disabled={distributing || isFullShortage}
+                                                            className={`w-full py-3.5 ${isFullShortage
+                                                                    ? 'bg-red-600/50 cursor-not-allowed'
+                                                                    : isPartial
+                                                                        ? 'bg-amber-600 hover:bg-amber-500'
+                                                                        : 'bg-emerald-600 hover:bg-emerald-500'
+                                                                } text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2`}
                                                         >
-                                                            {isPartial ? <span>Partial Transfer</span> : <span>Transfer</span>}
-                                                            <ArrowRight size={18} />
+                                                            {isFullShortage ? (
+                                                                <><AlertCircle size={18} /><span>No Funds Available</span></>
+                                                            ) : isPartial ? (
+                                                                <><span>Transfer {formatCurrency(willTransfer)}</span><ArrowRight size={18} /></>
+                                                            ) : (
+                                                                <><span>Transfer {formatCurrency(group.pendingAmount)}</span><ArrowRight size={18} /></>
+                                                            )}
                                                         </button>
                                                     </div>
                                                 ) : (
