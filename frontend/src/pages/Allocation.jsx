@@ -251,8 +251,16 @@ const Allocation = () => {
             byAccount[accId].totalRequired += item.required_amount;
         });
 
-        return Object.values(byAccount);
-    }, [previewData, editableAmounts]);
+        // Sort by target account balance (ascending) - prioritize accounts with less money
+        const groups = Object.values(byAccount);
+        groups.sort((a, b) => {
+            const balA = accounts.find(acc => acc.id === a.target_account_id)?.current_balance || 0;
+            const balB = accounts.find(acc => acc.id === b.target_account_id)?.current_balance || 0;
+            return balA - balB; // Lowest balance first
+        });
+
+        return groups;
+    }, [previewData, editableAmounts, accounts]);
 
     // Calculate dynamic total based on pending amounts only
     const currentDistributingTotal = groupedAllocations.reduce((sum, group) => sum + group.pendingAmount, 0);
@@ -538,10 +546,10 @@ const Allocation = () => {
                                                             onClick={() => handleExecute(group.target_account_id, willTransfer > 0 ? willTransfer : group.pendingAmount)}
                                                             disabled={distributing || isFullShortage}
                                                             className={`w-full py-3.5 ${isFullShortage
-                                                                    ? 'bg-red-600/50 cursor-not-allowed'
-                                                                    : isPartial
-                                                                        ? 'bg-amber-600 hover:bg-amber-500'
-                                                                        : 'bg-emerald-600 hover:bg-emerald-500'
+                                                                ? 'bg-red-600/50 cursor-not-allowed'
+                                                                : isPartial
+                                                                    ? 'bg-amber-600 hover:bg-amber-500'
+                                                                    : 'bg-emerald-600 hover:bg-emerald-500'
                                                                 } text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2`}
                                                         >
                                                             {isFullShortage ? (
