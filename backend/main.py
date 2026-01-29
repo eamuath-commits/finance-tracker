@@ -1143,6 +1143,7 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
         tx_in = crud.create_transaction(db, t_in)
         
         # Create ONE PayrollTransfer record per target account
+        # Note: Don't auto-link transaction_id - user will link via suggestions
         items_summary = ", ".join(data['items'][:3])
         if len(data['items']) > 3:
             items_summary += f" +{len(data['items']) - 3} more"
@@ -1152,8 +1153,7 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
             target_account_id=target_account_id,
             amount=transfer_amount,
             billing_month=billing_month,
-            note=f"Payday Distributor: {items_summary}",
-            transaction_id=tx_in.id
+            note=f"Payday Distributor: {items_summary}"
         )
         crud.create_payroll_transfer(db, payroll_transfer)
         
