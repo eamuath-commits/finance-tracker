@@ -1080,21 +1080,33 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
     target_date = datetime.now() + relativedelta(months=req.month_offset)
     billing_month = target_date.strftime('%Y-%m')
 
-    executed_transfers = []
-    
+    # Group allocations by target_account_id to avoid duplicate transfers
+    # Only include pending items (not transferred/allocated)
+    by_target = {}
     for item in preview.allocations:
-        if item.amount <= 0:
+        if item.amount <= 0 or item.status != 'pending':
             continue
             
         # Filter if specific target requested
         if req.target_account_id and item.target_account_id != req.target_account_id:
             continue
+        
+        if item.target_account_id not in by_target:
+            by_target[item.target_account_id] = {
+                'target_account_name': item.target_account_name,
+                'items': [],
+                'total_amount': 0
+            }
+        by_target[item.target_account_id]['items'].append(item.name)
+        by_target[item.target_account_id]['total_amount'] += item.amount
 
-        # Check for sufficient funds
+    executed_transfers = []
+    
+    for target_account_id, data in by_target.items():
         # Use override amount if provided for this specific target
-        requested_amount = item.amount
-        if req.override_amount is not None and req.target_account_id:
-             requested_amount = req.override_amount
+        requested_amount = data['total_amount']
+        if req.override_amount is not None and req.target_account_id == target_account_id:
+            requested_amount = req.override_amount
 
         transfer_amount = requested_amount
         shortage = 0.0
@@ -1108,18 +1120,20 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
                 # Skip if source is empty
                 continue
 
+        # Create ONE outgoing transaction
         t_out = schemas.TransactionCreate(
             account_id=source_acc.id,
             amount=-transfer_amount, 
-            merchant=f"Transfer to {item.target_account_name}",
+            merchant=f"Transfer to {data['target_account_name']}",
             category="Transfer",
             type="debit",
             timestamp=datetime.now()
         )
         crud.create_transaction(db, t_out)
         
+        # Create ONE incoming transaction
         t_in = schemas.TransactionCreate(
-            account_id=item.target_account_id,
+            account_id=target_account_id,
             amount=transfer_amount,
             merchant=f"Transfer from {source_acc.name}",
             category="Transfer",
@@ -1128,20 +1142,27 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
         )
         tx_in = crud.create_transaction(db, t_in)
         
-        # Auto-create PayrollTransfer record and link to incoming transaction
+        # Create ONE PayrollTransfer record per target account
+        items_summary = ", ".join(data['items'][:3])
+        if len(data['items']) > 3:
+            items_summary += f" +{len(data['items']) - 3} more"
+            
         payroll_transfer = schemas.PayrollTransferCreate(
             source_account_id=source_acc.id,
-            target_account_id=item.target_account_id,
+            target_account_id=target_account_id,
             amount=transfer_amount,
             billing_month=billing_month,
-            note=f"Auto-created from Payday Distributor - {item.name}",
-            transaction_id=tx_in.id  # Link to the incoming transaction
+            note=f"Payday Distributor: {items_summary}",
+            transaction_id=tx_in.id
         )
         crud.create_payroll_transfer(db, payroll_transfer)
         
+        # Update source balance for next iteration
+        source_acc.current_balance -= transfer_amount
+        
         # Track execution details
         executed_transfers.append({
-            "target": item.target_account_name,
+            "target": data['target_account_name'],
             "requested": requested_amount,
             "transferred": transfer_amount,
             "shortage": shortage
