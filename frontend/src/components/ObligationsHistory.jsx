@@ -253,6 +253,19 @@ const ObligationsPayments = ({ obligations, history, onEdit, onDelete, onRefresh
         }
     };
 
+    // Unlink a single transaction from a payment (for multi-link junction table)
+    const handleUnlinkSingleTransaction = async (paymentId, transactionId) => {
+        if (!confirm("Remove the link to this transaction?")) return;
+
+        try {
+            await axios.delete(`${API_URL}/payments/${paymentId}/transactions/${transactionId}`);
+            if (onRefresh) onRefresh();
+        } catch (err) {
+            console.error("Error unlinking transaction:", err);
+            alert("Failed to unlink transaction");
+        }
+    };
+
     return (
         <div className="animate-fade-in-up space-y-4">
             {/* Top Stats & Filters Row */}
@@ -390,7 +403,40 @@ const ObligationsPayments = ({ obligations, history, onEdit, onDelete, onRefresh
 
                                     {/* Linked Transaction Column */}
                                     <td className="px-4 py-3">
-                                        {item.transaction_id ? (
+                                        {/* Check for new multi-link first, fallback to legacy single-link */}
+                                        {item.linked_transactions && item.linked_transactions.length > 0 ? (
+                                            <div className="flex flex-wrap gap-1">
+                                                {item.linked_transactions.map(tx => (
+                                                    <div key={tx.id} className="flex items-center gap-1 bg-purple-500/20 text-purple-400 text-[10px] px-2 py-1 rounded border border-purple-500/30">
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedTransaction(tx);
+                                                                setShowTransactionDetail(true);
+                                                            }}
+                                                            className="font-mono hover:text-purple-200 flex items-center gap-1"
+                                                            title="View transaction details"
+                                                        >
+                                                            <Eye size={10} />
+                                                            {tx.merchant?.substring(0, 12) || tx.id.substring(0, 8)}...
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleUnlinkSingleTransaction(item.id, tx.id)}
+                                                            className="text-purple-500 hover:text-red-400 transition ml-1"
+                                                            title="Unlink this transaction"
+                                                        >
+                                                            <Unlink size={10} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                <button
+                                                    onClick={() => openLinkModal(item)}
+                                                    className="text-slate-500 hover:text-purple-400 text-[10px] px-1 py-1 transition"
+                                                    title="Link more transactions"
+                                                >
+                                                    + Add
+                                                </button>
+                                            </div>
+                                        ) : item.transaction_id ? (
                                             <div className="flex items-center gap-2">
                                                 <button
                                                     onClick={() => {

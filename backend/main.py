@@ -461,6 +461,22 @@ def read_obligation_payments(obligation_id: str, db: Session = Depends(get_db)):
     payments = crud.get_payments(db, obligation_id)
     result = []
     for p in payments:
+        # Get linked transactions from junction table
+        linked_txs = []
+        if p.linked_transactions:
+            for link in p.linked_transactions:
+                tx = link.transaction
+                if tx:
+                    linked_txs.append({
+                        "id": tx.id,
+                        "merchant": tx.merchant,
+                        "amount": tx.amount,
+                        "type": tx.type,
+                        "category": tx.category,
+                        "timestamp": tx.timestamp.isoformat() if tx.timestamp else None,
+                        "account_id": tx.account_id,
+                    })
+        
         payment_dict = {
             "id": p.id,
             "obligation_id": p.obligation_id,
@@ -470,8 +486,11 @@ def read_obligation_payments(obligation_id: str, db: Session = Depends(get_db)):
             "note": p.note,
             "status": p.status,
             "transaction_id": p.transaction_id,
-            "linked_transaction": None
+            "linked_transaction": None,
+            "linked_transactions": linked_txs,
+            "linked_transactions_count": len(linked_txs)
         }
+        # Legacy single-link support
         if p.transaction_id:
             tx = crud.get_transaction(db, p.transaction_id)
             if tx:
@@ -1273,11 +1292,29 @@ def get_distributions(
         if d.transaction_id:
             linked_tx = crud.get_transaction(db, d.transaction_id)
         
+        # Get linked transactions from junction table
+        linked_txs = []
+        if d.linked_transactions:
+            for link in d.linked_transactions:
+                tx = link.transaction
+                if tx:
+                    linked_txs.append({
+                        "id": tx.id,
+                        "merchant": tx.merchant,
+                        "amount": tx.amount,
+                        "type": tx.type,
+                        "category": tx.category,
+                        "timestamp": tx.timestamp.isoformat() if tx.timestamp else None,
+                        "account_id": tx.account_id,
+                    })
+        
         result.append({
             **d.__dict__,
             "source_account_name": source.name if source else None,
             "target_account_name": target.name if target else None,
-            "linked_transaction": linked_tx
+            "linked_transaction": linked_tx,
+            "linked_transactions": linked_txs,
+            "linked_transactions_count": len(linked_txs)
         })
     
     return result
