@@ -376,20 +376,30 @@ const Allocation = () => {
                                         const sourceBalance = accounts.find(a => a.id === sourceAccountId)?.current_balance || 0;
                                         const targetAcc = accounts.find(a => a.id === group.target_account_id);
 
-                                        const shortage = Math.max(0, group.pendingAmount - sourceBalance);
+                                        // Calculate cumulative spent before this group
+                                        const previousPending = groupedAllocations
+                                            .slice(0, idx)
+                                            .reduce((sum, g) => sum + g.pendingAmount, 0);
+                                        const remainingBefore = sourceBalance - previousPending;
+
+                                        // Shortage based on what's left after previous transfers
+                                        const shortage = Math.max(0, group.pendingAmount - remainingBefore);
                                         const willTransfer = Math.max(0, group.pendingAmount - shortage);
-                                        const isPartial = shortage > 0;
+                                        const isPartial = shortage > 0 && willTransfer > 0;
+                                        const isFullShortage = willTransfer === 0 && group.pendingAmount > 0;
                                         const hasAllocated = group.allocatedAmount > 0;
                                         const hasPending = group.pendingAmount > 0;
                                         const hasTransferred = group.transferredAmount > 0;
                                         const hasCovered = group.coveredAmount > 0;
 
-                                        // Card color: green if fully transferred/covered, amber if partial, default otherwise
+                                        // Card color: green if fully transferred/covered, red if full shortage, amber if partial, default otherwise
                                         const cardClass = (hasTransferred || hasCovered) && !hasPending
                                             ? 'bg-emerald-900/20 border-emerald-500/40'
-                                            : isPartial
-                                                ? 'bg-amber-900/10 border-amber-500/30'
-                                                : 'bg-slate-800/40 border-slate-700';
+                                            : isFullShortage
+                                                ? 'bg-red-900/10 border-red-500/30'
+                                                : isPartial
+                                                    ? 'bg-amber-900/10 border-amber-500/30'
+                                                    : 'bg-slate-800/40 border-slate-700';
 
                                         return (
                                             <div key={group.target_account_id} className={`relative flex flex-col gap-4 p-5 rounded-2xl border transition-all hover:shadow-lg hover:border-slate-600 ${cardClass}`}>
