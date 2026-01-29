@@ -79,11 +79,16 @@ function Transactions() {
         return transactions.filter(tx => {
             // Search filter
             if (searchTerm) {
-                const term = searchTerm.toLowerCase();
+                const term = searchTerm.toLowerCase().trim();
+                // Check if searching for amount (numeric)
+                const isNumericSearch = /^[\d.,]+$/.test(term);
                 const matchesSearch =
                     (tx.merchant?.toLowerCase() || '').includes(term) ||
                     (tx.category?.toLowerCase() || '').includes(term) ||
-                    (tx.notes?.toLowerCase() || '').includes(term);
+                    (tx.notes?.toLowerCase() || '').includes(term) ||
+                    // Amount search: match exact, partial, or formatted amounts
+                    (isNumericSearch && tx.amount?.toString().includes(term.replace(',', ''))) ||
+                    tx.amount?.toFixed(2).includes(term.replace(',', ''));
                 if (!matchesSearch) return false;
             }
             // Account/Credit Card filter
