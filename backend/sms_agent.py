@@ -706,7 +706,9 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
     category = result.get('category')
     if not category or category.lower() == "uncategorized":
         # Assign default categories based on sub_type if AI didn't suggest one
-        if sub_type in ['transfer', 'internal_transfer']:
+        if sub_type == 'internal_transfer':
+            category = "Internal Transfer"
+        elif sub_type == 'transfer':
             category = "Transfer"
         elif sub_type == 'payment':
             category = "Bills"

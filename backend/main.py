@@ -1125,7 +1125,7 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
             account_id=source_acc.id,
             amount=-transfer_amount, 
             merchant=f"Transfer to {data['target_account_name']}",
-            category="Transfer",
+            category="Internal Transfer",
             type="debit",
             timestamp=datetime.now()
         )
@@ -1136,7 +1136,7 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
             account_id=target_account_id,
             amount=transfer_amount,
             merchant=f"Transfer from {source_acc.name}",
-            category="Transfer",
+            category="Internal Transfer",
             type="credit",
             timestamp=datetime.now()
         )

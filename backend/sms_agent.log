@@ -1003,3 +1003,8 @@ Amount:S...
 2026-01-29 11:33:22,480 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-01-29 11:35:29,897 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-01-29 11:35:39,155 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 13:18:08,092 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 13:18:25,542 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 13:18:46,495 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-29 13:18:46,518 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-29 13:18:46,614 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).

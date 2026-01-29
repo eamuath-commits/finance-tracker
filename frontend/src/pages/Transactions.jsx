@@ -185,7 +185,7 @@ function Transactions() {
                     account_id: txForm.account_id,
                     amount: amount,
                     merchant: txForm.merchant || `Transfer to ${targetAcc?.name || 'Account'}`,
-                    category: 'Transfer',
+                    category: 'Internal Transfer',
                     type: 'debit',
                     notes: txForm.notes,
                     timestamp
@@ -196,7 +196,7 @@ function Transactions() {
                     account_id: txForm.target_account_id,
                     amount: amount,
                     merchant: txForm.merchant || `Transfer from ${sourceAcc?.name || 'Account'}`,
-                    category: 'Transfer',
+                    category: 'Internal Transfer',
                     type: 'credit',
                     notes: txForm.notes,
                     timestamp
