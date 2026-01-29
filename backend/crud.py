@@ -1317,14 +1317,9 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
         else:
             skipped_items.append(f"{loan_name} loan (no rule)")
     
-    # Limit amounts to source balance (pro-rata if needed)
-    total_amount = min(total_required, source_balance)
-    
-    if total_required > source_balance and total_required > 0:
-        # Pro-rata reduction
-        ratio = source_balance / total_required
-        for alloc in allocations:
-            alloc.amount = round(alloc.amount * ratio, 2)
+    # Calculate totals - show full required amounts without pro-rata reduction
+    # Shortage handling happens at execution time, not preview time
+    total_amount = total_required
     
     return schemas.AllocationPreviewResponse(
         total_required=total_required,
