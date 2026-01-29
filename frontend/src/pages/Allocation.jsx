@@ -116,7 +116,10 @@ const Allocation = () => {
             }
 
             // Re-fetch preview to show updated status (transferred items)
-            const previewRes = await axios.get(`${API_URL}/allocation/preview?source_account_id=${sourceAccountId}&month_offset=${monthOffset}`);
+            const previewRes = await axios.post(`${API_URL}/allocation/preview`, {
+                source_account_id: sourceAccountId,
+                month_offset: monthOffset
+            });
             setPreviewData(previewRes.data);
 
             // Refresh Account Balances
@@ -460,7 +463,7 @@ const Allocation = () => {
                                                         disabled={distributing || willTransfer <= 0}
                                                         className={`w-full py-3.5 ${isPartial ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'} text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2`}
                                                     >
-                                                        {isPartial ? <span>Confirm Partial Transfer</span> : <span>Confirm Transfer</span>}
+                                                        {isPartial ? <span>Partial Transfer</span> : <span>Transfer</span>}
                                                         <ArrowRight size={18} />
                                                     </button>
                                                 </div>
@@ -524,7 +527,7 @@ const Allocation = () => {
                                                         : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/20'
                                                         }`}
                                                 >
-                                                    {distributing ? <RefreshCw className="animate-spin w-4 h-4" /> : 'Confirm Transfer'}
+                                                    {distributing ? <RefreshCw className="animate-spin w-4 h-4" /> : 'Transfer'}
                                                 </button>
                                             </div>
                                         </div>

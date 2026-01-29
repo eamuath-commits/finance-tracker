@@ -594,3 +594,8 @@ Amount:SAR 1500
 To:MUZAMAL HUSSAIN
 To:1539
 26/1/29 07:52 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "transfer", "source_bank": "AlRajhiBank", "source_account_last4": "1505", "destination_account_last4": "1539", "amount": 1500, "currency": "SAR", "beneficiary": "MUZAMAL HUSSAIN", "category": "Transfer", "timestamp": "2026-01-26 07:52", "description": "Transfer to MUZAMAL HUSSAIN"}
+2026-01-29 10:41:34,616 - ai_raw_io - INFO - INPUT: PoS
+By:9365;mada-Apple Pay
+Amount:SAR 185.30
+At:ALDREES 1
+29/1/26 10:41 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 185.3, "currency": "SAR", "fees": null, "timestamp": "2026-01-29 10:41", "available_balance": null, "beneficiary": null, "merchant": "ALDREES 1", "sender_name": null, "category": "Transport", "description": "Purchase at ALDREES"}
