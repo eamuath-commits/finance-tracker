@@ -650,3 +650,7 @@ From:2104
 Amount:SAR 121
 At:Jahez
 30/1/26 23:55 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "2104", "card_info": "mada-Apple Pay 2104", "amount": 121, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 23:55", "available_balance": null, "beneficiary": null, "merchant": "Jahez", "sender_name": null, "category": "Food & Dining", "description": "Purchase at Jahez"}
+2026-01-30 02:17:52,968 - ai_raw_io - INFO - INPUT: Transfer Between Your Accounts
+Amount: SAR 300
+To: 7772
+26-1-14 22:42 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_bank": "AlRajhiBank", "source_account_last4": null, "destination_account_last4": "7772", "card_info": null, "amount": 300, "currency": "SAR", "fees": null, "timestamp": "2026-01-14 22:42", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": "Transfer", "description": "Transfer to 7772"}

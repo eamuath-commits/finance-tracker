@@ -1103,3 +1103,19 @@ By:4390;mada-Apple P...
 2026-01-30 02:06:19,913 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-01-30 02:06:19,938 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
 2026-01-30 02:06:20,020 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 02:17:50,446 - sms_agent - INFO - Received message from Channel_-1003635708322: +966566985112 —— Transfer Between Your Accounts
+Am...
+2026-01-30 02:17:50,933 - sms_agent - INFO - Parsed structured message - Sender: +966566985112 (separator: '——')
+2026-01-30 02:17:52,977 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 7772, Account: General
+2026-01-30 02:17:52,977 - sms_agent - INFO - Incoming Credit detected to own account General. ensure primary.
+2026-01-30 02:17:52,977 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: General
+2026-01-30 02:17:52,979 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=General
+2026-01-30 02:17:52,979 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to General
+2026-01-30 02:17:52,984 - sms_agent - INFO - DEBUG: Created transaction 1aa57494-3dbc-4367-aa30-2dc2032bf082 with status pending_action
+2026-01-30 02:17:52,986 - sms_agent - INFO - DEBUG: Sending inline buttons to user - 9 accounts
+2026-01-30 02:17:53,138 - sms_agent - INFO - DEBUG: Inline buttons sent successfully
+2026-01-30 02:18:36,442 - sms_agent - INFO - Completed transfer: Expense -> General
+2026-01-30 02:35:49,450 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 02:36:43,996 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 02:36:44,020 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-30 02:36:44,132 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).

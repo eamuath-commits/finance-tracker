@@ -3,6 +3,7 @@ import axios from 'axios';
 import { formatCurrency, selectClass, Modal } from './UI';
 import TransactionDetailModal from './TransactionDetailModal';
 import TransactionSelectorModal from './TransactionSelectorModal';
+import ConfirmDialog from './ConfirmDialog';
 import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Trash2, Eye, List } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
@@ -32,6 +33,9 @@ const Distributions = ({ accounts }) => {
     // Transaction Detail Modal State
     const [showTransactionDetail, setShowTransactionDetail] = useState(false);
     const [selectedTransaction, setSelectedTransaction] = useState(null);
+
+    // Confirm Dialog State
+    const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null });
 
     useEffect(() => {
         fetchTransfers();
@@ -200,38 +204,57 @@ const Distributions = ({ accounts }) => {
         }
     };
 
-    const handleUnlinkTransaction = async (transferId) => {
-        if (!confirm("Remove the link to this transaction?")) return;
-
-        try {
-            await axios.put(`${API_URL}/distributions/${transferId}`, { transaction_id: null });
-            fetchTransfers();
-        } catch (err) {
-            console.error("Error unlinking:", err);
-        }
+    const handleUnlinkTransaction = (transferId) => {
+        setConfirmDialog({
+            open: true,
+            title: 'Unlink Transaction',
+            message: 'Remove the link to this transaction?',
+            onConfirm: async () => {
+                try {
+                    await axios.put(`${API_URL}/distributions/${transferId}`, { transaction_id: null });
+                    fetchTransfers();
+                } catch (err) {
+                    console.error("Error unlinking:", err);
+                }
+                setConfirmDialog({ open: false, title: '', message: '', onConfirm: null });
+            }
+        });
     };
 
     // Unlink a single transaction from a distribution (for multi-link junction table)
-    const handleUnlinkSingleTransaction = async (distributionId, transactionId) => {
-        if (!confirm("Remove the link to this transaction?")) return;
-
-        try {
-            await axios.delete(`${API_URL}/distributions/${distributionId}/transactions/${transactionId}`);
-            fetchTransfers();
-        } catch (err) {
-            console.error("Error unlinking transaction:", err);
-            alert("Failed to unlink transaction");
-        }
+    const handleUnlinkSingleTransaction = (distributionId, transactionId) => {
+        setConfirmDialog({
+            open: true,
+            title: 'Unlink Transaction',
+            message: 'Remove the link to this transaction?',
+            onConfirm: async () => {
+                try {
+                    await axios.delete(`${API_URL}/distributions/${distributionId}/transactions/${transactionId}`);
+                    fetchTransfers();
+                } catch (err) {
+                    console.error("Error unlinking transaction:", err);
+                    alert("Failed to unlink transaction");
+                }
+                setConfirmDialog({ open: false, title: '', message: '', onConfirm: null });
+            }
+        });
     };
 
-    const handleDelete = async (transferId) => {
-        if (!confirm("Delete this distribution record?")) return;
-        try {
-            await axios.delete(`${API_URL}/distributions/${transferId}`);
-            fetchTransfers();
-        } catch (error) {
-            console.error("Failed to delete transfer:", error);
-        }
+    const handleDelete = (transferId) => {
+        setConfirmDialog({
+            open: true,
+            title: 'Delete Distribution',
+            message: 'Are you sure you want to delete this distribution record?',
+            onConfirm: async () => {
+                try {
+                    await axios.delete(`${API_URL}/distributions/${transferId}`);
+                    fetchTransfers();
+                } catch (error) {
+                    console.error("Failed to delete transfer:", error);
+                }
+                setConfirmDialog({ open: false, title: '', message: '', onConfirm: null });
+            }
+        });
     };
 
     if (loading) {
@@ -547,6 +570,15 @@ const Distributions = ({ accounts }) => {
                     setSelectedTransaction(null);
                 }}
                 transaction={selectedTransaction}
+            />
+
+            {/* Confirm Dialog */}
+            <ConfirmDialog
+                isOpen={confirmDialog.open}
+                title={confirmDialog.title}
+                message={confirmDialog.message}
+                onConfirm={confirmDialog.onConfirm}
+                onCancel={() => setConfirmDialog({ open: false, title: '', message: '', onConfirm: null })}
             />
         </div>
     );
