@@ -939,20 +939,27 @@ const Accounts = () => {
                 <Modal isOpen={true} title={editingTx ? "Edit Transaction" : "Add Transaction"} onClose={() => setShowTxModal(false)}>
                     <form onSubmit={handleSaveTx} className="space-y-4">
                         {/* Transaction Type Indicator */}
-                        <div className="flex gap-4 p-1 bg-slate-700 rounded-lg mb-4">
+                        <div className="grid grid-cols-3 gap-2 p-1 bg-slate-700 rounded-lg mb-4">
                             <button
                                 type="button"
-                                onClick={() => setTxForm(f => ({ ...f, category: '' }))}
-                                className="flex-1 py-1.5 text-xs font-bold uppercase rounded-md bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 transition text-center"
+                                onClick={() => setTxForm(f => ({ ...f, type: 'debit' }))}
+                                className={`py-1.5 text-xs font-bold uppercase rounded-md transition text-center ${txForm.type === 'debit' ? 'bg-red-600 text-white' : 'bg-slate-800 text-gray-400 hover:bg-slate-600'}`}
                             >
-                                Expense / Debit
+                                Expense
                             </button>
                             <button
                                 type="button"
-                                onClick={() => setTxForm(f => ({ ...f, category: 'Income' }))}
-                                className="flex-1 py-1.5 text-xs font-bold uppercase rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition text-center"
+                                onClick={() => setTxForm(f => ({ ...f, type: 'credit' }))}
+                                className={`py-1.5 text-xs font-bold uppercase rounded-md transition text-center ${txForm.type === 'credit' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-gray-400 hover:bg-slate-600'}`}
                             >
-                                Income / Credit
+                                Income
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTxForm(f => ({ ...f, type: 'transfer', category: 'Transfer' }))}
+                                className={`py-1.5 text-xs font-bold uppercase rounded-md transition text-center ${txForm.type === 'transfer' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-gray-400 hover:bg-slate-600'}`}
+                            >
+                                Transfer
                             </button>
                         </div>
                         <div>

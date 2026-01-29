@@ -631,20 +631,27 @@ function Transactions() {
             <Modal isOpen={showTxModal} title={editingTx ? "Edit Transaction" : "Add Transaction"} onClose={() => setShowTxModal(false)}>
                 <form onSubmit={handleSaveTx} className="space-y-4">
                     {/* Transaction Type */}
-                    <div className="grid grid-cols-2 gap-2 mb-4">
+                    <div className="grid grid-cols-3 gap-2 mb-4">
                         <button
                             type="button"
                             onClick={() => setTxForm({ ...txForm, type: 'debit' })}
-                            className={`py-2 px-4 rounded-lg font-medium transition ${txForm.type === 'debit' ? 'bg-red-600 text-white' : 'bg-slate-700 text-gray-400'}`}
+                            className={`py-2 px-3 rounded-lg font-medium transition text-sm ${txForm.type === 'debit' ? 'bg-red-600 text-white' : 'bg-slate-700 text-gray-400'}`}
                         >
                             Expense
                         </button>
                         <button
                             type="button"
                             onClick={() => setTxForm({ ...txForm, type: 'credit' })}
-                            className={`py-2 px-4 rounded-lg font-medium transition ${txForm.type === 'credit' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-gray-400'}`}
+                            className={`py-2 px-3 rounded-lg font-medium transition text-sm ${txForm.type === 'credit' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-gray-400'}`}
                         >
                             Income
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setTxForm({ ...txForm, type: 'transfer', category: 'Transfer' })}
+                            className={`py-2 px-3 rounded-lg font-medium transition text-sm ${txForm.type === 'transfer' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-400'}`}
+                        >
+                            Transfer
                         </button>
                     </div>
 
