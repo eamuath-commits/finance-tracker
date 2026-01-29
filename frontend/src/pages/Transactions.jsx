@@ -153,6 +153,8 @@ function Transactions() {
                 amount: '',
                 category: '',
                 type: 'debit',
+                is_internal: true,
+                transfer_direction: 'outgoing',
                 notes: '',
                 timestamp: new Date().toISOString().slice(0, 16)
             });
@@ -173,7 +175,7 @@ function Transactions() {
                     amount,
                     timestamp
                 });
-            } else if (txForm.type === 'transfer' && txForm.target_account_id) {
+            } else if (txForm.type === 'transfer' && txForm.is_internal && txForm.target_account_id) {
                 // Internal transfer - create TWO transactions
                 const sourceAcc = accounts.find(a => a.id === txForm.account_id);
                 const targetAcc = accounts.find(a => a.id === txForm.target_account_id);
@@ -196,6 +198,18 @@ function Transactions() {
                     merchant: txForm.merchant || `Transfer from ${sourceAcc?.name || 'Account'}`,
                     category: 'Transfer',
                     type: 'credit',
+                    notes: txForm.notes,
+                    timestamp
+                });
+            } else if (txForm.type === 'transfer' && !txForm.is_internal) {
+                // External transfer - single transaction with beneficiary
+                const isOutgoing = txForm.transfer_direction === 'outgoing';
+                await axios.post(`${API_URL}/transactions/`, {
+                    account_id: txForm.account_id,
+                    amount: amount,
+                    merchant: txForm.merchant, // Beneficiary name
+                    category: 'Transfer',
+                    type: isOutgoing ? 'debit' : 'credit',
                     notes: txForm.notes,
                     timestamp
                 });
@@ -693,40 +707,113 @@ function Transactions() {
                     {/* Account Selection - Different UI for transfers */}
                     {txForm.type === 'transfer' ? (
                         <div className="bg-slate-900/50 p-3 rounded-lg border border-blue-500/30 space-y-3">
-                            <label className="text-blue-400 text-xs font-semibold uppercase block">Internal Transfer</label>
-                            <div className="grid grid-cols-5 gap-2 items-center">
-                                <div className="col-span-2">
-                                    <label className="text-gray-500 text-[10px] uppercase mb-0.5 block">From Account</label>
-                                    <select
-                                        className={selectClass}
-                                        value={txForm.account_id}
-                                        onChange={e => setTxForm({ ...txForm, account_id: e.target.value })}
-                                        required
-                                    >
-                                        <option value="">Select Source</option>
-                                        {accounts.filter(a => a.id !== txForm.target_account_id).map(acc => (
-                                            <option key={acc.id} value={acc.id}>{acc.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="flex justify-center text-gray-500">
-                                    <span className="text-xl">→</span>
-                                </div>
-                                <div className="col-span-2">
-                                    <label className="text-gray-500 text-[10px] uppercase mb-0.5 block">To Account</label>
-                                    <select
-                                        className={selectClass}
-                                        value={txForm.target_account_id}
-                                        onChange={e => setTxForm({ ...txForm, target_account_id: e.target.value })}
-                                        required
-                                    >
-                                        <option value="">Select Target</option>
-                                        {accounts.filter(a => a.id !== txForm.account_id).map(acc => (
-                                            <option key={acc.id} value={acc.id}>{acc.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                            {/* Internal/External Toggle */}
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setTxForm({ ...txForm, is_internal: true })}
+                                    className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition ${txForm.is_internal ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-400 hover:bg-slate-600'}`}
+                                >
+                                    Internal (My Accounts)
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setTxForm({ ...txForm, is_internal: false })}
+                                    className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition ${!txForm.is_internal ? 'bg-purple-600 text-white' : 'bg-slate-700 text-gray-400 hover:bg-slate-600'}`}
+                                >
+                                    External (Beneficiary)
+                                </button>
                             </div>
+
+                            {txForm.is_internal ? (
+                                /* Internal Transfer: Source → Target */
+                                <div className="grid grid-cols-5 gap-2 items-center">
+                                    <div className="col-span-2">
+                                        <label className="text-gray-500 text-[10px] uppercase mb-0.5 block">From Account</label>
+                                        <select
+                                            className={selectClass}
+                                            value={txForm.account_id}
+                                            onChange={e => setTxForm({ ...txForm, account_id: e.target.value })}
+                                            required
+                                        >
+                                            <option value="">Select Source</option>
+                                            {accounts.filter(a => a.id !== txForm.target_account_id).map(acc => (
+                                                <option key={acc.id} value={acc.id}>{acc.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="flex justify-center text-gray-500">
+                                        <span className="text-xl">→</span>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="text-gray-500 text-[10px] uppercase mb-0.5 block">To Account</label>
+                                        <select
+                                            className={selectClass}
+                                            value={txForm.target_account_id}
+                                            onChange={e => setTxForm({ ...txForm, target_account_id: e.target.value })}
+                                            required
+                                        >
+                                            <option value="">Select Target</option>
+                                            {accounts.filter(a => a.id !== txForm.account_id).map(acc => (
+                                                <option key={acc.id} value={acc.id}>{acc.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                            ) : (
+                                /* External Transfer: Account + Direction + Beneficiary */
+                                <div className="space-y-3">
+                                    {/* Direction Toggle */}
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setTxForm({ ...txForm, transfer_direction: 'outgoing' })}
+                                            className={`flex-1 py-1.5 text-xs font-medium rounded-md transition ${txForm.transfer_direction === 'outgoing' ? 'bg-red-500/20 text-red-300 border border-red-500/50' : 'bg-slate-700 text-gray-400'}`}
+                                        >
+                                            ↑ Outgoing (Send)
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setTxForm({ ...txForm, transfer_direction: 'incoming' })}
+                                            className={`flex-1 py-1.5 text-xs font-medium rounded-md transition ${txForm.transfer_direction === 'incoming' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50' : 'bg-slate-700 text-gray-400'}`}
+                                        >
+                                            ↓ Incoming (Receive)
+                                        </button>
+                                    </div>
+
+                                    {/* Account */}
+                                    <div>
+                                        <label className="text-gray-500 text-[10px] uppercase mb-0.5 block">
+                                            {txForm.transfer_direction === 'outgoing' ? 'From Account' : 'To Account'}
+                                        </label>
+                                        <select
+                                            className={selectClass}
+                                            value={txForm.account_id}
+                                            onChange={e => setTxForm({ ...txForm, account_id: e.target.value })}
+                                            required
+                                        >
+                                            <option value="">Select Account</option>
+                                            {accounts.map(acc => (
+                                                <option key={acc.id} value={acc.id}>{acc.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* Beneficiary Name */}
+                                    <div>
+                                        <label className="text-gray-500 text-[10px] uppercase mb-0.5 block">
+                                            {txForm.transfer_direction === 'outgoing' ? 'Beneficiary Name' : 'Sender Name'}
+                                        </label>
+                                        <input
+                                            className={inputClass}
+                                            value={txForm.merchant}
+                                            onChange={e => setTxForm({ ...txForm, merchant: e.target.value })}
+                                            placeholder={txForm.transfer_direction === 'outgoing' ? 'e.g. John Doe, SABB Bank' : 'e.g. Company Name, Friend'}
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div>
@@ -738,19 +825,21 @@ function Transactions() {
                         </div>
                     )}
 
-                    {/* Merchant - label changes for transfers */}
-                    <div>
-                        <label className="text-gray-400 text-xs mb-1 block">
-                            {txForm.type === 'transfer' ? 'Description (optional)' : 'Merchant / Description'}
-                        </label>
-                        <input
-                            className={inputClass}
-                            value={txForm.merchant}
-                            onChange={e => setTxForm({ ...txForm, merchant: e.target.value })}
-                            placeholder={txForm.type === 'transfer' ? 'e.g. Monthly savings' : 'e.g. Starbucks'}
-                            required={txForm.type !== 'transfer'}
-                        />
-                    </div>
+                    {/* Merchant - only show for non-transfer and internal transfers */}
+                    {(txForm.type !== 'transfer' || txForm.is_internal) && (
+                        <div>
+                            <label className="text-gray-400 text-xs mb-1 block">
+                                {txForm.type === 'transfer' ? 'Description (optional)' : 'Merchant / Description'}
+                            </label>
+                            <input
+                                className={inputClass}
+                                value={txForm.merchant}
+                                onChange={e => setTxForm({ ...txForm, merchant: e.target.value })}
+                                placeholder={txForm.type === 'transfer' ? 'e.g. Monthly savings' : 'e.g. Starbucks'}
+                                required={txForm.type !== 'transfer'}
+                            />
+                        </div>
+                    )}
 
                     {/* Amount */}
                     <div>
