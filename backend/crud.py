@@ -1472,6 +1472,12 @@ def delete_distribution(db: Session, distribution_id: str):
     db_distribution = get_distribution(db, distribution_id)
     if not db_distribution:
         return False
+    
+    # First delete any linked entries in the junction table
+    db.query(models.DistributionTransaction).filter(
+        models.DistributionTransaction.distribution_id == distribution_id
+    ).delete(synchronize_session=False)
+    
     db.delete(db_distribution)
     db.commit()
     return True
