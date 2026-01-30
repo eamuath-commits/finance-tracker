@@ -870,6 +870,11 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
                 tx_status = "pending_transfer"
                 logger.info(f"Cross-bank transfer detected: {source_account.name if source_account else 'Unknown'} -> {dest_is_yours.name}")
     
+    # Build notes - include sender_name for credit transfers
+    tx_notes = None
+    if tx_type_str == 'credit' and result.get('sender_name'):
+        tx_notes = f"From: {result.get('sender_name')}"
+    
     transaction_data = schemas.TransactionCreate(
         account_id=account_id,
         credit_card_id=credit_card_id,  # NEW: Credit card support
@@ -884,7 +889,8 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
         category=category,
         type=tx_type_str,
         status=tx_status,
-        fees=result.get('fees', 0.0)
+        fees=result.get('fees', 0.0),
+        notes=tx_notes
     )
     
     tx = crud.create_transaction(db, transaction_data)
