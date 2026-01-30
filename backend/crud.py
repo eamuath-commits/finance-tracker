@@ -1438,7 +1438,11 @@ def create_distribution(db: Session, distribution: schemas.DistributionCreate):
 
 def get_distributions(db: Session, billing_month: str = None, source_account_id: str = None):
     """Get distributions, optionally filtered by month or source account."""
-    query = db.query(models.Distribution)
+    from sqlalchemy.orm import joinedload
+    
+    query = db.query(models.Distribution).options(
+        joinedload(models.Distribution.linked_transactions).joinedload(models.DistributionTransaction.transaction)
+    )
     
     if billing_month:
         query = query.filter(models.Distribution.billing_month == billing_month)
@@ -1449,7 +1453,11 @@ def get_distributions(db: Session, billing_month: str = None, source_account_id:
 
 def get_distribution(db: Session, distribution_id: str):
     """Get a single distribution by ID."""
-    return db.query(models.Distribution).filter(
+    from sqlalchemy.orm import joinedload
+    
+    return db.query(models.Distribution).options(
+        joinedload(models.Distribution.linked_transactions).joinedload(models.DistributionTransaction.transaction)
+    ).filter(
         models.Distribution.id == distribution_id
     ).first()
 
