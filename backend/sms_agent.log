@@ -1324,3 +1324,6 @@ From...
 2026-01-30 21:27:08,620 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
 2026-01-30 21:27:08,625 - sms_agent - INFO - Saved training example for: my mom
 2026-01-31 00:15:15,529 - sms_agent - WARNING - GEMINI_API_KEY not found. AI features disabled.
+2026-01-31 01:06:14,231 - sms_agent - WARNING - GEMINI_API_KEY not found. AI features disabled.
+2026-01-31 01:06:14,872 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-31 01:06:14,895 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...

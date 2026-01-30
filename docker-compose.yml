@@ -24,6 +24,9 @@ services:
       - "8000:8000"
     depends_on:
       - db
+    env_file:
+      - path: ./backend/.env
+        required: false
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/finance_db
       - TZ=Asia/Riyadh
@@ -41,7 +44,8 @@ services:
       - db
       - backend
     env_file:
-      - ./backend/.env
+      - path: ./backend/.env
+        required: false
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/finance_db
       - TZ=Asia/Riyadh
