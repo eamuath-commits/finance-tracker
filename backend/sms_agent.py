@@ -757,14 +757,21 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
 
         elif tx_type_str == 'credit':
             ai_source_last4 = result.get('source_account_last4')
+            sender_name = result.get('sender_name')
+            
+            # Priority 1: Check if source is a known internal account
             if ai_source_last4:
                 sender_acc_obj = crud.get_account_by_last_4(db, str(ai_source_last4))
                 if sender_acc_obj:
                      merchant_raw = f"Transfer from {sender_acc_obj.name}"
+                # Priority 2: Use sender_name if provided (e.g. "Executive Craft")
+                elif sender_name:
+                    merchant_raw = sender_name
+                # Priority 3: Fall back to account number only if no sender_name
                 else:
                      merchant_raw = f"Transfer from {ai_source_last4}"
-            elif result.get('sender_name'):
-                merchant_raw = result.get('sender_name')
+            elif sender_name:
+                merchant_raw = sender_name
             elif result.get('source_bank'):
                 merchant_raw = f"Transfer from {result.get('source_bank')}"
             else:
