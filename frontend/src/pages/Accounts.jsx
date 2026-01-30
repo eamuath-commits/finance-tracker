@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Wallet, PiggyBank, CreditCard, LayoutGrid, List, Receipt, CreditCard as ChipIcon, Edit3, Trash2, Plus, Search, Filter, MessageSquareText, User, Upload } from 'lucide-react';
 import { Card, SectionHeader, Modal, formatCurrency, inputClass, selectClass } from '../components/UI';
@@ -65,7 +65,7 @@ const getAccountTheme = (type) => {
     }
 };
 
-const AccountCard = ({ acc, onEdit = null }) => {
+const AccountCard = ({ acc, onEdit = null, onClick = null }) => {
     const theme = getAccountTheme(acc.account_type);
     const bankTheme = getBankCardTheme(acc.bank_name, acc.account_type);
     const isCreditCard = acc.account_type === 'Credit Card';
@@ -85,7 +85,7 @@ const AccountCard = ({ acc, onEdit = null }) => {
     return (
         <div className="relative w-full" style={{ paddingBottom: '63.05%' }}>
             <div
-                className="absolute inset-0 rounded-xl p-5 shadow-lg text-white overflow-hidden group hover:scale-[1.02] transition-all duration-300 border border-white/10"
+                className={`absolute inset-0 rounded-xl p-5 shadow-lg text-white overflow-hidden group hover:scale-[1.02] transition-all duration-300 border border-white/10 ${onClick ? 'cursor-pointer' : ''}`}
                 style={{
                     // Background styling
                     backgroundImage: hasCustomBackground
@@ -97,6 +97,7 @@ const AccountCard = ({ acc, onEdit = null }) => {
                     // Apply gradient when no custom background image
                     ...(hasCustomBackground ? {} : { background: bankTheme?.fallbackGradient || theme.backgroundGradient })
                 }}
+                onClick={onClick}
             >
                 {/* Background Decor - decorative blur circles */}
                 <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white/5 blur-3xl"></div>
@@ -166,7 +167,7 @@ const AccountCard = ({ acc, onEdit = null }) => {
     );
 };
 
-const SortableAccountCard = ({ acc, onEdit }) => {
+const SortableAccountCard = ({ acc, onEdit, onClick }) => {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: acc.id });
 
     const style = {
@@ -178,7 +179,7 @@ const SortableAccountCard = ({ acc, onEdit }) => {
         <div ref={setNodeRef} style={style} {...attributes} className="h-full">
             {/* Drag handle wrapper - only this part captures drag events */}
             <div {...listeners} className="touch-none cursor-grab active:cursor-grabbing h-full">
-                <AccountCard acc={acc} onEdit={onEdit} />
+                <AccountCard acc={acc} onEdit={onEdit} onClick={onClick} />
             </div>
         </div>
     );
@@ -263,6 +264,7 @@ const OverviewAccountRow = ({ acc, allTransactions }) => {
 
 const Accounts = () => {
     const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
 
     // Initialize activeTab: Strictly from URL to ensure History works
     const activeTab = searchParams.get('tab') || 'overview';
@@ -641,7 +643,12 @@ const Accounts = () => {
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                             <SortableContext items={typeAccounts.map(a => a.id)} strategy={rectSortingStrategy}>
                                                 {typeAccounts.map(acc => (
-                                                    <SortableAccountCard key={acc.id} acc={acc} onEdit={openAccountModal} />
+                                                    <SortableAccountCard
+                                                        key={acc.id}
+                                                        acc={acc}
+                                                        onEdit={openAccountModal}
+                                                        onClick={() => navigate(`/transactions?account_id=${acc.id}`)}
+                                                    />
                                                 ))}
                                             </SortableContext>
                                         </div>

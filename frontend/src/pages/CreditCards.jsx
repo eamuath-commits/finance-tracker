@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { format } from "date-fns";
 import { CreditCard as CreditCardIcon, Plus, Edit3, Trash2, DollarSign, TrendingUp, Calendar, Percent, ChevronDown, ChevronUp } from "lucide-react";
@@ -30,7 +31,7 @@ const getUtilizationColor = (percent) => {
 };
 
 // Credit Card Visual Component with custom bank themes
-const CreditCardVisual = ({ card, onEdit, onPayment }) => {
+const CreditCardVisual = ({ card, onEdit, onPayment, onClick }) => {
     const utilPercent = card.credit_limit > 0
         ? Math.min(100, (Math.abs(card.current_balance) / card.credit_limit) * 100)
         : 0;
@@ -40,12 +41,13 @@ const CreditCardVisual = ({ card, onEdit, onPayment }) => {
 
     return (
         <div
-            className={`credit-card-aspect rounded-xl shadow-lg text-white overflow-hidden group hover:scale-[1.02] transition-all duration-300 border border-white/10 ${!hasCustomBackground ? 'bg-gradient-to-br from-violet-600 to-purple-900' : ''}`}
+            className={`credit-card-aspect rounded-xl shadow-lg text-white overflow-hidden group hover:scale-[1.02] transition-all duration-300 border border-white/10 cursor-pointer ${!hasCustomBackground ? 'bg-gradient-to-br from-violet-600 to-purple-900' : ''}`}
             style={hasCustomBackground ? {
                 backgroundImage: `url(${bankTheme.backgroundImage})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center'
             } : {}}
+            onClick={onClick}
         >
             {/* Absolute content wrapper for padding-bottom fallback */}
             <div className="absolute inset-0 p-5">
@@ -150,6 +152,7 @@ const CreditCardVisual = ({ card, onEdit, onPayment }) => {
 };
 
 function CreditCards() {
+    const navigate = useNavigate();
     const [creditCards, setCreditCards] = useState([]);
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -398,6 +401,7 @@ function CreditCards() {
                                 card={card}
                                 onEdit={openEditModal}
                                 onPayment={openPaymentModal}
+                                onClick={() => navigate(`/transactions?credit_card_id=${card.id}`)}
                             />
 
                             {/* Transactions Toggle */}

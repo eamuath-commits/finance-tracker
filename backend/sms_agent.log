@@ -1323,3 +1323,4 @@ From...
 2026-01-30 21:27:08,617 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 1505, Account: Expense
 2026-01-30 21:27:08,620 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
 2026-01-30 21:27:08,625 - sms_agent - INFO - Saved training example for: my mom
+2026-01-31 00:15:15,529 - sms_agent - WARNING - GEMINI_API_KEY not found. AI features disabled.

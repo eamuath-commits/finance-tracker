@@ -61,6 +61,26 @@ function Transactions() {
     const [categoryFilter, setCategoryFilter] = useState('');
     const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
+    // Initialize filter from URL params (for navigation from account/credit card pages)
+    useEffect(() => {
+        const accountId = searchParams.get('account_id');
+        const creditCardId = searchParams.get('credit_card_id');
+
+        if (accountId) {
+            setAccountFilter(accountId);
+            // Ensure we're on the 'all' tab to see filtered transactions
+            if (activeTab !== 'all') {
+                setSearchParams({ tab: 'all', account_id: accountId });
+            }
+        } else if (creditCardId) {
+            setAccountFilter(creditCardId);
+            // Ensure we're on the 'all' tab to see filtered transactions
+            if (activeTab !== 'all') {
+                setSearchParams({ tab: 'all', credit_card_id: creditCardId });
+            }
+        }
+    }, [searchParams]);
+
     useEffect(() => {
         fetchData();
     }, [activeTab]);
