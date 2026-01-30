@@ -660,9 +660,3 @@ From:1505
 Amount:SAR 44.88
 At:HUNGERSTA
 30/1/26 03:42 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "1505", "card_info": "mada-Apple Pay 9365", "amount": 44.88, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 03:42", "available_balance": null, "beneficiary": null, "merchant": "HUNGERSTA", "sender_name": null, "category": "Food & Dining", "description": "Purchase at HUNGERSTA"}
-2026-01-30 13:01:59,473 - ai_raw_io - INFO - INPUT: Credit Transfer Internal
-Amount:SAR 5000
-To:7772
-From:Executive Craft
-From:3053
-26/1/29 17:38 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "Jazira Bank", "destination_bank": "AlRajhiBank", "source_account_last4": null, "destination_account_last4": "7772", "card_info": null, "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2029-01-26 17:38", "available_balance": null, "beneficiary": "Executive Craft", "merchant": null, "sender_name": null, "category": "Transfer", "description": "Transfer from Executive Craft"}
