@@ -1135,5 +1135,3 @@ By:9365;mada-Apple ...
 2026-01-30 03:42:21,076 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
 2026-01-30 03:42:21,086 - sms_agent - INFO - Saved training example for: HUNGERSTA
 2026-01-30 12:54:17,227 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
-2026-01-30 12:54:29,881 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
-2026-01-30 12:59:49,731 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
