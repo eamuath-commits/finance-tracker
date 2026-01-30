@@ -654,3 +654,9 @@ At:Jahez
 Amount: SAR 300
 To: 7772
 26-1-14 22:42 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_bank": "AlRajhiBank", "source_account_last4": null, "destination_account_last4": "7772", "card_info": null, "amount": 300, "currency": "SAR", "fees": null, "timestamp": "2026-01-14 22:42", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": "Transfer", "description": "Transfer to 7772"}
+2026-01-30 03:42:21,071 - ai_raw_io - INFO - INPUT: Online Purchase
+By:9365;mada-Apple Pay
+From:1505
+Amount:SAR 44.88
+At:HUNGERSTA
+30/1/26 03:42 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "1505", "card_info": "mada-Apple Pay 9365", "amount": 44.88, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 03:42", "available_balance": null, "beneficiary": null, "merchant": "HUNGERSTA", "sender_name": null, "category": "Food & Dining", "description": "Purchase at HUNGERSTA"}

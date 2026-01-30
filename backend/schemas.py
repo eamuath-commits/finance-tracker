@@ -424,6 +424,8 @@ class Distribution(DistributionBase):
     source_account_name: Optional[str] = None
     target_account_name: Optional[str] = None
     linked_transaction: Optional[Transaction] = None
+    linked_transactions: List[Transaction] = []
+    linked_transactions_count: int = 0
 
     class Config:
         from_attributes = True
