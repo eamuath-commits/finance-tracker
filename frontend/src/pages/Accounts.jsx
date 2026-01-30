@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { Wallet, PiggyBank, CreditCard, LayoutGrid, List, Receipt, CreditCard as ChipIcon, Edit3, Trash2, Plus, Search, Filter, MessageSquareText, User } from 'lucide-react';
+import { Wallet, PiggyBank, CreditCard, LayoutGrid, List, Receipt, CreditCard as ChipIcon, Edit3, Trash2, Plus, Search, Filter, MessageSquareText, User, Upload } from 'lucide-react';
 import { Card, SectionHeader, Modal, formatCurrency, inputClass, selectClass } from '../components/UI';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, rectSortingStrategy, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable';
@@ -894,8 +894,10 @@ const Accounts = () => {
                                             )}
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                 <div className="flex items-center gap-2">
-                                                    {tx.raw_sms_content ? (
-                                                        <img src="/sms-icon.png" alt="SMS" className="w-4 h-4 object-contain" title="Source: SMS" />
+                                                    {tx.source === 'webui' ? (
+                                                        <Upload size={14} className="text-blue-500" title="Source: Web Ingest" />
+                                                    ) : tx.source === 'telegram' || tx.raw_sms_content ? (
+                                                        <img src="/sms-icon.png" alt="SMS" className="w-4 h-4 object-contain" title="Source: Telegram/SMS" />
                                                     ) : (
                                                         <User size={14} className="text-slate-600" title="Source: Manual Entry" />
                                                     )}

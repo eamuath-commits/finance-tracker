@@ -659,10 +659,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except: pass
         if 'db' in locals(): db.close()
 
-async def _create_transaction_logic(db, result, source_account, source_credit_card, msg_text, reply_target=None):
+async def _create_transaction_logic(db, result, source_account, source_credit_card, msg_text, reply_target=None, source="telegram"):
     # --- 0. Multi-Currency Handling & Conversion ---
     original_amount = result.get('amount')
-    original_currency = result.get('currency', 'SAR').upper()
+    original_currency = (result.get('currency') or 'SAR').upper()
     sar_amount = original_amount
     exchange_rate = 1.0
 
@@ -800,7 +800,8 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
             category=category,
             type=tx_type_str,
             status="pending_action",
-            fees=result.get('fees', 0.0)
+            fees=result.get('fees', 0.0),
+            source=source  # Track transaction source
         )
         
         tx = crud.create_transaction(db, transaction_data)
@@ -884,7 +885,8 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
         category=category,
         type=tx_type_str,
         status=tx_status,
-        fees=result.get('fees', 0.0)
+        fees=result.get('fees', 0.0),
+        source=source  # Track transaction source (telegram, webui, manual)
     )
     
     tx = crud.create_transaction(db, transaction_data)

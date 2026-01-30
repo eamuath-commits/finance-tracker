@@ -282,7 +282,8 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate):
         fees=transaction.fees,
         original_amount=transaction.original_amount,
         original_currency=transaction.original_currency,
-        exchange_rate=transaction.exchange_rate
+        exchange_rate=transaction.exchange_rate,
+        source=transaction.source  # Track where transaction came from
     )
     db.add(db_transaction)
 

@@ -1135,3 +1135,191 @@ By:9365;mada-Apple ...
 2026-01-30 03:42:21,076 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
 2026-01-30 03:42:21,086 - sms_agent - INFO - Saved training example for: HUNGERSTA
 2026-01-30 12:54:17,227 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 13:20:28,849 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 13:20:30,788 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 13:20:30,811 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-30 13:23:45,372 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 13:26:48,303 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 13:28:53,925 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 13:28:53,932 - sms_agent - INFO - Saved training example for: POS Purchase
+2026-01-30 13:29:46,303 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 13:29:46,306 - sms_agent - INFO - Saved training example for: POS Purchase
+2026-01-30 13:30:32,477 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 13:30:32,481 - sms_agent - INFO - Saved training example for: POS Purchase
+2026-01-30 13:30:58,208 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 13:30:58,212 - sms_agent - INFO - Saved training example for: POS Purchase
+2026-01-30 13:34:21,578 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 13:34:21,580 - sms_agent - INFO - Saved training example for: POS Purchase
+2026-01-30 13:35:08,903 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 13:35:08,907 - sms_agent - INFO - Saved training example for: POS Purchase
+2026-01-30 13:35:30,540 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 13:35:30,544 - sms_agent - INFO - Saved training example for: POS Purchase
+2026-01-30 13:37:25,362 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 13:37:39,559 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 13:38:55,684 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 13:38:55,691 - sms_agent - INFO - Saved training example for: POS Purchase
+2026-01-30 13:40:12,383 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 13:40:12,389 - sms_agent - INFO - Saved training example for: POS Purchase
+2026-01-30 13:41:13,308 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 13:41:13,311 - sms_agent - INFO - Saved training example for: POS Purchase
+2026-01-30 13:44:00,188 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 13:44:00,192 - sms_agent - INFO - Saved training example for: POS Purchase
+2026-01-30 13:45:13,547 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 13:45:13,550 - sms_agent - INFO - Saved training example for: POS Purchase
+2026-01-30 13:46:28,129 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 13:46:28,133 - sms_agent - INFO - Saved training example for: POS Purchase
+2026-01-30 13:48:03,207 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 13:48:03,211 - sms_agent - INFO - Saved training example for: POS Purchase
+2026-01-30 13:55:13,128 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 13:55:29,144 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 13:59:56,888 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 13:59:56,896 - sms_agent - INFO - Saved training example for: POS Purchase
+2026-01-30 14:03:19,930 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 14:03:19,934 - sms_agent - INFO - Saved training example for: POS Purchase
+2026-01-30 14:06:02,310 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank—— PoS
+By:4390;mada-Atheer
+Amount:SAR 3...
+2026-01-30 14:06:02,713 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-01-30 14:06:04,893 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 4390, Account: Grocery
+2026-01-30 14:06:04,897 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-01-30 14:06:04,904 - sms_agent - INFO - Saved training example for: Health Ho
+2026-01-30 14:07:42,811 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=General
+2026-01-30 14:07:42,817 - sms_agent - INFO - Saved training example for: Transfer from 3053
+2026-01-30 15:17:40,986 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=General
+2026-01-30 15:17:40,992 - sms_agent - INFO - Saved training example for: Transfer from 3053
+2026-01-30 15:17:57,153 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=General
+2026-01-30 15:17:57,165 - sms_agent - INFO - Saved training example for: Transfer from 3053
+2026-01-30 18:53:26,944 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=General
+2026-01-30 18:53:26,951 - sms_agent - INFO - Saved training example for: Transfer from 3053
+2026-01-30 18:55:07,098 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 18:55:07,132 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-30 18:55:07,215 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 19:01:03,579 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 19:01:03,621 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-30 19:01:03,622 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 19:01:08,876 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 19:01:08,897 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-30 19:01:08,986 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 19:03:08,847 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— OTP Code:3563
+Reason:Rajhi Transfer...
+2026-01-30 19:03:08,849 - sms_agent - INFO - Skipping OTP/verification message from Channel_-1003635708322
+2026-01-30 19:03:26,239 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— Debit Internal Transfer
+From:1505
+A...
+2026-01-30 19:03:26,580 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-01-30 19:03:29,167 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 1505, Account: Expense
+2026-01-30 19:03:29,175 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 19:03:29,188 - sms_agent - INFO - Saved training example for: SABAH ABDULLAH
+2026-01-30 19:03:46,537 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— OTP Code:4190
+Reason:Rajhi Transfer...
+2026-01-30 19:03:46,538 - sms_agent - INFO - Skipping OTP/verification message from Channel_-1003635708322
+2026-01-30 19:04:02,099 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— Debit Internal Transfer
+From:9384
+A...
+2026-01-30 19:04:02,446 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-01-30 19:04:04,345 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 9384, Account: Liability
+2026-01-30 19:04:04,348 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Liability
+2026-01-30 19:04:04,355 - sms_agent - INFO - Saved training example for: MARIAM ALGHAMDI
+2026-01-30 19:07:49,465 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=General
+2026-01-30 19:07:49,473 - sms_agent - INFO - Saved training example for: Transfer from 3053
+2026-01-30 19:09:06,849 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=General
+2026-01-30 19:09:06,853 - sms_agent - INFO - Saved training example for: Transfer from 3053
+2026-01-30 19:10:20,395 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=General
+2026-01-30 19:10:20,396 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to General
+2026-01-30 19:10:20,398 - sms_agent - INFO - DEBUG: Created transaction 691fde2d-8646-4fad-b520-089ad5584663 with status pending_action
+2026-01-30 19:12:34,295 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=General
+2026-01-30 19:12:34,298 - sms_agent - INFO - Saved training example for: Transfer from 3053
+2026-01-30 19:14:43,390 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=General
+2026-01-30 19:14:43,397 - sms_agent - INFO - Saved training example for: Transfer from 3053
+2026-01-30 19:15:49,302 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=General
+2026-01-30 19:15:49,306 - sms_agent - INFO - Saved training example for: Transfer from 3053
+2026-01-30 19:16:26,926 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=General
+2026-01-30 19:16:26,930 - sms_agent - INFO - Saved training example for: Transfer from 3053
+2026-01-30 19:16:50,515 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=General
+2026-01-30 19:16:50,519 - sms_agent - INFO - Saved training example for: Transfer from 3053
+2026-01-30 19:20:57,321 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=General
+2026-01-30 19:20:57,321 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to General
+2026-01-30 19:20:57,325 - sms_agent - INFO - DEBUG: Created transaction 82833f84-cb22-4a65-8db8-d539bd04767b with status pending_action
+2026-01-30 19:22:58,422 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=General
+2026-01-30 19:22:58,428 - sms_agent - INFO - Saved training example for: Transfer from 3053
+2026-01-30 19:23:59,687 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 19:24:00,347 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 19:24:00,367 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-01-30 19:27:42,858 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 19:29:38,043 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 19:29:51,016 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 19:30:21,384 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 19:30:37,272 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=General
+2026-01-30 19:30:37,278 - sms_agent - INFO - Saved training example for: Transfer from 3053
+2026-01-30 19:30:37,816 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 19:30:53,148 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 19:31:06,968 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 19:31:46,973 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 19:33:18,675 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 19:34:15,639 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 19:34:15,646 - sms_agent - INFO - Saved training example for: AMAZON.SA
+2026-01-30 19:38:03,963 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 19:38:03,967 - sms_agent - INFO - Saved training example for: AMAZON.SA
+2026-01-30 19:44:00,009 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 19:44:00,015 - sms_agent - INFO - Saved training example for: STARBUCKS
+2026-01-30 19:46:43,460 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=General
+2026-01-30 19:46:43,460 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to General
+2026-01-30 19:46:43,463 - sms_agent - INFO - DEBUG: Created transaction 83891d46-2035-4093-a8d7-4c0c4d2ae603 with status pending_action
+2026-01-30 19:47:18,045 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=General
+2026-01-30 19:47:18,050 - sms_agent - INFO - Saved training example for: Transfer from 3053
+2026-01-30 19:49:24,349 - sms_agent - INFO - Converted 69 USD to 261.51 SAR using rate 3.79
+2026-01-30 19:49:24,353 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-01-30 19:49:24,360 - sms_agent - INFO - Saved training example for: OPENAI *C
+2026-01-30 20:40:03,013 - sms_agent - INFO - Converted 15 USD to 56.85 SAR using rate 3.79
+2026-01-30 20:40:03,017 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-01-30 20:40:03,023 - sms_agent - INFO - Saved training example for: Credit Card Payment
+2026-01-30 20:49:15,024 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— Online Purchase
+By:9365;mada-Apple ...
+2026-01-30 20:49:15,367 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-01-30 20:49:18,064 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 1505, Account: Expense
+2026-01-30 20:49:18,064 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 20:49:18,072 - sms_agent - INFO - Saved training example for: Keeta
+2026-01-30 20:53:56,541 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 20:54:45,144 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-01-30 21:25:13,643 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— OTP Code:0763
+Reason:Rajhi Transfer...
+2026-01-30 21:25:13,645 - sms_agent - INFO - Skipping OTP/verification message from Channel_-1003635708322
+2026-01-30 21:25:24,429 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— Debit Internal Transfer
+From:1505
+A...
+2026-01-30 21:25:24,834 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-01-30 21:25:28,124 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 1505, Account: Expense
+2026-01-30 21:25:28,129 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 21:25:28,134 - sms_agent - INFO - Saved training example for: MOHAMMED ISLAM
+2026-01-30 21:26:03,196 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— Transfer Between Your Accounts
+Amou...
+2026-01-30 21:26:03,574 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-01-30 21:26:05,832 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 3264, Account: Payroll
+2026-01-30 21:26:05,833 - sms_agent - INFO - Incoming Credit detected to own account Payroll. ensure primary.
+2026-01-30 21:26:05,833 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: Payroll
+2026-01-30 21:26:05,835 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=Payroll
+2026-01-30 21:26:05,836 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to Payroll
+2026-01-30 21:26:05,839 - sms_agent - INFO - DEBUG: Created transaction 8d83d23b-31c0-497a-86df-7d6366759879 with status pending_action
+2026-01-30 21:26:05,840 - sms_agent - INFO - DEBUG: Sending inline buttons to user - 9 accounts
+2026-01-30 21:26:06,020 - sms_agent - INFO - DEBUG: Inline buttons sent successfully
+2026-01-30 21:26:42,524 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— Transfer Between Your Accounts
+Amou...
+2026-01-30 21:26:42,895 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-01-30 21:26:44,932 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 1505, Account: Expense
+2026-01-30 21:26:44,936 - sms_agent - INFO - Incoming Credit detected to own account Expense. ensure primary.
+2026-01-30 21:26:44,936 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: Expense
+2026-01-30 21:26:44,937 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=Expense
+2026-01-30 21:26:44,937 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to Expense
+2026-01-30 21:26:44,939 - sms_agent - INFO - DEBUG: Created transaction 3ebe0356-81f2-4aaf-bc13-4158119bb833 with status pending_action
+2026-01-30 21:26:44,940 - sms_agent - INFO - DEBUG: Sending inline buttons to user - 9 accounts
+2026-01-30 21:26:45,129 - sms_agent - INFO - DEBUG: Inline buttons sent successfully
+2026-01-30 21:26:49,707 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— OTP Code:4831
+Reason:Local Transfer...
+2026-01-30 21:26:49,707 - sms_agent - INFO - Skipping OTP/verification message from Channel_-1003635708322
+2026-01-30 21:27:06,166 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— Debit Transfer Local
+Bank:SAIB
+From...
+2026-01-30 21:27:06,534 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-01-30 21:27:08,617 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 1505, Account: Expense
+2026-01-30 21:27:08,620 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-01-30 21:27:08,625 - sms_agent - INFO - Saved training example for: my mom

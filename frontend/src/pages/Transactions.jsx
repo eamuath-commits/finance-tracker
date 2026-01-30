@@ -2,8 +2,9 @@ import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { useSearchParams } from 'react-router-dom';
 import { format } from "date-fns";
-import { Search, Edit3, Trash2, Plus, User, Calendar, Filter, X, MessageSquare } from "lucide-react";
+import { Search, Edit3, Trash2, Plus, User, Calendar, Filter, X, MessageSquare, Upload } from "lucide-react";
 import { Modal, formatCurrency, inputClass, selectClass } from "../components/UI";
+import SMSIngestTab from "../components/SMSIngestTab";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
@@ -32,7 +33,16 @@ function Transactions() {
     const [showTxModal, setShowTxModal] = useState(false);
     const [editingTx, setEditingTx] = useState(null);
     const [txForm, setTxForm] = useState({
-        account_id: '', merchant: '', amount: '', category: '', type: 'debit', notes: '', timestamp: new Date().toISOString().slice(0, 16)
+        source_type: 'account', // 'account' or 'credit_card'
+        source_id: '', // the actual account_id or credit_card_id
+        account_id: '',
+        credit_card_id: '',
+        merchant: '',
+        amount: '',
+        category: '',
+        type: 'debit',
+        notes: '',
+        timestamp: new Date().toISOString().slice(0, 16)
     });
 
     // Backward compatibility: check tx.type first, fallback to category list
@@ -145,9 +155,14 @@ function Transactions() {
 
     const openTxModal = (tx) => {
         if (tx) {
+            // Determine if this transaction is for an account or credit card
+            const isCreditCard = !tx.account_id && tx.credit_card_id;
             setEditingTx(tx);
             setTxForm({
+                source_type: isCreditCard ? 'credit_card' : 'account',
+                source_id: isCreditCard ? tx.credit_card_id : tx.account_id || '',
                 account_id: tx.account_id || '',
+                credit_card_id: tx.credit_card_id || '',
                 merchant: tx.merchant || '',
                 amount: tx.amount || '',
                 category: tx.category || '',
@@ -157,8 +172,12 @@ function Transactions() {
             });
         } else {
             setEditingTx(null);
+            const defaultSourceId = accounts[0]?.id || '';
             setTxForm({
-                account_id: accounts[0]?.id || '',
+                source_type: 'account',
+                source_id: defaultSourceId,
+                account_id: defaultSourceId,
+                credit_card_id: '',
                 target_account_id: '',
                 merchant: '',
                 amount: '',
@@ -180,12 +199,26 @@ function Transactions() {
 
         try {
             if (editingTx) {
-                // Edit existing transaction
-                await axios.put(`${API_URL}/transactions/${editingTx.id}`, {
-                    ...txForm,
+                // Edit existing transaction - handle account vs credit card
+                const payload = {
+                    merchant: txForm.merchant,
                     amount,
+                    category: txForm.category,
+                    type: txForm.type,
+                    notes: txForm.notes,
                     timestamp
-                });
+                };
+
+                // Set the correct ID field based on source type
+                if (txForm.source_type === 'credit_card') {
+                    payload.account_id = null;
+                    payload.credit_card_id = txForm.source_id;
+                } else {
+                    payload.account_id = txForm.source_id;
+                    payload.credit_card_id = null;
+                }
+
+                await axios.put(`${API_URL}/transactions/${editingTx.id}`, payload);
             } else if (txForm.type === 'transfer' && txForm.is_internal && txForm.target_account_id) {
                 // Internal transfer - create TWO transactions
                 const sourceAcc = accounts.find(a => a.id === txForm.account_id);
@@ -313,6 +346,13 @@ function Transactions() {
                 >
                     <MessageSquare size={16} />
                     SMS Inbox
+                </button>
+                <button
+                    onClick={() => setActiveTab('ingest')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'ingest' ? 'bg-emerald-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                >
+                    <Upload size={16} />
+                    SMS Ingest
                 </button>
             </div>
 
@@ -508,8 +548,10 @@ function Transactions() {
                                             )}
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                 <div className="flex items-center gap-2">
-                                                    {tx.raw_sms_content ? (
-                                                        <img src="/sms-icon.png" alt="SMS" className="w-4 h-4 object-contain" title="Source: SMS" />
+                                                    {tx.source === 'webui' ? (
+                                                        <Upload size={14} className="text-blue-500" title="Source: Web Ingest" />
+                                                    ) : tx.source === 'telegram' || tx.raw_sms_content ? (
+                                                        <img src="/sms-icon.png" alt="SMS" className="w-4 h-4 object-contain" title="Source: Telegram/SMS" />
                                                     ) : (
                                                         <User size={14} className="text-slate-600" title="Source: Manual Entry" />
                                                     )}
@@ -607,7 +649,7 @@ function Transactions() {
                         </table>
                     </div>
                 </div>
-            ) : (
+            ) : activeTab === "inbox" ? (
                 /* SMS Inbox Tab */
                 <div className="animate-fade-in space-y-4">
                     <div className="flex justify-between items-center mb-4">
@@ -685,7 +727,16 @@ function Transactions() {
                         <div className="text-center py-12 text-gray-500">No messages in inbox.</div>
                     )}
                 </div>
-            )}
+            ) : null}
+
+            {/* SMS Ingest Tab - Always mounted to preserve state, hidden when not active */}
+            <div className={activeTab === "ingest" ? "" : "hidden"}>
+                <SMSIngestTab
+                    accounts={accounts}
+                    creditCards={creditCards}
+                    onTransactionCreated={fetchData}
+                />
+            </div>
 
             {/* Transaction Modal */}
             <Modal isOpen={showTxModal} title={editingTx ? "Edit Transaction" : "Add Transaction"} onClose={() => setShowTxModal(false)}>
@@ -828,10 +879,41 @@ function Transactions() {
                         </div>
                     ) : (
                         <div>
-                            <label className="text-gray-400 text-xs mb-1 block">Account</label>
-                            <select className={selectClass} value={txForm.account_id} onChange={e => setTxForm({ ...txForm, account_id: e.target.value })} required>
-                                <option value="">Select Account</option>
-                                {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                            <label className="text-gray-400 text-xs mb-1 block">Account / Credit Card</label>
+                            <select
+                                className={selectClass}
+                                value={`${txForm.source_type}:${txForm.source_id}`}
+                                onChange={e => {
+                                    const [type, id] = e.target.value.split(':');
+                                    setTxForm({
+                                        ...txForm,
+                                        source_type: type,
+                                        source_id: id,
+                                        account_id: type === 'account' ? id : '',
+                                        credit_card_id: type === 'credit_card' ? id : ''
+                                    });
+                                }}
+                                required
+                            >
+                                <option value="">Select Account or Credit Card</option>
+                                {accounts.length > 0 && (
+                                    <optgroup label="💳 Bank Accounts">
+                                        {accounts.map(acc => (
+                                            <option key={acc.id} value={`account:${acc.id}`}>
+                                                {acc.name} {acc.last_4_digits ? `(•••${acc.last_4_digits})` : ''}
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                )}
+                                {creditCards.length > 0 && (
+                                    <optgroup label="💳 Credit Cards">
+                                        {creditCards.map(cc => (
+                                            <option key={cc.id} value={`credit_card:${cc.id}`}>
+                                                {cc.card_name || cc.name} {cc.last_4_digits ? `(•••${cc.last_4_digits})` : ''}
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                )}
                             </select>
                         </div>
                     )}

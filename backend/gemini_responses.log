@@ -660,3 +660,182 @@ From:1505
 Amount:SAR 44.88
 At:HUNGERSTA
 30/1/26 03:42 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "1505", "card_info": "mada-Apple Pay 9365", "amount": 44.88, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 03:42", "available_balance": null, "beneficiary": null, "merchant": "HUNGERSTA", "sender_name": null, "category": "Food & Dining", "description": "Purchase at HUNGERSTA"}
+2026-01-30 13:28:53,917 - ai_raw_io - INFO - INPUT: AlRajhiBank PoS | By:9365;mada-Apple Pay | Amount:SAR 96.00 | Balance:SAR 12,345.67 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 96.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": 12345.67, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Purchase"}
+2026-01-30 13:29:46,296 - ai_raw_io - INFO - INPUT: AlRajhiBank PoS | By:9365;mada-Apple Pay | Amount:SAR 96.00 | Balance:SAR 12,345.67 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 96.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": 12345.67, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Purchase"}
+2026-01-30 13:30:32,469 - ai_raw_io - INFO - INPUT: AlRajhiBank —— PoS | By:9365;mada-Apple Pay | Amount:SAR 96.00 | Balance:SAR 12,345.67 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 96.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": 12345.67, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "PoS Purchase"}
+2026-01-30 13:30:58,201 - ai_raw_io - INFO - INPUT: AlRajhiBank —— PoS | By:9365;mada-Apple Pay | Amount:SAR 96.00 | Balance:SAR 12,345.67 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 96.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": 12345.67, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Purchase"}
+2026-01-30 13:33:50,083 - ai_raw_io - INFO - INPUT: AlRajhiBank PoS | By:9365;mada-Apple Pay | Amount:SAR 96.00 | Balance:SAR 12,345.67AlRajhiBank PoS | By:9365;mada-Apple Pay | Amount:SAR 96.00 | Balance:SAR 12,345.67 || OUTPUT: [{"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 96.0, "currency": "SAR", "available_balance": 12345.67, "timestamp": "2026-01-30 00:00", "merchant": null, "sender_name": null, "category": null, "description": "Purchase"}, {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 96.0, "currency": "SAR", "available_balance": 12345.67, "timestamp": "2026-01-30 00:00", "merchant": null, "sender_name": null, "category": null, "description": "Purchase"}]
+2026-01-30 13:34:21,572 - ai_raw_io - INFO - INPUT: AlRajhiBank PoS | By:9365;mada-Apple Pay | Amount:SAR 96.00 | Balance:SAR 12,345.67 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 96.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": 12345.67, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "PoS Purchase"}
+2026-01-30 13:35:08,897 - ai_raw_io - INFO - INPUT: AlRajhiBank PoS | By:9365;mada-Apple Pay | Amount:SAR 96.00 | Balance:SAR 12,345.67 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 96.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": 12345.67, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Purchase"}
+2026-01-30 13:35:30,533 - ai_raw_io - INFO - INPUT: test message AlRajhiBank PoS | By:9365;mada-Apple Pay | Amount:SAR 96.00 | Balance:SAR 12,345.67 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 96.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": 12345.67, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "PoS Purchase"}
+2026-01-30 13:38:55,674 - ai_raw_io - INFO - INPUT: AlRajhiBank PoS | By:9365;mada-Apple Pay | Amount:SAR 96.00 | Balance:SAR 12,345.67
+AlRajhiBank PoS | By:9365;mada-Apple Pay | Amount:SAR 96.00 | Balance:SAR 12,345.67 || OUTPUT: [{"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "9365", "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 96, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": 12345.67, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Purchase"}, {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "9365", "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 96, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": 12345.67, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Purchase"}]
+2026-01-30 13:40:12,378 - ai_raw_io - INFO - INPUT: AlRajhiBank PoS | By:9365;mada-Apple Pay | Amount:SAR 96.00 | Balance:SAR 12,345.67AlRajhiBank PoS | By:9365;mada-Apple Pay | Amount:SAR 96.00 | Balance:SAR 12,345.67 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 96, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": 12345.67, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Purchase"}
+2026-01-30 13:41:13,299 - ai_raw_io - INFO - INPUT: AlRajhiBank PoS | By:9365;mada-Apple Pay | Amount:SAR 96.00 | Balance:SAR 12,345.67 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 96.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": 12345.67, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "PoS Purchase"}
+2026-01-30 13:44:00,181 - ai_raw_io - INFO - INPUT: AlRajhiBank PoS | By:9365;mada-Apple Pay | Amount:SAR 96.00 | Balance:SAR 12,345.67 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 96.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": 12345.67, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Purchase"}
+2026-01-30 13:45:13,540 - ai_raw_io - INFO - INPUT: AlRajhiBank PoS | By:9365;mada-Apple Pay | Amount:SAR 96.00 | Balance:SAR 12,345.67 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 96.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": 12345.67, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Purchase"}
+2026-01-30 13:46:28,123 - ai_raw_io - INFO - INPUT: AlRajhiBank PoS | By:9365;mada-Apple Pay | Amount:SAR 96.00 | Balance:SAR 12,345.67 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 96.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": 12345.67, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Purchase"}
+2026-01-30 13:48:03,201 - ai_raw_io - INFO - INPUT: AlRajhiBank PoS | By:9365;mada-Apple Pay | Amount:SAR 96.00 | Balance:SAR 12,345.67 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "destination_bank": null, "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 96.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": 12345.67, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "PoS Purchase"}
+2026-01-30 13:51:57,641 - ai_raw_io - INFO - INPUT: AlRajhiBank PoS | By:9365;mada-Apple Pay | Amount: || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": null, "currency": null, "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "PoS Purchase"}
+2026-01-30 13:59:56,879 - ai_raw_io - INFO - INPUT: AlRajhiBank PoS | By:9365;mada-Apple Pay | Amount:SAR 96.00 | Balance:SAR 12,345.67AlRajhiBank PoS | || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "destination_bank": null, "destination_account_last4": null, "card_info": "mada-Apple Pay 9365", "amount": 96.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": 12345.67, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "PoS Purchase"}
+2026-01-30 14:03:19,924 - ai_raw_io - INFO - INPUT: AlRajhiBank PoS | By:9365;mada-Apple Pay | Amount:SAR 96.00 | Balance:SAR 12,345.67 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 96.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": 12345.67, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "PoS Purchase"}
+2026-01-30 14:06:04,883 - ai_raw_io - INFO - INPUT: PoS
+By:4390;mada-Atheer
+Amount:SAR 342.25
+At:Health Ho 
+30/1/26 14:06 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "4390", "card_info": "mada-Atheer 4390", "amount": 342.25, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 14:06", "available_balance": null, "beneficiary": null, "merchant": "Health Ho", "sender_name": null, "category": "Health", "description": "Purchase at Health Ho"}
+2026-01-30 14:07:42,805 - ai_raw_io - INFO - INPUT: Credit Transfer Internal
+Amount:SAR 5000
+To:7772
+From:Executive Craft
+From:3053
+26/1/29 17:38 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_bank": "AlRajhiBank", "source_account_last4": "3053", "destination_account_last4": "7772", "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2026-01-29 17:38", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": "Executive Craft", "category": "Transfer", "description": "Internal transfer from Executive Craft to 7772"}
+2026-01-30 15:17:40,981 - ai_raw_io - INFO - INPUT: Credit Transfer Internal
+Amount:SAR 5000
+To:7772
+From:Executive Craft
+From:3053
+26/1/29 17:38 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "transfer", "source_bank": null, "destination_bank": "AlRajhiBank", "source_account_last4": "3053", "destination_account_last4": "7772", "card_info": null, "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2026-01-29 17:38", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": "Executive Craft", "category": "Transfer", "description": "Incoming transfer"}
+2026-01-30 15:17:57,145 - ai_raw_io - INFO - INPUT: Credit Transfer Internal
+Amount:SAR 5030
+To:7772
+From:Executive Craft
+From:3053
+26/1/29 17:38 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": null, "destination_bank": "AlRajhiBank", "source_account_last4": "3053", "destination_account_last4": "7772", "card_info": null, "amount": 5030, "currency": "SAR", "fees": null, "timestamp": "2026-01-26 17:38", "available_balance": null, "beneficiary": "Executive Craft", "merchant": null, "sender_name": "Executive Craft", "category": "Transfer", "description": "Internal transfer from Executive Craft"}
+2026-01-30 18:53:26,936 - ai_raw_io - INFO - INPUT: Credit Transfer Internal
+Amount:SAR 5000
+To:7772
+From:Executive Craft
+From:3053
+26/1/29 17:38 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "transfer", "source_bank": null, "destination_bank": "AlRajhiBank", "source_account_last4": "3053", "destination_account_last4": "7772", "card_info": null, "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2026-01-26 17:38", "available_balance": null, "beneficiary": "Executive Craft", "merchant": null, "sender_name": null, "category": "Transfer", "description": "Incoming transfer"}
+2026-01-30 19:03:29,156 - ai_raw_io - INFO - INPUT: Debit Internal Transfer
+From:1505
+Amount:SAR 150
+To:SABAH ABDULLAH
+To:0450
+26/1/30 19:03 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "transfer", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "1505", "destination_account_last4": "0450", "card_info": null, "amount": 150, "currency": "SAR", "fees": null, "timestamp": "2030-01-26 19:03", "available_balance": null, "beneficiary": "SABAH ABDULLAH", "merchant": null, "sender_name": null, "category": "Transfer", "description": "Transfer to SABAH ABDULLAH"}
+2026-01-30 19:04:04,331 - ai_raw_io - INFO - INPUT: Debit Internal Transfer
+From:9384
+Amount:SAR 1300
+To:MARIAM ALGHAMDI
+To:0890
+26/1/30 19:04 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "transfer", "source_bank": "AlRajhiBank", "source_account_last4": "9384", "destination_account_last4": "0890", "card_info": null, "amount": 1300, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 19:04", "available_balance": null, "beneficiary": "MARIAM ALGHAMDI", "merchant": null, "sender_name": null, "category": "Transfer", "description": "Transfer to MARIAM ALGHAMDI"}
+2026-01-30 19:07:49,457 - ai_raw_io - INFO - INPUT: Credit Transfer Internal
+Amount:SAR 5000
+To:7772
+From:Executive Craft
+From:3053
+26/1/29 17:38 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": null, "destination_bank": "AlRajhiBank", "source_account_last4": "3053", "destination_account_last4": "7772", "card_info": null, "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2026-01-29 17:38", "available_balance": null, "beneficiary": "Executive Craft", "merchant": null, "sender_name": null, "category": null, "description": "Internal transfer to 7772"}
+2026-01-30 19:09:06,842 - ai_raw_io - INFO - INPUT: Credit Transfer Internal
+Amount:SAR 5000
+To:7772
+From:Executive Craft
+From:3053
+26/1/29 17:38 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": null, "destination_bank": "AlRajhiBank", "source_account_last4": "3053", "destination_account_last4": "7772", "card_info": null, "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2029-01-26 17:38", "available_balance": null, "beneficiary": "Executive Craft", "merchant": null, "sender_name": null, "category": "Transfer", "description": "Transfer to 7772"}
+2026-01-30 19:10:20,390 - ai_raw_io - INFO - INPUT: Credit Transfer Internal
+Amount:SAR 5000
+To:7772
+From:Executive CraftCredit Transfer Internal
+Amount:SAR 5000
+To:7772
+From:Executive Craft
+From:3053
+26/1/29 17:38 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": null, "destination_bank": "AlRajhiBank", "source_account_last4": null, "destination_account_last4": "7772", "card_info": null, "amount": 5000.0, "currency": "SAR", "fees": null, "timestamp": "2029-01-26 17:38", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": "Executive Craft", "category": null, "description": "Incoming transfer from Executive Craft"}
+2026-01-30 19:10:22,137 - ai_raw_io - INFO - INPUT: From:3053
+26/1/29 17:38 || OUTPUT: {"is_financial_event": false, "is_transaction": false, "transaction_type": null, "sub_type": null, "source_bank": null, "destination_bank": null, "source_account_last4": null, "destination_account_last4": null, "card_info": null, "amount": null, "currency": null, "fees": null, "timestamp": "2029-01-26 17:38", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": null}
+2026-01-30 19:12:34,287 - ai_raw_io - INFO - INPUT: Credit Transfer Internal
+Amount:SAR 5000
+To:7772
+From:Executive Craft
+From:3053
+26/1/29 17:38 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": null, "destination_bank": "AlRajhiBank", "source_account_last4": "3053", "destination_account_last4": "7772", "card_info": null, "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2029-01-26 17:38", "available_balance": null, "beneficiary": "Executive Craft", "merchant": null, "sender_name": null, "category": null, "description": "Transfer to 7772"}
+2026-01-30 19:14:43,382 - ai_raw_io - INFO - INPUT: Credit Transfer Internal
+Amount:SAR 5000
+To:7772
+From:Executive Craft
+From:3053 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_bank": "AlRajhiBank", "source_account_last4": "3053", "destination_account_last4": "7772", "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": null, "beneficiary": "Executive Craft", "merchant": null, "sender_name": null, "category": null, "description": "Transfer to 7772"}
+2026-01-30 19:15:49,294 - ai_raw_io - INFO - INPUT: Credit Transfer Internal
+Amount:SAR 5000
+To:7772
+From:Executive Craft
+From:3053 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": null, "destination_bank": "AlRajhiBank", "source_account_last4": "3053", "destination_account_last4": "7772", "card_info": null, "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": "Executive Craft", "category": null, "description": "Transfer to 7772"}
+2026-01-30 19:16:26,918 - ai_raw_io - INFO - INPUT: Credit Transfer Internal
+Amount:SAR 5000
+To:7772
+From:Executive Craft
+From:3053 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_bank": "AlRajhiBank", "source_account_last4": "3053", "destination_account_last4": "7772", "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": "Executive Craft", "category": null, "description": "Internal transfer from 3053 to 7772"}
+2026-01-30 19:16:50,507 - ai_raw_io - INFO - INPUT: Credit Transfer Internal
+Amount:SAR 5000
+To:7772
+From:Executive Craft
+From:3053 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": null, "destination_bank": "AlRajhiBank", "source_account_last4": "3053", "destination_account_last4": "7772", "card_info": null, "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": null, "beneficiary": "Executive Craft", "merchant": null, "sender_name": "Executive Craft", "category": "Transfer", "description": "Internal transfer from Executive Craft"}
+2026-01-30 19:20:55,375 - ai_raw_io - INFO - INPUT: Credit Transfer Internal || OUTPUT: {"is_financial_event": false, "is_transaction": false, "transaction_type": null, "sub_type": null, "source_bank": null, "destination_bank": null, "source_account_last4": null, "destination_account_last4": null, "card_info": null, "amount": null, "currency": null, "fees": null, "timestamp": null, "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": null}
+2026-01-30 19:20:57,316 - ai_raw_io - INFO - INPUT: Amount:SAR 5000
+To:7772 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "transfer", "source_bank": null, "destination_bank": "AlRajhiBank", "source_account_last4": null, "destination_account_last4": "7772", "card_info": null, "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 00:00", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": "Transfer", "description": "Transfer to 7772"}
+2026-01-30 19:22:58,416 - ai_raw_io - INFO - INPUT: Credit Transfer Internal
+Amount:SAR 5000
+To:7772
+From:Executive Craft
+From:3053
+26/1/29 17:38 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": null, "destination_bank": "AlRajhiBank", "source_account_last4": "3053", "destination_account_last4": "7772", "card_info": null, "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2029-01-26 17:38", "available_balance": null, "beneficiary": "Executive Craft", "merchant": null, "sender_name": null, "category": "Transfer", "description": "Transfer to 7772"}
+2026-01-30 19:30:37,262 - ai_raw_io - INFO - INPUT: Credit Transfer Internal
+Amount:SAR 5000
+To:7772
+From:Executive Craft
+From:3053
+26/1/29 17:38 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": null, "destination_bank": "AlRajhiBank", "source_account_last4": "3053", "destination_account_last4": "7772", "card_info": null, "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2026-01-29 17:38", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": "Executive Craft", "category": null, "description": "Internal transfer from Executive Craft"}
+2026-01-30 19:34:15,631 - ai_raw_io - INFO - INPUT: AlRajhiBank: 30/01 - 15:00 Purchase via mada-Apple Pay 9365 at AMAZON.SA Amount: 150.00 SAR. Available balance: 12345.67 SAR || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 150.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 15:00", "available_balance": 12345.67, "beneficiary": null, "merchant": "AMAZON.SA", "sender_name": null, "category": "Shopping", "description": "Purchase at AMAZON.SA"}
+2026-01-30 19:38:03,955 - ai_raw_io - INFO - INPUT: AlRajhiBank: 30/01 - 15:00 Purchase via mada-Apple Pay 9365 at AMAZON.SA Amount: 150.00 SAR. Available balance: 12345.67 SAR || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 150.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 15:00", "available_balance": 12345.67, "beneficiary": null, "merchant": "AMAZON.SA", "sender_name": null, "category": "Shopping", "description": "Purchase at AMAZON.SA"}
+2026-01-30 19:44:00,001 - ai_raw_io - INFO - INPUT: AlRajhiBank: 30/01 - 16:00 Purchase via mada-Apple Pay 9365 at STARBUCKS Amount: 35.00 SAR. Available balance: 12310.67 SAR || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 35.0, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 16:00", "available_balance": 12310.67, "beneficiary": null, "merchant": "STARBUCKS", "sender_name": null, "category": "Food & Dining", "description": "Purchase at STARBUCKS"}
+2026-01-30 19:46:43,453 - ai_raw_io - INFO - INPUT: Credit Transfer Internal
+Amount:SAR 5000
+To:7772
+From:Executive Craft
+From:3053
+26/1/29 17:38 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": null, "destination_bank": "AlRajhiBank", "source_account_last4": null, "destination_account_last4": "7772", "card_info": null, "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2029-01-26 17:38", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": "Executive Craft", "category": null, "description": "Transfer from Executive Craft"}
+2026-01-30 19:47:18,036 - ai_raw_io - INFO - INPUT: Credit Transfer Internal
+Amount:SAR 5000
+To:7772
+From:Executive Craft
+From:3053
+26/1/29 17:38 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "Executive Craft", "destination_bank": "AlRajhiBank", "source_account_last4": "3053", "destination_account_last4": "7772", "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2026-01-26 17:38", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": "Executive Craft", "category": "Transfer", "description": "Incoming transfer from Executive Craft"}
+2026-01-30 19:49:24,343 - ai_raw_io - INFO - INPUT: Online Purchase
+Card:7868 ;Visa
+Amount:69 USD
+At: OPENAI *C
+Country:USA
+Balance:5.73 USD
+Date:09-01-2026 02:09 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "7868", "card_info": "Visa 7868", "amount": 69, "currency": "USD", "fees": null, "timestamp": "2026-01-09 02:09", "available_balance": 5.73, "beneficiary": null, "merchant": "OPENAI *C", "sender_name": null, "category": "Subscriptions", "description": "Purchase at OPENAI"}
+2026-01-30 20:40:03,010 - ai_raw_io - INFO - INPUT: Credit Card:Payment
+Card:Visa 7868
+Amount:USD 15
+Balance:33.37 USD
+Date:06-01-2026 13:34 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "payment", "source_bank": "AlRajhiBank", "destination_account_last4": "7868", "card_info": "Visa 7868", "amount": 15, "currency": "USD", "fees": null, "timestamp": "2026-01-06 13:34", "available_balance": 33.37, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Credit Card Payment"}
+2026-01-30 20:49:18,057 - ai_raw_io - INFO - INPUT: Online Purchase
+By:9365;mada-Apple Pay
+From:1505
+Amount:SAR 113
+At:Keeta
+31/1/26 20:49 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "1505", "card_info": "mada-Apple Pay 9365", "amount": 113, "currency": "SAR", "fees": null, "timestamp": "2026-01-31 20:49", "available_balance": null, "beneficiary": null, "merchant": "Keeta", "sender_name": null, "category": null, "description": "Online Purchase at Keeta"}
+2026-01-30 21:25:28,121 - ai_raw_io - INFO - INPUT: Debit Internal Transfer
+From:1505
+Amount:SAR 50
+To:MOHAMMED ISLAM
+To:0477
+26/1/30 21:25 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "transfer", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "1505", "destination_account_last4": "0477", "card_info": null, "amount": 50, "currency": "SAR", "fees": null, "timestamp": "2026-01-26 21:25", "available_balance": null, "beneficiary": "MOHAMMED ISLAM", "merchant": null, "sender_name": null, "category": "Transfer", "description": "Transfer to MOHAMMED ISLAM"}
+2026-01-30 21:26:05,828 - ai_raw_io - INFO - INPUT: Transfer Between Your Accounts
+Amount: SAR 5000
+To: 3264
+26/1/30 21:26 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_bank": "AlRajhiBank", "source_account_last4": null, "destination_account_last4": "3264", "card_info": null, "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2030-01-26 21:26", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Transfer to 3264"}
+2026-01-30 21:26:44,928 - ai_raw_io - INFO - INPUT: Transfer Between Your Accounts
+Amount: SAR 5000
+To: 1505
+26/1/30 21:26 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_bank": "AlRajhiBank", "source_account_last4": null, "destination_account_last4": "1505", "card_info": null, "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 21:26", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": "Transfer", "description": "Transfer to 1505"}
+2026-01-30 21:27:08,613 - ai_raw_io - INFO - INPUT: Debit Transfer Local
+Bank:SAIB
+From:1505
+Amount:SAR 2000
+To:my mom
+To:3001
+Fees:SAR 0.58
+26/1/30 21:27 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "transfer", "source_bank": "SAIB", "destination_bank": null, "source_account_last4": "1505", "destination_account_last4": "3001", "card_info": null, "amount": 2000, "currency": "SAR", "fees": 0.58, "timestamp": "2026-01-26 21:27", "available_balance": null, "beneficiary": "my mom", "merchant": null, "sender_name": null, "category": "Transfer", "description": "Transfer to my mom"}

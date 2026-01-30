@@ -37,3 +37,41 @@ input[type=number] {
   -webkit-backdrop-filter: blur(24px);
   backdrop-filter: blur(24px);
 }
+
+/* Safari webkit prefixes for regular blur filter support */
+.blur-3xl {
+  -webkit-filter: blur(64px);
+  filter: blur(64px);
+}
+
+.blur-2xl {
+  -webkit-filter: blur(40px);
+  filter: blur(40px);
+}
+
+.blur-xl {
+  -webkit-filter: blur(24px);
+  filter: blur(24px);
+}
+
+.blur-lg {
+  -webkit-filter: blur(16px);
+  filter: blur(16px);
+}
+
+/* Credit card aspect ratio with Safari fallback */
+.credit-card-aspect {
+  position: relative;
+  width: 100%;
+  /* Padding-bottom fallback for Safari (1.586:1 ratio = 63.05%) */
+  padding-bottom: 63.05%;
+  height: 0;
+}
+
+@supports (aspect-ratio: 1.586 / 1) {
+  .credit-card-aspect {
+    aspect-ratio: 1.586 / 1;
+    padding-bottom: 0;
+    height: auto;
+  }
+}

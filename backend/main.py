@@ -853,7 +853,7 @@ async def receive_sms(request: Request, db: Session = Depends(get_db)):
 
     # 4. Create Transaction Logic (Handles Conversion, Credit/Debit, etc.)
     try:
-        await sms_agent._create_transaction_logic(db, result, account, None, body, reply_target=None)
+        await sms_agent._create_transaction_logic(db, result, account, None, body, reply_target=None, source="telegram")
         raw_msg.status = models.MessageStatus.PARSED
         raw_msg.error_log = None
         db.commit()
@@ -922,7 +922,7 @@ async def retry_message(message_id: str, db: Session = Depends(get_db)):
 
     # 3. Create Logic
     try:
-        await sms_agent._create_transaction_logic(db, result, account, None, msg.body, reply_target=None)
+        await sms_agent._create_transaction_logic(db, result, account, None, msg.body, reply_target=None, source="webui")
         msg.status = models.MessageStatus.PARSED
         msg.error_log = None
         db.commit()
@@ -941,18 +941,18 @@ def bulk_delete_messages(payload: schemas.BulkDeleteRequest, db: Session = Depen
         deleted_count += 1
     return {"message": f"Deleted {deleted_count} messages"}
 
-# --- Direct SMS Ingest (for iPhone Shortcuts) ---
+# --- Direct SMS Ingest (for iPhone Shortcuts and Web UI) ---
 @app.post("/api/sms/ingest")
 async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
     """
-    Direct SMS ingest endpoint for iPhone Shortcuts.
+    Direct SMS ingest endpoint for iPhone Shortcuts and Web UI.
     Accepts separate 'sender' and 'body' fields.
     
-    Example request:
-    {
-        "sender": "AlRajhiBank",
-        "body": "PoS | By:9365;mada-Apple Pay | Amount:SAR 96..."
-    }
+    Returns:
+    - status: "success" | "pending_action" | "ignored" | "failed"
+    - transaction: Created transaction details (if any)
+    - accounts: List of accounts for selection (if pending_action)
+    - parsed: AI parsing result
     """
     logger.info(f"[SMS-INGEST] Received from: {payload.sender}")
     
@@ -978,19 +978,33 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
         db.commit()
         return {"status": "failed", "reason": str(e)}
     
-    # 3. Check for errors
-    if result and result.get("error"):
+    # 3. Check for errors - ensure result is a dict
+    if isinstance(result, list):
+        result = result[0] if result else {}
+    
+    if result and isinstance(result, dict) and result.get("error"):
         raw_msg.status = models.MessageStatus.FAILED
         raw_msg.error_log = result.get("error")
         db.commit()
         return {"status": "failed", "reason": result.get("error")}
     
-    if not result or not result.get("is_financial_event"):
-        reason = result.get("reason", "Not a financial event") if result else "No response"
+    if not result or not isinstance(result, dict) or not result.get("is_financial_event"):
+        reason = result.get("reason", "Not a financial event") if isinstance(result, dict) and result else "No response"
         raw_msg.status = models.MessageStatus.FAILED
         raw_msg.error_log = reason
         db.commit()
         return {"status": "ignored", "reason": reason}
+    
+    # Check for Declines
+    if result.get("status") == "failed" or result.get("sub_type") == "decline":
+        raw_msg.status = models.MessageStatus.PARSED
+        raw_msg.error_log = "Transaction Declined (not added to ledger)"
+        db.commit()
+        return {
+            "status": "declined",
+            "reason": "Transaction was declined",
+            "parsed": result
+        }
     
     # 4. Find account
     last_4 = result.get("destination_account_last4") or result.get("source_account_last4")
@@ -1000,32 +1014,183 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
             last_4 = card_match.group(1)
     
     account = None
+    credit_card = None
     if last_4:
-        account = crud.get_account_by_last_4(db, str(last_4))
-        if not account:
-            # Try credit card
-            credit_card = crud.get_credit_card_by_last_4(db, str(last_4))
-            if credit_card:
-                account = credit_card
+        # Check credit cards first
+        credit_card = crud.get_credit_card_by_last4(db, str(last_4))
+        if not credit_card:
+            account = crud.get_account_by_last_4(db, str(last_4))
     
-    if not account:
-        raw_msg.status = models.MessageStatus.FAILED
-        raw_msg.error_log = f"Account not found for: {last_4}"
+    # 5. Handle unknown account - create pending_action transaction
+    if not account and not credit_card:
+        # Create pending_action transaction
+        import json as json_lib
+        tx_type = result.get("transaction_type", "debit")
+        
+        pending_tx = models.Transaction(
+            account_id=None,
+            credit_card_id=None,
+            amount=result.get("amount", 0),
+            merchant=result.get("merchant") or result.get("description") or "Unknown",
+            raw_sms_content=payload.body,
+            parsed_data=json_lib.dumps(result),
+            timestamp=datetime.now(),
+            category=result.get("category", "Uncategorized"),
+            type=tx_type,
+            status="pending_action"
+        )
+        db.add(pending_tx)
         db.commit()
-        return {"status": "warning", "reason": f"Account {last_4} not found", "parsed": result}
+        db.refresh(pending_tx)
+        
+        raw_msg.status = models.MessageStatus.PENDING
+        raw_msg.error_log = f"Waiting for account selection (last4: {last_4})"
+        db.commit()
+        
+        # Get available accounts for selection
+        accounts_list = crud.get_accounts(db)
+        credit_cards_list = crud.get_credit_cards(db)
+        
+        account_options = [
+            {"id": acc.id, "name": acc.name, "type": "account", "last_4": acc.last_4_digits}
+            for acc in accounts_list
+        ]
+        cc_options = [
+            {"id": cc.id, "name": cc.name, "type": "credit_card", "last_4": cc.last_4_digits}
+            for cc in credit_cards_list
+        ]
+        
+        return {
+            "status": "pending_action",
+            "reason": f"Unknown account: {last_4}" if last_4 else "No account identified",
+            "transaction_id": pending_tx.id,
+            "transaction": {
+                "id": pending_tx.id,
+                "amount": pending_tx.amount,
+                "merchant": pending_tx.merchant,
+                "type": pending_tx.type,
+                "category": pending_tx.category,
+                "status": pending_tx.status
+            },
+            "accounts": account_options,
+            "credit_cards": cc_options,
+            "parsed": result
+        }
     
-    # 5. Create transaction
+    # 6. Create transaction using existing sms_agent logic
     try:
-        await sms_agent._create_transaction_logic(db, result, account, None, payload.body, reply_target=None)
+        await sms_agent._create_transaction_logic(db, result, account, credit_card, payload.body, reply_target=None, source="webui")
         raw_msg.status = models.MessageStatus.PARSED
         raw_msg.error_log = None
         db.commit()
-        return {"status": "success", "message": "Transaction logged", "parsed": result}
+        
+        # Fetch the created transaction
+        created_tx = db.query(models.Transaction).filter(
+            models.Transaction.raw_sms_content == payload.body
+        ).order_by(models.Transaction.id.desc()).first()
+        
+        tx_response = None
+        if created_tx:
+            tx_response = {
+                "id": created_tx.id,
+                "amount": created_tx.amount,
+                "merchant": created_tx.merchant,
+                "type": created_tx.type,
+                "category": created_tx.category,
+                "status": created_tx.status,
+                "account_name": account.name if account else (credit_card.name if credit_card else None),
+                "timestamp": created_tx.timestamp.isoformat() if created_tx.timestamp else None
+            }
+        
+        return {
+            "status": "success",
+            "message": "Transaction logged",
+            "transaction": tx_response,
+            "parsed": result
+        }
     except Exception as e:
         raw_msg.status = models.MessageStatus.FAILED
         raw_msg.error_log = f"Transaction Error: {str(e)}"
         db.commit()
         return {"status": "failed", "reason": str(e)}
+
+
+@app.post("/api/sms/assign-account")
+def assign_account_to_pending_tx(
+    transaction_id: str,
+    account_id: str = None,
+    credit_card_id: str = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Assign an account or credit card to a pending_action transaction.
+    This is called after user selects from the account options.
+    """
+    tx = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    if tx.status != "pending_action":
+        raise HTTPException(status_code=400, detail="Transaction is not pending action")
+    
+    # Assign account or credit card
+    if account_id:
+        account = crud.get_account(db, account_id)
+        if not account:
+            raise HTTPException(status_code=404, detail="Account not found")
+        
+        tx.account_id = account_id
+        tx.status = "completed"
+        
+        # Update account balance
+        if tx.type == "credit":
+            account.current_balance += tx.amount
+        else:
+            account.current_balance -= tx.amount
+        tx.balance_after_transaction = account.current_balance
+        
+    elif credit_card_id:
+        cc = crud.get_credit_card(db, credit_card_id)
+        if not cc:
+            raise HTTPException(status_code=404, detail="Credit card not found")
+        
+        tx.credit_card_id = credit_card_id
+        tx.status = "completed"
+        
+        # Update credit card balance
+        if tx.type == "credit":
+            cc.current_balance -= tx.amount  # Payment reduces debt
+        else:
+            cc.current_balance += tx.amount  # Purchase increases debt
+        tx.balance_after_transaction = cc.current_balance
+    else:
+        raise HTTPException(status_code=400, detail="Either account_id or credit_card_id required")
+    
+    db.commit()
+    db.refresh(tx)
+    
+    account_name = None
+    if tx.account_id:
+        acc = crud.get_account(db, tx.account_id)
+        account_name = acc.name if acc else None
+    elif tx.credit_card_id:
+        cc = crud.get_credit_card(db, tx.credit_card_id)
+        account_name = cc.name if cc else None
+    
+    return {
+        "status": "success",
+        "transaction": {
+            "id": tx.id,
+            "amount": tx.amount,
+            "merchant": tx.merchant,
+            "type": tx.type,
+            "category": tx.category,
+            "status": tx.status,
+            "account_name": account_name,
+            "balance_after": tx.balance_after_transaction
+        }
+    }
+
 
 # --- Savings Goal Endpoints ---
 @app.post("/goals/", response_model=schemas.SavingsGoal)

@@ -139,6 +139,7 @@ class Transaction(Base):
     logo_url = Column(String, nullable=True)
     fees = Column(Float, default=0.0)
     parsed_data = Column(Text, nullable=True)  # JSON: Full AI-extracted data from SMS
+    source = Column(String, nullable=True)  # Source of transaction: 'telegram', 'webui', 'manual'
     
     # Relationships
     account = relationship("Account", back_populates="transactions")

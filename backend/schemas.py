@@ -55,6 +55,7 @@ class CreditCardCreate(CreditCardBase):
 class CreditCardUpdate(BaseModel):
     name: Optional[str] = None
     bank_name: Optional[str] = None
+    current_balance: Optional[float] = None
     credit_limit: Optional[float] = None
     statement_day: Optional[int] = None
     due_day: Optional[int] = None
@@ -92,6 +93,7 @@ class TransactionCreate(TransactionBase):
     raw_sms_content: Optional[str] = None
     parsed_data: Optional[str] = None  # JSON string of all AI-extracted fields
     timestamp: datetime
+    source: Optional[str] = None  # Source: 'telegram', 'webui', 'manual'
 
 class TransactionUpdate(BaseModel):
     amount: Optional[float] = None
@@ -114,6 +116,7 @@ class Transaction(TransactionBase):
     balance_after_transaction: Optional[float] = None
     raw_sms_content: Optional[str] = None  # Include raw SMS in response
     parsed_data: Optional[str] = None  # JSON string of all AI-extracted fields
+    source: Optional[str] = None  # Source: 'telegram', 'webui', 'manual'
 
     class Config:
         from_attributes = True
