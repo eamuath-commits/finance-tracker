@@ -312,15 +312,33 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
 
     // Resume processing waiting SMS items (called after pending_action is resolved)
     const resumeWaitingItems = async () => {
-        // Get waiting items from results (they were moved there when processing stopped)
-        const waitingItems = results.filter(r => r.status === 'waiting');
-        if (waitingItems.length === 0) return;
+        // Get waiting items from BOTH results AND processingQueue (async state timing)
+        const waitingFromResults = results.filter(r => r.status === 'waiting');
 
-        // Process one at a time
-        const firstWaiting = waitingItems[0];
+        // Also check processingQueue for waiting items (they may not have moved to results yet)
+        let waitingFromQueue = [];
+        setProcessingQueue(prev => {
+            waitingFromQueue = prev.filter(p => p.status === 'waiting');
+            return prev;
+        });
+
+        // Wait a tick for state to settle
+        await new Promise(r => setTimeout(r, 50));
+
+        // Combine and dedupe (prefer results if same id exists in both)
+        const allWaiting = [...waitingFromResults];
+        const seenIds = new Set(allWaiting.map(w => w.id));
+        waitingFromQueue.forEach(w => {
+            if (!seenIds.has(w.id)) allWaiting.push(w);
+        });
+
+        if (allWaiting.length === 0) return;
+
+        // Process one at a time - first waiting item
+        const firstWaiting = allWaiting[0];
         const msg = firstWaiting.sms;
 
-        // Remove from results and add to processingQueue
+        // Remove from both results and processingQueue, add back as parsing
         setResults(prev => prev.filter(r => r.id !== firstWaiting.id));
         setProcessingQueue([{
             id: firstWaiting.id,
@@ -346,13 +364,14 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
                 result.transaction_id = res.data.transaction_id;
             }
 
-            // Update status and move to results
-            setProcessingQueue([{
+            // Move completed item to results (at the END to maintain order)
+            setResults(prev => [...prev, {
                 id: firstWaiting.id,
                 sms: msg,
                 status: res.data.status,
                 result: { ...result, steps: [{ time: new Date().toLocaleTimeString(), action: "Complete", detail: `Status: ${res.data.status}` }] }
             }]);
+            setProcessingQueue([]);
 
             // If still pending_action, don't process more - user needs to resolve first
             if (res.data.status === "pending_action") {
@@ -368,22 +387,16 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
                 setTimeout(() => resumeWaitingItems(), 300);
             }
         } catch (err) {
-            setProcessingQueue([{
+            setResults(prev => [...prev, {
                 id: firstWaiting.id,
                 sms: msg,
                 status: "failed",
                 result: { status: "failed", reason: err.response?.data?.detail || err.message }
             }]);
+            setProcessingQueue([]);
             setIsProcessing(false);
             setAgentStatus("");
         }
-
-        // Move completed item from processingQueue to results
-        setProcessingQueue(prev => {
-            const completed = prev.filter(p => p.result);
-            setResults(old => [...completed, ...old]);
-            return [];
-        });
     };
 
     const retryBlocked = async () => {
@@ -394,8 +407,9 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
         );
         if (blockedOrWaiting.length === 0) return;
 
-        const retryQueue = blockedOrWaiting.map((item, idx) => ({
-            id: Date.now() + idx,
+        // KEEP original IDs to maintain sequence
+        const retryQueue = blockedOrWaiting.map((item) => ({
+            id: item.id,  // Keep original ID!
             sms: item.sms,
             status: "waiting",
             result: null,
@@ -410,7 +424,8 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
         setCurrentIndex(0);
 
         for (let i = 0; i < retryQueue.length; i++) {
-            const msg = retryQueue[i].sms;
+            const currentItem = retryQueue[i];
+            const msg = currentItem.sms;
 
             setCurrentIndex(i);
             setAgentStatus(`🤖 Gemini: Processing SMS ${i + 1} of ${retryQueue.length}...`);
@@ -426,7 +441,7 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
                     body: msg
                 });
 
-                const result = { id: Date.now() + Math.random(), sms: msg, ...res.data };
+                const result = { id: currentItem.id, sms: msg, ...res.data };
 
                 if (res.data.status === "pending_action") {
                     result.accounts = res.data.accounts;
@@ -472,8 +487,9 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
         setAgentStatus("");
         setCurrentIndex(-1);
 
+        // APPEND to results (correct order) instead of prepending
         setProcessingQueue(prev => {
-            setResults(old => [...prev.filter(p => p.result), ...old]);
+            setResults(old => [...old, ...prev.filter(p => p.result)]);
             return [];
         });
 
