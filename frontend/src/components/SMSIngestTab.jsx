@@ -178,9 +178,10 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
         setAgentStatus("");
         setCurrentIndex(-1);
 
+        // REPLACE results instead of appending (fixes duplication issue)
         setProcessingQueue(prev => {
             const completed = prev.filter(p => p.result);
-            setResults(old => [...completed, ...old]);
+            setResults(completed);  // Replace, not append
             return [];
         });
 
