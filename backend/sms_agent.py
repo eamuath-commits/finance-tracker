@@ -1017,14 +1017,17 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
     # Determine transaction status
     tx_status = "completed"  # Default
     
-    # If this is a DEBIT transfer TO your own account at another bank, mark as pending_transfer
+    # NOTE: Bank-to-bank transfers are completed immediately.
+    # The debit SMS contains the source account (From: last4).
+    # The credit SMS will arrive later from the destination bank.
+    # Each SMS is processed independently - no pending/waiting needed.
     if sub_type in ['transfer', 'internal_transfer'] and tx_type_str == 'debit':
         if ai_dest_last4:
             # Check if destination is ALSO your account (cross-bank internal transfer)
             dest_is_yours = crud.get_account_by_last_4(db, str(ai_dest_last4))
             if dest_is_yours:
-                tx_status = "pending_transfer"
-                logger.info(f"Cross-bank transfer detected: {source_account.name if source_account else 'Unknown'} -> {dest_is_yours.name}")
+                # Log the cross-bank transfer but keep as completed
+                logger.info(f"Cross-bank transfer detected (completed): {source_account.name if source_account else 'Unknown'} -> {dest_is_yours.name}")
     
     transaction_data = schemas.TransactionCreate(
         account_id=account_id,
