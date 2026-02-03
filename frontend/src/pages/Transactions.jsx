@@ -674,16 +674,38 @@ function Transactions() {
                 <div className="animate-fade-in space-y-4">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-bold text-white">SMS Inbox</h2>
-                        <div className="flex gap-2">
-                            {isSelectionMode && selectedMsgIds.size > 0 && (
-                                <button
-                                    onClick={handleBulkDelete}
-                                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm"
-                                >
-                                    <Trash2 size={16} /> Delete ({selectedMsgIds.size})
-                                </button>
+                        <div className="flex gap-2 items-center">
+                            {isSelectionMode && (
+                                <>
+                                    {/* Select All Checkbox */}
+                                    <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={inboxMessages.length > 0 && selectedMsgIds.size === inboxMessages.length}
+                                            onChange={() => {
+                                                if (selectedMsgIds.size === inboxMessages.length) {
+                                                    setSelectedMsgIds(new Set());
+                                                } else {
+                                                    setSelectedMsgIds(new Set(inboxMessages.map(m => m.id)));
+                                                }
+                                            }}
+                                            className="w-4 h-4 accent-blue-500"
+                                        />
+                                        Select All
+                                    </label>
+                                    {selectedMsgIds.size > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={handleBulkDelete}
+                                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm"
+                                        >
+                                            <Trash2 size={16} /> Delete ({selectedMsgIds.size})
+                                        </button>
+                                    )}
+                                </>
                             )}
                             <button
+                                type="button"
                                 onClick={() => {
                                     setIsSelectionMode(!isSelectionMode);
                                     if (isSelectionMode) setSelectedMsgIds(new Set());
@@ -730,6 +752,7 @@ function Transactions() {
                             <div className="flex gap-2 items-start">
                                 {msg.status === 'FAILED' && (
                                     <button
+                                        type="button"
                                         onClick={() => handleRetry(msg.id)}
                                         className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition shadow"
                                     >
@@ -737,7 +760,7 @@ function Transactions() {
                                         Retry Parse
                                     </button>
                                 )}
-                                <button onClick={() => handleDeleteMsg(msg.id)} className="text-red-400 hover:text-red-300 p-1.5 hover:bg-slate-700 rounded transition">
+                                <button type="button" onClick={() => handleDeleteMsg(msg.id)} className="text-red-400 hover:text-red-300 p-1.5 hover:bg-slate-700 rounded transition">
                                     <Trash2 size={16} />
                                 </button>
                             </div>
