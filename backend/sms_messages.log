@@ -198,3 +198,43 @@
 2026-01-30 21:26:42,524 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— Transfer Between Your Accounts | Amount: SAR 5000 | To: 1505 | 26/1/30 21:26
 2026-01-30 21:26:49,707 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— OTP Code:4831 | Reason:Local Transfer - Mobile App | Amount:2,000.00 SAR
 2026-01-30 21:27:06,167 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— Debit Transfer Local | Bank:SAIB | From:1505 | Amount:SAR 2000 | To:my mom | To:3001 | Fees:SAR 0.58 | 26/1/30 21:27
+2026-01-31 19:02:46,136 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— Online Purchase | By:4390;mada-Apple Pay | From:2104 | Amount:SAR 55.54 | At:Keeta | 31/1/26 19:03
+2026-01-31 19:02:48,886 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— Online Purchase | By:4390;mada-Apple Pay | From:2104 | Amount:SAR 55.54 | At:Keeta | 31/1/26 19:03
+2026-01-31 19:06:27,360 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— PoS | By:4390;mada-Atheer | Amount:SAR 242.35 | At:DANUBE 13  | 31/1/26 19:06
+2026-01-31 19:21:34,177 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— PoS | By:4390;mada-Atheer | Amount:SAR 168 | At:Hjeen Tra  | 31/1/26 19:21
+2026-01-31 19:28:04,644 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— Online Purchase | By:9365;mada-Apple Pay | From:1505 | Amount:SAR 73.20 | At:HUNGERSTA | 31/1/26 19:28
+2026-01-31 19:34:24,436 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— PoS | By:4390;mada-Atheer | Amount:SAR 38 | At:Alttwyr W  | 31/1/26 19:34
+2026-01-31 21:15:32,640 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— PoS | By:4390;mada-Atheer | Amount:SAR 130.01 | At:SASCO Qen  | 1/2/26 21:15
+2026-02-01 01:38:32,260 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— OTP Code:9494 | Reason:Rajhi Transfer - Mobile App | Amount:70.00 SAR
+2026-02-01 01:38:42,843 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— Debit Internal Transfer | From:1505 | Amount:SAR 70 | To:YAZEED ALSHAMI | To:6967 | 26/2/1 01:38
+2026-02-01 03:16:56,320 | FROM: Channel_-1003635708322 | SMS: STC Bank —— 3145 is your OTP | For: MUSANAD | Amount: 1,500.00 SAR | *Do not share the code
+2026-02-01 03:17:01,672 | FROM: Channel_-1003635708322 | SMS: STC Bank —— Outcome Transfer to Sponsored  | Amount:1500.00SAR  | To:MAE CLAIRE BARQUILLA  | Acc:7195*  | At:01/02/26 03:17
+2026-02-01 03:17:28,283 | FROM: Channel_-1003635708322 | SMS: STC Bank —— 2267 is your OTP | For: MUSANAD | Amount: 1,500.00 SAR | *Do not share the code
+2026-02-01 03:17:36,572 | FROM: Channel_-1003635708322 | SMS: STC Bank —— Outcome Transfer to Sponsored  | Amount:1500.00SAR  | To:NORMA CAFE  | Acc:6566*  | At:01/02/26 03:17
+2026-02-01 03:20:32,907 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— Credit Transfer Local | Via:INMA | Amount:SAR 2000 | To:9384 | From:MUATH AMER MOHAMMED ALASIRI | From:1000 | 26/2/1 03:20
+2026-02-01 11:18:01,074 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— Online Purchase | By:9365;mada-Apple Pay | From:1505 | Amount:SAR 150 | At:STC Bank | 1/2/26 11:18
+2026-02-01 11:18:21,242 | FROM: Channel_-1003635708322 | SMS: STC Bank —— Adding money to account | Amount: 150.00 SAR | Via: *XXXX | At: 01/02/26 11:18
+2026-02-01 11:18:46,541 | FROM: Channel_-1003635708322 | SMS: STC Bank —— 4642 is your OTP | For: Transfer to contact | Amount: 150.00 SAR | *Do not share the code
+2026-02-01 11:19:05,331 | FROM: Channel_-1003635708322 | SMS: STC Bank —— Internal outward transfer | Amount:150.00SAR | To:MUHAMMAD KHAN | Acc:2907* | At:01/02/26 11:19
+2026-02-01 16:07:29,734 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— Online Purchase | By:4390;mada-Apple Pay | From:2104 | Amount:SAR 40.80 | At:Keemart | 1/2/26 16:07
+2026-02-01 16:07:32,210 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— Online Purchase | By:4390;mada-Apple Pay | From:2104 | Amount:SAR 40.80 | At:Keemart | 1/2/26 16:07
+2026-02-01 20:32:36,893 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— PoS | By:9365;mada-Apple Pay | Amount:SAR 587.28 | At:BELAL FOR | 2/2/26 20:32
+2026-02-01 20:39:06,537 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— PoS | By:9365;mada-Apple Pay | Amount:SAR 96 | At:EASY BAKE | 2/2/26 20:39
+2026-02-02 09:05:15,691 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— Online Purchase | By:9365;mada-Apple Pay | From:1505 | Amount:SAR 350 | At:STC Bank | 2/2/26 09:05
+2026-02-02 09:06:01,516 | FROM: Channel_-1003635708322 | SMS: STC Bank —— 3124 is your OTP | For: MUSANAD | Amount: 1,900.00 SAR | *Do not share the code
+2026-02-02 09:06:05,683 | FROM: Channel_-1003635708322 | SMS: STC Bank —— Outcome Transfer to Sponsored  | Amount:1900.00SAR  | To:MOHAMMED ISLAM  | Acc:1386*  | At:02/02/26 09:06
+2026-02-02 09:07:59,658 | FROM: Channel_-1003635708322 | SMS: STC Bank —— 7700 is your OTP | For: Transfer to contact | Amount: 250.00 SAR | *Do not share the code
+2026-02-02 09:08:10,079 | FROM: Channel_-1003635708322 | SMS: STC Bank —— Internal outward transfer | Amount:250.00SAR | To:MOHAMED ABDELSATTAR | Acc:3607* | At:02/02/26 09:08
+2026-02-02 11:00:12,966 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— PoS | By:4390;mada-Atheer | Amount:SAR 151.66 | At:DANUBE 13  | 2/2/26 11:00
+2026-02-02 11:15:18,815 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— Online Purchase | By:4390;mada-Apple Pay | From:2104 | Amount:SAR 124.25 | At:Keemart | 2/2/26 11:15
+2026-02-02 11:15:21,785 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— Online Purchase | By:4390;mada-Apple Pay | From:2104 | Amount:SAR 124.25 | At:Keemart | 2/2/26 11:15
+2026-02-02 11:26:03,736 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— PoS | By:4390;mada-Atheer | Amount:SAR 42.99 | At:PANDA RET  | 2/2/26 11:26
+2026-02-02 11:48:44,680 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— PoS | By:9365;mada-Apple Pay | Amount:SAR 7 | At:GOT COOKI | 2/2/26 11:49
+2026-02-02 12:28:28,462 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— Online Purchase | By:4390;mada-Apple Pay | From:2104 | Amount:SAR 100 | At:COMMERCIA | 2/2/26 12:28
+2026-02-02 12:28:31,183 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— Online Purchase | By:4390;mada-Apple Pay | From:2104 | Amount:SAR 100 | At:COMMERCIA | 2/2/26 12:28
+2026-02-02 13:21:31,236 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— OTP Code:9590 | Reason:Local Transfer - Mobile App | Amount:1,999.00 SAR
+2026-02-02 13:21:47,026 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— Debit Transfer Local | Bank:Stc bank | From:7772 | Amount:SAR 1999 | To:MUATH ALASIRI | To:0863 | Fees:SAR 0.58 | 26/2/2 13:22
+2026-02-02 15:05:20,217 | FROM: Channel_-1003635708322 | SMS: STC Bank —— 3998 is your OTP | For: MUSANAD | Amount: 2,000.00 SAR | *Do not share the code
+2026-02-02 15:05:28,385 | FROM: Channel_-1003635708322 | SMS: STC Bank —— Outcome Transfer to Sponsored  | Amount:2000.00SAR  | To:AJITH SIVANUNNI  | Acc:0404*  | At:02/02/26 15:05
+2026-02-02 17:39:18,358 | FROM: Channel_-1003635708322 | SMS: +966504730091 —— Credit Transfer Internal | Amount:SAR 6500 | To:2104 | From:MUATH ALASIRI | From:9384 | 26/1/25 19:18
+2026-02-02 18:36:07,133 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— Online Purchase | By:9365;mada-Apple Pay | From:1505 | Amount:SAR 207.45 | At:HUNGERSTA | 2/2/26 18:36
