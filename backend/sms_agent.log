@@ -6949,3 +6949,5 @@ By:9365;mada-Apple ...
 2026-02-03 20:01:22,842 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-03 16:32:27
 2026-02-03 20:01:22,843 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Liability
 2026-02-03 20:01:22,849 - sms_agent - INFO - Saved training example for: Bill Payment - STC
+2026-02-03 20:21:20,415 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-03 20:21:34,664 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).

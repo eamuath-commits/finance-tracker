@@ -1053,35 +1053,36 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
             core_lines.append(line_stripped)
     
     # Use first line + amount line for duplicate check (unique combination)
-    if len(core_lines) >= 1:
-        search_line1 = core_lines[0][:50]  # First content line (e.g., "Credit Card:Payment")
-        
-        # Build query conditions
-        query = db.query(models.Transaction).filter(
-            models.Transaction.raw_sms_content.ilike(f"%{search_line1}%")
-        )
-        
-        # Add amount line if found (makes the check more specific)
-        if amount_line:
-            query = query.filter(
-                models.Transaction.raw_sms_content.ilike(f"%{amount_line[:40]}%")
-            )
-        
-        existing_tx = query.first()
-        if existing_tx:
-            logger.info(f"[SMS-INGEST] Duplicate SMS detected, already processed as transaction {existing_tx.id}")
-            return {
-                "status": "duplicate",
-                "reason": "This SMS has already been processed",
-                "transaction_id": existing_tx.id,
-                "transaction": {
-                    "id": existing_tx.id,
-                    "merchant": existing_tx.merchant,
-                    "amount": existing_tx.amount,
-                    "type": str(existing_tx.type),
-                    "status": str(existing_tx.status)
-                }
-            }
+    # DISABLED: Allow duplicate SMS to be processed
+    # if len(core_lines) >= 1:
+    #     search_line1 = core_lines[0][:50]  # First content line (e.g., "Credit Card:Payment")
+    #     
+    #     # Build query conditions
+    #     query = db.query(models.Transaction).filter(
+    #         models.Transaction.raw_sms_content.ilike(f"%{search_line1}%")
+    #     )
+    #     
+    #     # Add amount line if found (makes the check more specific)
+    #     if amount_line:
+    #         query = query.filter(
+    #             models.Transaction.raw_sms_content.ilike(f"%{amount_line[:40]}%")
+    #         )
+    #     
+    #     existing_tx = query.first()
+    #     if existing_tx:
+    #         logger.info(f"[SMS-INGEST] Duplicate SMS detected, already processed as transaction {existing_tx.id}")
+    #         return {
+    #             "status": "duplicate",
+    #             "reason": "This SMS has already been processed",
+    #             "transaction_id": existing_tx.id,
+    #             "transaction": {
+    #                 "id": existing_tx.id,
+    #                 "merchant": existing_tx.merchant,
+    #                 "amount": existing_tx.amount,
+    #                 "type": str(existing_tx.type),
+    #                 "status": str(existing_tx.status)
+    #             }
+    #         }
     
     # 1. Create Raw Message record (will be deleted if not a transaction)
     raw_msg = models.RawMessage(
