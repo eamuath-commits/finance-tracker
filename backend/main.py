@@ -1006,10 +1006,17 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
     """
     logger.info(f"[SMS-INGEST] Received from: {payload.sender}")
     
-    # 0. Early filter: Skip OTP messages entirely (don't even store them)
+    # 0. Early filter: Skip OTP/verification messages entirely (don't even store them)
     body_lower = payload.body.lower()
-    if 'otp' in body_lower or 'verification code' in body_lower or 'one-time' in body_lower:
-        logger.info(f"[SMS-INGEST] Skipping OTP message")
+    otp_keywords = [
+        'otp', 'verification code', 'one-time', 'one time', 
+        'رمز التحقق', 'كلمة السر', 'رمز سري',  # Arabic OTP keywords
+        'security code', 'pin code', 'temporary password',
+        'verify your', 'confirm your identity', 'authentication code',
+        'do not share', 'لا تشاركه', 'expires in'
+    ]
+    if any(kw in body_lower for kw in otp_keywords):
+        logger.info(f"[SMS-INGEST] Skipping OTP/verification message")
         return {"status": "ignored", "reason": "OTP/verification message"}
     
     # 0b. QUEUE CHECK: Block new SMS processing if there are pending transactions
