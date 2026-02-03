@@ -843,6 +843,11 @@ def delete_transaction(db: Session, transaction_id: str):
         logger.warning(f"[DELETE_TX] Transaction not found: {transaction_id}")
         return None
     
+    # Delete queue entry first to avoid FK constraint issues
+    db.query(models.TransactionQueue).filter(
+        models.TransactionQueue.transaction_id == transaction_id
+    ).delete()
+    
     logger.info(f"[DELETE_TX] Found tx: type={db_tx.type}, amount={db_tx.amount}, account_id={db_tx.account_id}, cc_id={db_tx.credit_card_id}")
     
     # Revert Account balance change
