@@ -312,43 +312,22 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
 
     // Resume processing waiting SMS items (called after pending_action is resolved)
     const resumeWaitingItems = async () => {
-        // Get waiting items from BOTH results AND processingQueue (async state timing)
-        const waitingFromResults = results.filter(r => r.status === 'waiting');
+        // Get first waiting item from results
+        const waitingItems = results.filter(r => r.status === 'waiting');
+        if (waitingItems.length === 0) return;
 
-        // Also check processingQueue for waiting items (they may not have moved to results yet)
-        let waitingFromQueue = [];
-        setProcessingQueue(prev => {
-            waitingFromQueue = prev.filter(p => p.status === 'waiting');
-            return prev;
-        });
-
-        // Wait a tick for state to settle
-        await new Promise(r => setTimeout(r, 50));
-
-        // Combine and dedupe (prefer results if same id exists in both)
-        const allWaiting = [...waitingFromResults];
-        const seenIds = new Set(allWaiting.map(w => w.id));
-        waitingFromQueue.forEach(w => {
-            if (!seenIds.has(w.id)) allWaiting.push(w);
-        });
-
-        if (allWaiting.length === 0) return;
-
-        // Process one at a time - first waiting item
-        const firstWaiting = allWaiting[0];
+        // Process first waiting item, update in-place
+        const firstWaiting = waitingItems[0];
+        const itemId = firstWaiting.id;
         const msg = firstWaiting.sms;
 
-        // Remove from both results and processingQueue, add back as parsing
-        setResults(prev => prev.filter(r => r.id !== firstWaiting.id));
-        setProcessingQueue([{
-            id: firstWaiting.id,
-            sms: msg,
-            status: "parsing",
-            result: null,
-            steps: [{ time: new Date().toLocaleTimeString(), action: "Resuming", detail: "Processing queued message..." }]
-        }]);
         setIsProcessing(true);
         setAgentStatus(`🤖 Gemini: Processing queued SMS...`);
+
+        // Update to parsing in-place
+        setResults(prev => prev.map(r =>
+            r.id === itemId ? { ...r, status: "parsing" } : r
+        ));
 
         try {
             const res = await axios.post(`${API_URL}/api/sms/ingest`, {
@@ -356,7 +335,7 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
                 body: msg
             });
 
-            const result = { id: firstWaiting.id, sms: msg, ...res.data };
+            const result = { id: itemId, sms: msg, ...res.data };
 
             if (res.data.status === "pending_action") {
                 result.accounts = res.data.accounts;
@@ -364,14 +343,14 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
                 result.transaction_id = res.data.transaction_id;
             }
 
-            // Move completed item to results (at the END to maintain order)
-            setResults(prev => [...prev, {
-                id: firstWaiting.id,
-                sms: msg,
-                status: res.data.status,
-                result: { ...result, steps: [{ time: new Date().toLocaleTimeString(), action: "Complete", detail: `Status: ${res.data.status}` }] }
-            }]);
-            setProcessingQueue([]);
+            // Update item in-place (no removal/addition)
+            setResults(prev => prev.map(r =>
+                r.id === itemId ? {
+                    ...r,
+                    status: res.data.status,
+                    result: { ...result, steps: [{ time: new Date().toLocaleTimeString(), action: "Resumed", detail: `Status: ${res.data.status}` }] }
+                } : r
+            ));
 
             // If still pending_action, don't process more - user needs to resolve first
             if (res.data.status === "pending_action") {
@@ -387,50 +366,50 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
                 setTimeout(() => resumeWaitingItems(), 300);
             }
         } catch (err) {
-            setResults(prev => [...prev, {
-                id: firstWaiting.id,
-                sms: msg,
-                status: "failed",
-                result: { status: "failed", reason: err.response?.data?.detail || err.message }
-            }]);
-            setProcessingQueue([]);
+            setResults(prev => prev.map(r =>
+                r.id === itemId ? {
+                    ...r,
+                    status: "failed",
+                    result: { status: "failed", reason: err.response?.data?.detail || err.message }
+                } : r
+            ));
             setIsProcessing(false);
             setAgentStatus("");
         }
     };
 
     const retryBlocked = async () => {
-        // Include both blocked AND waiting items for retry
-        const blockedOrWaiting = results.filter(r =>
-            r.status === 'blocked' || r.result?.status === 'blocked' ||
-            r.status === 'waiting'
-        );
-        if (blockedOrWaiting.length === 0) return;
+        // Get IDs of blocked/waiting items to retry (in their current order in results)
+        const blockedOrWaitingIds = results
+            .filter(r => r.status === 'blocked' || r.result?.status === 'blocked' || r.status === 'waiting')
+            .map(r => r.id);
 
-        // KEEP original IDs to maintain sequence
-        const retryQueue = blockedOrWaiting.map((item) => ({
-            id: item.id,  // Keep original ID!
-            sms: item.sms,
-            status: "waiting",
-            result: null,
-            steps: [{ time: new Date().toLocaleTimeString(), action: "Retry", detail: "Retrying queued message..." }]
-        }));
+        if (blockedOrWaitingIds.length === 0) return;
 
-        setResults(prev => prev.filter(r =>
-            !(r.status === 'blocked' || r.result?.status === 'blocked' || r.status === 'waiting')
-        ));
-        setProcessingQueue(retryQueue);
         setIsProcessing(true);
         setCurrentIndex(0);
 
-        for (let i = 0; i < retryQueue.length; i++) {
-            const currentItem = retryQueue[i];
+        // Process each blocked/waiting item ONE AT A TIME, updating IN-PLACE (no removal/re-add)
+        for (let i = 0; i < blockedOrWaitingIds.length; i++) {
+            const itemId = blockedOrWaitingIds[i];
+
+            // Get current item from results (may have changed during processing)
+            let currentItem = null;
+            setResults(prev => {
+                currentItem = prev.find(r => r.id === itemId);
+                return prev;
+            });
+            await new Promise(r => setTimeout(r, 10)); // Let state settle
+
+            if (!currentItem) continue;
             const msg = currentItem.sms;
 
             setCurrentIndex(i);
-            setAgentStatus(`🤖 Gemini: Processing SMS ${i + 1} of ${retryQueue.length}...`);
-            setProcessingQueue(prev => prev.map((item, idx) =>
-                idx === i ? { ...item, status: "parsing", steps: [...item.steps, { time: new Date().toLocaleTimeString(), action: "Parsing", detail: "Sending to Gemini..." }] } : item
+            setAgentStatus(`🤖 Gemini: Retrying SMS ${i + 1} of ${blockedOrWaitingIds.length}...`);
+
+            // Update this item to 'parsing' status in-place
+            setResults(prev => prev.map(r =>
+                r.id === itemId ? { ...r, status: "parsing" } : r
             ));
 
             try {
@@ -441,7 +420,7 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
                     body: msg
                 });
 
-                const result = { id: currentItem.id, sms: msg, ...res.data };
+                const result = { id: itemId, sms: msg, ...res.data };
 
                 if (res.data.status === "pending_action") {
                     result.accounts = res.data.accounts;
@@ -449,36 +428,34 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
                     result.transaction_id = res.data.transaction_id;
                 }
 
-                setProcessingQueue(prev => prev.map((item, idx) =>
-                    idx === i ? {
-                        ...item,
+                // Update this item with result IN-PLACE (no appending)
+                setResults(prev => prev.map(r =>
+                    r.id === itemId ? {
+                        ...r,
                         status: res.data.status,
-                        result: {
-                            ...result,
-                            steps: [...item.steps, { time: new Date().toLocaleTimeString(), action: "Complete", detail: `Status: ${res.data.status}` }]
-                        }
-                    } : item
+                        result: { ...result, steps: [{ time: new Date().toLocaleTimeString(), action: "Retried", detail: `Status: ${res.data.status}` }] }
+                    } : r
                 ));
 
                 // SEQUENTIAL: Stop on pending_action - user needs to resolve first
                 if (res.data.status === "pending_action") {
                     setAgentStatus(`⏳ Waiting: This SMS needs account selection before continuing`);
-                    setProcessingQueue(prev => prev.map((item, idx) =>
-                        idx > i ? { ...item, status: "waiting", result: { reason: "Waiting for pending item", steps: [{ time: new Date().toLocaleTimeString(), action: "Waiting", detail: "Queued" }] } } : item
-                    ));
-                    break;
+                    setIsProcessing(false);
+                    return; // Exit - resumeWaitingItems will handle remaining items after resolution
                 }
 
                 if (res.data.status === "blocked") {
                     setAgentStatus(`⚠️ Blocked: ${res.data.blocked_count} pending transaction(s) need resolution`);
-                    setProcessingQueue(prev => prev.map((item, idx) =>
-                        idx > i ? { ...item, status: "waiting", result: { reason: "Waiting for blocked item", steps: [{ time: new Date().toLocaleTimeString(), action: "Waiting", detail: "Queued" }] } } : item
-                    ));
-                    break;
+                    setIsProcessing(false);
+                    return;
                 }
             } catch (err) {
-                setProcessingQueue(prev => prev.map((item, idx) =>
-                    idx === i ? { ...item, status: "failed", result: { status: "failed", reason: err.response?.data?.detail || err.message } } : item
+                setResults(prev => prev.map(r =>
+                    r.id === itemId ? {
+                        ...r,
+                        status: "failed",
+                        result: { status: "failed", reason: err.response?.data?.detail || err.message }
+                    } : r
                 ));
             }
         }
@@ -486,12 +463,6 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
         setIsProcessing(false);
         setAgentStatus("");
         setCurrentIndex(-1);
-
-        // APPEND to results (correct order) instead of prepending
-        setProcessingQueue(prev => {
-            setResults(old => [...old, ...prev.filter(p => p.result)]);
-            return [];
-        });
 
         if (onTransactionCreated) setTimeout(() => onTransactionCreated(), 200);
     };
