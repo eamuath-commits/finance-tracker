@@ -19,6 +19,7 @@ from sms_parser import parser
 import sms_agent
 import analysis
 import analysis_schema
+import queue_processor
 
 # --- Migration Logic ---
 def run_migrations(engine):
@@ -752,20 +753,23 @@ def complete_pending_transfer(transaction_id: str, source_account_id: str, db: S
         status="completed",
         fees=pending_tx.fees
     )
-    
-    # Update source account balance (subtract)
-    source_account.current_balance -= pending_tx.amount
-    debit_tx.balance_after_transaction = source_account.current_balance
-    
     db.add(debit_tx)
     
     # 2. Update the credit transaction: mark as completed and update merchant name
     pending_tx.status = "completed"
     pending_tx.merchant = f"Transfer from {source_account.name}"
     
-    # Update destination account balance (add) - was pending, now apply
-    dest_account.current_balance += pending_tx.amount
-    pending_tx.balance_after_transaction = dest_account.current_balance
+    # 3. Apply balance updates via queue processor
+    # Source account: debit (subtract)
+    queue_processor.apply_balance_update(db, debit_tx)
+    
+    # Destination account: credit (add)
+    queue_processor.apply_balance_update(db, pending_tx)
+    
+    # 4. Unblock any blocked queue items and auto-process
+    queue_processor.unblock_transaction(db, pending_tx.id)
+    queue_processor.try_process(db, account_id=source_account_id)
+    queue_processor.try_process(db, account_id=pending_tx.account_id)
     
     db.commit()
     db.refresh(pending_tx)
@@ -783,6 +787,29 @@ def get_pending_transactions(db: Session = Depends(get_db)):
         models.Transaction.status == "pending_action"
     ).order_by(models.Transaction.timestamp.desc()).all()
     return pending
+
+@app.get("/queue/status")
+def get_queue_status(db: Session = Depends(get_db)):
+    """Get current transaction queue status"""
+    return queue_processor.get_queue_status(db)
+
+@app.get("/queue/blocked")
+def get_blocked_transactions(db: Session = Depends(get_db)):
+    """Get all blocked transactions requiring resolution"""
+    return queue_processor.get_blocked_transactions(db)
+
+@app.post("/queue/process")
+def process_queue(
+    account_id: Optional[str] = None,
+    credit_card_id: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Manually trigger queue processing"""
+    processed = queue_processor.try_process(db, account_id=account_id, credit_card_id=credit_card_id)
+    return {
+        "processed_count": len(processed),
+        "transactions": [{"id": tx.id, "amount": tx.amount, "merchant": tx.merchant} for tx in processed]
+    }
 
 # --- Analysis Endpoints ---
 @app.get("/analysis/allocation", response_model=analysis_schema.AllocationResponse)
@@ -1230,12 +1257,8 @@ def assign_account_to_pending_tx(
         tx.account_id = account_id
         tx.status = "completed"
         
-        # Update account balance
-        if tx.type == "credit":
-            account.current_balance += tx.amount
-        else:
-            account.current_balance -= tx.amount
-        tx.balance_after_transaction = account.current_balance
+        # Update account balance via queue processor
+        queue_processor.apply_balance_update(db, tx)
         
     elif credit_card_id:
         cc = crud.get_credit_card(db, credit_card_id)
@@ -1245,14 +1268,17 @@ def assign_account_to_pending_tx(
         tx.credit_card_id = credit_card_id
         tx.status = "completed"
         
-        # Update credit card balance
-        if tx.type == "credit":
-            cc.current_balance -= tx.amount  # Payment reduces debt
-        else:
-            cc.current_balance += tx.amount  # Purchase increases debt
-        tx.balance_after_transaction = cc.current_balance
+        # Update credit card balance via queue processor
+        queue_processor.apply_balance_update(db, tx)
     else:
         raise HTTPException(status_code=400, detail="Either account_id or credit_card_id required")
+    
+    # Unblock any blocked queue items and auto-process
+    queue_processor.unblock_transaction(db, tx.id)
+    if account_id:
+        queue_processor.try_process(db, account_id=account_id)
+    elif credit_card_id:
+        queue_processor.try_process(db, credit_card_id=credit_card_id)
     
     db.commit()
     db.refresh(tx)

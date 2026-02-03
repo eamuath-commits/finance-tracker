@@ -304,3 +304,29 @@ class DistributionTransaction(Base):
     # Relationships
     distribution = relationship("Distribution", backref="linked_transactions")
     transaction = relationship("Transaction", backref="distribution_links")
+
+
+class QueueStatus(enum.Enum):
+    QUEUED = "queued"      # Waiting to be processed
+    BLOCKED = "blocked"    # Blocked by pending item
+    PROCESSED = "processed"  # Balance has been updated
+
+
+class TransactionQueue(Base):
+    """Queue for transaction processing to ensure balance consistency"""
+    __tablename__ = "transaction_queue"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    transaction_id = Column(String, ForeignKey("transactions.id", ondelete="CASCADE"), nullable=False)
+    account_id = Column(String, ForeignKey("accounts.id"), nullable=True)
+    credit_card_id = Column(String, ForeignKey("credit_cards.id"), nullable=True)
+    status = Column(String, default="queued")  # queued, blocked, processed
+    queued_at = Column(DateTime, default=datetime.now)
+    processed_at = Column(DateTime, nullable=True)
+    blocked_reason = Column(String, nullable=True)
+    
+    # Relationships
+    transaction = relationship("Transaction", backref="queue_entry")
+    account = relationship("Account")
+    credit_card = relationship("CreditCard")
+

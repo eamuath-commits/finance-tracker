@@ -5627,3 +5627,10 @@ By:9365;mada-Apple ...
 2026-02-02 18:36:09,673 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 1505, Account: Expense
 2026-02-02 18:36:09,675 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
 2026-02-02 18:36:09,681 - sms_agent - INFO - Saved training example for: HUNGERSTA
+2026-02-03 06:17:23,730 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-03 06:17:47,852 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-03 06:19:43,404 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-03 06:20:04,632 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-03 06:20:26,599 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-03 06:20:46,511 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-03 06:20:57,598 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
