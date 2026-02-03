@@ -937,7 +937,7 @@ async def retry_message(message_id: str, db: Session = Depends(get_db)):
 
     # 2. Find Account logic (Unified) - Match sms_agent logic
     # For debits: source comes first. For credits: check destination first.
-    tx_type = result.get("transaction_type", "").lower()
+    tx_type = (result.get("transaction_type") or "").lower()
     
     if tx_type == "credit":
         last_4 = result.get("destination_account_last4") or result.get("source_account_last4")
@@ -1192,7 +1192,7 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
 
     # For DEBIT: money LEAVES your account, so source is YOUR account
     # For CREDIT: money ENTERS your account, so destination is YOUR account
-    tx_type = result.get("transaction_type", "debit").lower()
+    tx_type = (result.get("transaction_type") or "debit").lower()
     
     if tx_type == "debit":
         # For debits, prioritize source account (where money leaves)
@@ -1219,7 +1219,7 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
     if not account and not credit_card:
         # Create pending_action transaction
         import json as json_lib
-        tx_type = result.get("transaction_type", "debit")
+        tx_type = result.get("transaction_type") or "debit"
         
         pending_tx = models.Transaction(
             account_id=None,

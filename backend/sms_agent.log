@@ -6668,3 +6668,97 @@ By:9365;mada-Apple ...
 2026-02-03 17:12:22,680 - sms_agent - INFO - Saved training example for: HUNGERSTA
 2026-02-03 17:12:24,642 - sms_agent - INFO - 📊 Token Usage - Input: 5135, Output: 221, Total: 5356
 2026-02-03 17:12:26,510 - sms_agent - INFO - 📊 Token Usage - Input: 5138, Output: 195, Total: 5333
+2026-02-03 19:49:13,210 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-03 19:50:09,084 - sms_agent - INFO - 📊 Token Usage - Input: 5156, Output: 208, Total: 5364
+2026-02-03 19:50:09,094 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 09:50:58
+2026-02-03 19:50:09,097 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Payroll
+2026-02-03 19:50:09,106 - sms_agent - INFO - Saved training example for: DELL TECHNOLOGIES SINGLE LLC
+2026-02-03 19:50:10,754 - sms_agent - INFO - 📊 Token Usage - Input: 5127, Output: 195, Total: 5322
+2026-02-03 19:50:10,765 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 10:55:18
+2026-02-03 19:50:10,765 - sms_agent - INFO - Converted 9.77 AED to 9.97 SAR using rate 1.02
+2026-02-03 19:50:10,768 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-03 19:50:10,773 - sms_agent - INFO - Saved training example for: Credit Card Payment
+2026-02-03 19:50:12,271 - sms_agent - INFO - 📊 Token Usage - Input: 5126, Output: 156, Total: 5282
+2026-02-03 19:50:12,278 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 10:55:40
+2026-02-03 19:50:12,278 - sms_agent - INFO - Converted 10 AED to 10.2 SAR using rate 1.02
+2026-02-03 19:50:12,280 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-03 19:50:12,286 - sms_agent - INFO - Saved training example for: Credit Card Payment
+2026-02-03 19:50:14,055 - sms_agent - INFO - 📊 Token Usage - Input: 5129, Output: 208, Total: 5337
+2026-02-03 19:50:14,058 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 12:47:07
+2026-02-03 19:50:14,059 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-03 19:50:14,065 - sms_agent - INFO - Saved training example for: Refund from credit card to account
+2026-02-03 19:50:16,061 - sms_agent - INFO - 📊 Token Usage - Input: 5146, Output: 219, Total: 5365
+2026-02-03 19:50:16,066 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 17:05:01
+2026-02-03 19:50:16,069 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Payroll
+2026-02-03 19:50:16,074 - sms_agent - INFO - Saved training example for: MUATH ALASIRI
+2026-02-03 19:50:17,579 - sms_agent - INFO - 📊 Token Usage - Input: 5122, Output: 199, Total: 5321
+2026-02-03 19:50:17,583 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 17:47:25
+2026-02-03 19:50:17,586 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=Liability
+2026-02-03 19:50:17,586 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to Liability
+2026-02-03 19:50:17,591 - sms_agent - INFO - DEBUG: Created transaction 065f8376-a7a4-4705-9270-ec6d1f018536 with status pending_action
+2026-02-03 19:50:29,365 - sms_agent - INFO - 📊 Token Usage - Input: 5121, Output: 193, Total: 5314
+2026-02-03 19:50:29,371 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 17:48:38
+2026-02-03 19:50:29,374 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=Auto Lease
+2026-02-03 19:50:29,374 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to Auto Lease
+2026-02-03 19:50:29,379 - sms_agent - INFO - DEBUG: Created transaction 4a929cd4-fb99-4f2a-b535-c6528bcf1b38 with status pending_action
+2026-02-03 19:50:37,549 - sms_agent - INFO - 📊 Token Usage - Input: 5119, Output: 183, Total: 5302
+2026-02-03 19:50:37,552 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 17:49:51
+2026-02-03 19:50:37,555 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=Expense
+2026-02-03 19:50:37,555 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to Expense
+2026-02-03 19:50:37,559 - sms_agent - INFO - DEBUG: Created transaction 7e2ee8b3-1701-464a-a0f6-665875b6531f with status pending_action
+2026-02-03 19:50:47,766 - sms_agent - INFO - 📊 Token Usage - Input: 5148, Output: 197, Total: 5345
+2026-02-03 19:50:47,777 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 17:51:06
+2026-02-03 19:50:47,780 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Payroll
+2026-02-03 19:50:47,781 - sms_agent - INFO - Cross-bank transfer detected (completed): Payroll -> Jazira Checking
+2026-02-03 19:50:47,791 - sms_agent - INFO - Saved training example for: Transfer to Jazira Checking
+2026-02-03 19:50:49,926 - sms_agent - INFO - 📊 Token Usage - Input: 5132, Output: 227, Total: 5359
+2026-02-03 19:50:49,935 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 19:18:14
+2026-02-03 19:50:49,938 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Liability
+2026-02-03 19:50:49,939 - sms_agent - INFO - Cross-bank transfer detected (completed): Liability -> Grocery
+2026-02-03 19:50:49,943 - sms_agent - INFO - Saved training example for: Transfer to Grocery
+2026-02-03 19:50:51,600 - sms_agent - INFO - 📊 Token Usage - Input: 5139, Output: 191, Total: 5330
+2026-02-03 19:50:51,607 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 20:48:19
+2026-02-03 19:50:51,608 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Auto Lease
+2026-02-03 19:50:51,613 - sms_agent - INFO - Saved training example for: Loan Instalment Payment
+2026-02-03 19:50:53,084 - sms_agent - INFO - 📊 Token Usage - Input: 5138, Output: 166, Total: 5304
+2026-02-03 19:50:53,090 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 21:30:42
+2026-02-03 19:50:53,092 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=General
+2026-02-03 19:50:53,103 - sms_agent - INFO - Saved training example for: RASHA AMER ALASIRI
+2026-02-03 19:50:54,800 - sms_agent - INFO - 📊 Token Usage - Input: 5124, Output: 200, Total: 5324
+2026-02-03 19:50:54,807 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 23:21:46
+2026-02-03 19:50:54,809 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-03 19:50:54,815 - sms_agent - INFO - Saved training example for: BARBER HA
+2026-02-03 19:50:56,561 - sms_agent - INFO - 📊 Token Usage - Input: 5129, Output: 203, Total: 5332
+2026-02-03 19:50:56,567 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 23:26:37
+2026-02-03 19:50:56,568 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-03 19:50:56,574 - sms_agent - INFO - Saved training example for: ADAM PHAR
+2026-02-03 19:50:58,275 - sms_agent - INFO - 📊 Token Usage - Input: 5129, Output: 204, Total: 5333
+2026-02-03 19:50:58,284 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 23:34:24
+2026-02-03 19:50:58,286 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-03 19:50:58,290 - sms_agent - INFO - Saved training example for: MEED Jawh
+2026-02-03 19:51:00,253 - sms_agent - INFO - 📊 Token Usage - Input: 5128, Output: 204, Total: 5332
+2026-02-03 19:51:00,261 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 23:36:09
+2026-02-03 19:51:00,262 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-03 19:51:00,267 - sms_agent - INFO - Saved training example for: PETROMIN F
+2026-02-03 19:51:02,028 - sms_agent - INFO - 📊 Token Usage - Input: 5134, Output: 205, Total: 5339
+2026-02-03 19:51:02,034 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 01:11:42
+2026-02-03 19:51:02,035 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-03 19:51:02,041 - sms_agent - INFO - Saved training example for: HUNGERSTA
+2026-02-03 19:51:04,245 - sms_agent - INFO - 📊 Token Usage - Input: 5135, Output: 221, Total: 5356
+2026-02-03 19:51:06,316 - sms_agent - INFO - 📊 Token Usage - Input: 5138, Output: 205, Total: 5343
+2026-02-03 19:51:20,131 - sms_agent - INFO - 📊 Token Usage - Input: 5131, Output: 221, Total: 5352
+2026-02-03 19:51:20,137 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 15:03:42
+2026-02-03 19:51:20,139 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-03 19:51:20,144 - sms_agent - INFO - Saved training example for: MOHAMMED ISLAM
+2026-02-03 19:51:22,403 - sms_agent - INFO - 📊 Token Usage - Input: 5132, Output: 199, Total: 5331
+2026-02-03 19:51:22,409 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 16:23:13
+2026-02-03 19:51:22,410 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-03 19:51:22,415 - sms_agent - INFO - Saved training example for: Yazysa
+2026-02-03 19:51:25,227 - sms_agent - INFO - 📊 Token Usage - Input: 5131, Output: 221, Total: 5352
+2026-02-03 19:51:25,233 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 17:22:54
+2026-02-03 19:51:25,235 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-03 19:51:25,241 - sms_agent - INFO - Saved training example for: SABAH ABDULLAH
+2026-02-03 19:51:27,350 - sms_agent - INFO - 📊 Token Usage - Input: 5115, Output: 233, Total: 5348
+2026-02-03 19:54:31,956 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-03 19:55:01,074 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-03 19:55:15,689 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
