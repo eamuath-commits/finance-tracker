@@ -848,6 +848,57 @@ def delete_transaction(db: Session, transaction_id: str):
         models.TransactionQueue.transaction_id == transaction_id
     ).delete()
     
+    # INTERNAL TRANSFER CLEANUP: Delete corresponding credit leg
+    # If this is a debit transfer, find and delete the matching credit leg
+    if db_tx.category == "Transfer" and str(db_tx.type).lower() == "debit":
+        # Find credit leg by matching timestamp, amount, and category
+        credit_leg = db.query(models.Transaction).filter(
+            models.Transaction.id != transaction_id,  # Not the same transaction
+            models.Transaction.amount == db_tx.amount,
+            models.Transaction.category == "Transfer",
+            models.Transaction.type == "credit",
+            models.Transaction.timestamp == db_tx.timestamp
+        ).first()
+        
+        if credit_leg:
+            logger.info(f"[DELETE_TX] Found credit leg on account {credit_leg.account_id}, deleting...")
+            # Revert credit leg balance
+            if credit_leg.account:
+                credit_leg.account.current_balance -= credit_leg.amount
+                db.add(credit_leg.account)
+                logger.info(f"[DELETE_TX] Reverted credit leg balance: {credit_leg.account.name} -= {credit_leg.amount}")
+            # Delete queue entry for credit leg
+            db.query(models.TransactionQueue).filter(
+                models.TransactionQueue.transaction_id == credit_leg.id
+            ).delete()
+            db.delete(credit_leg)
+    
+    # Also check if THIS is a credit leg, and clean up the debit leg
+    if db_tx.category == "Transfer" and str(db_tx.type).lower() == "credit":
+        # Find debit leg by matching timestamp, amount, and category
+        debit_leg = db.query(models.Transaction).filter(
+            models.Transaction.id != transaction_id,
+            models.Transaction.amount == db_tx.amount,
+            models.Transaction.category == "Transfer",
+            models.Transaction.type == "debit",
+            models.Transaction.timestamp == db_tx.timestamp
+        ).first()
+        
+        if debit_leg:
+            logger.info(f"[DELETE_TX] Found debit leg on account {debit_leg.account_id}, deleting...")
+            # Revert debit leg balance
+            if debit_leg.account:
+                debit_leg.account.current_balance += debit_leg.amount
+                if debit_leg.fees:
+                    debit_leg.account.current_balance += debit_leg.fees
+                db.add(debit_leg.account)
+                logger.info(f"[DELETE_TX] Reverted debit leg balance: {debit_leg.account.name} += {debit_leg.amount}")
+            # Delete queue entry for debit leg
+            db.query(models.TransactionQueue).filter(
+                models.TransactionQueue.transaction_id == debit_leg.id
+            ).delete()
+            db.delete(debit_leg)
+
     logger.info(f"[DELETE_TX] Found tx: type={db_tx.type}, amount={db_tx.amount}, account_id={db_tx.account_id}, cc_id={db_tx.credit_card_id}")
     
     # Revert Account balance change
