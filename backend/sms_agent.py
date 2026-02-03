@@ -1050,6 +1050,41 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
     
     tx = crud.create_transaction(db, transaction_data)
     
+    # --- 5b. AUTO-LINK: CC 7868 Payments → Expense Account ---
+    # When Credit Card 7868 receives a payment (credit), auto-create debit on Expense account
+    if source_credit_card and source_credit_card.last_4_digits == "7868":
+        if tx_type_str == "credit" and sub_type in ['payment', 'cc_payment', 'credit_card_payment']:
+            # Find Expense account
+            expense_account = db.query(models.Account).filter(
+                models.Account.name.ilike("%expense%")
+            ).first()
+            
+            if expense_account:
+                logger.info(f"Auto-linking CC 7868 payment: Creating debit on Expense account for {sar_amount} SAR")
+                
+                # Create corresponding debit transaction on Expense account
+                debit_data = schemas.TransactionCreate(
+                    account_id=expense_account.id,
+                    credit_card_id=None,
+                    amount=sar_amount,
+                    original_amount=original_amount,
+                    original_currency=original_currency,
+                    exchange_rate=exchange_rate if original_currency != 'SAR' else None,
+                    merchant=f"CC Payment to {source_credit_card.name}",
+                    raw_sms_content=msg_text,
+                    parsed_data=json.dumps(result),
+                    timestamp=tx_timestamp,
+                    category="Credit Card Payment",
+                    type="debit",
+                    status="completed",
+                    fees=0.0,
+                    source=source
+                )
+                debit_tx = crud.create_transaction(db, debit_data)
+                logger.info(f"Auto-created debit transaction {debit_tx.id} on Expense account")
+            else:
+                logger.warning("CC 7868 payment detected but no Expense account found for auto-linking")
+    
     # --- 6. Save as Training Example (Learn from Success) ---
     try:
         crud.create_training_example(db, msg_text, result)
