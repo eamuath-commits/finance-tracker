@@ -248,6 +248,55 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
         }
     };
 
+    // Ignore a pending/blocked SMS and continue processing
+    const handleIgnore = async (resultId, transactionId) => {
+        // If there's a transaction in the database, delete it
+        if (transactionId) {
+            try {
+                await axios.delete(`${API_URL}/transactions/${transactionId}`);
+            } catch (err) {
+                console.log("Transaction may not exist:", err.message);
+            }
+        }
+
+        // Mark item as ignored in results
+        setResults(prev => prev.map(r => {
+            if (r.id === resultId || r.result?.transaction_id === transactionId) {
+                return {
+                    ...r,
+                    status: "ignored",
+                    result: {
+                        ...r.result,
+                        status: "ignored",
+                        reason: "Skipped by user",
+                        steps: [...(r.result?.steps || []), { time: new Date().toLocaleTimeString(), action: "Ignored", detail: "Skipped by user" }]
+                    }
+                };
+            }
+            return r;
+        }));
+
+        // Also check processingQueue
+        setProcessingQueue(prev => prev.map(item => {
+            if (item.id === resultId || item.result?.transaction_id === transactionId) {
+                return {
+                    ...item,
+                    status: "ignored",
+                    result: {
+                        ...item.result,
+                        status: "ignored",
+                        reason: "Skipped by user",
+                        steps: [...(item.result?.steps || item.steps || []), { time: new Date().toLocaleTimeString(), action: "Ignored", detail: "Skipped by user" }]
+                    }
+                };
+            }
+            return item;
+        }));
+
+        // Resume processing waiting items
+        setTimeout(() => resumeWaitingItems(), 300);
+    };
+
     // Resume processing waiting SMS items (called after pending_action is resolved)
     const resumeWaitingItems = async () => {
         // Get waiting items from results (they were moved there when processing stopped)
@@ -567,6 +616,7 @@ AlRajhiBank —— Credit Transfer Internal | Amount:SAR 5000 | To:7772"
                                 getStatusIcon={getStatusIcon}
                                 getStatusBadge={getStatusBadge}
                                 onAccountSelect={handleAccountSelect}
+                                onIgnore={handleIgnore}
                                 accounts={accounts}
                             />
                         ))}
@@ -580,6 +630,7 @@ AlRajhiBank —— Credit Transfer Internal | Amount:SAR 5000 | To:7772"
                                 getStatusIcon={getStatusIcon}
                                 getStatusBadge={getStatusBadge}
                                 onAccountSelect={handleAccountSelect}
+                                onIgnore={handleIgnore}
                                 accounts={accounts}
                             />
                         ))}
@@ -591,7 +642,7 @@ AlRajhiBank —— Credit Transfer Internal | Amount:SAR 5000 | To:7772"
 };
 
 // Individual SMS Row Component with expandable details
-const SMSRow = ({ item, index, isExpanded, onToggle, getStatusIcon, getStatusBadge, onAccountSelect, accounts }) => {
+const SMSRow = ({ item, index, isExpanded, onToggle, getStatusIcon, getStatusBadge, onAccountSelect, onIgnore, accounts }) => {
     const r = item.result || {};
     const tx = r.transaction;
     const status = r.status || item.status;
@@ -629,9 +680,9 @@ const SMSRow = ({ item, index, isExpanded, onToggle, getStatusIcon, getStatusBad
                         <span className="text-gray-400 font-mono">{parsed.amount}</span>
                     ) : "-"}
                 </div>
-                <div className="min-w-[150px]">
+                <div className="min-w-[180px]">
                     {status === "pending_action" && r.accounts ? (
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1 items-center">
                             {r.accounts.slice(0, 2).map(acc => (
                                 <button
                                     type="button"
@@ -642,6 +693,14 @@ const SMSRow = ({ item, index, isExpanded, onToggle, getStatusIcon, getStatusBad
                                     {acc.name.length > 10 ? acc.name.substring(0, 10) + "..." : acc.name}
                                 </button>
                             ))}
+                            <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); onIgnore(item.id, r.transaction_id); }}
+                                className="px-2 py-1 bg-gray-600 hover:bg-gray-500 text-gray-200 text-xs rounded border border-gray-500 transition"
+                                title="Skip this SMS"
+                            >
+                                Skip
+                            </button>
                         </div>
                     ) : tx?.account_name ? (
                         <span className="text-gray-400 text-sm">{tx.account_name}</span>
