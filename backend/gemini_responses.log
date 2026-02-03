@@ -12052,3 +12052,42 @@ To:Muath Alasiri
 To:8001
 Fees:SAR 2.88
 26/1/25 17:51 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "transfer", "source_bank": "Jazira Bank", "destination_bank": "AlRajhiBank", "source_account_last4": "3264", "destination_account_last4": "8001", "amount": 58430.24, "currency": "SAR", "fees": 2.88, "timestamp": "2025-01-26 17:51", "available_balance": null, "beneficiary": "Muath Alasiri", "merchant": null, "sender_name": null, "category": "Transfer", "description": "Transfer to Muath Alasiri"}
+2026-02-03 16:12:12,037 - ai_raw_io - INFO - INPUT: 2026-01-25 23:21:46 from AlRajhiBank
+
+PoS
+By:9365;mada-Apple Pay
+Amount:SAR 50
+At:BARBER HA
+26/1/26 23:21 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 50, "currency": "SAR", "fees": null, "timestamp": "2026-01-26 23:21", "available_balance": null, "beneficiary": null, "merchant": "BARBER HA", "sender_name": null, "category": "Personal Care", "description": "Purchase at BARBER HA"}
+2026-02-03 16:12:14,208 - ai_raw_io - INFO - INPUT: 2026-01-25 23:26:37 from AlRajhiBank
+
+PoS
+By:9365;mada-Apple Pay
+Amount:SAR 152.30
+At:ADAM PHAR
+26/1/26 23:26 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 152.3, "currency": "SAR", "fees": null, "timestamp": "2026-01-26 23:26", "available_balance": null, "beneficiary": null, "merchant": "ADAM PHAR", "sender_name": null, "category": null, "description": "Purchase at ADAM PHAR"}
+2026-02-03 16:12:16,314 - ai_raw_io - INFO - INPUT: 2026-01-25 23:34:24 from AlRajhiBank
+
+PoS
+By:9365;mada-Apple Pay
+Amount:SAR 463.95
+At:MEED Jawh
+26/1/26 23:34 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "9365", "card_info": "mada-Apple Pay 9365", "amount": 463.95, "currency": "SAR", "fees": null, "timestamp": "2026-01-26 23:34", "available_balance": null, "beneficiary": null, "merchant": "MEED Jawh", "sender_name": null, "category": null, "description": "Purchase at MEED Jawh"}
+2026-02-03 16:19:35,502 - ai_raw_io - INFO - INPUT: 2026-01-25 17:51:06 from AlRajhiBank || OUTPUT: {"is_financial_event": false, "is_transaction": false, "transaction_type": null, "sub_type": null, "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": null, "destination_account_last4": null, "card_info": null, "amount": null, "currency": null, "fees": null, "timestamp": "2026-01-25 17:51", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": null}
+2026-02-03 16:19:37,999 - ai_raw_io - INFO - INPUT: Debit Transfer Local
+Bank:BJAZ
+From:3264
+Amount:SAR 58430.24
+To:Muath Alasiri
+To:8001
+Fees:SAR 2.88
+26/1/25 17:51 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "transfer", "source_bank": "Jazira Bank", "destination_bank": null, "source_account_last4": "3264", "destination_account_last4": "8001", "card_info": null, "amount": 58430.24, "currency": "SAR", "fees": 2.88, "timestamp": "2025-01-26 17:51", "available_balance": null, "beneficiary": "Muath Alasiri", "merchant": null, "sender_name": null, "category": "Transfer", "description": "Transfer to Muath Alasiri"}
+2026-02-03 16:20:22,012 - ai_raw_io - INFO - INPUT: 2026-01-25 17:51:06 from AlRajhiBank || OUTPUT: {"is_financial_event": false, "is_transaction": false, "transaction_type": null, "sub_type": null, "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": null, "destination_account_last4": null, "card_info": null, "amount": null, "currency": null, "fees": null, "timestamp": "2026-01-25 17:51", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": null}
+2026-02-03 16:20:24,242 - ai_raw_io - INFO - INPUT: Debit Transfer Local
+Bank:BJAZ
+From:3264
+Amount:SAR 58430.24
+To:Muath Alasiri
+To:8001
+Fees:SAR 2.88
+26/1/25 17:51 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "transfer", "source_bank": "BJAZ", "destination_bank": "AlRajhiBank", "source_account_last4": "8001", "destination_account_last4": "8001", "amount": 58430.24, "currency": "SAR", "fees": 2.88, "timestamp": "2025-01-26 17:51", "beneficiary": "Muath Alasiri", "category": "Transfer", "description": "Transfer to Muath Alasiri"}

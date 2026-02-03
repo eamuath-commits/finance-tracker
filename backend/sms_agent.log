@@ -6332,3 +6332,26 @@ By:9365;mada-Apple ...
 2026-02-03 11:38:51,102 - sms_agent - INFO - Saved training example for: Transfer to Jazira Checking
 2026-02-03 16:10:51,765 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-02-03 16:11:13,448 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-03 16:12:12,036 - sms_agent - INFO - 📊 Token Usage - Input: 5124, Output: 200, Total: 5324
+2026-02-03 16:12:12,049 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 23:21:46
+2026-02-03 16:12:12,051 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-03 16:12:12,060 - sms_agent - INFO - Saved training example for: BARBER HA
+2026-02-03 16:12:14,207 - sms_agent - INFO - 📊 Token Usage - Input: 5129, Output: 203, Total: 5332
+2026-02-03 16:12:14,213 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 23:26:37
+2026-02-03 16:12:14,214 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-03 16:12:14,220 - sms_agent - INFO - Saved training example for: ADAM PHAR
+2026-02-03 16:12:16,313 - sms_agent - INFO - 📊 Token Usage - Input: 5129, Output: 204, Total: 5333
+2026-02-03 16:12:16,321 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 23:34:24
+2026-02-03 16:12:16,322 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-03 16:12:16,327 - sms_agent - INFO - Saved training example for: MEED Jawh
+2026-02-03 16:19:35,501 - sms_agent - INFO - 📊 Token Usage - Input: 5082, Output: 191, Total: 5273
+2026-02-03 16:19:37,997 - sms_agent - INFO - 📊 Token Usage - Input: 5123, Output: 227, Total: 5350
+2026-02-03 16:19:38,010 - sms_agent - WARNING - Past year detected (2025), correcting to 2026
+2026-02-03 16:19:38,010 - sms_agent - INFO - Using SMS timestamp for WebUI: 2026-01-26 17:51:00
+2026-02-03 16:19:38,013 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Payroll
+2026-02-03 16:19:38,014 - sms_agent - INFO - Cross-bank transfer detected (completed): Payroll -> Jazira Checking
+2026-02-03 16:19:38,023 - sms_agent - INFO - Saved training example for: Transfer to Jazira Checking
+2026-02-03 16:20:22,010 - sms_agent - INFO - 📊 Token Usage - Input: 5082, Output: 191, Total: 5273
+2026-02-03 16:20:24,241 - sms_agent - INFO - 📊 Token Usage - Input: 5123, Output: 195, Total: 5318
+2026-02-03 16:23:39,111 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-03 16:23:50,815 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).

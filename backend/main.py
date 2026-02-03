@@ -1124,6 +1124,14 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
         db.commit()
         return {"status": "ignored", "reason": reason}
 
+    # 3b. Fallback: Extract source_bank from SMS header if not parsed by AI
+    # Pattern: "YYYY-MM-DD HH:MM:SS from BankName"
+    if not result.get("source_bank"):
+        import re
+        header_match = re.search(r'\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+from\s+(\S+)', payload.body, re.IGNORECASE)
+        if header_match:
+            result["source_bank"] = header_match.group(1)
+            logger.info(f"[SMS-INGEST] Extracted source_bank from header: {result['source_bank']}")
     
     # Check for Declines
     if result.get("status") == "failed" or result.get("sub_type") == "decline":

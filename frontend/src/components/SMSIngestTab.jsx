@@ -44,10 +44,22 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
     // }, [results]);
 
     const parseSMSMessages = (text) => {
+        // If explicit separator exists, use it
         if (text.includes('----')) {
             return text.split(/\n-{4,}\n/).map(s => s.trim()).filter(s => s.length > 0);
         }
-        return text.split(/\n\s*\n/).map(s => s.trim()).filter(s => s.length > 0);
+
+        // Split on timestamp headers (YYYY-MM-DD HH:MM:SS from BankName)
+        // Each timestamp starts a new SMS, but keep timestamp with its body
+        const timestampPattern = /(?=\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+from\s+)/i;
+        const messages = text.split(timestampPattern).map(s => s.trim()).filter(s => s.length > 0);
+
+        // If no timestamp pattern found, fall back to double-newline split
+        if (messages.length <= 1 && text.includes('\n\n')) {
+            return text.split(/\n\s*\n/).map(s => s.trim()).filter(s => s.length > 0);
+        }
+
+        return messages;
     };
 
     const toggleExpand = (id) => {
