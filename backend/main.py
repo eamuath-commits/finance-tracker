@@ -767,9 +767,10 @@ def complete_pending_transfer(transaction_id: str, source_account_id: str, db: S
     queue_processor.apply_balance_update(db, pending_tx)
     
     # 4. Unblock any blocked queue items and auto-process
+    # NOTE: Only process source - destination was already credited by apply_balance_update above
     queue_processor.unblock_transaction(db, pending_tx.id)
     queue_processor.try_process(db, account_id=source_account_id)
-    queue_processor.try_process(db, account_id=pending_tx.account_id)
+    # DO NOT call try_process for pending_tx.account_id - we already applied balance update manually
     
     db.commit()
     db.refresh(pending_tx)
