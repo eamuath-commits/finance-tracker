@@ -1,19 +1,47 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { Send, CheckCircle, AlertTriangle, XCircle, Loader2, RefreshCw, Upload, Clock, Ban } from "lucide-react";
+import { Send, CheckCircle, AlertTriangle, XCircle, Loader2, RefreshCw, Upload, Clock, Ban, ChevronDown, ChevronRight, Eye } from "lucide-react";
 import { formatCurrency } from "./UI";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
+const STORAGE_KEY = "sms_ingest_results";
+
 const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated }) => {
     const [smsInput, setSmsInput] = useState("");
-    const [processingQueue, setProcessingQueue] = useState([]); // Array of {sms, status, result}
+    const [processingQueue, setProcessingQueue] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(-1);
     const [agentStatus, setAgentStatus] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
-    const [results, setResults] = useState([]); // Completed results
+    const [results, setResults] = useState([]);
+    const [expandedRows, setExpandedRows] = useState(new Set());
 
-    // Split SMS by separator lines (---- or blank lines for single messages)
+    // Load results from localStorage on mount
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) {
+                    setResults(parsed);
+                }
+            }
+        } catch (e) {
+            console.error("Failed to load saved results:", e);
+        }
+    }, []);
+
+    // Save results to localStorage whenever they change
+    useEffect(() => {
+        if (results.length > 0) {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
+            } catch (e) {
+                console.error("Failed to save results:", e);
+            }
+        }
+    }, [results]);
+
     const parseSMSMessages = (text) => {
         if (text.includes('----')) {
             return text.split(/\n-{4,}\n/).map(s => s.trim()).filter(s => s.length > 0);
@@ -21,16 +49,28 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
         return text.split(/\n\s*\n/).map(s => s.trim()).filter(s => s.length > 0);
     };
 
+    const toggleExpand = (id) => {
+        setExpandedRows(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
+    };
+
     const processSMS = async () => {
         const messages = parseSMSMessages(smsInput);
         if (messages.length === 0) return;
 
-        // Initialize queue with all messages as "waiting"
         const initialQueue = messages.map((sms, idx) => ({
             id: Date.now() + idx,
             sms,
             status: "waiting",
-            result: null
+            result: null,
+            steps: [] // Track processing steps
         }));
 
         setProcessingQueue(initialQueue);
@@ -38,53 +78,77 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
         setCurrentIndex(0);
         setSmsInput("");
 
-        // Process each message one by one with live updates
         for (let i = 0; i < messages.length; i++) {
             const msg = messages[i];
+            const itemId = initialQueue[i].id;
 
-            // Update status to "parsing"
+            // Step 1: Starting
             setCurrentIndex(i);
-            setAgentStatus(`Gemini: Parsing SMS ${i + 1} of ${messages.length}...`);
+            const addStep = (step) => {
+                setProcessingQueue(prev => prev.map((item, idx) =>
+                    idx === i ? { ...item, steps: [...item.steps, { time: new Date().toLocaleTimeString(), ...step }] } : item
+                ));
+            };
+
+            addStep({ action: "Starting", detail: "Sending to Gemini AI for parsing..." });
+            setAgentStatus(`🤖 Gemini: Parsing SMS ${i + 1} of ${messages.length}...`);
             setProcessingQueue(prev => prev.map((item, idx) =>
                 idx === i ? { ...item, status: "parsing" } : item
             ));
 
             try {
-                // Small delay to show UI update
                 await new Promise(r => setTimeout(r, 100));
 
-                setAgentStatus(`Gemini: Extracting transaction details...`);
+                addStep({ action: "Extracting", detail: "Gemini extracting transaction details..." });
+                setAgentStatus(`🤖 Gemini: Extracting transaction from SMS ${i + 1}...`);
 
                 const res = await axios.post(`${API_URL}/api/sms/ingest`, {
                     sender: "WebUI",
                     body: msg
                 });
 
-                // Update queue with result
                 const result = {
-                    id: Date.now() + Math.random(),
+                    id: itemId,
                     sms: msg,
                     ...res.data
                 };
 
-                // Handle different statuses
+                // Add parsing result step
+                if (res.data.parsed) {
+                    addStep({
+                        action: "Parsed",
+                        detail: `Type: ${res.data.parsed.type || 'N/A'}, Amount: ${res.data.parsed.amount || 'N/A'}, Merchant: ${res.data.parsed.description || res.data.parsed.merchant || 'N/A'}`
+                    });
+                }
+
                 let finalStatus = res.data.status;
                 if (finalStatus === "pending_action") {
                     result.accounts = res.data.accounts;
                     result.credit_cards = res.data.credit_cards;
                     result.transaction_id = res.data.transaction_id;
+                    addStep({ action: "Pending", detail: "Needs account selection" });
+                } else if (finalStatus === "success") {
+                    addStep({ action: "Created", detail: `Transaction created: ${res.data.transaction?.merchant || 'Transaction'}` });
+                } else if (finalStatus === "ignored") {
+                    addStep({ action: "Ignored", detail: res.data.reason || "Message ignored" });
+                } else if (finalStatus === "blocked") {
+                    addStep({ action: "Blocked", detail: `Queue blocked: ${res.data.blocked_count} pending transaction(s)` });
                 }
 
-                setProcessingQueue(prev => prev.map((item, idx) =>
-                    idx === i ? { ...item, status: finalStatus, result } : item
-                ));
+                // Get final steps before updating
+                let finalSteps = [];
+                setProcessingQueue(prev => {
+                    const item = prev.find((_, idx) => idx === i);
+                    finalSteps = item?.steps || [];
+                    return prev.map((item, idx) =>
+                        idx === i ? { ...item, status: finalStatus, result: { ...result, steps: [...finalSteps, { time: new Date().toLocaleTimeString(), action: "Complete", detail: `Status: ${finalStatus}` }] } } : item
+                    );
+                });
 
-                // If blocked, stop processing
                 if (finalStatus === "blocked") {
                     setAgentStatus(`⚠️ Queue blocked: ${res.data.blocked_count} pending transaction(s) need resolution`);
-                    // Mark remaining as blocked
                     setProcessingQueue(prev => prev.map((item, idx) =>
-                        idx > i ? { ...item, status: "blocked", result: { reason: "Blocked by pending transactions" } } : item
+                        idx > i ? { ...item, status: "blocked", result: { reason: "Blocked by pending transactions", steps: [{ time: new Date().toLocaleTimeString(), action: "Blocked", detail: "Waiting for pending transactions" }] } } : item
                     ));
                     break;
                 }
@@ -97,7 +161,8 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
                         status: "failed",
                         result: {
                             status: "failed",
-                            reason: err.response?.data?.detail || err.message
+                            reason: err.response?.data?.detail || err.message,
+                            steps: [...(item.steps || []), { time: new Date().toLocaleTimeString(), action: "Failed", detail: err.response?.data?.detail || err.message }]
                         }
                     } : item
                 ));
@@ -108,9 +173,9 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
         setAgentStatus("");
         setCurrentIndex(-1);
 
-        // Move completed queue to results
         setProcessingQueue(prev => {
-            setResults(old => [...prev.filter(p => p.result), ...old]);
+            const completed = prev.filter(p => p.result);
+            setResults(old => [...completed, ...old]);
             return [];
         });
 
@@ -120,12 +185,13 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
     };
 
     const handleAccountSelect = async (resultId, accountId, isCreditCard = false) => {
-        const result = results.find(r => r.result?.transaction_id === resultId);
+        const result = results.find(r => r.result?.transaction_id === resultId || r.id === resultId);
         if (!result) return;
 
         try {
+            const txId = result.result?.transaction_id || resultId;
             const params = new URLSearchParams();
-            params.append("transaction_id", resultId);
+            params.append("transaction_id", txId);
             if (isCreditCard) {
                 params.append("credit_card_id", accountId);
             } else {
@@ -135,11 +201,16 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
             const res = await axios.post(`${API_URL}/api/sms/assign-account?${params.toString()}`);
 
             setResults(prev => prev.map(r => {
-                if (r.result?.transaction_id === resultId) {
+                if ((r.result?.transaction_id === txId) || r.id === resultId) {
                     return {
                         ...r,
                         status: "success",
-                        result: { ...r.result, status: "success", transaction: res.data.transaction }
+                        result: {
+                            ...r.result,
+                            status: "success",
+                            transaction: res.data.transaction,
+                            steps: [...(r.result?.steps || []), { time: new Date().toLocaleTimeString(), action: "Assigned", detail: `Account assigned successfully` }]
+                        }
                     };
                 }
                 return r;
@@ -149,6 +220,85 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
         } catch (err) {
             alert(err.response?.data?.detail || "Failed to assign account");
         }
+    };
+
+    const retryBlocked = async () => {
+        const blockedItems = results.filter(r => r.status === 'blocked' || r.result?.status === 'blocked');
+        if (blockedItems.length === 0) return;
+
+        const retryQueue = blockedItems.map((item, idx) => ({
+            id: Date.now() + idx,
+            sms: item.sms,
+            status: "waiting",
+            result: null,
+            steps: [{ time: new Date().toLocaleTimeString(), action: "Retry", detail: "Retrying blocked message..." }]
+        }));
+
+        setResults(prev => prev.filter(r => r.status !== 'blocked' && r.result?.status !== 'blocked'));
+        setProcessingQueue(retryQueue);
+        setIsProcessing(true);
+        setCurrentIndex(0);
+
+        for (let i = 0; i < retryQueue.length; i++) {
+            const msg = retryQueue[i].sms;
+
+            setCurrentIndex(i);
+            setAgentStatus(`🤖 Gemini: Retrying SMS ${i + 1} of ${retryQueue.length}...`);
+            setProcessingQueue(prev => prev.map((item, idx) =>
+                idx === i ? { ...item, status: "parsing", steps: [...item.steps, { time: new Date().toLocaleTimeString(), action: "Parsing", detail: "Sending to Gemini..." }] } : item
+            ));
+
+            try {
+                await new Promise(r => setTimeout(r, 100));
+
+                const res = await axios.post(`${API_URL}/api/sms/ingest`, {
+                    sender: "WebUI",
+                    body: msg
+                });
+
+                const result = { id: Date.now() + Math.random(), sms: msg, ...res.data };
+
+                if (res.data.status === "pending_action") {
+                    result.accounts = res.data.accounts;
+                    result.credit_cards = res.data.credit_cards;
+                    result.transaction_id = res.data.transaction_id;
+                }
+
+                setProcessingQueue(prev => prev.map((item, idx) =>
+                    idx === i ? {
+                        ...item,
+                        status: res.data.status,
+                        result: {
+                            ...result,
+                            steps: [...item.steps, { time: new Date().toLocaleTimeString(), action: "Complete", detail: `Status: ${res.data.status}` }]
+                        }
+                    } : item
+                ));
+
+                if (res.data.status === "blocked") {
+                    setAgentStatus(`⚠️ Still blocked: ${res.data.blocked_count} pending transaction(s)`);
+                    setProcessingQueue(prev => prev.map((item, idx) =>
+                        idx > i ? { ...item, status: "blocked", result: { reason: "Still blocked", steps: [{ time: new Date().toLocaleTimeString(), action: "Blocked", detail: "Still blocked" }] } } : item
+                    ));
+                    break;
+                }
+            } catch (err) {
+                setProcessingQueue(prev => prev.map((item, idx) =>
+                    idx === i ? { ...item, status: "failed", result: { status: "failed", reason: err.response?.data?.detail || err.message } } : item
+                ));
+            }
+        }
+
+        setIsProcessing(false);
+        setAgentStatus("");
+        setCurrentIndex(-1);
+
+        setProcessingQueue(prev => {
+            setResults(old => [...prev.filter(p => p.result), ...old]);
+            return [];
+        });
+
+        if (onTransactionCreated) setTimeout(() => onTransactionCreated(), 200);
     };
 
     const getStatusIcon = (status) => {
@@ -182,88 +332,10 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
     const clearResults = () => {
         setResults([]);
         setProcessingQueue([]);
-    };
-
-    // Retry blocked messages after resolving pending transactions
-    const retryBlocked = async () => {
-        const blockedItems = results.filter(r => r.status === 'blocked' || r.result?.status === 'blocked');
-        if (blockedItems.length === 0) return;
-
-        // Move blocked items back to processing queue
-        const retryQueue = blockedItems.map((item, idx) => ({
-            id: Date.now() + idx,
-            sms: item.sms,
-            status: "waiting",
-            result: null
-        }));
-
-        // Remove blocked items from results
-        setResults(prev => prev.filter(r => r.status !== 'blocked' && r.result?.status !== 'blocked'));
-
-        // Start processing
-        setProcessingQueue(retryQueue);
-        setIsProcessing(true);
-        setCurrentIndex(0);
-
-        // Process each message
-        for (let i = 0; i < retryQueue.length; i++) {
-            const msg = retryQueue[i].sms;
-
-            setCurrentIndex(i);
-            setAgentStatus(`Gemini: Retrying SMS ${i + 1} of ${retryQueue.length}...`);
-            setProcessingQueue(prev => prev.map((item, idx) =>
-                idx === i ? { ...item, status: "parsing" } : item
-            ));
-
-            try {
-                await new Promise(r => setTimeout(r, 100));
-                setAgentStatus(`Gemini: Extracting transaction details...`);
-
-                const res = await axios.post(`${API_URL}/api/sms/ingest`, {
-                    sender: "WebUI",
-                    body: msg
-                });
-
-                const result = { id: Date.now() + Math.random(), sms: msg, ...res.data };
-
-                if (res.data.status === "pending_action") {
-                    result.accounts = res.data.accounts;
-                    result.credit_cards = res.data.credit_cards;
-                    result.transaction_id = res.data.transaction_id;
-                }
-
-                setProcessingQueue(prev => prev.map((item, idx) =>
-                    idx === i ? { ...item, status: res.data.status, result } : item
-                ));
-
-                if (res.data.status === "blocked") {
-                    setAgentStatus(`⚠️ Still blocked: ${res.data.blocked_count} pending transaction(s)`);
-                    setProcessingQueue(prev => prev.map((item, idx) =>
-                        idx > i ? { ...item, status: "blocked", result: { reason: "Still blocked by pending transactions" } } : item
-                    ));
-                    break;
-                }
-            } catch (err) {
-                setProcessingQueue(prev => prev.map((item, idx) =>
-                    idx === i ? { ...item, status: "failed", result: { status: "failed", reason: err.response?.data?.detail || err.message } } : item
-                ));
-            }
-        }
-
-        setIsProcessing(false);
-        setAgentStatus("");
-        setCurrentIndex(-1);
-
-        setProcessingQueue(prev => {
-            setResults(old => [...prev.filter(p => p.result), ...old]);
-            return [];
-        });
-
-        if (onTransactionCreated) setTimeout(() => onTransactionCreated(), 200);
+        localStorage.removeItem(STORAGE_KEY);
     };
 
     const hasBlockedMessages = results.some(r => r.status === 'blocked' || r.result?.status === 'blocked');
-
     const totalMessages = parseSMSMessages(smsInput).length;
     const allItems = [...processingQueue, ...results];
 
@@ -307,32 +379,30 @@ AlRajhiBank —— Credit Transfer Internal | Amount:SAR 5000 | To:7772"
 
             {/* Live Processing Panel */}
             {isProcessing && processingQueue.length > 0 && (
-                <div className="bg-slate-800 rounded-xl border border-blue-500/50 p-4 shadow-lg animate-pulse-slow">
+                <div className="bg-slate-800 rounded-xl border border-blue-500/50 p-4 shadow-lg">
                     <div className="flex justify-between items-center mb-3">
                         <h3 className="text-white font-bold flex items-center gap-2">
                             <Loader2 size={18} className="text-blue-400 animate-spin" />
                             Processing ({currentIndex + 1} of {processingQueue.length})
                         </h3>
-                        {/* Progress bar */}
                         <div className="flex gap-1">
                             {processingQueue.map((item, idx) => (
                                 <div
                                     key={idx}
                                     className={`w-4 h-2 rounded ${item.status === 'success' ? 'bg-emerald-500' :
-                                        item.status === 'failed' ? 'bg-red-500' :
-                                            item.status === 'pending_action' ? 'bg-amber-500' :
-                                                item.status === 'parsing' ? 'bg-blue-500 animate-pulse' :
-                                                    item.status === 'blocked' ? 'bg-orange-500' :
-                                                        'bg-slate-600'
+                                            item.status === 'failed' ? 'bg-red-500' :
+                                                item.status === 'pending_action' ? 'bg-amber-500' :
+                                                    item.status === 'parsing' ? 'bg-blue-500 animate-pulse' :
+                                                        item.status === 'blocked' ? 'bg-orange-500' :
+                                                            'bg-slate-600'
                                         }`}
                                 />
                             ))}
                         </div>
                     </div>
-                    {/* Agent Status */}
                     {agentStatus && (
                         <div className="text-sm text-blue-300 bg-blue-900/30 rounded-lg px-3 py-2 font-mono">
-                            🤖 {agentStatus}
+                            {agentStatus}
                         </div>
                     )}
                 </div>
@@ -344,7 +414,7 @@ AlRajhiBank —— Credit Transfer Internal | Amount:SAR 5000 | To:7772"
                     <div className="p-4 border-b border-slate-700 flex justify-between items-center">
                         <h3 className="text-lg font-bold text-white flex items-center gap-2">
                             <Upload size={20} className="text-emerald-400" />
-                            Processing Results
+                            Processing Results ({allItems.length})
                         </h3>
                         <div className="flex gap-2">
                             {hasBlockedMessages && !isProcessing && (
@@ -366,100 +436,189 @@ AlRajhiBank —— Credit Transfer Internal | Amount:SAR 5000 | To:7772"
                         </div>
                     </div>
 
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead>
-                                <tr className="bg-slate-700/50 text-left text-xs text-gray-400 uppercase tracking-wider">
-                                    <th className="px-4 py-3 w-8">#</th>
-                                    <th className="px-4 py-3">Status</th>
-                                    <th className="px-4 py-3">Description</th>
-                                    <th className="px-4 py-3">Account</th>
-                                    <th className="px-4 py-3 text-right">Amount</th>
-                                    <th className="px-4 py-3">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-700">
-                                {processingQueue.map((item, idx) => (
-                                    <tr key={`q-${idx}`} className={`transition ${item.status === 'parsing' ? 'bg-blue-900/20' : 'hover:bg-slate-700/30'}`}>
-                                        <td className="px-4 py-3 text-gray-500 text-sm">{idx + 1}</td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-2">
-                                                {getStatusIcon(item.status)}
-                                                <span className={getStatusBadge(item.status)}>
-                                                    {item.status?.toUpperCase().replace("_", " ")}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <span className="text-xs text-gray-400 font-mono truncate block max-w-xs">
-                                                {item.sms.length > 60 ? item.sms.substring(0, 60) + "..." : item.sms}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-gray-500">-</td>
-                                        <td className="px-4 py-3 text-right text-gray-500">-</td>
-                                        <td className="px-4 py-3 text-gray-500 text-xs">
-                                            {item.result?.reason || "-"}
-                                        </td>
-                                    </tr>
-                                ))}
-                                {results.map((item, idx) => {
-                                    const r = item.result || {};
-                                    const tx = r.transaction;
-                                    return (
-                                        <tr key={`r-${item.id}`} className="hover:bg-slate-700/30 transition">
-                                            <td className="px-4 py-3 text-gray-500 text-sm">{processingQueue.length + idx + 1}</td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center gap-2">
-                                                    {getStatusIcon(r.status || item.status)}
-                                                    <span className={getStatusBadge(r.status || item.status)}>
-                                                        {(r.status || item.status)?.toUpperCase().replace("_", " ")}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex flex-col">
-                                                    <span className="text-white font-medium">
-                                                        {tx?.merchant || r.parsed?.description || "-"}
-                                                    </span>
-                                                    <span className="text-xs text-gray-500 font-mono truncate max-w-xs">
-                                                        {item.sms.length > 50 ? item.sms.substring(0, 50) + "..." : item.sms}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3 text-gray-400">
-                                                {tx?.account_name || "-"}
-                                            </td>
-                                            <td className="px-4 py-3 text-right">
-                                                {tx ? (
-                                                    <span className={`font-bold ${tx.type === 'credit' ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                        {formatCurrency(tx.amount)}
-                                                    </span>
-                                                ) : "-"}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                {r.status === "pending_action" && r.accounts ? (
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {r.accounts.slice(0, 3).map(acc => (
-                                                            <button
-                                                                type="button"
-                                                                key={acc.id}
-                                                                onClick={() => handleAccountSelect(r.transaction_id, acc.id, false)}
-                                                                className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded border border-slate-600 transition"
-                                                            >
-                                                                {acc.name.length > 8 ? acc.name.substring(0, 8) + "..." : acc.name}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                ) : r.reason ? (
-                                                    <span className="text-xs text-gray-400">{r.reason}</span>
-                                                ) : "-"}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                    {/* SMS Rows with Expandable Details */}
+                    <div className="divide-y divide-slate-700">
+                        {processingQueue.map((item, idx) => (
+                            <SMSRow
+                                key={`q-${item.id}`}
+                                item={item}
+                                index={idx}
+                                isExpanded={expandedRows.has(item.id)}
+                                onToggle={() => toggleExpand(item.id)}
+                                getStatusIcon={getStatusIcon}
+                                getStatusBadge={getStatusBadge}
+                                onAccountSelect={handleAccountSelect}
+                                accounts={accounts}
+                            />
+                        ))}
+                        {results.map((item, idx) => (
+                            <SMSRow
+                                key={`r-${item.id}`}
+                                item={item}
+                                index={processingQueue.length + idx}
+                                isExpanded={expandedRows.has(item.id)}
+                                onToggle={() => toggleExpand(item.id)}
+                                getStatusIcon={getStatusIcon}
+                                getStatusBadge={getStatusBadge}
+                                onAccountSelect={handleAccountSelect}
+                                accounts={accounts}
+                            />
+                        ))}
                     </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Individual SMS Row Component with expandable details
+const SMSRow = ({ item, index, isExpanded, onToggle, getStatusIcon, getStatusBadge, onAccountSelect, accounts }) => {
+    const r = item.result || {};
+    const tx = r.transaction;
+    const status = r.status || item.status;
+    const steps = r.steps || item.steps || [];
+    const parsed = r.parsed;
+
+    return (
+        <div className={`transition ${item.status === 'parsing' ? 'bg-blue-900/20' : 'hover:bg-slate-700/30'}`}>
+            {/* Main Row */}
+            <div className="flex items-center gap-3 px-4 py-3 cursor-pointer" onClick={onToggle}>
+                <button type="button" className="text-gray-400 hover:text-white p-1">
+                    {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                </button>
+                <span className="text-gray-500 text-sm w-6">{index + 1}</span>
+                <div className="flex items-center gap-2 min-w-[120px]">
+                    {getStatusIcon(status)}
+                    <span className={getStatusBadge(status)}>
+                        {status?.toUpperCase().replace("_", " ")}
+                    </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                    <div className="text-white font-medium truncate">
+                        {tx?.merchant || parsed?.description || parsed?.merchant || "Processing..."}
+                    </div>
+                    <div className="text-xs text-gray-500 font-mono truncate">
+                        {item.sms.length > 80 ? item.sms.substring(0, 80) + "..." : item.sms}
+                    </div>
+                </div>
+                <div className="text-right min-w-[100px]">
+                    {tx ? (
+                        <span className={`font-bold ${tx.type === 'credit' ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {formatCurrency(tx.amount)}
+                        </span>
+                    ) : parsed?.amount ? (
+                        <span className="text-gray-400 font-mono">{parsed.amount}</span>
+                    ) : "-"}
+                </div>
+                <div className="min-w-[150px]">
+                    {status === "pending_action" && r.accounts ? (
+                        <div className="flex flex-wrap gap-1">
+                            {r.accounts.slice(0, 2).map(acc => (
+                                <button
+                                    type="button"
+                                    key={acc.id}
+                                    onClick={(e) => { e.stopPropagation(); onAccountSelect(r.transaction_id || item.id, acc.id, false); }}
+                                    className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded border border-slate-600 transition"
+                                >
+                                    {acc.name.length > 10 ? acc.name.substring(0, 10) + "..." : acc.name}
+                                </button>
+                            ))}
+                        </div>
+                    ) : tx?.account_name ? (
+                        <span className="text-gray-400 text-sm">{tx.account_name}</span>
+                    ) : r.reason ? (
+                        <span className="text-xs text-gray-500">{r.reason}</span>
+                    ) : null}
+                </div>
+            </div>
+
+            {/* Expanded Details */}
+            {isExpanded && (
+                <div className="bg-slate-900/50 border-t border-slate-700 px-6 py-4 space-y-4">
+                    {/* Original SMS */}
+                    <div>
+                        <h4 className="text-xs font-bold text-gray-400 uppercase mb-2 flex items-center gap-2">
+                            <Eye size={12} /> Original SMS
+                        </h4>
+                        <pre className="text-xs text-gray-300 bg-black/30 p-3 rounded-lg font-mono whitespace-pre-wrap max-h-32 overflow-y-auto border border-slate-700">
+                            {item.sms}
+                        </pre>
+                    </div>
+
+                    {/* Parsed Data */}
+                    {parsed && (
+                        <div>
+                            <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">🤖 Gemini Parsed Data</h4>
+                            <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                                <div>
+                                    <span className="text-gray-500">Type:</span>
+                                    <span className={`ml-2 font-bold ${parsed.type === 'credit' ? 'text-emerald-400' : 'text-red-400'}`}>
+                                        {parsed.type?.toUpperCase() || 'N/A'}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-500">Amount:</span>
+                                    <span className="ml-2 text-white font-mono">{parsed.amount || 'N/A'}</span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-500">Merchant:</span>
+                                    <span className="ml-2 text-white">{parsed.description || parsed.merchant || 'N/A'}</span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-500">Category:</span>
+                                    <span className="ml-2 text-blue-400">{parsed.category || 'N/A'}</span>
+                                </div>
+                                {parsed.card_last_4 && (
+                                    <div>
+                                        <span className="text-gray-500">Card:</span>
+                                        <span className="ml-2 text-white font-mono">•••• {parsed.card_last_4}</span>
+                                    </div>
+                                )}
+                                {parsed.currency && (
+                                    <div>
+                                        <span className="text-gray-500">Currency:</span>
+                                        <span className="ml-2 text-white">{parsed.currency}</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Processing Steps Timeline */}
+                    {steps.length > 0 && (
+                        <div>
+                            <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">📋 Processing Timeline</h4>
+                            <div className="space-y-1">
+                                {steps.map((step, i) => (
+                                    <div key={i} className="flex items-start gap-2 text-xs">
+                                        <span className="text-gray-600 font-mono w-20 flex-shrink-0">{step.time}</span>
+                                        <span className={`font-bold w-16 flex-shrink-0 ${step.action === 'Complete' ? 'text-emerald-400' :
+                                                step.action === 'Failed' || step.action === 'Blocked' ? 'text-red-400' :
+                                                    step.action === 'Pending' ? 'text-amber-400' :
+                                                        'text-blue-400'
+                                            }`}>{step.action}</span>
+                                        <span className="text-gray-400">{step.detail}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Transaction Result */}
+                    {tx && (
+                        <div>
+                            <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">✅ Created Transaction</h4>
+                            <div className="bg-emerald-900/20 p-3 rounded-lg border border-emerald-800/30 text-xs">
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                    <div><span className="text-gray-500">ID:</span> <span className="text-white font-mono">{tx.id?.substring(0, 8)}...</span></div>
+                                    <div><span className="text-gray-500">Merchant:</span> <span className="text-white">{tx.merchant}</span></div>
+                                    <div><span className="text-gray-500">Amount:</span> <span className={`font-bold ${tx.type === 'credit' ? 'text-emerald-400' : 'text-red-400'}`}>{formatCurrency(tx.amount)}</span></div>
+                                    <div><span className="text-gray-500">Account:</span> <span className="text-white">{tx.account_name || 'N/A'}</span></div>
+                                    <div><span className="text-gray-500">Category:</span> <span className="text-blue-400">{tx.category || 'N/A'}</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
