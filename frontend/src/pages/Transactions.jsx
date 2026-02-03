@@ -123,6 +123,7 @@ function Transactions() {
                     (tx.merchant?.toLowerCase() || '').includes(term) ||
                     (tx.category?.toLowerCase() || '').includes(term) ||
                     (tx.notes?.toLowerCase() || '').includes(term) ||
+                    (tx.raw_sms_content?.toLowerCase() || '').includes(term) ||
                     // Amount search: match exact, partial, or formatted amounts
                     (isNumericSearch && tx.amount?.toString().includes(term.replace(',', ''))) ||
                     tx.amount?.toFixed(2).includes(term.replace(',', ''));
@@ -157,6 +158,20 @@ function Transactions() {
             return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
         });
     }, [transactions, searchTerm, accountFilter, typeFilter, categoryFilter, dateRange, sortOrder]);
+
+    // Calculate totals based on filtered transactions
+    const totals = useMemo(() => {
+        let totalCredit = 0;
+        let totalDebit = 0;
+        filteredTransactions.forEach(tx => {
+            if (isCredit(tx)) {
+                totalCredit += tx.amount || 0;
+            } else {
+                totalDebit += tx.amount || 0;
+            }
+        });
+        return { totalCredit, totalDebit, net: totalCredit - totalDebit };
+    }, [filteredTransactions]);
 
     const handleDeleteTx = async (id) => {
         if (!window.confirm("Are you sure?")) return;
@@ -498,6 +513,27 @@ function Transactions() {
                                 </button>
                             </div>
                         )}
+                    </div>
+
+                    {/* Totals Summary Bar */}
+                    <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 mb-6 flex flex-wrap gap-6 items-center justify-between">
+                        <div className="flex gap-6">
+                            <div className="flex items-center gap-2">
+                                <span className="text-gray-400 text-sm">Credit:</span>
+                                <span className="text-emerald-400 font-bold">+{formatCurrency(totals.totalCredit)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-gray-400 text-sm">Debit:</span>
+                                <span className="text-red-400 font-bold">-{formatCurrency(totals.totalDebit)}</span>
+                            </div>
+                            <div className="flex items-center gap-2 border-l border-slate-600 pl-6">
+                                <span className="text-gray-400 text-sm">Net:</span>
+                                <span className={`font-bold ${totals.net >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                    {totals.net >= 0 ? '+' : ''}{formatCurrency(totals.net)}
+                                </span>
+                            </div>
+                        </div>
+                        <span className="text-gray-500 text-sm">{filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''}</span>
                     </div>
 
                     {/* Pending Transactions Banner - just a simple notification */}
