@@ -6355,3 +6355,19 @@ By:9365;mada-Apple ...
 2026-02-03 16:20:24,241 - sms_agent - INFO - 📊 Token Usage - Input: 5123, Output: 195, Total: 5318
 2026-02-03 16:23:39,111 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-02-03 16:23:50,815 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-03 16:41:02,196 - sms_agent - INFO - 📊 Token Usage - Input: 5148, Output: 197, Total: 5345
+2026-02-03 16:41:02,208 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 17:51:06
+2026-02-03 16:41:02,209 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Payroll
+2026-02-03 16:41:02,210 - sms_agent - INFO - Cross-bank transfer detected (completed): Payroll -> Jazira Checking
+2026-02-03 16:41:02,220 - sms_agent - INFO - Saved training example for: Transfer to Jazira Checking
+2026-02-03 16:41:27,185 - sms_agent - INFO - 📊 Token Usage - Input: 5148, Output: 197, Total: 5345
+2026-02-03 16:41:27,189 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 17:51:06
+2026-02-03 16:41:27,190 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Payroll
+2026-02-03 16:41:27,190 - sms_agent - INFO - Cross-bank transfer detected (completed): Payroll -> Jazira Checking
+2026-02-03 16:41:27,195 - sms_agent - INFO - Saved training example for: Transfer to Jazira Checking
+2026-02-03 16:41:48,297 - sms_agent - INFO - 📊 Token Usage - Input: 5081, Output: 27, Total: 5108
+2026-02-03 16:41:50,550 - sms_agent - INFO - 📊 Token Usage - Input: 5137, Output: 224, Total: 5361
+2026-02-03 16:41:50,560 - sms_agent - INFO - Using SMS timestamp for WebUI: 2026-01-26 10:55:00
+2026-02-03 16:41:50,563 - sms_agent - INFO - Swapping Primary Account for Credit: Liability -> Jazira Checking
+2026-02-03 16:41:50,564 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Jazira Checking
+2026-02-03 16:41:50,576 - sms_agent - INFO - Saved training example for: Transfer from Liability
