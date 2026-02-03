@@ -65,6 +65,22 @@ const getAccountTheme = (type) => {
     }
 };
 
+// Get local logo path based on bank name
+const getLocalLogo = (bankName) => {
+    if (!bankName) return '/banks/bank2.png';
+    const n = bankName.toLowerCase().replace(/\s+/g, '');
+
+    if (n.includes('stc')) return '/banks/stc-logo.png';
+    if (n.includes('rajhi') || n.includes('alrajhi')) return '/banks/alrajhi-logo.png';
+    if (n.includes('jazira') || n.includes('ajb')) return '/banks/jazira-logo.png';
+    if (n.includes('snb') || n.includes('ahli')) return '/banks/snb-logo.png';
+    if (n.includes('riyad')) return '/banks/riyad-logo.png';
+    if (n.includes('samba')) return '/banks/samba-logo.png';
+    if (n.includes('arab') || n.includes('anb')) return '/banks/anb-logo.png';
+
+    return '/banks/bank2.png';
+};
+
 const AccountCard = ({ acc, onEdit = null, onClick = null }) => {
     const theme = getAccountTheme(acc.account_type);
     const bankTheme = getBankCardTheme(acc.bank_name, acc.account_type);
