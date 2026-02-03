@@ -1030,24 +1030,40 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
             "action_required": "Resolve pending transactions before ingesting new SMS"
         }
     
-    # 0c. DUPLICATE CHECK: Skip if exact same SMS body already processed
-    existing_tx = db.query(models.Transaction).filter(
-        models.Transaction.raw_sms_content == payload.body.strip()
-    ).first()
-    if existing_tx:
-        logger.info(f"[SMS-INGEST] Duplicate SMS detected, already processed as transaction {existing_tx.id}")
-        return {
-            "status": "duplicate",
-            "reason": "This SMS has already been processed",
-            "transaction_id": existing_tx.id,
-            "transaction": {
-                "id": existing_tx.id,
-                "merchant": existing_tx.merchant,
-                "amount": existing_tx.amount,
-                "type": str(existing_tx.type),
-                "status": str(existing_tx.status)
+    # 0c. DUPLICATE CHECK: Skip if same SMS body already processed
+    # Normalize the body by extracting core content (skip timestamp/sender headers)
+    body_lines = payload.body.strip().split('\n')
+    # Skip lines that look like headers (contain "from" and bank name)
+    core_lines = []
+    for line in body_lines:
+        line_lower = line.lower().strip()
+        # Skip header lines like "2026-01-25 17:05:01 from AlRajhiBank"
+        if ' from ' in line_lower and ('bank' in line_lower or 'alrajhi' in line_lower or 'stc' in line_lower):
+            continue
+        if line.strip():
+            core_lines.append(line.strip())
+    
+    core_content = '\n'.join(core_lines)
+    
+    # Check for duplicate by core content (use LIKE for partial match)
+    if core_content:
+        existing_tx = db.query(models.Transaction).filter(
+            models.Transaction.raw_sms_content.ilike(f"%{core_content[:100]}%")
+        ).first()
+        if existing_tx:
+            logger.info(f"[SMS-INGEST] Duplicate SMS detected, already processed as transaction {existing_tx.id}")
+            return {
+                "status": "duplicate",
+                "reason": "This SMS has already been processed",
+                "transaction_id": existing_tx.id,
+                "transaction": {
+                    "id": existing_tx.id,
+                    "merchant": existing_tx.merchant,
+                    "amount": existing_tx.amount,
+                    "type": str(existing_tx.type),
+                    "status": str(existing_tx.status)
+                }
             }
-        }
     
     # 1. Create Raw Message record (will be deleted if not a transaction)
     raw_msg = models.RawMessage(

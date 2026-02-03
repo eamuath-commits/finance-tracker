@@ -65,6 +65,10 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
         const messages = parseSMSMessages(smsInput);
         if (messages.length === 0) return;
 
+        // Clear old results when starting a fresh batch
+        setResults([]);
+        localStorage.removeItem(STORAGE_KEY);
+
         const initialQueue = messages.map((sms, idx) => ({
             id: Date.now() + idx,
             sms,
