@@ -1012,6 +1012,17 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
         logger.info(f"[SMS-INGEST] Skipping OTP message")
         return {"status": "ignored", "reason": "OTP/verification message"}
     
+    # 0b. QUEUE CHECK: Block new SMS processing if there are pending transactions
+    queue_status = queue_processor.get_queue_status(db)
+    if queue_status["blocked"] > 0:
+        logger.warning(f"[SMS-INGEST] BLOCKED: {queue_status['blocked']} pending transactions need resolution")
+        return {
+            "status": "blocked",
+            "reason": f"Cannot process new SMS. {queue_status['blocked']} pending transaction(s) need your action first.",
+            "blocked_count": queue_status["blocked"],
+            "action_required": "Resolve pending transactions before ingesting new SMS"
+        }
+    
     # 1. Create Raw Message record (will be deleted if not a transaction)
     raw_msg = models.RawMessage(
         sender=payload.sender,
