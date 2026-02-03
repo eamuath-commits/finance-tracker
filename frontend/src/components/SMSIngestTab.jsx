@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { Send, CheckCircle, AlertTriangle, XCircle, Loader2, RefreshCw, Upload, Clock, Ban, ChevronDown, ChevronRight, Eye } from "lucide-react";
+import { Send, CheckCircle, AlertTriangle, XCircle, Loader2, RefreshCw, Upload, Clock, Ban, ChevronDown, ChevronRight, Eye, Copy } from "lucide-react";
 import { formatCurrency } from "./UI";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
@@ -309,6 +309,7 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
             case "ignored": return <XCircle className="text-gray-400" size={18} />;
             case "failed": return <XCircle className="text-red-400" size={18} />;
             case "blocked": return <Ban className="text-orange-400" size={18} />;
+            case "duplicate": return <Copy className="text-purple-400" size={18} />;
             case "parsing": return <Loader2 className="text-blue-400 animate-spin" size={18} />;
             case "waiting": return <Clock className="text-gray-500" size={18} />;
             default: return <Clock className="text-gray-500" size={18} />;
@@ -323,6 +324,7 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
             ignored: "bg-gray-500/20 text-gray-400 border-gray-500/30",
             failed: "bg-red-500/20 text-red-400 border-red-500/30",
             blocked: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+            duplicate: "bg-purple-500/20 text-purple-400 border-purple-500/30",
             parsing: "bg-blue-500/20 text-blue-400 border-blue-500/30",
             waiting: "bg-slate-500/20 text-slate-400 border-slate-500/30"
         };
@@ -390,11 +392,11 @@ AlRajhiBank —— Credit Transfer Internal | Amount:SAR 5000 | To:7772"
                                 <div
                                     key={idx}
                                     className={`w-4 h-2 rounded ${item.status === 'success' ? 'bg-emerald-500' :
-                                            item.status === 'failed' ? 'bg-red-500' :
-                                                item.status === 'pending_action' ? 'bg-amber-500' :
-                                                    item.status === 'parsing' ? 'bg-blue-500 animate-pulse' :
-                                                        item.status === 'blocked' ? 'bg-orange-500' :
-                                                            'bg-slate-600'
+                                        item.status === 'failed' ? 'bg-red-500' :
+                                            item.status === 'pending_action' ? 'bg-amber-500' :
+                                                item.status === 'parsing' ? 'bg-blue-500 animate-pulse' :
+                                                    item.status === 'blocked' ? 'bg-orange-500' :
+                                                        'bg-slate-600'
                                         }`}
                                 />
                             ))}
@@ -593,9 +595,9 @@ const SMSRow = ({ item, index, isExpanded, onToggle, getStatusIcon, getStatusBad
                                     <div key={i} className="flex items-start gap-2 text-xs">
                                         <span className="text-gray-600 font-mono w-20 flex-shrink-0">{step.time}</span>
                                         <span className={`font-bold w-16 flex-shrink-0 ${step.action === 'Complete' ? 'text-emerald-400' :
-                                                step.action === 'Failed' || step.action === 'Blocked' ? 'text-red-400' :
-                                                    step.action === 'Pending' ? 'text-amber-400' :
-                                                        'text-blue-400'
+                                            step.action === 'Failed' || step.action === 'Blocked' ? 'text-red-400' :
+                                                step.action === 'Pending' ? 'text-amber-400' :
+                                                    'text-blue-400'
                                             }`}>{step.action}</span>
                                         <span className="text-gray-400">{step.detail}</span>
                                     </div>
