@@ -16,31 +16,32 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
     const [results, setResults] = useState([]);
     const [expandedRows, setExpandedRows] = useState(new Set());
 
-    // Load results from localStorage on mount
-    useEffect(() => {
-        try {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed)) {
-                    setResults(parsed);
-                }
-            }
-        } catch (e) {
-            console.error("Failed to load saved results:", e);
-        }
-    }, []);
+    // DISABLED: localStorage was causing stale results to accumulate
+    // Results now reset on page refresh for cleaner experience
+    // useEffect(() => {
+    //     try {
+    //         const saved = localStorage.getItem(STORAGE_KEY);
+    //         if (saved) {
+    //             const parsed = JSON.parse(saved);
+    //             if (Array.isArray(parsed)) {
+    //                 setResults(parsed);
+    //             }
+    //         }
+    //     } catch (e) {
+    //         console.error("Failed to load saved results:", e);
+    //     }
+    // }, []);
 
-    // Save results to localStorage whenever they change
-    useEffect(() => {
-        if (results.length > 0) {
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
-            } catch (e) {
-                console.error("Failed to save results:", e);
-            }
-        }
-    }, [results]);
+    // DISABLED: No longer saving to localStorage
+    // useEffect(() => {
+    //     if (results.length > 0) {
+    //         try {
+    //             localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
+    //         } catch (e) {
+    //             console.error("Failed to save results:", e);
+    //         }
+    //     }
+    // }, [results]);
 
     const parseSMSMessages = (text) => {
         if (text.includes('----')) {

@@ -1031,29 +1031,42 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
         }
     
     # 0c. DUPLICATE CHECK: Skip if same SMS body already processed
-    # Extract first few meaningful lines for matching (skip timestamp/sender headers)
+    # Extract meaningful lines for matching (skip timestamp/sender headers)
     body_lines = payload.body.strip().split('\n')
     core_lines = []
+    amount_line = None
+    
     for line in body_lines:
         line_lower = line.lower().strip()
+        line_stripped = line.strip()
+        
         # Skip header lines like "2026-01-25 17:05:01 from AlRajhiBank"
         if ' from ' in line_lower and ('bank' in line_lower or 'alrajhi' in line_lower or 'stc' in line_lower):
             continue
-        if line.strip():
-            core_lines.append(line.strip())
-        if len(core_lines) >= 2:  # Get first 2 meaningful lines
-            break
-    
-    # Use first two lines for duplicate check (more reliable with ILIKE)
-    if len(core_lines) >= 2:
-        # Search for both lines separately
-        search_line1 = core_lines[0][:50]  # First 50 chars of line 1
-        search_line2 = core_lines[1][:50]  # First 50 chars of line 2
         
-        existing_tx = db.query(models.Transaction).filter(
-            models.Transaction.raw_sms_content.ilike(f"%{search_line1}%"),
-            models.Transaction.raw_sms_content.ilike(f"%{search_line2}%")
-        ).first()
+        # Capture amount line specifically (contains "amount" or numeric value with currency)
+        if 'amount' in line_lower and amount_line is None:
+            amount_line = line_stripped
+        
+        if line_stripped:
+            core_lines.append(line_stripped)
+    
+    # Use first line + amount line for duplicate check (unique combination)
+    if len(core_lines) >= 1:
+        search_line1 = core_lines[0][:50]  # First content line (e.g., "Credit Card:Payment")
+        
+        # Build query conditions
+        query = db.query(models.Transaction).filter(
+            models.Transaction.raw_sms_content.ilike(f"%{search_line1}%")
+        )
+        
+        # Add amount line if found (makes the check more specific)
+        if amount_line:
+            query = query.filter(
+                models.Transaction.raw_sms_content.ilike(f"%{amount_line[:40]}%")
+            )
+        
+        existing_tx = query.first()
         if existing_tx:
             logger.info(f"[SMS-INGEST] Duplicate SMS detected, already processed as transaction {existing_tx.id}")
             return {
