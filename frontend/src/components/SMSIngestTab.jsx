@@ -150,10 +150,27 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
                     );
                 });
 
+                // SEQUENTIAL QUEUE: Stop processing if this item needs resolution
+                // Mark all subsequent items as 'waiting' - they will be processed after resolution
+                if (finalStatus === "pending_action") {
+                    setAgentStatus(`⏳ Waiting: SMS ${i + 1} needs account selection before continuing`);
+                    setProcessingQueue(prev => prev.map((item, idx) =>
+                        idx > i ? {
+                            ...item,
+                            status: "waiting",
+                            result: {
+                                reason: "Waiting for previous SMS to be resolved",
+                                steps: [{ time: new Date().toLocaleTimeString(), action: "Waiting", detail: "Queued - waiting for pending item" }]
+                            }
+                        } : item
+                    ));
+                    break; // Stop processing loop - resume when pending_action is resolved
+                }
+
                 if (finalStatus === "blocked") {
                     setAgentStatus(`⚠️ Queue blocked: ${res.data.blocked_count} pending transaction(s) need resolution`);
                     setProcessingQueue(prev => prev.map((item, idx) =>
-                        idx > i ? { ...item, status: "blocked", result: { reason: "Blocked by pending transactions", steps: [{ time: new Date().toLocaleTimeString(), action: "Blocked", detail: "Waiting for pending transactions" }] } } : item
+                        idx > i ? { ...item, status: "waiting", result: { reason: "Waiting for blocked item", steps: [{ time: new Date().toLocaleTimeString(), action: "Waiting", detail: "Queued - waiting for blocked item" }] } } : item
                     ));
                     break;
                 }
@@ -223,24 +240,109 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
             }));
 
             if (onTransactionCreated) onTransactionCreated();
+
+            // RESUME QUEUE: Process any waiting SMS items after resolving pending_action
+            setTimeout(() => resumeWaitingItems(), 300);
         } catch (err) {
             alert(err.response?.data?.detail || "Failed to assign account");
         }
     };
 
-    const retryBlocked = async () => {
-        const blockedItems = results.filter(r => r.status === 'blocked' || r.result?.status === 'blocked');
-        if (blockedItems.length === 0) return;
+    // Resume processing waiting SMS items (called after pending_action is resolved)
+    const resumeWaitingItems = async () => {
+        // Get waiting items from results (they were moved there when processing stopped)
+        const waitingItems = results.filter(r => r.status === 'waiting');
+        if (waitingItems.length === 0) return;
 
-        const retryQueue = blockedItems.map((item, idx) => ({
+        // Process one at a time
+        const firstWaiting = waitingItems[0];
+        const msg = firstWaiting.sms;
+
+        // Remove from results and add to processingQueue
+        setResults(prev => prev.filter(r => r.id !== firstWaiting.id));
+        setProcessingQueue([{
+            id: firstWaiting.id,
+            sms: msg,
+            status: "parsing",
+            result: null,
+            steps: [{ time: new Date().toLocaleTimeString(), action: "Resuming", detail: "Processing queued message..." }]
+        }]);
+        setIsProcessing(true);
+        setAgentStatus(`🤖 Gemini: Processing queued SMS...`);
+
+        try {
+            const res = await axios.post(`${API_URL}/api/sms/ingest`, {
+                sender: "WebUI",
+                body: msg
+            });
+
+            const result = { id: firstWaiting.id, sms: msg, ...res.data };
+
+            if (res.data.status === "pending_action") {
+                result.accounts = res.data.accounts;
+                result.credit_cards = res.data.credit_cards;
+                result.transaction_id = res.data.transaction_id;
+            }
+
+            // Update status and move to results
+            setProcessingQueue([{
+                id: firstWaiting.id,
+                sms: msg,
+                status: res.data.status,
+                result: { ...result, steps: [{ time: new Date().toLocaleTimeString(), action: "Complete", detail: `Status: ${res.data.status}` }] }
+            }]);
+
+            // If still pending_action, don't process more - user needs to resolve first
+            if (res.data.status === "pending_action") {
+                setIsProcessing(false);
+                setAgentStatus(`⏳ Waiting: This SMS needs account selection before continuing`);
+            } else if (res.data.status === "blocked") {
+                setIsProcessing(false);
+                setAgentStatus(`⚠️ Blocked: Transaction needs resolution`);
+            } else {
+                // Success - continue with remaining waiting items
+                setIsProcessing(false);
+                setAgentStatus("");
+                setTimeout(() => resumeWaitingItems(), 300);
+            }
+        } catch (err) {
+            setProcessingQueue([{
+                id: firstWaiting.id,
+                sms: msg,
+                status: "failed",
+                result: { status: "failed", reason: err.response?.data?.detail || err.message }
+            }]);
+            setIsProcessing(false);
+            setAgentStatus("");
+        }
+
+        // Move completed item from processingQueue to results
+        setProcessingQueue(prev => {
+            const completed = prev.filter(p => p.result);
+            setResults(old => [...completed, ...old]);
+            return [];
+        });
+    };
+
+    const retryBlocked = async () => {
+        // Include both blocked AND waiting items for retry
+        const blockedOrWaiting = results.filter(r =>
+            r.status === 'blocked' || r.result?.status === 'blocked' ||
+            r.status === 'waiting'
+        );
+        if (blockedOrWaiting.length === 0) return;
+
+        const retryQueue = blockedOrWaiting.map((item, idx) => ({
             id: Date.now() + idx,
             sms: item.sms,
             status: "waiting",
             result: null,
-            steps: [{ time: new Date().toLocaleTimeString(), action: "Retry", detail: "Retrying blocked message..." }]
+            steps: [{ time: new Date().toLocaleTimeString(), action: "Retry", detail: "Retrying queued message..." }]
         }));
 
-        setResults(prev => prev.filter(r => r.status !== 'blocked' && r.result?.status !== 'blocked'));
+        setResults(prev => prev.filter(r =>
+            !(r.status === 'blocked' || r.result?.status === 'blocked' || r.status === 'waiting')
+        ));
         setProcessingQueue(retryQueue);
         setIsProcessing(true);
         setCurrentIndex(0);
@@ -249,7 +351,7 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
             const msg = retryQueue[i].sms;
 
             setCurrentIndex(i);
-            setAgentStatus(`🤖 Gemini: Retrying SMS ${i + 1} of ${retryQueue.length}...`);
+            setAgentStatus(`🤖 Gemini: Processing SMS ${i + 1} of ${retryQueue.length}...`);
             setProcessingQueue(prev => prev.map((item, idx) =>
                 idx === i ? { ...item, status: "parsing", steps: [...item.steps, { time: new Date().toLocaleTimeString(), action: "Parsing", detail: "Sending to Gemini..." }] } : item
             ));
@@ -281,10 +383,19 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
                     } : item
                 ));
 
-                if (res.data.status === "blocked") {
-                    setAgentStatus(`⚠️ Still blocked: ${res.data.blocked_count} pending transaction(s)`);
+                // SEQUENTIAL: Stop on pending_action - user needs to resolve first
+                if (res.data.status === "pending_action") {
+                    setAgentStatus(`⏳ Waiting: This SMS needs account selection before continuing`);
                     setProcessingQueue(prev => prev.map((item, idx) =>
-                        idx > i ? { ...item, status: "blocked", result: { reason: "Still blocked", steps: [{ time: new Date().toLocaleTimeString(), action: "Blocked", detail: "Still blocked" }] } } : item
+                        idx > i ? { ...item, status: "waiting", result: { reason: "Waiting for pending item", steps: [{ time: new Date().toLocaleTimeString(), action: "Waiting", detail: "Queued" }] } } : item
+                    ));
+                    break;
+                }
+
+                if (res.data.status === "blocked") {
+                    setAgentStatus(`⚠️ Blocked: ${res.data.blocked_count} pending transaction(s) need resolution`);
+                    setProcessingQueue(prev => prev.map((item, idx) =>
+                        idx > i ? { ...item, status: "waiting", result: { reason: "Waiting for blocked item", steps: [{ time: new Date().toLocaleTimeString(), action: "Waiting", detail: "Queued" }] } } : item
                     ));
                     break;
                 }
