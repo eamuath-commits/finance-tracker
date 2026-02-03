@@ -184,6 +184,86 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
         setProcessingQueue([]);
     };
 
+    // Retry blocked messages after resolving pending transactions
+    const retryBlocked = async () => {
+        const blockedItems = results.filter(r => r.status === 'blocked' || r.result?.status === 'blocked');
+        if (blockedItems.length === 0) return;
+
+        // Move blocked items back to processing queue
+        const retryQueue = blockedItems.map((item, idx) => ({
+            id: Date.now() + idx,
+            sms: item.sms,
+            status: "waiting",
+            result: null
+        }));
+
+        // Remove blocked items from results
+        setResults(prev => prev.filter(r => r.status !== 'blocked' && r.result?.status !== 'blocked'));
+
+        // Start processing
+        setProcessingQueue(retryQueue);
+        setIsProcessing(true);
+        setCurrentIndex(0);
+
+        // Process each message
+        for (let i = 0; i < retryQueue.length; i++) {
+            const msg = retryQueue[i].sms;
+
+            setCurrentIndex(i);
+            setAgentStatus(`Gemini: Retrying SMS ${i + 1} of ${retryQueue.length}...`);
+            setProcessingQueue(prev => prev.map((item, idx) =>
+                idx === i ? { ...item, status: "parsing" } : item
+            ));
+
+            try {
+                await new Promise(r => setTimeout(r, 100));
+                setAgentStatus(`Gemini: Extracting transaction details...`);
+
+                const res = await axios.post(`${API_URL}/api/sms/ingest`, {
+                    sender: "WebUI",
+                    body: msg
+                });
+
+                const result = { id: Date.now() + Math.random(), sms: msg, ...res.data };
+
+                if (res.data.status === "pending_action") {
+                    result.accounts = res.data.accounts;
+                    result.credit_cards = res.data.credit_cards;
+                    result.transaction_id = res.data.transaction_id;
+                }
+
+                setProcessingQueue(prev => prev.map((item, idx) =>
+                    idx === i ? { ...item, status: res.data.status, result } : item
+                ));
+
+                if (res.data.status === "blocked") {
+                    setAgentStatus(`⚠️ Still blocked: ${res.data.blocked_count} pending transaction(s)`);
+                    setProcessingQueue(prev => prev.map((item, idx) =>
+                        idx > i ? { ...item, status: "blocked", result: { reason: "Still blocked by pending transactions" } } : item
+                    ));
+                    break;
+                }
+            } catch (err) {
+                setProcessingQueue(prev => prev.map((item, idx) =>
+                    idx === i ? { ...item, status: "failed", result: { status: "failed", reason: err.response?.data?.detail || err.message } } : item
+                ));
+            }
+        }
+
+        setIsProcessing(false);
+        setAgentStatus("");
+        setCurrentIndex(-1);
+
+        setProcessingQueue(prev => {
+            setResults(old => [...prev.filter(p => p.result), ...old]);
+            return [];
+        });
+
+        if (onTransactionCreated) setTimeout(() => onTransactionCreated(), 200);
+    };
+
+    const hasBlockedMessages = results.some(r => r.status === 'blocked' || r.result?.status === 'blocked');
+
     const totalMessages = parseSMSMessages(smsInput).length;
     const allItems = [...processingQueue, ...results];
 
@@ -239,11 +319,11 @@ AlRajhiBank —— Credit Transfer Internal | Amount:SAR 5000 | To:7772"
                                 <div
                                     key={idx}
                                     className={`w-4 h-2 rounded ${item.status === 'success' ? 'bg-emerald-500' :
-                                            item.status === 'failed' ? 'bg-red-500' :
-                                                item.status === 'pending_action' ? 'bg-amber-500' :
-                                                    item.status === 'parsing' ? 'bg-blue-500 animate-pulse' :
-                                                        item.status === 'blocked' ? 'bg-orange-500' :
-                                                            'bg-slate-600'
+                                        item.status === 'failed' ? 'bg-red-500' :
+                                            item.status === 'pending_action' ? 'bg-amber-500' :
+                                                item.status === 'parsing' ? 'bg-blue-500 animate-pulse' :
+                                                    item.status === 'blocked' ? 'bg-orange-500' :
+                                                        'bg-slate-600'
                                         }`}
                                 />
                             ))}
@@ -266,13 +346,24 @@ AlRajhiBank —— Credit Transfer Internal | Amount:SAR 5000 | To:7772"
                             <Upload size={20} className="text-emerald-400" />
                             Processing Results
                         </h3>
-                        <button
-                            type="button"
-                            onClick={clearResults}
-                            className="text-gray-400 hover:text-white text-sm flex items-center gap-1"
-                        >
-                            <RefreshCw size={14} /> Clear
-                        </button>
+                        <div className="flex gap-2">
+                            {hasBlockedMessages && !isProcessing && (
+                                <button
+                                    type="button"
+                                    onClick={retryBlocked}
+                                    className="bg-orange-600 hover:bg-orange-700 text-white text-sm px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition"
+                                >
+                                    <RefreshCw size={14} /> Retry Blocked
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={clearResults}
+                                className="text-gray-400 hover:text-white text-sm flex items-center gap-1"
+                            >
+                                <RefreshCw size={14} /> Clear
+                            </button>
+                        </div>
                     </div>
 
                     <div className="overflow-x-auto">
