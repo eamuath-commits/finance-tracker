@@ -1031,9 +1031,8 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
         }
     
     # 0c. DUPLICATE CHECK: Skip if same SMS body already processed
-    # Normalize the body by extracting core content (skip timestamp/sender headers)
+    # Extract first few meaningful lines for matching (skip timestamp/sender headers)
     body_lines = payload.body.strip().split('\n')
-    # Skip lines that look like headers (contain "from" and bank name)
     core_lines = []
     for line in body_lines:
         line_lower = line.lower().strip()
@@ -1042,13 +1041,18 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
             continue
         if line.strip():
             core_lines.append(line.strip())
+        if len(core_lines) >= 2:  # Get first 2 meaningful lines
+            break
     
-    core_content = '\n'.join(core_lines)
-    
-    # Check for duplicate by core content (use LIKE for partial match)
-    if core_content:
+    # Use first two lines for duplicate check (more reliable with ILIKE)
+    if len(core_lines) >= 2:
+        # Search for both lines separately
+        search_line1 = core_lines[0][:50]  # First 50 chars of line 1
+        search_line2 = core_lines[1][:50]  # First 50 chars of line 2
+        
         existing_tx = db.query(models.Transaction).filter(
-            models.Transaction.raw_sms_content.ilike(f"%{core_content[:100]}%")
+            models.Transaction.raw_sms_content.ilike(f"%{search_line1}%"),
+            models.Transaction.raw_sms_content.ilike(f"%{search_line2}%")
         ).first()
         if existing_tx:
             logger.info(f"[SMS-INGEST] Duplicate SMS detected, already processed as transaction {existing_tx.id}")
