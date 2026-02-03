@@ -570,69 +570,68 @@ def assign_account_to_transaction(db: Session, transaction_id: str, account_id: 
     if tx.status == "pending_action":
         tx.status = "completed"
         
-        is_credit = str(tx.type).lower() == "credit"
-        if is_credit:
-            account.current_balance += tx.amount
-        else:
-            account.current_balance -= tx.amount
-            
-        tx.balance_after_transaction = account.current_balance
-        db.add(account)
+        # INTERNAL TRANSFER SPECIAL HANDLING
+        # If merchant ends with " Account", this is assigning SOURCE to an outbound transfer
+        # The transaction type may be 'credit' (from SMS perspective) but we need to DEBIT the source
+        is_outbound_transfer = tx.category == "Transfer" and tx.merchant and tx.merchant.endswith(" Account")
         
-        # INTERNAL TRANSFER LOGIC (Delayed)
-        # If this was a transfer, we need to create the Credit Leg now that we know the Source
-        if tx.category == "Transfer" and tx.merchant.endswith(" Account"):
-            potential_acc_name = tx.merchant.replace(" Account", "")
-            print(f"DEBUG: Attempting to resolve transfer destination. Potential Name: '{potential_acc_name}'")
+        if is_outbound_transfer:
+            # This is an outbound transfer - source account should be DEBITED
+            potential_dest_name = tx.merchant.replace(" Account", "")
+            dest_acc = db.query(models.Account).filter(models.Account.name.ilike(potential_dest_name)).first()
             
-            # Case-insensitive lookup
-            dest_acc = db.query(models.Account).filter(models.Account.name.ilike(potential_acc_name)).first()
+            # Convert transaction to DEBIT type (money leaving source)
+            tx.type = "debit"
+            tx.merchant = f"Transfer to {potential_dest_name}"
             
-            if dest_acc:
-                print(f"DEBUG: Found destination account: {dest_acc.name} (ID: {dest_acc.id})")
-            else:
-                print(f"DEBUG: Destination account '{potential_acc_name}' NOT FOUND queries.")
+            # Debit the source account
+            account.current_balance -= tx.amount
+            if tx.fees:
+                account.current_balance -= tx.fees
+            tx.balance_after_transaction = account.current_balance
+            db.add(account)
             
+            # Create Credit Leg on destination (only if not already exists)
             if dest_acc and dest_acc.id != account_id:
-                # Check if bank names match for instant completion
-                is_same_bank = (
-                    account.bank_name and dest_acc.bank_name and 
-                    account.bank_name.strip().lower() == dest_acc.bank_name.strip().lower()
-                )
-                
-                # Check if we already have this credit leg (avoid duplicates)
                 existing_credit = db.query(models.Transaction).filter(
-                     models.Transaction.account_id == dest_acc.id,
-                     models.Transaction.amount == tx.amount,
-                     models.Transaction.type == "credit",
-                     models.Transaction.timestamp == tx.timestamp
+                    models.Transaction.account_id == dest_acc.id,
+                    models.Transaction.amount == tx.amount,
+                    models.Transaction.type == "credit",
+                    models.Transaction.timestamp == tx.timestamp
                 ).first()
                 
-                if existing_credit:
-                    # UPDATE EXISTING CREDIT LEG
-                    print(f"DEBUG: Found existing credit leg. Updating merchant to '{account.name} Account'")
-                    existing_credit.merchant = f"{account.name} Account"
-                    db.add(existing_credit)
-                else:
-                    # Create Credit Leg (Fallback if not created earlier)
-                    print(f"DEBUG: No existing credit leg found. Creating new one.")
+                if not existing_credit:
+                    # Check if banks match for instant completion
+                    is_same_bank = (
+                        account.bank_name and dest_acc.bank_name and 
+                        account.bank_name.strip().lower() == dest_acc.bank_name.strip().lower()
+                    )
+                    
                     credit_tx = models.Transaction(
                         account_id=dest_acc.id,
                         amount=tx.amount,
-                        merchant=f"{account.name} Account", # From the now-known source
-                        category="Transfer",
+                        merchant=f"Transfer from {account.name}",
+                        category="Internal Transfer",
                         type="credit",
-                        balance_after_transaction=dest_acc.current_balance + tx.amount if is_same_bank else None,
-                        status="completed" if is_same_bank else "pending",
+                        balance_after_transaction=dest_acc.current_balance + tx.amount,
+                        status="completed",
                         timestamp=tx.timestamp,
                         raw_sms_content=tx.raw_sms_content
                     )
                     
-                    if is_same_bank:
-                        dest_acc.current_balance += tx.amount
-                        db.add(dest_acc)
-                    
+                    dest_acc.current_balance += tx.amount
+                    db.add(dest_acc)
                     db.add(credit_tx)
+        else:
+            # Normal transaction (not outbound transfer)
+            is_credit = str(tx.type).lower() == "credit"
+            if is_credit:
+                account.current_balance += tx.amount
+            else:
+                account.current_balance -= tx.amount
+                
+            tx.balance_after_transaction = account.current_balance
+            db.add(account)
         
     db.commit()
     db.refresh(tx)
