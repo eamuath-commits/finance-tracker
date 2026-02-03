@@ -60,6 +60,7 @@ function Transactions() {
     const [typeFilter, setTypeFilter] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('');
     const [dateRange, setDateRange] = useState({ start: '', end: '' });
+    const [sortOrder, setSortOrder] = useState('desc'); // 'asc' or 'desc' for date sorting
 
     // Initialize filter from URL params (for navigation from account/credit card pages)
     useEffect(() => {
@@ -150,8 +151,12 @@ function Transactions() {
                 if (txDate > endDate) return false;
             }
             return true;
+        }).sort((a, b) => {
+            const dateA = new Date(a.timestamp);
+            const dateB = new Date(b.timestamp);
+            return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
         });
-    }, [transactions, searchTerm, accountFilter, typeFilter, categoryFilter, dateRange]);
+    }, [transactions, searchTerm, accountFilter, typeFilter, categoryFilter, dateRange, sortOrder]);
 
     const handleDeleteTx = async (id) => {
         if (!window.confirm("Are you sure?")) return;
@@ -531,7 +536,17 @@ function Transactions() {
                                             />
                                         </th>
                                     )}
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
+                                    <th
+                                        className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors group"
+                                        onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                                    >
+                                        <span className="flex items-center gap-1">
+                                            Date
+                                            <span className="text-blue-400 group-hover:text-blue-300">
+                                                {sortOrder === 'asc' ? '↑' : '↓'}
+                                            </span>
+                                        </span>
+                                    </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Account / Card</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Beneficiary / Source</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Category</th>
