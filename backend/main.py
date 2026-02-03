@@ -220,6 +220,78 @@ def delete_account(account_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Account not found")
     return {"message": "Account deleted successfully"}
 
+@app.post("/accounts/{account_id}/recalculate-balance")
+def recalculate_account_balance(account_id: str, db: Session = Depends(get_db)):
+    """Recalculate account balance from transaction history"""
+    account = db.query(models.Account).filter(models.Account.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    # Get the most recent transaction with balance_after_transaction
+    latest_tx = db.query(models.Transaction).filter(
+        models.Transaction.account_id == account_id,
+        models.Transaction.balance_after_transaction.isnot(None)
+    ).order_by(models.Transaction.timestamp.desc()).first()
+    
+    old_balance = account.current_balance
+    
+    if latest_tx and latest_tx.balance_after_transaction is not None:
+        account.current_balance = latest_tx.balance_after_transaction
+    else:
+        # No transactions with balance - calculate from scratch
+        credits = db.query(models.Transaction).filter(
+            models.Transaction.account_id == account_id,
+            models.Transaction.type == "credit"
+        ).all()
+        debits = db.query(models.Transaction).filter(
+            models.Transaction.account_id == account_id,
+            models.Transaction.type == "debit"
+        ).all()
+        account.current_balance = sum(t.amount for t in credits) - sum(t.amount for t in debits)
+    
+    db.commit()
+    db.refresh(account)
+    
+    return {
+        "message": "Balance recalculated",
+        "account_id": account_id,
+        "old_balance": old_balance,
+        "new_balance": account.current_balance,
+        "source": "latest_transaction" if latest_tx else "calculated"
+    }
+
+@app.post("/accounts/recalculate-all-balances")
+def recalculate_all_account_balances(db: Session = Depends(get_db)):
+    """Recalculate all account balances from transaction history"""
+    accounts = db.query(models.Account).all()
+    results = []
+    
+    for account in accounts:
+        latest_tx = db.query(models.Transaction).filter(
+            models.Transaction.account_id == account.id,
+            models.Transaction.balance_after_transaction.isnot(None)
+        ).order_by(models.Transaction.timestamp.desc()).first()
+        
+        old_balance = account.current_balance
+        
+        if latest_tx and latest_tx.balance_after_transaction is not None:
+            account.current_balance = latest_tx.balance_after_transaction
+        
+        results.append({
+            "account": account.name,
+            "old_balance": old_balance,
+            "new_balance": account.current_balance,
+            "changed": old_balance != account.current_balance
+        })
+    
+    db.commit()
+    
+    return {
+        "message": "All balances recalculated",
+        "results": results,
+        "total_changed": sum(1 for r in results if r["changed"])
+    }
+
 # --- Credit Card Endpoints ---
 @app.post("/credit-cards/", response_model=schemas.CreditCard)
 def create_credit_card(card: schemas.CreditCardCreate, db: Session = Depends(get_db)):
@@ -754,6 +826,7 @@ def complete_pending_transfer(transaction_id: str, source_account_id: str, db: S
         fees=pending_tx.fees
     )
     db.add(debit_tx)
+    db.flush()  # Get the ID before adding to queue
     
     # 2. Update the credit transaction: mark as completed and update merchant name
     pending_tx.status = "completed"
@@ -766,7 +839,16 @@ def complete_pending_transfer(transaction_id: str, source_account_id: str, db: S
     # Destination account: credit (add)
     queue_processor.apply_balance_update(db, pending_tx)
     
-    # 4. Unblock any blocked queue items and auto-process
+    # 4. Add queue entries to track these transactions
+    debit_queue = models.TransactionQueue(
+        transaction_id=debit_tx.id,
+        account_id=source_account_id,
+        status="processed",
+        processed_at=datetime.utcnow()
+    )
+    db.add(debit_queue)
+    
+    # 5. Unblock any blocked queue items and auto-process
     # NOTE: Only process source - destination was already credited by apply_balance_update above
     queue_processor.unblock_transaction(db, pending_tx.id)
     queue_processor.try_process(db, account_id=source_account_id)
