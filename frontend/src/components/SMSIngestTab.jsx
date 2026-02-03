@@ -312,8 +312,16 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
 
     // Resume processing waiting SMS items (called after pending_action is resolved)
     const resumeWaitingItems = async () => {
-        // Get first waiting item from results
-        const waitingItems = results.filter(r => r.status === 'waiting');
+        // Use setResults to get CURRENT state (avoids stale closure issue)
+        let waitingItems = [];
+        setResults(prev => {
+            waitingItems = prev.filter(r => r.status === 'waiting');
+            return prev; // Don't modify, just read
+        });
+
+        // Wait a tick for state to settle
+        await new Promise(r => setTimeout(r, 50));
+
         if (waitingItems.length === 0) return;
 
         // Process first waiting item, update in-place
