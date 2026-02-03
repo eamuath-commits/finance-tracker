@@ -6951,3 +6951,10 @@ By:9365;mada-Apple ...
 2026-02-03 20:01:22,849 - sms_agent - INFO - Saved training example for: Bill Payment - STC
 2026-02-03 20:21:20,415 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-02-03 20:21:34,664 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-03 20:26:30,285 - sms_agent - INFO - 📊 Token Usage - Input: 5156, Output: 208, Total: 5364
+2026-02-03 20:26:30,297 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 09:50:58
+2026-02-03 20:26:30,299 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Payroll
+2026-02-03 20:26:30,308 - sms_agent - INFO - Saved training example for: DELL TECHNOLOGIES SINGLE LLC
+2026-02-03 20:26:32,162 - sms_agent - INFO - 📊 Token Usage - Input: 5127, Output: 216, Total: 5343
+2026-02-03 20:31:24,628 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-03 20:31:34,105 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).

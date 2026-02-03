@@ -55,6 +55,7 @@ class CreditCardCreate(CreditCardBase):
 class CreditCardUpdate(BaseModel):
     name: Optional[str] = None
     bank_name: Optional[str] = None
+    last_4_digits: Optional[str] = None
     current_balance: Optional[float] = None
     credit_limit: Optional[float] = None
     statement_day: Optional[int] = None

@@ -13215,3 +13215,19 @@ Biller:001
 Service:STC BILL
 Bill:00825552502
 26/2/3 16:32 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "payment", "source_bank": "AlRajhiBank", "source_account_last4": "9384", "destination_bank": null, "destination_account_last4": null, "card_info": null, "amount": 504.98, "currency": "SAR", "fees": null, "timestamp": "2026-02-03 16:32", "available_balance": null, "beneficiary": null, "merchant": "STC BILL", "sender_name": null, "category": "Bills", "description": "Bill Payment - STC"}
+2026-02-03 20:26:30,286 - ai_raw_io - INFO - INPUT: 2026-01-25 09:50:58 from AlRajhiBank
+
+Credit Transfer Local
+Via:SAUDI AWWAL BANK (FORMERLY: THE SAUDI BRITISH BANK
+Amount:SAR 110095.73
+To:3264
+From:DELL TECHNOLOGIES SINGLE LLC
+From:
+26/1/25 09:50 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "transfer", "source_bank": "SAUDI AWWAL BANK", "destination_bank": "AlRajhiBank", "destination_account_last4": "3264", "amount": 110095.73, "currency": "SAR", "fees": null, "timestamp": "2026-01-25 09:50", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": "DELL TECHNOLOGIES SINGLE LLC", "category": "Salary", "description": "Salary from DELL TECHNOLOGIES"}
+2026-02-03 20:26:32,162 - ai_raw_io - INFO - INPUT: 2026-01-25 10:55:18 from AlRajhiBank
+
+Credit Card:Payment
+Card:Visa 7868
+Amount:AED 9.77
+Balance:9.77 AED
+25/1/26 10:55 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "payment", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "7868", "destination_account_last4": null, "card_info": "Visa 7868", "amount": 9.77, "currency": "AED", "fees": null, "timestamp": "2026-01-25 10:55", "available_balance": 9.77, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Credit Card Payment"}
