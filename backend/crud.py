@@ -125,9 +125,16 @@ def create_account_alias(db: Session, account_id: str, alias: schemas.AccountAli
 def delete_account(db: Session, account_id: str):
     db_account = db.query(models.Account).filter(models.Account.id == account_id).first()
     if db_account:
+        # Delete related allocation rules that reference this account
+        db.query(models.AllocationRule).filter(
+            models.AllocationRule.target_account_id == account_id
+        ).delete(synchronize_session=False)
+        
         db.delete(db_account)
         db.commit()
     return db_account
+
+
 
 def delete_account_alias(db: Session, alias_id: int):
     db_alias = db.query(models.AccountAlias).filter(models.AccountAlias.id == alias_id).first()
@@ -192,6 +199,105 @@ def find_potential_duplicate(db: Session, account_id: str, amount: float, tx_typ
         print(f"DEBUG: Found Duplicate/Match: {potential.id} (Date: {potential.timestamp})")
     
     return potential
+
+
+def recalculate_account_balances(db: Session, account_id: str = None, credit_card_id: str = None):
+    """
+    Recalculate balance_after_transaction for all transactions of an account/card.
+    This should be called when an older transaction is inserted to maintain chronological accuracy.
+    
+    Algorithm:
+    1. Get starting balance from oldest transaction or assume 0
+    2. Process all transactions in chronological order
+    3. Update balance_after_transaction for each
+    """
+    if not account_id and not credit_card_id:
+        return
+    
+    # Get all completed/pending_transfer transactions in chronological order
+    query = db.query(models.Transaction).filter(
+        models.Transaction.status.in_(["completed", "pending_transfer"])
+    )
+    
+    if account_id:
+        query = query.filter(models.Transaction.account_id == account_id)
+    else:
+        query = query.filter(models.Transaction.credit_card_id == credit_card_id)
+    
+    transactions = query.order_by(models.Transaction.timestamp.asc()).all()
+    
+    if not transactions:
+        return
+    
+    # Get current account/card balance and work backwards to find starting balance
+    # OR calculate running balance from first transaction
+    running_balance = 0.0
+    
+    # For accounts: get the current balance and work back
+    if account_id:
+        account = db.query(models.Account).filter(models.Account.id == account_id).first()
+        if account:
+            # Calculate what balance should be at start by reversing all transactions
+            running_balance = account.current_balance
+            for tx in reversed(transactions):
+                try:
+                    is_credit = tx.type == models.TransactionType.CREDIT or str(tx.type).lower() == "credit"
+                except:
+                    is_credit = str(tx.type).lower() == "credit"
+                
+                if is_credit:
+                    running_balance -= tx.amount
+                else:
+                    running_balance += tx.amount
+                
+                if tx.fees:
+                    running_balance += tx.fees
+    else:
+        # For credit cards
+        credit_card = db.query(models.CreditCard).filter(models.CreditCard.id == credit_card_id).first()
+        if credit_card:
+            running_balance = credit_card.current_balance
+            for tx in reversed(transactions):
+                try:
+                    is_credit = tx.type == models.TransactionType.CREDIT or str(tx.type).lower() == "credit"
+                except:
+                    is_credit = str(tx.type).lower() == "credit"
+                
+                if is_credit:
+                    running_balance += tx.amount  # Reverse payment
+                else:
+                    running_balance -= tx.amount  # Reverse purchase
+                
+                if tx.fees:
+                    running_balance -= tx.fees
+    
+    # Now recalculate forward
+    for tx in transactions:
+        try:
+            is_credit = tx.type == models.TransactionType.CREDIT or str(tx.type).lower() == "credit"
+        except:
+            is_credit = str(tx.type).lower() == "credit"
+        
+        if account_id:
+            if is_credit:
+                running_balance += tx.amount
+            else:
+                running_balance -= tx.amount
+            if tx.fees:
+                running_balance -= tx.fees
+        else:
+            # Credit card logic (inverted)
+            if is_credit:
+                running_balance -= tx.amount  # Payment
+            else:
+                running_balance += tx.amount  # Purchase
+            if tx.fees:
+                running_balance += tx.fees
+        
+        tx.balance_after_transaction = running_balance
+        db.add(tx)
+    
+    db.commit()
 
 def create_transaction(db: Session, transaction: schemas.TransactionCreate):
     # Update Account Balance FIRST so we can record it
@@ -289,7 +395,32 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate):
 
     db.commit()
     db.refresh(db_transaction)
+    
+    # Check if this transaction is older than existing ones - if so, recalculate all balances
+    if transaction.timestamp and (account or credit_card) and transaction.status in ["completed", "pending_transfer"]:
+        # Find the newest existing transaction for this account/card
+        existing_query = db.query(models.Transaction).filter(
+            models.Transaction.id != db_transaction.id,
+            models.Transaction.status.in_(["completed", "pending_transfer"])
+        )
+        
+        if account:
+            existing_query = existing_query.filter(models.Transaction.account_id == account.id)
+        else:
+            existing_query = existing_query.filter(models.Transaction.credit_card_id == credit_card.id)
+        
+        newest_existing = existing_query.order_by(models.Transaction.timestamp.desc()).first()
+        
+        if newest_existing and transaction.timestamp < newest_existing.timestamp:
+            # This transaction is older than existing ones - recalculate all balances
+            recalculate_account_balances(
+                db, 
+                account_id=account.id if account else None,
+                credit_card_id=credit_card.id if credit_card else None
+            )
+    
     return db_transaction
+
 
 def get_transaction(db: Session, transaction_id: str):
     return db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
@@ -298,19 +429,24 @@ def find_pending_transfer(db: Session, source_last4: str, dest_last4: str, amoun
     """
     Find a pending transfer that matches the source account, destination account, and amount.
     Used to link cross-bank transfers (Debit from Bank A → Credit to Bank B).
-    """
-    if not source_last4 or not dest_last4:
-        return None
     
-    # Find pending_transfer transactions with matching criteria
-    # We need to search in parsed_data JSON for account info
+    Matching logic:
+    1. If BOTH source and dest provided: exact match on source + dest + amount
+    2. If only dest provided: match on dest + amount + time window (48 hours)
+    """
+    from datetime import timedelta
+    import json
+    
+    if not dest_last4:
+        return None  # At minimum we need the destination
+    
+    # Find pending_transfer transactions with matching amount
     pending_txs = db.query(models.Transaction).filter(
         models.Transaction.status == "pending_transfer",
         models.Transaction.amount == amount,
         models.Transaction.type == "debit"
-    ).all()
+    ).order_by(models.Transaction.timestamp.desc()).all()
     
-    import json
     for tx in pending_txs:
         if tx.parsed_data:
             try:
@@ -318,13 +454,23 @@ def find_pending_transfer(db: Session, source_last4: str, dest_last4: str, amoun
                 tx_source = parsed.get('source_account_last4')
                 tx_dest = parsed.get('destination_account_last4')
                 
-                # Match: Debit's source = Credit's source, Debit's dest = Credit's dest
-                if str(tx_source) == str(source_last4) and str(tx_dest) == str(dest_last4):
-                    return tx
+                # Match Strategy 1: Exact match (both source and dest provided)
+                if source_last4 and tx_source and tx_dest:
+                    if str(tx_source) == str(source_last4) and str(tx_dest) == str(dest_last4):
+                        return tx
+                
+                # Match Strategy 2: Destination + amount + time window (when credit SMS lacks source)
+                # Credit should arrive within 48 hours of the debit
+                if not source_last4 and str(tx_dest) == str(dest_last4):
+                    if tx.timestamp:
+                        time_diff = abs((datetime.now() - tx.timestamp).total_seconds())
+                        if time_diff <= 48 * 3600:  # 48 hours in seconds
+                            return tx
             except:
                 continue
     
     return None
+
 
 def confirm_pending_transfer(db: Session, transaction_id: str):
     """Mark a pending transfer as confirmed after the credit SMS arrives"""
@@ -663,39 +809,98 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
     return db_tx
 
 def delete_transaction(db: Session, transaction_id: str):
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"[DELETE_TX] Starting delete for transaction_id: {transaction_id}")
+    
     db_tx = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
-    if db_tx:
-        # Revert balance change
-        account = db_tx.account
-        if account:
-            if db_tx.type == models.TransactionType.CREDIT:
-                # Original was ADD, so removal is SUBTRACT
-                account.current_balance -= db_tx.amount
-            else:
-                # Original was SUBTRACT, so removal is ADD
-                account.current_balance += db_tx.amount
-            
-            # Revert Wallet Balance
-            if db_tx.original_currency and db_tx.original_currency.upper() != "SAR":
-                curr = db_tx.original_currency.upper()
-                wallet = db.query(models.CurrencyWallet).filter(
-                    models.CurrencyWallet.account_id == account.id,
-                    models.CurrencyWallet.currency_code == curr
-                ).first()
-                if wallet:
-                    if db_tx.type == models.TransactionType.CREDIT or str(db_tx.type).lower() == "credit":
-                        wallet.balance -= (db_tx.original_amount or 0.0)
-                    else:
-                        wallet.balance += (db_tx.original_amount or 0.0)
-                    db.add(wallet)
-
-            db.add(account)
+    if not db_tx:
+        logger.warning(f"[DELETE_TX] Transaction not found: {transaction_id}")
+        return None
+    
+    logger.info(f"[DELETE_TX] Found tx: type={db_tx.type}, amount={db_tx.amount}, account_id={db_tx.account_id}, cc_id={db_tx.credit_card_id}")
+    
+    # Revert Account balance change
+    account = db_tx.account
+    if account:
+        old_balance = account.current_balance
+        # Compare type as string (db stores 'credit'/'debit', not enum)
+        tx_type = str(db_tx.type).lower() if db_tx.type else 'debit'
+        if tx_type == 'credit' or db_tx.type == models.TransactionType.CREDIT:
+            # Original was ADD, so removal is SUBTRACT
+            account.current_balance -= db_tx.amount
+        else:
+            # Original was SUBTRACT, so removal is ADD
+            account.current_balance += db_tx.amount
         
-        db.delete(db_tx)
-        db.commit()
+        # Revert fees (fees are always deducted, so add them back)
+        if db_tx.fees and db_tx.fees > 0:
+            account.current_balance += db_tx.fees
+        
+        logger.info(f"[DELETE_TX] Account {account.name}: {old_balance} -> {account.current_balance}")
+        
+        # Revert Wallet Balance
+        if db_tx.original_currency and db_tx.original_currency.upper() != "SAR":
+            curr = db_tx.original_currency.upper()
+            wallet = db.query(models.CurrencyWallet).filter(
+                models.CurrencyWallet.account_id == account.id,
+                models.CurrencyWallet.currency_code == curr
+            ).first()
+            if wallet:
+                if db_tx.type == models.TransactionType.CREDIT or str(db_tx.type).lower() == "credit":
+                    wallet.balance -= (db_tx.original_amount or 0.0)
+                else:
+                    wallet.balance += (db_tx.original_amount or 0.0)
+                db.add(wallet)
+
+        db.add(account)
+    else:
+        logger.info(f"[DELETE_TX] No account linked to transaction")
+    
+    # Revert Credit Card balance change
+    credit_card = db_tx.credit_card
+    if credit_card:
+        old_cc_balance = credit_card.current_balance
+        # Compare type as string (db stores 'credit'/'debit', not enum)
+        cc_tx_type = str(db_tx.type).lower() if db_tx.type else 'debit'
+        if cc_tx_type == 'credit' or db_tx.type == models.TransactionType.CREDIT:
+            # Original was CREDIT (payment), so removal increases balance (undo the payment)
+            credit_card.current_balance += db_tx.amount
+        else:
+            # Original was DEBIT (charge), so removal decreases balance (undo the charge)
+            credit_card.current_balance -= db_tx.amount
+        logger.info(f"[DELETE_TX] Credit Card {credit_card.name}: {old_cc_balance} -> {credit_card.current_balance}")
+        db.add(credit_card)
+    else:
+        logger.info(f"[DELETE_TX] No credit card linked to transaction")
+    
+    db.delete(db_tx)
+    db.commit()
+    logger.info(f"[DELETE_TX] Transaction deleted and committed")
     return db_tx
 
+
+def delete_message(db: Session, message_id: str):
+    """Delete a raw message from the inbox and its associated transaction"""
+    msg = db.query(models.RawMessage).filter(models.RawMessage.id == message_id).first()
+    if msg:
+        # Find and delete associated transaction by matching raw_sms_content
+        if msg.body:
+            tx = db.query(models.Transaction).filter(
+                models.Transaction.raw_sms_content == msg.body
+            ).first()
+            if tx:
+                # Use delete_transaction to properly handle balance updates
+                delete_transaction(db, tx.id)
+        
+        db.delete(msg)
+        db.commit()
+    return msg
+
+
 def create_payment(db: Session, obligation_id: str, payment: schemas.PaymentCreate):
+
     # Check for duplicate billing_month
     if payment.billing_month:
         existing = db.query(models.Payment).filter(

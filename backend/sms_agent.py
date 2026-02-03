@@ -110,6 +110,65 @@ else:
     logger.warning("GEMINI_API_KEY not found. AI features disabled.")
     model = None
 
+
+def validate_parsed_digits(original_sms: str, parsed_data: dict) -> dict:
+    """
+    Post-processing validation: Verify AI-parsed account numbers exist in original SMS.
+    If AI misread a digit (e.g., 1967 → 1964), try to correct it.
+    
+    Args:
+        original_sms: The original SMS text
+        parsed_data: The AI-parsed JSON data
+    
+    Returns:
+        Corrected parsed_data with validated account numbers
+    """
+    import re
+    
+    fields_to_validate = ['source_account_last4', 'destination_account_last4']
+    
+    # Extract all 4-digit numbers from original SMS
+    all_4digit_numbers = re.findall(r'\b(\d{4})\b', original_sms)
+    # Also extract last 4 of any longer number (like full account numbers)
+    longer_numbers = re.findall(r'(\d{5,})', original_sms)
+    for num in longer_numbers:
+        all_4digit_numbers.append(num[-4:])
+    
+    all_4digit_set = set(all_4digit_numbers)
+    
+    for field in fields_to_validate:
+        ai_value = parsed_data.get(field)
+        if not ai_value:
+            continue
+        
+        ai_value_str = str(ai_value)
+        
+        # Check if AI's value exists in the SMS
+        if ai_value_str in all_4digit_set or ai_value_str in original_sms:
+            continue  # Value is correct
+        
+        # AI misread the number - try to find the correct one
+        # Look for numbers that are "close" to what AI parsed (1-2 digit difference)
+        def digit_distance(a: str, b: str) -> int:
+            if len(a) != len(b):
+                return 999
+            return sum(1 for x, y in zip(a, b) if x != y)
+        
+        best_match = None
+        best_distance = 999
+        
+        for candidate in all_4digit_set:
+            dist = digit_distance(ai_value_str, candidate)
+            if dist < best_distance and dist <= 2:  # Allow up to 2 digit differences
+                best_distance = dist
+                best_match = candidate
+        
+        if best_match and best_match != ai_value_str:
+            logger.warning(f"Digit validation: {field} corrected from '{ai_value_str}' to '{best_match}' (original SMS didn't contain '{ai_value_str}')")
+            parsed_data[field] = best_match
+    
+    return parsed_data
+
 async def parse_with_ai(db: Session, text: str):
     """
     Sends SMS text to Gemini AI and expects a JSON response.
@@ -169,6 +228,8 @@ async def parse_with_ai(db: Session, text: str):
     - "Notification : Declined" = Failed transaction (sub_type: decline, is_transaction: false)
     - "Debit: Loan Instalment" = Loan payment (DEBIT, sub_type: loan)
     - "Refund" = Money returned (CREDIT)
+    - **DATE FORMAT**: AlRajhi uses YY/M/DD HH:MM format (e.g., "26/1/25 17:48" = 2026-01-25 17:48)
+
     
     **STC Bank**:
     - "Internal outward transfer" = Outgoing to STC user (DEBIT)
@@ -309,6 +370,14 @@ async def parse_with_ai(db: Session, text: str):
             # Ideally run in executor, but for now simple call.
             response = await asyncio.to_thread(model.generate_content, prompt)
             
+            # Log token usage
+            if hasattr(response, 'usage_metadata'):
+                usage = response.usage_metadata
+                input_tokens = getattr(usage, 'prompt_token_count', 0)
+                output_tokens = getattr(usage, 'candidates_token_count', 0)
+                total_tokens = getattr(usage, 'total_token_count', 0)
+                logger.info(f"📊 Token Usage - Input: {input_tokens}, Output: {output_tokens}, Total: {total_tokens}")
+            
             # Cleanup code blocks if AI wraps in ```json ... ```
             clean_text = response.text.replace("```json", "").replace("```", "").strip()
             data = json.loads(clean_text)
@@ -448,6 +517,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
          db.commit()
          db.close()
          return
+    
+    # Validate AI-parsed account numbers against original SMS
+    result = validate_parsed_digits(sms_body, result)
+
 
     if not result.get("is_financial_event"):
         try: await message.reply_text("ℹ️ Not a financial event. Ignored.")
@@ -660,8 +733,67 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if 'db' in locals(): db.close()
 
 async def _create_transaction_logic(db, result, source_account, source_credit_card, msg_text, reply_target=None, source="telegram"):
-    # --- 0. Multi-Currency Handling & Conversion ---
+    # --- 0. Timestamp Handling: Use SMS timestamp for WebUI, current time for Telegram ---
+    from dateutil import parser as date_parser
+    import re
+    
+    tx_timestamp = datetime.now()  # Default fallback
+    current_year = datetime.now().year
+    header_timestamp_used = False
+    
+    # For WebUI source, first check for user-provided header timestamp
+    # Format: "2026-01-31 11:49:37 from AlRajhiBank"
+    if source == "webui" and msg_text:
+        header_match = re.match(r'^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+from\s+', msg_text, re.IGNORECASE)
+        if header_match:
+            try:
+                tx_timestamp = datetime.strptime(header_match.group(1), "%Y-%m-%d %H:%M:%S")
+                header_timestamp_used = True
+                logger.info(f"Using header timestamp from WebUI: {tx_timestamp}")
+            except Exception as e:
+                logger.warning(f"Failed to parse header timestamp: {e}")
+    
+    # Fall back to AI-parsed timestamp if no header timestamp
+    if source == "webui" and not header_timestamp_used and result.get("timestamp"):
+        try:
+            parsed_ts = date_parser.parse(result["timestamp"])
+            
+            # --- YEAR VALIDATION: Prevent future dates and very old dates ---
+            parsed_year = parsed_ts.year
+            
+            # If year is in the future (parsing error), assume current year
+            if parsed_year > current_year:
+                logger.warning(f"Future year detected ({parsed_year}), correcting to {current_year}")
+                parsed_ts = parsed_ts.replace(year=current_year)
+            
+            # If year is more than a few months in the past AND not current year, likely parsing error
+            # AlRajhi uses YY/M/DD format where "25" could be parsed as 2025 instead of 2026-01-25
+            elif parsed_year < current_year:
+                # Check if it's a recent date that got the wrong year
+                # If the month/day would make sense as a recent transaction (within last 6 months), use current year
+                test_date = parsed_ts.replace(year=current_year)
+                now = datetime.now()
+                six_months_ago = now.replace(month=now.month - 6) if now.month > 6 else now.replace(year=now.year - 1, month=now.month + 6)
+                
+                if test_date <= now and test_date >= six_months_ago:
+                    logger.warning(f"Past year detected ({parsed_year}), correcting to {current_year}")
+                    parsed_ts = test_date
+                elif test_date > now:
+                    # Transaction would be in the future if we use current year, use last year
+                    logger.warning(f"Past year detected ({parsed_year}), keeping as-is (would be future)")
+                else:
+                    # Very old transaction, keep as-is
+                    logger.info(f"Transaction from {parsed_year} - older than 6 months, keeping original year")
+            
+            tx_timestamp = parsed_ts
+            logger.info(f"Using SMS timestamp for WebUI: {tx_timestamp}")
+        except Exception as e:
+            logger.warning(f"Failed to parse SMS timestamp '{result.get('timestamp')}': {e}, using current time")
+
+    
+    # --- 0b. Multi-Currency Handling & Conversion ---
     original_amount = result.get('amount')
+
     original_currency = (result.get('currency') or 'SAR').upper()
     sar_amount = original_amount
     exchange_rate = 1.0
@@ -744,31 +876,52 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
     
     elif sub_type in ['transfer', 'internal_transfer']:
         if tx_type_str == 'debit':
+            # Smart merchant naming for transfers:
+            # 1. If destination is user's own account → account name
+            # 2. If beneficiary name exists → beneficiary name
+            # 3. Otherwise → account number
+            dest_last4 = result.get('destination_account_last4')
+            
             if dest_account:
+                # Destination is user's own account - use account label
                 merchant_raw = f"Transfer to {dest_account.name}"
                 clean_merchant = dest_account.name
             elif result.get('beneficiary'):
+                # External transfer with beneficiary name
                 merchant_raw = result.get('beneficiary')
                 clean_merchant = result.get('beneficiary')
+            elif dest_last4:
+                # No beneficiary name, show account number
+                merchant_raw = f"Transfer to ****{dest_last4}"
             elif result.get('destination_bank'):
-                 merchant_raw = f"Transfer to {result.get('destination_bank')}"
+                merchant_raw = f"Transfer to {result.get('destination_bank')}"
             else:
-                 merchant_raw = "Outgoing Transfer"
+                merchant_raw = "Outgoing Transfer"
+
 
         elif tx_type_str == 'credit':
+            # Smart merchant naming for incoming credits:
+            # 1. If source is user's own account → account name  
+            # 2. If sender_name exists → sender name
+            # 3. Otherwise → account number
             ai_source_last4 = result.get('source_account_last4')
-            if ai_source_last4:
-                sender_acc_obj = crud.get_account_by_last_4(db, str(ai_source_last4))
-                if sender_acc_obj:
-                     merchant_raw = f"Transfer from {sender_acc_obj.name}"
-                else:
-                     merchant_raw = f"Transfer from {ai_source_last4}"
+            sender_acc_obj = crud.get_account_by_last_4(db, str(ai_source_last4)) if ai_source_last4 else None
+            
+            if sender_acc_obj:
+                # Source is user's own account - use account label
+                merchant_raw = f"Transfer from {sender_acc_obj.name}"
             elif result.get('sender_name'):
+                # External transfer with sender name
                 merchant_raw = result.get('sender_name')
+            elif ai_source_last4:
+                # No sender name, show account number
+                merchant_raw = f"Transfer from ****{ai_source_last4}"
             elif result.get('source_bank'):
                 merchant_raw = f"Transfer from {result.get('source_bank')}"
             else:
                 merchant_raw = "Incoming Transfer"
+
+
     else:
         merchant_raw = result.get('description') or result.get('sub_type')
 
@@ -780,8 +933,10 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
         not source_credit_card and  # Not a credit card transaction
         sub_type in ['transfer', 'internal_transfer'] and 
         tx_type_str == 'credit' and 
-        not ai_source_last4
+        not ai_source_last4 and
+        not result.get('sender_name')  # If sender_name exists, it's an EXTERNAL credit, not internal transfer
     )
+
     
     logger.info(f"DEBUG: is_internal_transfer_missing_source={is_internal_transfer_missing_source}, source_account={source_account.name if source_account else None}")
     
@@ -796,7 +951,7 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
             merchant=merchant_raw,
             raw_sms_content=msg_text,
             parsed_data=json.dumps(result),
-            timestamp=datetime.now(),
+            timestamp=tx_timestamp,
             category=category,
             type=tx_type_str,
             status="pending_action",
@@ -881,7 +1036,8 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
         merchant=merchant_raw,
         raw_sms_content=msg_text,
         parsed_data=json.dumps(result),
-        timestamp=datetime.now(),
+        timestamp=tx_timestamp,
+
         category=category,
         type=tx_type_str,
         status=tx_status,

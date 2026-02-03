@@ -13,8 +13,13 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
     const [pendingResult, setPendingResult] = useState(null);
     const [forceUpdate, setForceUpdate] = useState(0); // Force re-render trigger
 
-    // Split SMS by blank lines
+    // Split SMS by separator lines (---- or blank lines for single messages)
     const parseSMSMessages = (text) => {
+        // First try to split by ---- separator (for bulk messages)
+        if (text.includes('----')) {
+            return text.split(/\n-{4,}\n/).map(s => s.trim()).filter(s => s.length > 0);
+        }
+        // Fall back to blank line separation for single/simple messages
         return text.split(/\n\s*\n/).map(s => s.trim()).filter(s => s.length > 0);
     };
 

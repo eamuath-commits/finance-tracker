@@ -820,6 +820,7 @@ async def receive_sms(request: Request, db: Session = Depends(get_db)):
     # 2. Unified AI Parse
     try:
         result = await sms_agent.parse_with_ai(db, body)
+        result = sms_agent.validate_parsed_digits(body, result)  # Validate account numbers
     except Exception as e:
         raw_msg.status = models.MessageStatus.FAILED
         raw_msg.error_log = f"AI Parse Error: {str(e)}"
@@ -881,6 +882,7 @@ async def retry_message(message_id: str, db: Session = Depends(get_db)):
     # 1. Re-Run AI Parse
     try:
         result = await sms_agent.parse_with_ai(db, msg.body)
+        result = sms_agent.validate_parsed_digits(msg.body, result)  # Validate account numbers
         logger.info(f"[RETRY] AI Response: {result}")
     except Exception as e:
         logger.error(f"[RETRY] AI Parse Exception: {str(e)}")
@@ -905,24 +907,44 @@ async def retry_message(message_id: str, db: Session = Depends(get_db)):
         db.commit()
         return {"status": "ignored", "reason": f"Not financial: {reason}"}
 
-    # 2. Find Account logic (Unified)
-    last_4 = result.get("destination_account_last4") or result.get("source_account_last4")
+    # 2. Find Account logic (Unified) - Match sms_agent logic
+    # For debits: source comes first. For credits: check destination first.
+    tx_type = result.get("transaction_type", "").lower()
+    
+    if tx_type == "credit":
+        last_4 = result.get("destination_account_last4") or result.get("source_account_last4")
+    else:
+        # Default: source first (for debit/purchase/transfer FROM)
+        last_4 = result.get("source_account_last4") or result.get("destination_account_last4")
+    
     # Fallback to card info
     if not last_4 and result.get("card_info"):
-         card_match = re.search(r"(\d{4})", result["card_info"])
-         if card_match: last_4 = card_match.group(1)
+        card_digits = "".join(filter(str.isdigit, str(result.get("card_info"))))
+        if len(card_digits) >= 4:
+            last_4 = card_digits[-4:]
 
-    account = crud.get_account_by_last_4(db, last_4=last_4) if last_4 else None
+    # Sanitize
+    if last_4:
+        last_4 = "".join(filter(str.isdigit, str(last_4)))[-4:]
 
-    if not account:
+    # Check credit cards first, then accounts (matching sms_agent behavior)
+    credit_card = None
+    account = None
+    
+    if last_4:
+        credit_card = crud.get_credit_card_by_last4(db, last_4)
+        if not credit_card:
+            account = crud.get_account_by_last_4(db, last_4=last_4)
+
+    if not account and not credit_card:
         msg.status = models.MessageStatus.FAILED
-        msg.error_log = f"Retry: Account {last_4} not found"
+        msg.error_log = f"Retry: Account/Card {last_4} not found"
         db.commit()
         return {"status": "warning", "reason": "Account not found"}
 
     # 3. Create Logic
     try:
-        await sms_agent._create_transaction_logic(db, result, account, None, msg.body, reply_target=None, source="webui")
+        await sms_agent._create_transaction_logic(db, result, account, credit_card, msg.body, reply_target=None, source="webui")
         msg.status = models.MessageStatus.PARSED
         msg.error_log = None
         db.commit()
@@ -932,6 +954,7 @@ async def retry_message(message_id: str, db: Session = Depends(get_db)):
         msg.error_log = f"Retry Error: {str(e)}"
         db.commit()
         return {"status": "failed", "reason": str(e)}
+
 
 @app.post("/messages/bulk-delete")
 def bulk_delete_messages(payload: schemas.BulkDeleteRequest, db: Session = Depends(get_db)):
@@ -956,7 +979,13 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
     """
     logger.info(f"[SMS-INGEST] Received from: {payload.sender}")
     
-    # 1. Create Raw Message record
+    # 0. Early filter: Skip OTP messages entirely (don't even store them)
+    body_lower = payload.body.lower()
+    if 'otp' in body_lower or 'verification code' in body_lower or 'one-time' in body_lower:
+        logger.info(f"[SMS-INGEST] Skipping OTP message")
+        return {"status": "ignored", "reason": "OTP/verification message"}
+    
+    # 1. Create Raw Message record (will be deleted if not a transaction)
     raw_msg = models.RawMessage(
         sender=payload.sender,
         body=payload.body,
@@ -966,10 +995,12 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
     db.add(raw_msg)
     db.commit()
     db.refresh(raw_msg)
+
     
     # 2. AI Parse
     try:
         result = await sms_agent.parse_with_ai(db, payload.body)
+        result = sms_agent.validate_parsed_digits(payload.body, result)  # Validate account numbers
         logger.info(f"[SMS-INGEST] AI Response: {result}")
     except Exception as e:
         logger.error(f"[SMS-INGEST] AI Error: {str(e)}")
@@ -990,10 +1021,11 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
     
     if not result or not isinstance(result, dict) or not result.get("is_financial_event"):
         reason = result.get("reason", "Not a financial event") if isinstance(result, dict) and result else "No response"
-        raw_msg.status = models.MessageStatus.FAILED
-        raw_msg.error_log = reason
+        # Delete the raw message - don't store non-transactions in inbox (like Telegram behavior)
+        db.delete(raw_msg)
         db.commit()
         return {"status": "ignored", "reason": reason}
+
     
     # Check for Declines
     if result.get("status") == "failed" or result.get("sub_type") == "decline":
@@ -1006,8 +1038,63 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
             "parsed": result
         }
     
-    # 4. Find account
-    last_4 = result.get("destination_account_last4") or result.get("source_account_last4")
+    # 4a. Check if user has an account at this bank - ignore SMS from banks where user has no account
+    # For CREDITS: check destination_bank (where money goes = user's bank)
+    # For DEBITS: check source_bank (where money leaves = user's bank)
+    tx_type_for_bank = (result.get("transaction_type") or "debit").lower()
+    
+    if tx_type_for_bank == "credit":
+        # For credits, the user's bank is the destination (receiving bank)
+        bank_to_check = result.get("destination_bank")
+    else:
+        # For debits, the user's bank is the source (sending bank)
+        bank_to_check = result.get("source_bank") or result.get("destination_bank")
+    
+    if bank_to_check:
+        bank_lower = bank_to_check.lower().strip()
+        
+        # Get all bank names from user's accounts and credit cards
+        user_accounts = db.query(models.Account).all()
+        user_credit_cards = db.query(models.CreditCard).all()
+        
+        user_bank_names = set()
+        for acc in user_accounts:
+            if acc.bank_name:
+                user_bank_names.add(acc.bank_name.lower().strip())
+        for card in user_credit_cards:
+            if card.bank_name:
+                user_bank_names.add(card.bank_name.lower().strip())
+        
+        # Check if any user bank matches the SMS bank
+        has_account_at_bank = any(
+            user_bank in bank_lower or bank_lower in user_bank 
+            for user_bank in user_bank_names
+        )
+        
+        if not has_account_at_bank and user_bank_names:  # Only filter if user has some accounts
+            raw_msg.status = models.MessageStatus.FAILED
+            raw_msg.error_log = f"No account at bank: {bank_to_check}"
+            db.commit()
+            return {
+                "status": "ignored",
+                "reason": f"No account registered at bank: {bank_to_check}",
+                "parsed": result
+            }
+
+    
+    # 4. Find account - prioritize based on transaction type
+
+    # For DEBIT: money LEAVES your account, so source is YOUR account
+    # For CREDIT: money ENTERS your account, so destination is YOUR account
+    tx_type = result.get("transaction_type", "debit").lower()
+    
+    if tx_type == "debit":
+        # For debits, prioritize source account (where money leaves)
+        last_4 = result.get("source_account_last4") or result.get("destination_account_last4")
+    else:
+        # For credits, prioritize destination account (where money enters)
+        last_4 = result.get("destination_account_last4") or result.get("source_account_last4")
+    
     if not last_4 and result.get("card_info"):
         card_match = re.search(r"(\d{4})", result["card_info"])
         if card_match:
@@ -1020,6 +1107,7 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
         credit_card = crud.get_credit_card_by_last4(db, str(last_4))
         if not credit_card:
             account = crud.get_account_by_last_4(db, str(last_4))
+
     
     # 5. Handle unknown account - create pending_action transaction
     if not account and not credit_card:
@@ -1699,8 +1787,10 @@ def search_transactions(
     if query:
         q = q.filter(
             (models.Transaction.merchant.ilike(f"%{query}%")) |
-            (models.Transaction.notes.ilike(f"%{query}%"))
+            (models.Transaction.notes.ilike(f"%{query}%")) |
+            (models.Transaction.raw_sms_content.ilike(f"%{query}%"))
         )
+
     
     if account_id:
         q = q.filter(models.Transaction.account_id == account_id)

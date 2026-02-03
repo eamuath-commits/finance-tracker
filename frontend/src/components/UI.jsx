@@ -60,6 +60,20 @@ export const SectionHeader = ({ title, onAdd }) => (
 );
 
 export const Modal = ({ isOpen, title, children, onClose, size = "md" }) => {
+    // ESC key handler to close modal
+    React.useEffect(() => {
+        if (!isOpen) return;
+
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                onClose();
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onClose]);
+
     if (!isOpen) return null;
 
     const sizeClasses = {
@@ -82,6 +96,7 @@ export const Modal = ({ isOpen, title, children, onClose, size = "md" }) => {
         </div>
     );
 };
+
 
 export const EditIcon = ({ onClick }) => (
     <button onClick={onClick} className="text-gray-500 hover:text-blue-400 ml-2">

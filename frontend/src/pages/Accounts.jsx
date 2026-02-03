@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Wallet, PiggyBank, CreditCard, LayoutGrid, List, Receipt, CreditCard as ChipIcon, Edit3, Trash2, Plus, Search, Filter, MessageSquareText, User, Upload } from 'lucide-react';
 import { Card, SectionHeader, Modal, formatCurrency, inputClass, selectClass } from '../components/UI';
@@ -65,7 +65,22 @@ const getAccountTheme = (type) => {
     }
 };
 
-const AccountCard = ({ acc, onEdit = null }) => {
+// Get local logo path based on bank name
+const getLocalLogo = (bankName) => {
+    if (!bankName) return '/banks/bank2.png';
+    const n = bankName.toLowerCase();
+    if (n.includes('rajhi')) return '/banks/alrajhi.png';
+    if (n.includes('stc')) return '/banks/stc.png';
+    if (n.includes('jazira') || n.includes('ajb')) return '/banks/jazira.png';
+    if (n.includes('ncb') || n.includes('ahli')) return '/banks/ncb.png';
+    if (n.includes('alinma')) return '/banks/alinma.png';
+    if (n.includes('riyadh') || n.includes('riyad')) return '/banks/riyad.png';
+    if (n.includes('sabb') || n.includes('awwal')) return '/banks/sabb.png';
+    return '/banks/bank2.png';
+};
+
+const AccountCard = ({ acc, onEdit = null, onClick = null }) => {
+
     const theme = getAccountTheme(acc.account_type);
     const bankTheme = getBankCardTheme(acc.bank_name, acc.account_type);
     const isCreditCard = acc.account_type === 'Credit Card';
@@ -84,8 +99,10 @@ const AccountCard = ({ acc, onEdit = null }) => {
     // Calculate padding percentage for 1.586:1 aspect ratio = 100 / 1.586 = 63.05%
     return (
         <div className="relative w-full" style={{ paddingBottom: '63.05%' }}>
+
             <div
-                className="absolute inset-0 rounded-xl p-5 shadow-lg text-white overflow-hidden group hover:scale-[1.02] transition-all duration-300 border border-white/10"
+                className="absolute inset-0 rounded-xl p-5 shadow-lg text-white overflow-hidden group hover:scale-[1.02] transition-all duration-300 border border-white/10 cursor-pointer"
+                onClick={onClick}
                 style={{
                     // Background styling
                     backgroundImage: hasCustomBackground
@@ -107,14 +124,24 @@ const AccountCard = ({ acc, onEdit = null }) => {
 
                     {/* Edit Button */}
                     {onEdit && (
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onEdit(acc); }}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            className="absolute top-3 right-3 p-1.5 bg-black/30 hover:bg-black/50 rounded-full backdrop-blur-md transition opacity-0 group-hover:opacity-100 z-20"
-                        >
-                            <Edit3 size={14} />
-                        </button>
+                        <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 z-20">
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onEdit(acc); }}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                className="p-1.5 bg-black/30 hover:bg-black/50 rounded-full backdrop-blur-md transition"
+                            >
+                                <Edit3 size={14} />
+                            </button>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onEdit(acc, 'delete'); }}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                className="p-1.5 bg-red-500/40 hover:bg-red-500/70 rounded-full backdrop-blur-md transition"
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        </div>
                     )}
+
 
                     {/* Footer (Balance and Payment Network Logo) */}
                     <div>
@@ -125,23 +152,43 @@ const AccountCard = ({ acc, onEdit = null }) => {
                                 <p className="text-2xl font-bold tracking-tight text-white drop-shadow-md">{formatCurrency(acc.current_balance)}</p>
                             </div>
 
-                            {/* Right side: Payment Network Logo (Mada/Visa) */}
+                            {/* Right side: Payment Network Logos based on aliases */}
                             <div className="text-right flex flex-col items-end gap-1">
-                                {/* Mada or Visa Logo */}
-                                {showVisa && (
+                                {/* Show logos based on alias names */}
+                                {isCreditCard ? (
                                     <img src="/visa-logo.png" alt="Visa" className="h-6 w-auto object-contain drop-shadow-md" />
-                                )}
-                                {showMada && (
-                                    <img src="/mada-logo.png" alt="Mada" className="h-10 w-auto object-contain drop-shadow-md" />
-                                )}
+                                ) : hasLinkedCard ? (
+                                    <div className="flex flex-col items-end gap-0.5">
+                                        {/* Show logos based on alias types */}
+                                        {(() => {
+                                            const hasMada = acc.aliases.some(a => a.alias_name?.toLowerCase().includes('mada'));
+                                            const hasVisa = acc.aliases.some(a => a.alias_name?.toLowerCase().includes('visa'));
+                                            return (
+                                                <div className="flex flex-col gap-1 items-end">
+                                                    {hasMada && <img src="/mada-logo.png" alt="Mada" className="h-8 w-auto object-contain drop-shadow-md" />}
+                                                    {hasVisa && <img src="/visa-logo.png" alt="Visa" className="h-5 w-auto object-contain drop-shadow-md" />}
+                                                    {!hasMada && !hasVisa && <img src="/mada-logo.png" alt="Mada" className="h-8 w-auto object-contain drop-shadow-md" />}
+                                                </div>
 
-                                {/* Card digits if available */}
-                                {cardDigits && (
+                                            );
+                                        })()}
+                                        {/* Show all card digits */}
+                                        {acc.aliases.map(alias => (
+                                            <span key={alias.id} className="text-[10px] font-mono font-bold tracking-wider text-white/80 drop-shadow-sm">
+                                                •••• {alias.last_4_digits}
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : null}
+
+                                {/* Card digits for credit card */}
+                                {isCreditCard && acc.last_4_digits && (
                                     <span className="text-xs font-mono font-bold tracking-wider text-white/90 drop-shadow-sm">
-                                        •••• {cardDigits}
+                                        •••• {acc.last_4_digits}
                                     </span>
                                 )}
                             </div>
+
                         </div>
 
                         {/* Utilization Bar for Credit Cards */}
@@ -166,7 +213,7 @@ const AccountCard = ({ acc, onEdit = null }) => {
     );
 };
 
-const SortableAccountCard = ({ acc, onEdit }) => {
+const SortableAccountCard = ({ acc, onEdit, onClick }) => {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: acc.id });
 
     const style = {
@@ -178,7 +225,7 @@ const SortableAccountCard = ({ acc, onEdit }) => {
         <div ref={setNodeRef} style={style} {...attributes} className="h-full">
             {/* Drag handle wrapper - only this part captures drag events */}
             <div {...listeners} className="touch-none cursor-grab active:cursor-grabbing h-full">
-                <AccountCard acc={acc} onEdit={onEdit} />
+                <AccountCard acc={acc} onEdit={onEdit} onClick={onClick} />
             </div>
         </div>
     );
@@ -263,6 +310,7 @@ const OverviewAccountRow = ({ acc, allTransactions }) => {
 
 const Accounts = () => {
     const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
 
     // Initialize activeTab: Strictly from URL to ensure History works
     const activeTab = searchParams.get('tab') || 'overview';
@@ -486,15 +534,17 @@ const Accounts = () => {
         }
     };
 
-    const handleDeleteAccount = async () => {
-        if (!editingId || !confirm('Are you sure you want to delete this account? This action cannot be undone.')) return;
+    const handleDeleteAccount = async (accountId = null) => {
+        const idToDelete = accountId || editingId;
+        if (!idToDelete) return;
         try {
-            await axios.delete(`${API_URL}/accounts/${editingId}`);
+            await axios.delete(`${API_URL}/accounts/${idToDelete}`);
             setShowAccountModal(false);
             setEditingId(null);
             fetchData();
         } catch (err) { alert('Error deleting account'); }
     };
+
 
     const handleSaveAccount = async (e) => {
         e.preventDefault();
@@ -519,7 +569,15 @@ const Accounts = () => {
         } catch (err) { alert('Error saving account'); }
     };
 
-    const openAccountModal = (acc = null) => {
+    const openAccountModal = (acc = null, action = null) => {
+        // If delete action, trigger delete directly
+        if (action === 'delete' && acc) {
+            if (window.confirm(`Delete account "${acc.name}"? This cannot be undone.`)) {
+                handleDeleteAccount(acc.id);
+            }
+            return;
+        }
+
         if (acc) {
             setEditingId(acc.id);
             setAccountForm({
@@ -541,6 +599,7 @@ const Accounts = () => {
         }
         setShowAccountModal(true);
     };
+
 
     if (loading) return <div className="p-10 text-center text-white">Loading Accounts...</div>;
 
@@ -638,10 +697,16 @@ const Accounts = () => {
 
                                     {/* Account Cards Grid */}
                                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
                                             <SortableContext items={typeAccounts.map(a => a.id)} strategy={rectSortingStrategy}>
                                                 {typeAccounts.map(acc => (
-                                                    <SortableAccountCard key={acc.id} acc={acc} onEdit={openAccountModal} />
+                                                    <SortableAccountCard
+                                                        key={acc.id}
+                                                        acc={acc}
+                                                        onEdit={openAccountModal}
+                                                        onClick={() => navigate(`/transactions?account_id=${acc.id}`)}
+                                                    />
                                                 ))}
                                             </SortableContext>
                                         </div>
@@ -1164,31 +1229,22 @@ const Accounts = () => {
                             </div>
                         )}
 
-                        {/* Income Account Toggle */}
-                        <div className="flex items-center gap-3 p-3 bg-slate-700/50 rounded border border-slate-600">
-                            <input
-                                type="checkbox"
-                                id="is_income"
-                                checked={accountForm.is_income || false}
-                                onChange={e => setAccountForm({ ...accountForm, is_income: e.target.checked })}
-                                className="w-4 h-4 accent-emerald-500"
-                            />
-                            <label htmlFor="is_income" className="text-sm text-gray-300">
-                                <span className="font-medium">Income Account</span>
-                                <span className="text-gray-500 text-xs block">Use as source for Smart Allocation (e.g., Salary)</span>
-                            </label>
-                        </div>
-
                         <div className="flex justify-between items-center mt-6 gap-3">
+
                             {editingId && (
                                 <button
                                     type="button"
-                                    onClick={handleDeleteAccount}
+                                    onClick={() => {
+                                        if (window.confirm('Delete this account? This cannot be undone.')) {
+                                            handleDeleteAccount();
+                                        }
+                                    }}
                                     className="text-red-400 hover:text-red-300 text-xs flex items-center gap-1 px-3 py-2 hover:bg-red-500/10 rounded-lg transition border border-transparent hover:border-red-500/30"
                                 >
                                     <Trash2 size={14} /> Delete
                                 </button>
                             )}
+
                             <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-medium flex-1 shadow-md border border-green-500 transition">
                                 Save Account
                             </button>

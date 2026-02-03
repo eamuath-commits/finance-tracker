@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { Search, Edit3, Trash2, Plus, User, Calendar, Filter, X, MessageSquare, Upload } from "lucide-react";
 import { Modal, formatCurrency, inputClass, selectClass } from "../components/UI";
 import SMSIngestTab from "../components/SMSIngestTab";
+import ConfirmDialog from "../components/ConfirmDialog";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
@@ -27,7 +28,9 @@ function Transactions() {
     const [accounts, setAccounts] = useState([]);
     const [creditCards, setCreditCards] = useState([]); // NEW: For credit card transactions
     const [inboxMessages, setInboxMessages] = useState([]);
+    const [inboxSearch, setInboxSearch] = useState('');
     const [loading, setLoading] = useState(true);
+
 
     // Modal State
     const [showTxModal, setShowTxModal] = useState(false);
@@ -59,7 +62,28 @@ function Transactions() {
     const [accountFilter, setAccountFilter] = useState('');
     const [typeFilter, setTypeFilter] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
     const [dateRange, setDateRange] = useState({ start: '', end: '' });
+
+    // Sort State
+    const [sortColumn, setSortColumn] = useState('timestamp');
+    const [sortDirection, setSortDirection] = useState('desc'); // 'asc' or 'desc'
+
+    const handleSort = (column) => {
+        if (sortColumn === column) {
+            // Toggle direction if same column
+            setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            // New column, default to desc for date/amount, asc for text
+            setSortColumn(column);
+            setSortDirection(['timestamp', 'amount', 'balance_after_transaction'].includes(column) ? 'desc' : 'asc');
+        }
+    };
+
+
+
+    // Confirm Dialog State (Chrome-compatible replacement for window.confirm)
+    const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, id: null, type: null });
 
     useEffect(() => {
         fetchData();
@@ -90,9 +114,9 @@ function Transactions() {
         }
     };
 
-    // Filter transactions
+    // Filter and Sort transactions
     const filteredTransactions = useMemo(() => {
-        return transactions.filter(tx => {
+        let result = transactions.filter(tx => {
             // Search filter
             if (searchTerm) {
                 const term = searchTerm.toLowerCase().trim();
@@ -102,11 +126,13 @@ function Transactions() {
                     (tx.merchant?.toLowerCase() || '').includes(term) ||
                     (tx.category?.toLowerCase() || '').includes(term) ||
                     (tx.notes?.toLowerCase() || '').includes(term) ||
+                    (tx.raw_sms_content?.toLowerCase() || '').includes(term) ||
                     // Amount search: match exact, partial, or formatted amounts
                     (isNumericSearch && tx.amount?.toString().includes(term.replace(',', ''))) ||
                     tx.amount?.toFixed(2).includes(term.replace(',', ''));
                 if (!matchesSearch) return false;
             }
+
             // Account/Credit Card filter
             if (accountFilter && tx.account_id !== accountFilter && tx.credit_card_id !== accountFilter) return false;
             // Type filter
@@ -117,6 +143,8 @@ function Transactions() {
             }
             // Category filter
             if (categoryFilter && tx.category !== categoryFilter) return false;
+            // Status filter
+            if (statusFilter && tx.status !== statusFilter) return false;
             // Date range filter
             if (dateRange.start) {
                 const txDate = new Date(tx.timestamp);
@@ -131,27 +159,95 @@ function Transactions() {
             }
             return true;
         });
-    }, [transactions, searchTerm, accountFilter, typeFilter, categoryFilter, dateRange]);
+
+        // Apply sorting
+        result.sort((a, b) => {
+            let aVal, bVal;
+
+            switch (sortColumn) {
+                case 'timestamp':
+                    // Parse dates carefully - handle null/undefined
+                    aVal = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+                    bVal = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+                    // If timestamps are NaN, treat as 0
+                    if (isNaN(aVal)) aVal = 0;
+                    if (isNaN(bVal)) bVal = 0;
+                    break;
+                case 'amount':
+                    aVal = parseFloat(a.amount) || 0;
+                    bVal = parseFloat(b.amount) || 0;
+                    break;
+                case 'balance_after_transaction':
+                    aVal = parseFloat(a.balance_after_transaction) || 0;
+                    bVal = parseFloat(b.balance_after_transaction) || 0;
+                    break;
+                case 'merchant':
+                    aVal = (a.merchant || '').toLowerCase();
+                    bVal = (b.merchant || '').toLowerCase();
+                    break;
+                case 'category':
+                    aVal = (a.category || '').toLowerCase();
+                    bVal = (b.category || '').toLowerCase();
+                    break;
+                case 'account':
+                    const aAcc = accounts.find(acc => acc.id === a.account_id);
+                    const bAcc = accounts.find(acc => acc.id === b.account_id);
+                    aVal = (aAcc?.name || '').toLowerCase();
+                    bVal = (bAcc?.name || '').toLowerCase();
+                    break;
+                default:
+                    return 0;
+            }
+
+            // Compare
+            let comparison = 0;
+            if (aVal < bVal) comparison = -1;
+            else if (aVal > bVal) comparison = 1;
+
+            // Apply direction
+            return sortDirection === 'asc' ? comparison : -comparison;
+        });
+
+        return result;
+    }, [transactions, searchTerm, accountFilter, typeFilter, categoryFilter, statusFilter, dateRange, sortColumn, sortDirection, accounts]);
+
 
     const handleDeleteTx = async (id) => {
-        if (!window.confirm("Are you sure?")) return;
-        try {
-            await axios.delete(`${API_URL}/transactions/${id}`);
-            setTransactions(transactions.filter(t => t.id !== id));
-        } catch (e) {
-            console.error("Delete failed:", e);
-        }
+        setConfirmDialog({ isOpen: true, id, type: 'transaction' });
     };
 
     const handleDeleteMsg = async (id) => {
-        if (!window.confirm("Are you sure?")) return;
+        setConfirmDialog({ isOpen: true, id, type: 'message' });
+    };
+
+    const confirmDelete = async () => {
+        const { id, type } = confirmDialog;
+        setConfirmDialog({ isOpen: false, id: null, type: null });
         try {
-            await axios.post(`${API_URL}/messages/bulk-delete`, { ids: [id] });
-            setInboxMessages(inboxMessages.filter(m => m.id !== id));
+            if (type === 'transaction') {
+                await axios.delete(`${API_URL}/transactions/${id}`);
+                setTransactions(transactions.filter(t => t.id !== id));
+            } else if (type === 'message') {
+                await axios.post(`${API_URL}/messages/bulk-delete`, { ids: [id] });
+                setInboxMessages(inboxMessages.filter(m => m.id !== id));
+            } else if (type === 'bulk_message') {
+                await axios.post(`${API_URL}/messages/bulk-delete`, { ids: id });
+                setSelectedMsgIds(new Set());
+                setIsSelectionMode(false);
+                fetchData();
+            } else if (type === 'bulk_transaction') {
+                await axios.post(`${API_URL}/transactions/bulk-delete`, { ids: id });
+                setSelectedTxIds(new Set());
+                setIsSelectionMode(false);
+                fetchData();
+            }
         } catch (e) {
             console.error("Delete failed:", e);
         }
     };
+
+
+
 
     const openTxModal = (tx) => {
         if (tx) {
@@ -273,11 +369,20 @@ function Transactions() {
         }
     };
 
-    const handleBulkDelete = async () => {
+    const handleBulkDelete = () => {
+        // Use ConfirmDialog instead of window.confirm (Chrome blocks window.confirm)
         const ids = activeTab === 'inbox' ? Array.from(selectedMsgIds) : Array.from(selectedTxIds);
-        if (!window.confirm(`Delete ${ids.length} items?`)) return;
+        if (ids.length === 0) return;
+        setConfirmDialog({
+            isOpen: true,
+            id: ids,
+            type: activeTab === 'inbox' ? 'bulk_message' : 'bulk_transaction'
+        });
+    };
+
+    const executeBulkDelete = async (ids, type) => {
         try {
-            if (activeTab === 'inbox') {
+            if (type === 'bulk_message') {
                 await axios.post(`${API_URL}/messages/bulk-delete`, { ids });
                 setSelectedMsgIds(new Set());
             } else {
@@ -290,6 +395,7 @@ function Transactions() {
             console.error("Bulk delete failed", e);
         }
     };
+
 
     const handleRetry = async (msgId) => {
         try {
@@ -319,7 +425,8 @@ function Transactions() {
         }
     };
 
-    const hasActiveFilters = searchTerm || accountFilter || typeFilter || categoryFilter || dateRange.start || dateRange.end;
+    const hasActiveFilters = searchTerm || accountFilter || typeFilter || categoryFilter || statusFilter || dateRange.start || dateRange.end;
+
 
     return (
         <div className="space-y-6">
@@ -449,6 +556,21 @@ function Transactions() {
                                 <div className="absolute right-3 top-3.5 text-gray-400 pointer-events-none">▼</div>
                             </div>
 
+                            {/* Status */}
+                            <div className="relative">
+                                <select
+                                    className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 appearance-none"
+                                    value={statusFilter}
+                                    onChange={e => setStatusFilter(e.target.value)}
+                                >
+                                    <option value="">All Statuses</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="pending_action">Pending Action</option>
+                                    <option value="pending_transfer">Pending Transfer</option>
+                                </select>
+                                <div className="absolute right-3 top-3.5 text-gray-400 pointer-events-none">▼</div>
+                            </div>
+
                             {/* Start Date */}
                             <input
                                 type="date"
@@ -511,12 +633,42 @@ function Transactions() {
                                             />
                                         </th>
                                     )}
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Account / Card</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Beneficiary / Source</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Category</th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Amount</th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Balance</th>
+                                    <th
+                                        onClick={() => handleSort('timestamp')}
+                                        className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white hover:bg-slate-800 transition-colors"
+                                    >
+                                        Date {sortColumn === 'timestamp' && (sortDirection === 'asc' ? '▲' : '▼')}
+                                    </th>
+                                    <th
+                                        onClick={() => handleSort('account')}
+                                        className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white hover:bg-slate-800 transition-colors"
+                                    >
+                                        Account / Card {sortColumn === 'account' && (sortDirection === 'asc' ? '▲' : '▼')}
+                                    </th>
+                                    <th
+                                        onClick={() => handleSort('merchant')}
+                                        className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white hover:bg-slate-800 transition-colors"
+                                    >
+                                        Beneficiary / Source {sortColumn === 'merchant' && (sortDirection === 'asc' ? '▲' : '▼')}
+                                    </th>
+                                    <th
+                                        onClick={() => handleSort('category')}
+                                        className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white hover:bg-slate-800 transition-colors"
+                                    >
+                                        Category {sortColumn === 'category' && (sortDirection === 'asc' ? '▲' : '▼')}
+                                    </th>
+                                    <th
+                                        onClick={() => handleSort('amount')}
+                                        className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white hover:bg-slate-800 transition-colors"
+                                    >
+                                        Amount {sortColumn === 'amount' && (sortDirection === 'asc' ? '▲' : '▼')}
+                                    </th>
+                                    <th
+                                        onClick={() => handleSort('balance_after_transaction')}
+                                        className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white hover:bg-slate-800 transition-colors"
+                                    >
+                                        Balance {sortColumn === 'balance_after_transaction' && (sortDirection === 'asc' ? '▲' : '▼')}
+                                    </th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
@@ -655,14 +807,51 @@ function Transactions() {
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-bold text-white">SMS Inbox</h2>
                         <div className="flex gap-2">
-                            {isSelectionMode && selectedMsgIds.size > 0 && (
-                                <button
-                                    onClick={handleBulkDelete}
-                                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm"
-                                >
-                                    <Trash2 size={16} /> Delete ({selectedMsgIds.size})
-                                </button>
-                            )}
+                            {isSelectionMode && (() => {
+                                // Get filtered messages based on search
+                                const filteredMsgs = inboxMessages.filter(msg => {
+                                    if (!inboxSearch.trim()) return true;
+                                    const search = inboxSearch.toLowerCase();
+                                    return (
+                                        (msg.body || '').toLowerCase().includes(search) ||
+                                        (msg.sender || '').toLowerCase().includes(search)
+                                    );
+                                });
+                                const allFilteredSelected = filteredMsgs.length > 0 &&
+                                    filteredMsgs.every(m => selectedMsgIds.has(m.id));
+
+                                return (
+                                    <>
+                                        <button
+                                            onClick={() => {
+                                                if (allFilteredSelected) {
+                                                    // Deselect all filtered
+                                                    const next = new Set(selectedMsgIds);
+                                                    filteredMsgs.forEach(m => next.delete(m.id));
+                                                    setSelectedMsgIds(next);
+                                                } else {
+                                                    // Select all filtered
+                                                    const next = new Set(selectedMsgIds);
+                                                    filteredMsgs.forEach(m => next.add(m.id));
+                                                    setSelectedMsgIds(next);
+                                                }
+                                            }}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm"
+                                        >
+                                            {allFilteredSelected ? 'Deselect All' : `Select All${inboxSearch.trim() ? ` (${filteredMsgs.length})` : ''}`}
+                                        </button>
+
+                                        {selectedMsgIds.size > 0 && (
+                                            <button
+                                                onClick={handleBulkDelete}
+                                                className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm"
+                                            >
+                                                <Trash2 size={16} /> Delete ({selectedMsgIds.size})
+                                            </button>
+                                        )}
+                                    </>
+                                );
+                            })()}
                             <button
                                 onClick={() => {
                                     setIsSelectionMode(!isSelectionMode);
@@ -675,59 +864,83 @@ function Transactions() {
                         </div>
                     </div>
 
-                    {inboxMessages.map((msg) => (
-                        <div key={msg.id} className="bg-slate-800 p-4 rounded-xl border border-slate-700 flex justify-between items-start group">
-                            <div className="flex gap-3">
-                                {isSelectionMode && (
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedMsgIds.has(msg.id)}
-                                        onChange={() => {
-                                            const next = new Set(selectedMsgIds);
-                                            if (next.has(msg.id)) next.delete(msg.id);
-                                            else next.add(msg.id);
-                                            setSelectedMsgIds(next);
-                                        }}
-                                        className="mt-1 w-4 h-4 accent-blue-500"
-                                    />
-                                )}
-                                <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-sm font-bold text-white">{msg.sender || "Unknown Sender"}</span>
-                                        <span className="text-xs text-gray-500">{format(new Date(msg.timestamp), "MMM d, HH:mm")}</span>
-                                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${msg.status === 'PARSED' ? 'bg-emerald-900/30 text-emerald-400' : msg.status === 'FAILED' ? 'bg-red-900/30 text-red-400' : 'bg-yellow-900/30 text-yellow-400'}`}>
-                                            {msg.status}
-                                        </span>
-                                    </div>
-                                    <p className="text-gray-300 text-sm whitespace-pre-wrap">{msg.body}</p>
-                                    {msg.error_log && (
-                                        <p className="text-red-400 text-xs mt-2 font-mono bg-red-900/20 p-2 rounded">
-                                            Error: {msg.error_log}
-                                        </p>
+
+                    {/* Search Bar */}
+                    <div className="mb-4">
+                        <input
+                            type="text"
+                            placeholder="Search messages (OTP, bank name, etc.)"
+                            value={inboxSearch}
+                            onChange={(e) => setInboxSearch(e.target.value)}
+                            className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                        />
+                    </div>
+
+                    {inboxMessages
+                        .filter(msg => {
+                            if (!inboxSearch.trim()) return true;
+                            const search = inboxSearch.toLowerCase();
+                            return (
+                                (msg.body || '').toLowerCase().includes(search) ||
+                                (msg.sender || '').toLowerCase().includes(search)
+                            );
+                        })
+                        .map((msg) => (
+
+                            <div key={msg.id} className="bg-slate-800 p-4 rounded-xl border border-slate-700 flex justify-between items-start group">
+                                <div className="flex gap-3">
+                                    {isSelectionMode && (
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedMsgIds.has(msg.id)}
+                                            onChange={() => {
+                                                const next = new Set(selectedMsgIds);
+                                                if (next.has(msg.id)) next.delete(msg.id);
+                                                else next.add(msg.id);
+                                                setSelectedMsgIds(next);
+                                            }}
+                                            className="mt-1 w-4 h-4 accent-blue-500"
+                                        />
                                     )}
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-sm font-bold text-white">{msg.sender || "Unknown Sender"}</span>
+                                            <span className="text-xs text-gray-500">{format(new Date(msg.timestamp), "MMM d, HH:mm")}</span>
+                                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${msg.status === 'PARSED' ? 'bg-emerald-900/30 text-emerald-400' : msg.status === 'FAILED' ? 'bg-red-900/30 text-red-400' : 'bg-yellow-900/30 text-yellow-400'}`}>
+                                                {msg.status}
+                                            </span>
+                                        </div>
+                                        <p className="text-gray-300 text-sm whitespace-pre-wrap">{msg.body}</p>
+                                        {msg.error_log && (
+                                            <p className="text-red-400 text-xs mt-2 font-mono bg-red-900/20 p-2 rounded">
+                                                Error: {msg.error_log}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="flex gap-2 items-start">
-                                {msg.status === 'FAILED' && (
+                                <div className="flex gap-2 items-start">
+                                    {/* Re-parse button for all messages */}
                                     <button
                                         onClick={() => handleRetry(msg.id)}
                                         className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition shadow"
+                                        title="Re-parse this SMS with updated AI"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" /><path d="M16 21h5v-5" /></svg>
-                                        Retry Parse
+                                        Re-parse
                                     </button>
-                                )}
-                                <button onClick={() => handleDeleteMsg(msg.id)} className="text-red-400 hover:text-red-300 p-1.5 hover:bg-slate-700 rounded transition">
-                                    <Trash2 size={16} />
-                                </button>
+
+                                    <button onClick={() => handleDeleteMsg(msg.id)} className="text-red-400 hover:text-red-300 p-1.5 hover:bg-slate-700 rounded transition">
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        ))}
                     {inboxMessages.length === 0 && (
                         <div className="text-center py-12 text-gray-500">No messages in inbox.</div>
                     )}
                 </div>
-            ) : null}
+            ) : null
+            }
 
             {/* SMS Ingest Tab - Always mounted to preserve state, hidden when not active */}
             <div className={activeTab === "ingest" ? "" : "hidden"}>
@@ -738,8 +951,25 @@ function Transactions() {
                 />
             </div>
 
+
+            {/* Confirm Delete Dialog */}
+            <ConfirmDialog
+                isOpen={confirmDialog.isOpen}
+                title={confirmDialog.type?.startsWith('bulk_') ? `Delete ${Array.isArray(confirmDialog.id) ? confirmDialog.id.length : 1} Items` : "Delete Item"}
+                message={confirmDialog.type?.startsWith('bulk_')
+                    ? `Are you sure you want to delete ${Array.isArray(confirmDialog.id) ? confirmDialog.id.length : 1} items? This action cannot be undone.`
+                    : "Are you sure you want to delete this? This action cannot be undone."}
+                confirmText="Delete"
+                cancelText="Cancel"
+                variant="danger"
+                onConfirm={confirmDelete}
+                onCancel={() => setConfirmDialog({ isOpen: false, id: null, type: null })}
+            />
+
+
             {/* Transaction Modal */}
             <Modal isOpen={showTxModal} title={editingTx ? "Edit Transaction" : "Add Transaction"} onClose={() => setShowTxModal(false)}>
+
                 <form onSubmit={handleSaveTx} className="space-y-4">
                     {/* Transaction Type */}
                     <div className="grid grid-cols-3 gap-2 mb-4">
@@ -985,7 +1215,7 @@ function Transactions() {
                     </div>
                 </form>
             </Modal>
-        </div>
+        </div >
     );
 }
 

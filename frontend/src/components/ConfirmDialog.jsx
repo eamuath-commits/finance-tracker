@@ -41,7 +41,7 @@ const ConfirmDialog = ({
     const styles = variantStyles[variant] || variantStyles.danger;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ pointerEvents: 'auto' }}>
             {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-black/70 backdrop-blur-sm"
@@ -70,12 +70,14 @@ const ConfirmDialog = ({
                     {/* Actions */}
                     <div className="flex gap-3">
                         <button
+                            type="button"
                             onClick={onCancel}
                             className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2.5 px-4 rounded-lg font-medium transition"
                         >
                             {cancelText}
                         </button>
                         <button
+                            type="button"
                             onClick={onConfirm}
                             className={`flex-1 ${styles.confirmBtn} text-white py-2.5 px-4 rounded-lg font-medium transition`}
                         >
@@ -85,6 +87,7 @@ const ConfirmDialog = ({
                 </div>
             </div>
         </div>
+
     );
 };
 
