@@ -97,6 +97,8 @@ class TransactionCreate(TransactionBase):
     source: Optional[str] = None  # Source: 'telegram', 'webui', 'manual'
 
 class TransactionUpdate(BaseModel):
+    account_id: Optional[str] = None
+    credit_card_id: Optional[str] = None
     amount: Optional[float] = None
     merchant: Optional[str] = None
     category: Optional[str] = None
