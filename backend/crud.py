@@ -396,6 +396,30 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate):
     db.commit()
     db.refresh(db_transaction)
     
+    # Add to transaction queue for tracking
+    # pending_action = blocked (needs user resolution)
+    # completed/pending_transfer = processed (balance already updated above)
+    if transaction.status == "pending_action":
+        queue_entry = models.TransactionQueue(
+            transaction_id=db_transaction.id,
+            account_id=transaction.account_id,
+            credit_card_id=transaction.credit_card_id,
+            status="blocked",
+            blocked_reason="Missing source account"
+        )
+        db.add(queue_entry)
+        db.commit()
+    elif transaction.status in ["completed", "pending_transfer"]:
+        queue_entry = models.TransactionQueue(
+            transaction_id=db_transaction.id,
+            account_id=transaction.account_id,
+            credit_card_id=transaction.credit_card_id,
+            status="processed",
+            processed_at=datetime.utcnow()
+        )
+        db.add(queue_entry)
+        db.commit()
+    
     # Check if this transaction is older than existing ones - if so, recalculate all balances
     if transaction.timestamp and (account or credit_card) and transaction.status in ["completed", "pending_transfer"]:
         # Find the newest existing transaction for this account/card
