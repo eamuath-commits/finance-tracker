@@ -61,6 +61,7 @@ function Transactions() {
     const [categoryFilter, setCategoryFilter] = useState('');
     const [dateRange, setDateRange] = useState({ start: '', end: '' });
     const [sortOrder, setSortOrder] = useState('desc'); // 'asc' or 'desc' for date sorting
+    const [countLimit, setCountLimit] = useState(''); // '' = all, '10', '25', '50', '100'
 
     // Initialize filter from URL params (for navigation from account/credit card pages)
     useEffect(() => {
@@ -113,7 +114,7 @@ function Transactions() {
 
     // Filter transactions
     const filteredTransactions = useMemo(() => {
-        return transactions.filter(tx => {
+        const filtered = transactions.filter(tx => {
             // Search filter
             if (searchTerm) {
                 const term = searchTerm.toLowerCase().trim();
@@ -152,12 +153,21 @@ function Transactions() {
                 if (txDate > endDate) return false;
             }
             return true;
-        }).sort((a, b) => {
+        });
+
+        // Sort by date
+        const sorted = filtered.sort((a, b) => {
             const dateA = new Date(a.timestamp);
             const dateB = new Date(b.timestamp);
             return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
         });
-    }, [transactions, searchTerm, accountFilter, typeFilter, categoryFilter, dateRange, sortOrder]);
+
+        // Apply count limit if set
+        if (countLimit && !isNaN(parseInt(countLimit))) {
+            return sorted.slice(0, parseInt(countLimit));
+        }
+        return sorted;
+    }, [transactions, searchTerm, accountFilter, typeFilter, categoryFilter, dateRange, sortOrder, countLimit]);
 
     // Calculate totals based on filtered transactions
     const totals = useMemo(() => {
@@ -347,6 +357,7 @@ function Transactions() {
         setTypeFilter('');
         setCategoryFilter('');
         setDateRange({ start: '', end: '' });
+        setCountLimit('');
     };
 
     const completePendingTransfer = async (txId, sourceAccountId) => {
@@ -485,6 +496,22 @@ function Transactions() {
                                 >
                                     <option value="">All Categories</option>
                                     {Categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                </select>
+                                <div className="absolute right-3 top-3.5 text-gray-400 pointer-events-none">▼</div>
+                            </div>
+
+                            {/* Count Limit */}
+                            <div className="relative">
+                                <select
+                                    className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 appearance-none"
+                                    value={countLimit}
+                                    onChange={e => setCountLimit(e.target.value)}
+                                >
+                                    <option value="">Show All</option>
+                                    <option value="10">Last 10</option>
+                                    <option value="25">Last 25</option>
+                                    <option value="50">Last 50</option>
+                                    <option value="100">Last 100</option>
                                 </select>
                                 <div className="absolute right-3 top-3.5 text-gray-400 pointer-events-none">▼</div>
                             </div>
