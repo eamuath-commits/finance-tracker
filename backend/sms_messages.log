@@ -240,3 +240,13 @@
 2026-02-02 18:36:07,133 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— Online Purchase | By:9365;mada-Apple Pay | From:1505 | Amount:SAR 207.45 | At:HUNGERSTA | 2/2/26 18:36
 2026-02-03 22:41:43,436 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— Online Purchase | By:9365;mada-Apple Pay | From:1505 | Amount:SAR 81 | At:Jahez | 4/2/26 22:42
 2026-02-03 23:04:34,925 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— Online Purchase | By:9365;mada-Apple Pay | From:1505 | Amount:SAR 49.47 | At:Mrsool | 4/2/26 23:04
+2026-02-04 10:10:30,679 | FROM: Channel_-1003635708322 | SMS: Jazira Bank —— One Time Password | Code: 9228 | Reason: Confirmation to enroll into La Tajil Program | Transaction Amount: 5200 | Date: 2026-02-04 10:10
+2026-02-04 12:50:41,833 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— PoS | By:9365;mada-Apple Pay | Amount:SAR 7 | At:GOT COOKI | 4/2/26 12:51
+2026-02-04 15:18:29,410 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— PoS | By:9365;mada-Apple Pay | Amount:SAR 7 | At:GOT COOKI | 4/2/26 15:18
+2026-02-04 15:19:20,371 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— PoS | By:9365;mada-Apple Pay | Amount:SAR 8 | At:CITY FRES | 4/2/26 15:19
+2026-02-04 16:11:05,105 | FROM: Channel_-1003635708322 | SMS: Jazira Bank —— POS Purchase Contactless Credit card 4897 of :550.00 SAR At: Start of Change Medical C on : 2026-02-04 16:11 Available Balance : 10809.80 SAR Due Amount: 58440.2 SAR
+2026-02-04 18:07:46,943 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— Online Purchase | By:9365;mada-Apple Pay | From:1505 | Amount:SAR 85.68 | At:HUNGERSTA | 4/2/26 18:08
+2026-02-04 20:30:11,274 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank —— Notification : Declined due to insufficient fund | Transaction : Online Purchase | Card: 7868 | Amount : USD 31.29 | Merchant : ADOBE *8 | Date : 4/2/26 20:30
+2026-02-04 20:32:50,587 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— PoS | By:4390;mada-Apple Pay | Amount:SAR 1552.37 | At:SAUDI MAR | 5/2/26 20:33
+2026-02-04 22:38:40,641 | FROM: Channel_-1003635708322 | SMS: STC Bank —— 7958 is your OTP | For: Transfer to contact | Amount: 1.00 SAR | *Do not share the code
+2026-02-04 22:38:47,037 | FROM: Channel_-1003635708322 | SMS: STC Bank —— Internal outward transfer | Amount:1.00SAR | To:SARAH ALALMAEE | Acc:3537* | At:04/02/26 22:39
