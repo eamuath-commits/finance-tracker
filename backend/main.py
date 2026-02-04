@@ -20,6 +20,7 @@ import sms_agent
 import analysis
 import analysis_schema
 import queue_processor
+from rate_limiter import RateLimitMiddleware
 
 # --- Migration Logic ---
 def run_migrations(engine):
@@ -191,6 +192,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Rate limiting middleware (must be added after CORS)
+app.add_middleware(RateLimitMiddleware)
 
 @app.get("/")
 def read_root():
