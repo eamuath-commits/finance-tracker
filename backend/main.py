@@ -848,11 +848,18 @@ def complete_pending_transfer(transaction_id: str, source_account_id: str, db: S
     )
     db.add(debit_queue)
     
-    # 5. Unblock any blocked queue items and auto-process
-    # NOTE: Only process source - destination was already credited by apply_balance_update above
-    queue_processor.unblock_transaction(db, pending_tx.id)
+    # 5. Mark the credit transaction's queue entry as processed (NOT queued!)
+    # The balance was already applied above, so we must NOT allow try_process to apply it again
+    credit_queue = db.query(models.TransactionQueue).filter(
+        models.TransactionQueue.transaction_id == pending_tx.id
+    ).first()
+    if credit_queue:
+        credit_queue.status = "processed"
+        credit_queue.blocked_reason = None
+        credit_queue.processed_at = datetime.utcnow()
+    
+    # Process any remaining queued items for source account
     queue_processor.try_process(db, account_id=source_account_id)
-    # DO NOT call try_process for pending_tx.account_id - we already applied balance update manually
     
     db.commit()
     db.refresh(pending_tx)

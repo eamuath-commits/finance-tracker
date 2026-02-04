@@ -7749,3 +7749,5 @@ By:9365;mada-Apple ...
 2026-02-04 08:47:36,712 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=Expense
 2026-02-04 08:47:36,712 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to Expense
 2026-02-04 08:47:36,717 - sms_agent - INFO - DEBUG: Created transaction 2d2f1093-3346-4bd4-84dd-85b063c58014 with status pending_action
+2026-02-04 08:49:59,016 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-04 08:50:14,126 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
