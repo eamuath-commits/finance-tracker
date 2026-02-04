@@ -14735,3 +14735,192 @@ Transfer Between Your Accounts
 Amount: SAR 5000
 To: 1505
 26/1/30 21:26 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_account_last4": "1505", "amount": 5000, "currency": "SAR", "timestamp": "2026-01-30 21:26", "description": "Transfer to 1505"}
+2026-02-04 08:51:37,564 - ai_raw_io - INFO - INPUT: 2026-01-25 09:50:58 from AlRajhiBank
+
+Credit Transfer Local
+Via:SAUDI AWWAL BANK (FORMERLY: THE SAUDI BRITISH BANK
+Amount:SAR 110095.73
+To:3264
+From:DELL TECHNOLOGIES SINGLE LLC
+From:
+26/1/25 09:50 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "transfer", "source_bank": "SAUDI AWWAL BANK", "destination_bank": "AlRajhiBank", "destination_account_last4": "3264", "amount": 110095.73, "currency": "SAR", "fees": null, "timestamp": "2026-01-25 09:50", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": "DELL TECHNOLOGIES SINGLE LLC", "category": "Salary", "description": "Salary from DELL TECHNOLOGIES"}
+2026-02-04 08:51:39,217 - ai_raw_io - INFO - INPUT: 2026-01-25 17:05:01 from AlRajhiBank
+
+Debit Transfer Local
+Bank:Stc bank
+From:3264
+Amount:SAR 4800
+To:MUATH ALASIRI
+To:0863
+Fees:SAR 0.58
+26/1/25 17:04 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "transfer", "source_bank": "AlRajhiBank", "destination_bank": "Stc bank", "source_account_last4": "3264", "destination_account_last4": "0863", "amount": 4800, "currency": "SAR", "fees": 0.58, "timestamp": "2026-01-25 17:05", "beneficiary": "MUATH ALASIRI", "category": "Transfer", "description": "Transfer to MUATH ALASIRI"}
+2026-02-04 08:51:40,972 - ai_raw_io - INFO - INPUT: 2026-01-25 17:47:25 from AlRajhiBank
+
+Transfer Between Your Accounts
+Amount: SAR 11354.96
+To: 9384
+26/1/25 17:47 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_account_last4": "9384", "amount": 11354.96, "currency": "SAR", "timestamp": "2026-01-25 17:47", "description": "Transfer to 9384", "source_account_last4": null, "destination_bank": "AlRajhiBank", "card_info": null, "fees": null, "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": "Transfer"}
+2026-02-04 08:51:52,008 - ai_raw_io - INFO - INPUT: 2026-01-25 17:48:38 from AlRajhiBank
+
+Transfer Between Your Accounts
+Amount: SAR 3032.19
+To: 5225
+26/1/25 17:48 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_bank": "AlRajhiBank", "destination_account_last4": "5225", "amount": 3032.19, "currency": "SAR", "fees": null, "timestamp": "2026-01-25 17:48", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Transfer to 5225"}
+2026-02-04 08:52:01,841 - ai_raw_io - INFO - INPUT: 2026-01-25 17:49:51 from AlRajhiBank
+
+Transfer Between Your Accounts
+Amount: SAR 10000
+To: 1505
+26/1/25 17:49 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_account_last4": "1505", "amount": 10000, "currency": "SAR", "fees": null, "timestamp": "2026-01-25 17:49", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Transfer to 1505"}
+2026-02-04 08:52:10,470 - ai_raw_io - INFO - INPUT: 2026-01-25 17:51:06 from AlRajhiBank
+
+Debit Transfer Local
+Bank:BJAZ
+From:3264
+Amount:SAR 58430.24
+To:Muath Alasiri
+To:8001
+Fees:SAR 2.88
+26/1/25 17:51 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "transfer", "source_bank": "AlRajhiBank", "destination_bank": "Jazira Bank", "source_account_last4": "3264", "destination_account_last4": "8001", "amount": 58430.24, "currency": "SAR", "fees": 2.88, "timestamp": "2026-01-25 17:51", "beneficiary": "Muath Alasiri", "category": "Transfer", "description": "Transfer to Muath Alasiri"}
+2026-02-04 08:52:12,633 - ai_raw_io - INFO - INPUT: 2026-01-30 21:26:21 from AlRajhiBank
+
+Transfer Between Your Accounts
+Amount: SAR 5000
+To: 3264
+26/1/30 21:26 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_bank": "AlRajhiBank", "destination_account_last4": "3264", "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 21:26", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Transfer to 3264"}
+2026-02-04 08:52:34,876 - ai_raw_io - INFO - INPUT: 2026-01-30 21:27:00 from AlRajhiBank
+
+Transfer Between Your Accounts
+Amount: SAR 5000
+To: 1505
+26/1/30 21:26 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_account_last4": "1505", "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 21:26", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Transfer to 1505"}
+2026-02-04 08:54:09,498 - ai_raw_io - INFO - INPUT: 2026-01-30 21:26:21 from AlRajhiBank
+
+Transfer Between Your Accounts
+Amount: SAR 5000
+To: 3264
+26/1/30 21:26 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_account_last4": "3264", "amount": 5000, "currency": "SAR", "timestamp": "2026-01-30 21:26", "description": "Transfer to 3264"}
+2026-02-04 08:54:20,800 - ai_raw_io - INFO - INPUT: 2026-01-30 21:27:00 from AlRajhiBank
+
+Transfer Between Your Accounts
+Amount: SAR 5000
+To: 1505
+26/1/30 21:26 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_account_last4": "1505", "amount": 5000, "currency": "SAR", "timestamp": "2026-01-30 21:26", "description": "Transfer to 1505", "source_account_last4": null, "destination_bank": "AlRajhiBank", "card_info": null, "fees": null, "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": null}
+2026-02-04 08:55:42,144 - ai_raw_io - INFO - INPUT: 2026-01-25 09:50:58 from AlRajhiBank
+
+Credit Transfer Local
+Via:SAUDI AWWAL BANK (FORMERLY: THE SAUDI BRITISH BANK
+Amount:SAR 110095.73
+To:3264
+From:DELL TECHNOLOGIES SINGLE LLC
+From:
+26/1/25 09:50 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "transfer", "source_bank": "SAUDI AWWAL BANK", "destination_bank": "AlRajhiBank", "destination_account_last4": "3264", "source_account_last4": null, "card_info": null, "amount": 110095.73, "currency": "SAR", "fees": null, "timestamp": "2026-01-25 09:50", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": "DELL TECHNOLOGIES SINGLE LLC", "category": "Salary", "description": "Salary from DELL TECHNOLOGIES"}
+2026-02-04 08:55:44,504 - ai_raw_io - INFO - INPUT: 2026-01-25 17:05:01 from AlRajhiBank
+
+Debit Transfer Local
+Bank:Stc bank
+From:3264
+Amount:SAR 4800
+To:MUATH ALASIRI
+To:0863
+Fees:SAR 0.58
+26/1/25 17:04 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "transfer", "source_bank": "AlRajhiBank", "destination_bank": "Stc bank", "source_account_last4": "3264", "destination_account_last4": "0863", "amount": 4800, "currency": "SAR", "fees": 0.58, "timestamp": "2026-01-25 17:04", "available_balance": null, "beneficiary": "MUATH ALASIRI", "merchant": null, "sender_name": null, "category": "Transfer", "description": "Transfer to MUATH ALASIRI"}
+2026-02-04 08:55:46,652 - ai_raw_io - INFO - INPUT: 2026-01-25 17:47:25 from AlRajhiBank
+
+Transfer Between Your Accounts
+Amount: SAR 11354.96
+To: 9384
+26/1/25 17:47 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_bank": "AlRajhiBank", "destination_account_last4": "9384", "amount": 11354.96, "currency": "SAR", "fees": null, "timestamp": "2026-01-25 17:47", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": "Transfer", "description": "Transfer to 9384"}
+2026-02-04 08:55:53,470 - ai_raw_io - INFO - INPUT: 2026-01-25 17:48:38 from AlRajhiBank
+
+Transfer Between Your Accounts
+Amount: SAR 3032.19
+To: 5225
+26/1/25 17:48 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_account_last4": "5225", "amount": 3032.19, "currency": "SAR", "fees": null, "timestamp": "2026-01-25 17:48", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Transfer to 5225"}
+2026-02-04 08:56:08,979 - ai_raw_io - INFO - INPUT: 2026-01-25 17:49:51 from AlRajhiBank
+
+Transfer Between Your Accounts
+Amount: SAR 10000
+To: 1505
+26/1/25 17:49 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_account_last4": "1505", "amount": 10000, "currency": "SAR", "fees": null, "timestamp": "2026-01-25 17:49", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Transfer to 1505"}
+2026-02-04 08:56:20,648 - ai_raw_io - INFO - INPUT: 2026-01-25 17:51:06 from AlRajhiBank
+
+Debit Transfer Local
+Bank:BJAZ
+From:3264
+Amount:SAR 58430.24
+To:Muath Alasiri
+To:8001
+Fees:SAR 2.88
+26/1/25 17:51 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "transfer", "source_bank": "AlRajhiBank", "destination_bank": "Jazira Bank", "source_account_last4": "3264", "destination_account_last4": "8001", "amount": 58430.24, "currency": "SAR", "fees": 2.88, "timestamp": "2026-01-25 17:51", "beneficiary": "Muath Alasiri", "category": "Transfer", "description": "Transfer to Muath Alasiri"}
+2026-02-04 08:56:22,418 - ai_raw_io - INFO - INPUT: 2026-01-30 21:26:21 from AlRajhiBank
+
+Transfer Between Your Accounts
+Amount: SAR 5000
+To: 3264
+26/1/30 21:26 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_account_last4": "3264", "amount": 5000, "currency": "SAR", "timestamp": "2026-01-30 21:26", "description": "Transfer to 3264"}
+2026-02-04 08:56:30,595 - ai_raw_io - INFO - INPUT: 2026-01-30 21:27:00 from AlRajhiBank
+
+Transfer Between Your Accounts
+Amount: SAR 5000
+To: 1505
+26/1/30 21:26 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_account_last4": "1505", "card_info": null, "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 21:26", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Transfer to 1505"}
+2026-02-04 08:57:39,807 - ai_raw_io - INFO - INPUT: 2026-01-25 09:50:58 from AlRajhiBank
+
+Credit Transfer Local
+Via:SAUDI AWWAL BANK (FORMERLY: THE SAUDI BRITISH BANK
+Amount:SAR 110095.73
+To:3264
+From:DELL TECHNOLOGIES SINGLE LLC
+From:
+26/1/25 09:50 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "transfer", "source_bank": "SAUDI AWWAL BANK", "destination_bank": "AlRajhiBank", "destination_account_last4": "3264", "amount": 110095.73, "currency": "SAR", "fees": null, "timestamp": "2026-01-25 09:50", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": "DELL TECHNOLOGIES SINGLE LLC", "category": "Salary", "description": "Salary from DELL TECHNOLOGIES"}
+2026-02-04 08:57:41,948 - ai_raw_io - INFO - INPUT: 2026-01-25 17:05:01 from AlRajhiBank
+
+Debit Transfer Local
+Bank:Stc bank
+From:3264
+Amount:SAR 4800
+To:MUATH ALASIRI
+To:0863
+Fees:SAR 0.58
+26/1/25 17:04 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "transfer", "source_bank": "AlRajhiBank", "destination_bank": "Stc bank", "source_account_last4": "3264", "destination_account_last4": "0863", "amount": 4800, "currency": "SAR", "fees": 0.58, "timestamp": "2026-01-25 17:04", "available_balance": null, "beneficiary": "MUATH ALASIRI", "merchant": null, "sender_name": null, "category": "Transfer", "description": "Transfer to MUATH ALASIRI"}
+2026-02-04 08:57:44,182 - ai_raw_io - INFO - INPUT: 2026-01-25 17:47:25 from AlRajhiBank
+
+Transfer Between Your Accounts
+Amount: SAR 11354.96
+To: 9384
+26/1/25 17:47 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_account_last4": "9384", "amount": 11354.96, "currency": "SAR", "timestamp": "2026-01-25 17:47", "description": "Transfer to 9384", "fees": null, "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "card_info": null, "destination_bank": null}
+2026-02-04 08:57:59,771 - ai_raw_io - INFO - INPUT: 2026-01-25 17:48:38 from AlRajhiBank
+
+Transfer Between Your Accounts
+Amount: SAR 3032.19
+To: 5225
+26/1/25 17:48 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_bank": "AlRajhiBank", "destination_account_last4": "5225", "amount": 3032.19, "currency": "SAR", "fees": null, "timestamp": "2026-01-25 17:48", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Transfer to 5225"}
+2026-02-04 08:58:07,815 - ai_raw_io - INFO - INPUT: 2026-01-25 17:49:51 from AlRajhiBank
+
+Transfer Between Your Accounts
+Amount: SAR 10000
+To: 1505
+26/1/25 17:49 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_account_last4": "1505", "amount": 10000, "currency": "SAR", "timestamp": "2026-01-25 17:49", "description": "Transfer to 1505"}
+2026-02-04 08:58:16,010 - ai_raw_io - INFO - INPUT: 2026-01-25 17:51:06 from AlRajhiBank
+
+Debit Transfer Local
+Bank:BJAZ
+From:3264
+Amount:SAR 58430.24
+To:Muath Alasiri
+To:8001
+Fees:SAR 2.88
+26/1/25 17:51 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "transfer", "source_bank": "AlRajhiBank", "destination_bank": "Jazira Bank", "source_account_last4": "3264", "destination_account_last4": "8001", "amount": 58430.24, "currency": "SAR", "fees": 2.88, "timestamp": "2026-01-25 17:51", "beneficiary": "Muath Alasiri", "category": "Transfer", "description": "Transfer to Muath Alasiri"}
+2026-02-04 08:58:17,768 - ai_raw_io - INFO - INPUT: 2026-01-30 21:26:21 from AlRajhiBank
+
+Transfer Between Your Accounts
+Amount: SAR 5000
+To: 3264
+26/1/30 21:26 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_bank": "AlRajhiBank", "destination_account_last4": "3264", "card_info": null, "amount": 5000, "currency": "SAR", "fees": null, "timestamp": "2026-01-30 21:26", "available_balance": null, "beneficiary": null, "merchant": null, "sender_name": null, "category": null, "description": "Transfer to 3264"}
+2026-02-04 08:58:28,739 - ai_raw_io - INFO - INPUT: 2026-01-30 21:27:00 from AlRajhiBank
+
+Transfer Between Your Accounts
+Amount: SAR 5000
+To: 1505
+26/1/30 21:26 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "internal_transfer", "source_bank": "AlRajhiBank", "destination_account_last4": "1505", "amount": 5000, "currency": "SAR", "timestamp": "2026-01-30 21:26", "description": "Transfer to 1505"}
