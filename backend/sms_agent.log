@@ -7294,3 +7294,19 @@ By:9365;mada-Apple ...
 2026-02-03 22:01:39,155 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
 2026-02-03 22:06:05,896 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
 2026-02-03 22:06:20,039 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-03 22:41:43,434 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— Online Purchase
+By:9365;mada-Apple ...
+2026-02-03 22:41:43,772 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-02-03 22:41:45,929 - sms_agent - INFO - 📊 Token Usage - Input: 5104, Output: 196, Total: 5300
+2026-02-03 22:41:45,932 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 1505, Account: Expense
+2026-02-03 22:41:45,934 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-03 22:41:45,946 - sms_agent - INFO - Saved training example for: Jahez
+2026-02-03 23:04:34,924 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank —— Online Purchase
+By:9365;mada-Apple ...
+2026-02-03 23:04:35,328 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-02-03 23:04:37,511 - sms_agent - INFO - 📊 Token Usage - Input: 5108, Output: 202, Total: 5310
+2026-02-03 23:04:37,514 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 1505, Account: Expense
+2026-02-03 23:04:37,515 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-03 23:04:37,523 - sms_agent - INFO - Saved training example for: Mrsool
+2026-02-04 06:53:43,338 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-04 06:54:03,615 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).

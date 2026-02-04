@@ -828,11 +828,30 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
             
             # Save Account Balance
             db.add(account)
-            # Update snapshot logic if needed, but risky to overwrite historical snapshot. 
-            # Best effort: Update balance_after_transaction to current balance? 
-            # Or leave it as the historical record. 
-            # Let's update it to reflect the *corrected* state essentially.
+            # Update this transaction's snapshot
             db_tx.balance_after_transaction = account.current_balance
+            
+            # --- BACKWARDS-ANCHOR: Cascade balance updates to all subsequent transactions ---
+            # Find all transactions for this account AFTER the edited one (by timestamp)
+            subsequent_txs = db.query(models.Transaction).filter(
+                models.Transaction.account_id == db_tx.account_id,
+                models.Transaction.timestamp > db_tx.timestamp,
+                models.Transaction.status == "completed"
+            ).order_by(models.Transaction.timestamp.asc()).all()
+            
+            if subsequent_txs:
+                running_balance = account.current_balance
+                for sub_tx in subsequent_txs:
+                    sub_type = str(sub_tx.type).lower() if sub_tx.type else 'debit'
+                    if sub_type == 'credit':
+                        running_balance += sub_tx.amount
+                    else:
+                        running_balance -= sub_tx.amount
+                    # Deduct fees
+                    if sub_tx.fees:
+                        running_balance -= sub_tx.fees
+                    sub_tx.balance_after_transaction = running_balance
+                    db.add(sub_tx)
 
     db.add(db_tx)
     db.commit()

@@ -13910,3 +13910,15 @@ Biller:001
 Service:STC BILL
 Bill:00825552502
 26/2/3 16:32 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "payment", "source_bank": "AlRajhiBank", "destination_bank": null, "source_account_last4": "9384", "destination_account_last4": null, "card_info": null, "amount": 504.98, "currency": "SAR", "fees": null, "timestamp": "2026-02-03 16:32", "available_balance": null, "beneficiary": null, "merchant": "STC BILL", "sender_name": null, "category": "Bills", "description": "Bill Payment - STC"}
+2026-02-03 22:41:45,929 - ai_raw_io - INFO - INPUT: Online Purchase
+By:9365;mada-Apple Pay
+From:1505
+Amount:SAR 81
+At:Jahez
+4/2/26 22:42 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "1505", "card_info": "mada-Apple Pay 1505", "amount": 81, "currency": "SAR", "fees": null, "timestamp": "2026-02-04 22:42", "available_balance": null, "beneficiary": null, "merchant": "Jahez", "sender_name": null, "category": null, "description": "Purchase at Jahez"}
+2026-02-03 23:04:37,511 - ai_raw_io - INFO - INPUT: Online Purchase
+By:9365;mada-Apple Pay
+From:1505
+Amount:SAR 49.47
+At:Mrsool
+4/2/26 23:04 || OUTPUT: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "source_bank": "AlRajhiBank", "source_account_last4": "1505", "card_info": "mada-Apple Pay 9365", "amount": 49.47, "currency": "SAR", "fees": null, "timestamp": "2026-02-04 23:04", "available_balance": null, "beneficiary": null, "merchant": "Mrsool", "sender_name": null, "category": null, "description": "Online Purchase at Mrsool"}
