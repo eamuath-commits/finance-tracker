@@ -378,6 +378,148 @@ function Transactions() {
 
     const hasActiveFilters = searchTerm || accountFilter || typeFilter || categoryFilter || dateRange.start || dateRange.end;
 
+    // Export state
+    const [showExportMenu, setShowExportMenu] = useState(false);
+
+    // Export functions - all use filteredTransactions to respect filters
+    const exportToCSV = () => {
+        const headers = ['Date', 'Merchant', 'Amount', 'Type', 'Category', 'Account', 'Balance After', 'Notes'];
+        const rows = filteredTransactions.map(tx => [
+            format(new Date(tx.timestamp), 'yyyy-MM-dd HH:mm'),
+            tx.merchant || '',
+            tx.amount,
+            tx.type || 'debit',
+            tx.category || '',
+            accounts.find(a => a.id === tx.account_id)?.name || creditCards.find(c => c.id === tx.credit_card_id)?.name || '',
+            tx.balance_after_transaction || '',
+            (tx.notes || '').replace(/,/g, ';')
+        ]);
+
+        const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        downloadFile(csvContent, 'transactions.csv', 'text/csv');
+        setShowExportMenu(false);
+    };
+
+    const exportToExcel = () => {
+        // Tab-separated values that Excel can open directly
+        const headers = ['Date', 'Merchant', 'Amount', 'Type', 'Category', 'Account', 'Balance After', 'Notes'];
+        const rows = filteredTransactions.map(tx => [
+            format(new Date(tx.timestamp), 'yyyy-MM-dd HH:mm'),
+            tx.merchant || '',
+            tx.amount,
+            tx.type || 'debit',
+            tx.category || '',
+            accounts.find(a => a.id === tx.account_id)?.name || creditCards.find(c => c.id === tx.credit_card_id)?.name || '',
+            tx.balance_after_transaction || '',
+            tx.notes || ''
+        ]);
+
+        const tsvContent = [headers.join('\t'), ...rows.map(r => r.join('\t'))].join('\n');
+        downloadFile(tsvContent, 'transactions.xls', 'application/vnd.ms-excel');
+        setShowExportMenu(false);
+    };
+
+    const exportToTXT = () => {
+        let content = 'TRANSACTION EXPORT\n';
+        content += '='.repeat(60) + '\n';
+        content += `Generated: ${format(new Date(), 'yyyy-MM-dd HH:mm')}\n`;
+        content += `Total Transactions: ${filteredTransactions.length}\n`;
+        content += '='.repeat(60) + '\n\n';
+
+        filteredTransactions.forEach((tx, i) => {
+            content += `${i + 1}. ${tx.merchant || 'N/A'}\n`;
+            content += `   Date: ${format(new Date(tx.timestamp), 'yyyy-MM-dd HH:mm')}\n`;
+            content += `   Amount: ${tx.type === 'credit' ? '+' : '-'}${formatCurrency(tx.amount)}\n`;
+            content += `   Category: ${tx.category || 'N/A'}\n`;
+            const accName = accounts.find(a => a.id === tx.account_id)?.name || creditCards.find(c => c.id === tx.credit_card_id)?.name;
+            content += `   Account: ${accName || 'N/A'}\n`;
+            if (tx.balance_after_transaction != null) {
+                content += `   Balance After: ${formatCurrency(tx.balance_after_transaction)}\n`;
+            }
+            if (tx.notes) content += `   Notes: ${tx.notes}\n`;
+            content += '\n';
+        });
+
+        downloadFile(content, 'transactions.txt', 'text/plain');
+        setShowExportMenu(false);
+    };
+
+    const exportToPDF = () => {
+        // Create printable HTML that browser can print to PDF
+        const printWindow = window.open('', '_blank');
+        let html = `
+            <html>
+            <head>
+                <title>Transactions Export</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; }
+                    h1 { color: #1e40af; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th { background: #1e40af; color: white; padding: 8px; text-align: left; }
+                    td { padding: 8px; border-bottom: 1px solid #ddd; }
+                    tr:nth-child(even) { background: #f8f9fa; }
+                    .credit { color: #16a34a; }
+                    .debit { color: #dc2626; }
+                    .summary { margin: 20px 0; padding: 10px; background: #f0f9ff; border-radius: 8px; }
+                </style>
+            </head>
+            <body>
+                <h1>Transaction Report</h1>
+                <div class="summary">
+                    <strong>Generated:</strong> ${format(new Date(), 'yyyy-MM-dd HH:mm')} | 
+                    <strong>Total:</strong> ${filteredTransactions.length} transactions
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Merchant</th>
+                            <th>Amount</th>
+                            <th>Category</th>
+                            <th>Account</th>
+                            <th>Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        filteredTransactions.forEach(tx => {
+            const accName = accounts.find(a => a.id === tx.account_id)?.name || creditCards.find(c => c.id === tx.credit_card_id)?.name || '';
+            html += `
+                <tr>
+                    <td>${format(new Date(tx.timestamp), 'yyyy-MM-dd')}</td>
+                    <td>${tx.merchant || '-'}</td>
+                    <td class="${tx.type === 'credit' ? 'credit' : 'debit'}">
+                        ${tx.type === 'credit' ? '+' : '-'}${tx.amount?.toFixed(2) || '0.00'}
+                    </td>
+                    <td>${tx.category || '-'}</td>
+                    <td>${accName}</td>
+                    <td>${tx.balance_after_transaction?.toFixed(2) || '-'}</td>
+                </tr>
+            `;
+        });
+
+        html += `</tbody></table>
+            <script>window.print();</script>
+            </body></html>`;
+
+        printWindow.document.write(html);
+        printWindow.document.close();
+        setShowExportMenu(false);
+    };
+
+    const downloadFile = (content, filename, type) => {
+        const blob = new Blob([content], { type });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -566,7 +708,39 @@ function Transactions() {
                                 </span>
                             </div>
                         </div>
-                        <span className="text-gray-500 text-sm">{filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''}</span>
+                        <div className="flex items-center gap-3">
+                            <span className="text-gray-500 text-sm">{filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''}</span>
+
+                            {/* Export Dropdown */}
+                            <div className="relative">
+                                <button
+                                    onClick={() => setShowExportMenu(!showExportMenu)}
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition"
+                                >
+                                    <Upload size={14} className="rotate-180" />
+                                    Export
+                                </button>
+                                {showExportMenu && (
+                                    <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
+                                        <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-50 overflow-hidden">
+                                            <button onClick={exportToCSV} className="w-full px-4 py-2.5 text-left text-sm text-white hover:bg-slate-700 flex items-center gap-3">
+                                                📊 CSV
+                                            </button>
+                                            <button onClick={exportToExcel} className="w-full px-4 py-2.5 text-left text-sm text-white hover:bg-slate-700 flex items-center gap-3">
+                                                📗 Excel (.xls)
+                                            </button>
+                                            <button onClick={exportToPDF} className="w-full px-4 py-2.5 text-left text-sm text-white hover:bg-slate-700 flex items-center gap-3">
+                                                📄 PDF (Print)
+                                            </button>
+                                            <button onClick={exportToTXT} className="w-full px-4 py-2.5 text-left text-sm text-white hover:bg-slate-700 flex items-center gap-3">
+                                                📝 Text (.txt)
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
                     </div>
 
                     {/* Pending Transactions Banner - just a simple notification */}
