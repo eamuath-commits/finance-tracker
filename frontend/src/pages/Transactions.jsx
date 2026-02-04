@@ -218,7 +218,8 @@ function Transactions() {
                 category: tx.category || '',
                 type: tx.type || 'debit',
                 notes: tx.notes || '',
-                timestamp: tx.timestamp ? new Date(tx.timestamp).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16)
+                timestamp: tx.timestamp ? new Date(tx.timestamp).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
+                previous_balance: ''  // Leave empty by default, user can fill to adjust
             });
         } else {
             setEditingTx(null);
@@ -266,6 +267,11 @@ function Transactions() {
                 } else {
                     payload.account_id = txForm.source_id;
                     payload.credit_card_id = null;
+                }
+
+                // Include previous_balance if user provided one (for cascade recalculation)
+                if (txForm.previous_balance !== '' && !isNaN(parseFloat(txForm.previous_balance))) {
+                    payload.previous_balance = parseFloat(txForm.previous_balance);
                 }
 
                 await axios.put(`${API_URL}/transactions/${editingTx.id}`, payload);
@@ -1060,6 +1066,26 @@ function Transactions() {
                         <label className="text-gray-400 text-xs mb-1 block">Amount (SAR)</label>
                         <input type="number" step="0.01" className={inputClass} value={txForm.amount} onChange={e => setTxForm({ ...txForm, amount: e.target.value })} placeholder="0.00" required />
                     </div>
+
+                    {/* Previous Balance - only show when editing existing transaction */}
+                    {editingTx && txForm.source_type === 'account' && (
+                        <div className="bg-slate-900/50 p-3 rounded-lg border border-blue-500/30">
+                            <label className="text-blue-400 text-xs mb-1 block">
+                                Previous Balance (Balance Before This Transaction)
+                            </label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                className={inputClass}
+                                value={txForm.previous_balance}
+                                onChange={e => setTxForm({ ...txForm, previous_balance: e.target.value })}
+                                placeholder="Leave empty to keep current"
+                            />
+                            <p className="text-gray-500 text-xs mt-1">
+                                Setting this will recalculate this transaction's balance and all subsequent transactions.
+                            </p>
+                        </div>
+                    )}
 
                     {/* Category - hidden for transfers since it's auto-set */}
                     {txForm.type !== 'transfer' && (

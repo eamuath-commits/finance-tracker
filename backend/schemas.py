@@ -110,6 +110,7 @@ class TransactionUpdate(BaseModel):
     original_amount: Optional[float] = None
     original_currency: Optional[str] = None
     exchange_rate: Optional[float] = None
+    previous_balance: Optional[float] = None  # If set, recalculate from this balance
 
 class Transaction(TransactionBase):
     id: str

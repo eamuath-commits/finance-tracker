@@ -829,41 +829,62 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
             # Save Account Balance
             db.add(account)
             
-            # --- RECALCULATE ALL SNAPSHOTS FROM BEGINNING ---
+            # --- RECALCULATE SNAPSHOTS ---
             # Get ALL transactions for this account ordered by timestamp
             all_txs = db.query(models.Transaction).filter(
                 models.Transaction.account_id == db_tx.account_id,
                 models.Transaction.status == "completed"
             ).order_by(models.Transaction.timestamp.asc()).all()
             
-            # Calculate starting balance by reversing from current_balance
-            # starting_balance + sum(all effects) = current_balance
-            # So: starting_balance = current_balance - sum(all effects)
-            running_balance = account.current_balance
-            for tx in reversed(all_txs):
-                tx_type = str(tx.type).lower() if tx.type else 'debit'
-                if tx_type == 'credit':
-                    running_balance -= tx.amount
-                else:
-                    running_balance += tx.amount
-                if tx.fees:
-                    running_balance += tx.fees
-            
-            # running_balance is now the starting balance (before first transaction)
-            starting_balance = running_balance
-            
-            # Now iterate forward and set correct balance_after for each transaction
-            running_balance = starting_balance
-            for tx in all_txs:
-                tx_type = str(tx.type).lower() if tx.type else 'debit'
-                if tx_type == 'credit':
-                    running_balance += tx.amount
-                else:
-                    running_balance -= tx.amount
-                if tx.fees:
-                    running_balance -= tx.fees
-                tx.balance_after_transaction = running_balance
-                db.add(tx)
+            # Check if user provided a previous_balance anchor point
+            if transaction_update.previous_balance is not None:
+                # User specified previous_balance - use it as anchor for THIS transaction
+                # Find index of this transaction
+                tx_index = next((i for i, t in enumerate(all_txs) if t.id == db_tx.id), None)
+                
+                if tx_index is not None:
+                    # Recalculate from the anchor point forward
+                    running_balance = transaction_update.previous_balance
+                    for tx in all_txs[tx_index:]:
+                        tx_type = str(tx.type).lower() if tx.type else 'debit'
+                        if tx_type == 'credit':
+                            running_balance += (tx.amount or 0)
+                        else:
+                            running_balance -= (tx.amount or 0)
+                        if tx.fees:
+                            running_balance -= tx.fees
+                        tx.balance_after_transaction = running_balance
+                        db.add(tx)
+                    
+                    # Update current balance to final
+                    account.current_balance = running_balance
+            else:
+                # No anchor provided - calculate starting balance by reversing from current_balance
+                running_balance = account.current_balance
+                for tx in reversed(all_txs):
+                    tx_type = str(tx.type).lower() if tx.type else 'debit'
+                    if tx_type == 'credit':
+                        running_balance -= tx.amount
+                    else:
+                        running_balance += tx.amount
+                    if tx.fees:
+                        running_balance += tx.fees
+                
+                # running_balance is now starting balance
+                starting_balance = running_balance
+                
+                # Iterate forward and set correct balance_after for each transaction
+                running_balance = starting_balance
+                for tx in all_txs:
+                    tx_type = str(tx.type).lower() if tx.type else 'debit'
+                    if tx_type == 'credit':
+                        running_balance += tx.amount
+                    else:
+                        running_balance -= tx.amount
+                    if tx.fees:
+                        running_balance -= tx.fees
+                    tx.balance_after_transaction = running_balance
+                    db.add(tx)
 
     db.add(db_tx)
     db.commit()
