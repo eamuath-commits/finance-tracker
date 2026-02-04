@@ -4,6 +4,12 @@ Tests for balance cascade recalculation logic.
 These are critical business logic tests for ledger integrity.
 """
 import pytest
+from datetime import datetime
+
+
+def get_timestamp():
+    """Get current timestamp in ISO format for test transactions."""
+    return datetime.now().isoformat()
 
 
 class TestBalanceCascade:
@@ -19,7 +25,8 @@ class TestBalanceCascade:
             "amount": 100.0,
             "merchant": "First",
             "category": "Shopping",
-            "type": "debit"
+            "type": "debit",
+            "timestamp": get_timestamp()
         }).json()
         
         # Transaction 2: -50 = 850
@@ -28,7 +35,8 @@ class TestBalanceCascade:
             "amount": 50.0,
             "merchant": "Second",
             "category": "Shopping",
-            "type": "debit"
+            "type": "debit",
+            "timestamp": get_timestamp()
         }).json()
         
         # Transaction 3: +200 = 1050
@@ -37,7 +45,8 @@ class TestBalanceCascade:
             "amount": 200.0,
             "merchant": "Third",
             "category": "Income",
-            "type": "credit"
+            "type": "credit",
+            "timestamp": get_timestamp()
         }).json()
         
         # Verify cascade (balance snapshots)
@@ -60,7 +69,8 @@ class TestBalanceCascade:
             "amount": 100.0,
             "merchant": "Test",
             "category": "Shopping",
-            "type": "debit"
+            "type": "debit",
+            "timestamp": get_timestamp()
         }).json()
         
         # Update amount
@@ -84,7 +94,8 @@ class TestBalanceCascade:
             "amount": 100.0,
             "merchant": "To Delete",
             "category": "Shopping",
-            "type": "debit"
+            "type": "debit",
+            "timestamp": get_timestamp()
         }).json()
         
         # Delete it
@@ -107,7 +118,8 @@ class TestBalanceIntegrity:
             "amount": 5000.0,  # More than 1000 balance
             "merchant": "Big Purchase",
             "category": "Shopping",
-            "type": "debit"
+            "type": "debit",
+            "timestamp": get_timestamp()
         })
         # Should succeed (no negative balance enforcement)
         assert response.status_code == 200
@@ -125,7 +137,8 @@ class TestBalanceIntegrity:
             "amount": 0.0,
             "merchant": "Zero Test",
             "category": "Other",
-            "type": "debit"
+            "type": "debit",
+            "timestamp": get_timestamp()
         })
         # Should succeed with no balance change
         if response.status_code == 200:

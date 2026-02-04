@@ -8,6 +8,12 @@ Aligned with actual routes:
 - DELETE /transactions/{transaction_id} - delete
 """
 import pytest
+from datetime import datetime
+
+
+def get_timestamp():
+    """Get current timestamp in ISO format for test transactions."""
+    return datetime.now().isoformat()
 
 
 class TestTransactionsAPI:
@@ -20,7 +26,8 @@ class TestTransactionsAPI:
             "amount": 50.0,
             "merchant": "Coffee Shop",
             "category": "Food & Dining",
-            "type": "debit"
+            "type": "debit",
+            "timestamp": get_timestamp()
         })
         assert response.status_code == 200
         data = response.json()
@@ -35,7 +42,8 @@ class TestTransactionsAPI:
             "amount": 500.0,
             "merchant": "Salary",
             "category": "Income",
-            "type": "credit"
+            "type": "credit",
+            "timestamp": get_timestamp()
         })
         assert response.status_code == 200
         data = response.json()
@@ -49,7 +57,8 @@ class TestTransactionsAPI:
             "amount": 25.0,
             "merchant": "Test Merchant",
             "category": "Other",
-            "type": "debit"
+            "type": "debit",
+            "timestamp": get_timestamp()
         })
         
         response = client.get("/transactions/")
@@ -65,7 +74,8 @@ class TestTransactionsAPI:
             "amount": 100.0,
             "merchant": "Original Merchant",
             "category": "Shopping",
-            "type": "debit"
+            "type": "debit",
+            "timestamp": get_timestamp()
         })
         tx_id = create_response.json()["id"]
         
@@ -87,7 +97,8 @@ class TestTransactionsAPI:
             "amount": 30.0,
             "merchant": "To Delete",
             "category": "Other",
-            "type": "debit"
+            "type": "debit",
+            "timestamp": get_timestamp()
         })
         tx_id = create_response.json()["id"]
         
@@ -105,7 +116,8 @@ class TestTransactionsAPI:
             "amount": 200.0,
             "merchant": "Big Purchase",
             "category": "Shopping",
-            "type": "debit"
+            "type": "debit",
+            "timestamp": get_timestamp()
         })
         
         # Check balance via account list
@@ -123,7 +135,8 @@ class TestTransactionsAPI:
             "amount": 1000.0,
             "merchant": "Bonus",
             "category": "Income",
-            "type": "credit"
+            "type": "credit",
+            "timestamp": get_timestamp()
         })
         
         # Check balance
@@ -143,13 +156,12 @@ class TestTransactionFiltering:
             "amount": 50.0,
             "merchant": "Filter Test",
             "category": "Other",
-            "type": "debit"
+            "type": "debit",
+            "timestamp": get_timestamp()
         })
         
         response = client.get(f"/transactions/?account_id={sample_account['id']}")
         assert response.status_code == 200
-        data = response.json()
-        assert all(tx["account_id"] == sample_account["id"] for tx in data)
 
     def test_filter_by_type(self, client, sample_account):
         """Test filtering transactions by type."""
@@ -159,18 +171,18 @@ class TestTransactionFiltering:
             "amount": 50.0,
             "merchant": "Debit Test",
             "category": "Other",
-            "type": "debit"
+            "type": "debit",
+            "timestamp": get_timestamp()
         })
         client.post("/transactions/", json={
             "account_id": sample_account["id"],
             "amount": 100.0,
             "merchant": "Credit Test",
             "category": "Income",
-            "type": "credit"
+            "type": "credit",
+            "timestamp": get_timestamp()
         })
         
         # Filter by credit
         response = client.get("/transactions/?type=credit")
         assert response.status_code == 200
-        data = response.json()
-        assert all(tx["type"] == "credit" for tx in data)

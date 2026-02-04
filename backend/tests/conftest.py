@@ -7,6 +7,7 @@ Each test runs in a transaction that is rolled back after completion.
 import pytest
 import os
 import sys
+import uuid
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
@@ -24,6 +25,11 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@db:5432
 
 engine = create_engine(DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def get_unique_digits():
+    """Generate unique 4-digit string for test data."""
+    return str(uuid.uuid4().int)[:4]
 
 
 @pytest.fixture(scope="function")
@@ -81,10 +87,11 @@ def client(db_session):
 @pytest.fixture
 def sample_account(client):
     """Create a sample account for testing - will be rolled back."""
+    unique_digits = get_unique_digits()
     response = client.post("/accounts/", json={
-        "name": "Test Bank Account",
+        "name": f"Test Bank Account {unique_digits}",
         "account_type": "SAVINGS",
-        "last_4_digits": "1234",
+        "last_4_digits": unique_digits,
         "current_balance": 1000.0,
         "bank_name": "Test Bank"
     })
@@ -94,11 +101,12 @@ def sample_account(client):
 
 @pytest.fixture
 def sample_credit_card(client):
-    """Create a sample credit card for testing - will be rolled back.""" 
+    """Create a sample credit card for testing - will be rolled back."""
+    unique_digits = get_unique_digits()
     response = client.post("/credit-cards/", json={
-        "card_name": "Test Visa",
+        "name": f"Test Visa {unique_digits}",  # Schema uses 'name' not 'card_name'
         "bank_name": "Test Bank",
-        "last_4_digits": "5678",
+        "last_4_digits": unique_digits,
         "credit_limit": 10000.0
     })
     assert response.status_code == 200, f"Failed to create credit card: {response.text}"

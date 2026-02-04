@@ -9,6 +9,12 @@ Routes:
 - DELETE /credit-cards/{card_id} - delete
 """
 import pytest
+import uuid
+
+
+def get_unique_digits():
+    """Generate unique 4-digit string for test data."""
+    return str(uuid.uuid4().int)[:4]
 
 
 class TestCreditCardsAPI:
@@ -16,15 +22,16 @@ class TestCreditCardsAPI:
 
     def test_create_credit_card(self, client):
         """Test creating a new credit card."""
+        unique_digits = get_unique_digits()
         response = client.post("/credit-cards/", json={
-            "card_name": "Platinum Visa",
+            "name": "Platinum Visa",         # Schema requires 'name' not 'card_name'
             "bank_name": "Al Rajhi Bank",
-            "last_4_digits": "4321",
+            "last_4_digits": unique_digits,
             "credit_limit": 20000.0
         })
-        assert response.status_code == 200
+        assert response.status_code == 200, f"Failed: {response.text}"
         data = response.json()
-        assert data["card_name"] == "Platinum Visa"
+        assert data["name"] == "Platinum Visa"
         assert data["credit_limit"] == 20000.0
 
     def test_get_credit_cards(self, client, sample_credit_card):
@@ -44,12 +51,12 @@ class TestCreditCardsAPI:
     def test_update_credit_card(self, client, sample_credit_card):
         """Test updating a credit card."""
         response = client.put(f"/credit-cards/{sample_credit_card['id']}", json={
-            "card_name": "Updated Card Name",
+            "name": "Updated Card Name",
             "credit_limit": 25000.0
         })
         assert response.status_code == 200
         data = response.json()
-        assert data["card_name"] == "Updated Card Name"
+        assert data["name"] == "Updated Card Name"
 
     def test_delete_credit_card(self, client, sample_credit_card):
         """Test deleting a credit card."""

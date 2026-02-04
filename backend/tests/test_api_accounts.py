@@ -9,6 +9,18 @@ Aligned with actual API routes:
 - POST /accounts/{account_id}/recalculate-balance - recalculate
 """
 import pytest
+import uuid
+from datetime import datetime
+
+
+def get_unique_digits():
+    """Generate unique 4-digit string for test data."""
+    return str(uuid.uuid4().int)[:4]
+
+
+def get_timestamp():
+    """Get current timestamp in ISO format for test transactions."""
+    return datetime.now().isoformat()
 
 
 class TestAccountsAPI:
@@ -16,17 +28,18 @@ class TestAccountsAPI:
 
     def test_create_account(self, client):
         """Test creating a new account."""
+        unique_digits = get_unique_digits()
         response = client.post("/accounts/", json={
             "name": "Savings Account",
             "account_type": "SAVINGS",
-            "last_4_digits": "9999",
+            "last_4_digits": unique_digits,  # Unique to avoid conflicts
             "current_balance": 5000.0,
             "bank_name": "Al Rajhi Bank"
         })
         assert response.status_code == 200
         data = response.json()
         assert data["name"] == "Savings Account"
-        assert data["last_4_digits"] == "9999"
+        assert data["last_4_digits"] == unique_digits
         assert data["current_balance"] == 5000.0
 
     def test_get_accounts(self, client, sample_account):
@@ -78,13 +91,14 @@ class TestAccountBalance:
         """Test that balance updates after transaction."""
         initial_balance = sample_account["current_balance"]
         
-        # Create a debit transaction
+        # Create a debit transaction with timestamp
         tx_response = client.post("/transactions/", json={
             "account_id": sample_account["id"],
             "amount": 100.0,
             "merchant": "Test Store",
             "category": "Shopping",
-            "type": "debit"
+            "type": "debit",
+            "timestamp": get_timestamp()
         })
         assert tx_response.status_code == 200
         

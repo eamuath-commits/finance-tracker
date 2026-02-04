@@ -6,6 +6,12 @@ Routes:
 - GET /transactions/pending
 """
 import pytest
+from datetime import datetime
+
+
+def get_timestamp():
+    """Get current timestamp in ISO format for test transactions."""
+    return datetime.now().isoformat()
 
 
 class TestTransfers:
@@ -18,7 +24,8 @@ class TestTransfers:
             "amount": 500.0,
             "merchant": "Transfer to Savings",
             "category": "Internal Transfer",
-            "type": "debit"
+            "type": "debit",
+            "timestamp": get_timestamp()
         })
         assert response.status_code == 200
         data = response.json()
@@ -41,7 +48,8 @@ class TestTransfers:
             "merchant": "Pending Transfer",
             "category": "Transfer",
             "type": "credit",
-            "status": "pending_source"
+            "status": "pending_source",
+            "timestamp": get_timestamp()
         })
         
         if tx_response.status_code == 200:
@@ -67,7 +75,8 @@ class TestTransferBalances:
             "amount": 300.0,
             "merchant": "Transfer Out",
             "category": "Transfer",
-            "type": "debit"
+            "type": "debit",
+            "timestamp": get_timestamp()
         })
         
         accounts = client.get("/accounts/").json()
@@ -83,7 +92,8 @@ class TestTransferBalances:
             "amount": 500.0,
             "merchant": "Transfer In",
             "category": "Transfer",
-            "type": "credit"
+            "type": "credit",
+            "timestamp": get_timestamp()
         })
         
         accounts = client.get("/accounts/").json()
