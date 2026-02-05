@@ -83,10 +83,22 @@ rate_limiter = RateLimiter()
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """FastAPI middleware for rate limiting."""
     
+    # CORS headers to include in rate-limited responses
+    CORS_HEADERS = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+        "Access-Control-Allow-Headers": "*",
+        "Access-Control-Allow-Credentials": "true",
+    }
+    
     async def dispatch(self, request: Request, call_next):
         # Skip rate limiting for health checks and docs
         path = request.url.path
         if path in ["/", "/docs", "/openapi.json", "/health"]:
+            return await call_next(request)
+        
+        # Skip rate limiting for OPTIONS preflight requests (CORS)
+        if request.method == "OPTIONS":
             return await call_next(request)
         
         # Get client identifier (IP or forwarded IP)
@@ -102,17 +114,20 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         
         if not allowed:
             logger.warning(f"Rate limit exceeded for {client_ip}: {count}/{limit} on {path}")
+            # Include CORS headers in 429 response so browser can read it
+            headers = {
+                "Retry-After": str(WINDOW_SIZE),
+                "X-RateLimit-Limit": str(limit),
+                "X-RateLimit-Remaining": "0",
+                **self.CORS_HEADERS
+            }
             return JSONResponse(
                 status_code=429,
                 content={
                     "detail": "Rate limit exceeded. Please slow down.",
                     "retry_after_seconds": WINDOW_SIZE
                 },
-                headers={
-                    "Retry-After": str(WINDOW_SIZE),
-                    "X-RateLimit-Limit": str(limit),
-                    "X-RateLimit-Remaining": "0"
-                }
+                headers=headers
             )
         
         # Process request and add rate limit headers to response
