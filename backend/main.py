@@ -1193,10 +1193,31 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
     db.refresh(raw_msg)
 
     
-    # 2. AI Parse
+    # 2. Extract sender from header if present (WebUI format: "2025-09-20 09:39:36 from STC Bank")
+    effective_sender = payload.sender
+    body_for_parsing = payload.body
+    
+    # Check first line for header pattern
+    first_line = body_lines[0] if body_lines else ""
+    import re
+    header_match = re.search(r'^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+from\s+(.+)$', first_line.strip(), re.IGNORECASE)
+    if header_match:
+        extracted_sender = header_match.group(1).strip()
+        logger.info(f"[SMS-INGEST] Extracted sender from header: {extracted_sender}")
+        effective_sender = extracted_sender
+        # Remove header line from body for cleaner parsing
+        body_for_parsing = '\n'.join(body_lines[1:]).strip()
+    
+    # Update raw message with effective sender
+    raw_msg.sender = effective_sender
+    db.commit()
+
+    # 2b. Use bank-specific parser based on sender
     try:
-        result = await sms_agent.parse_with_ai(db, payload.body)
-        result = sms_agent.validate_parsed_digits(payload.body, result)  # Validate account numbers
+        from bank_parsers import get_parser
+        parser = get_parser(effective_sender)
+        result = await parser.parse(db, body_for_parsing)
+        result = sms_agent.validate_parsed_digits(body_for_parsing, result)  # Validate account numbers
         logger.info(f"[SMS-INGEST] AI Response: {result}")
     except Exception as e:
         logger.error(f"[SMS-INGEST] AI Error: {str(e)}")
