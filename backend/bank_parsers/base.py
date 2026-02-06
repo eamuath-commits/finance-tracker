@@ -95,20 +95,25 @@ class BaseBankParser(ABC):
     
     def _apply_default_account(self, result: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Apply default account if no account was found in SMS.
+        Apply default account if the relevant account field is empty.
+        
+        For debits: source_account_last4 should be the user's account (apply default if empty)
+        For credits: destination_account_last4 should be the user's account (apply default if empty)
         """
         if not self.DEFAULT_ACCOUNT_LAST4:
             return result
         
-        # If no source account found, use default
-        if not result.get('source_account_last4') and not result.get('destination_account_last4'):
-            logger.info(f"[{self.BANK_NAME}] Using default account: {self.DEFAULT_ACCOUNT_LAST4}")
-            
-            # For debits, set as source; for credits, set as destination
-            if result.get('transaction_type') == 'debit':
-                result['source_account_last4'] = self.DEFAULT_ACCOUNT_LAST4
-            else:
-                result['destination_account_last4'] = self.DEFAULT_ACCOUNT_LAST4
+        tx_type = result.get('transaction_type')
+        
+        # For debits: money leaves user's account → source should be default if empty
+        if tx_type == 'debit' and not result.get('source_account_last4'):
+            logger.info(f"[{self.BANK_NAME}] Applying default source account: {self.DEFAULT_ACCOUNT_LAST4}")
+            result['source_account_last4'] = self.DEFAULT_ACCOUNT_LAST4
+        
+        # For credits: money enters user's account → destination should be default if empty
+        elif tx_type == 'credit' and not result.get('destination_account_last4'):
+            logger.info(f"[{self.BANK_NAME}] Applying default destination account: {self.DEFAULT_ACCOUNT_LAST4}")
+            result['destination_account_last4'] = self.DEFAULT_ACCOUNT_LAST4
         
         return result
     
