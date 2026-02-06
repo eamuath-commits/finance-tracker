@@ -21,6 +21,7 @@ import analysis
 import analysis_schema
 import queue_processor
 from rate_limiter import RateLimitMiddleware
+from webhook import router as webhook_router
 
 # --- Migration Logic ---
 def run_migrations(engine):
@@ -195,6 +196,9 @@ app.add_middleware(
 
 # Rate limiting middleware (must be added after CORS)
 app.add_middleware(RateLimitMiddleware)
+
+# Include webhook router for Cloudflare Tunnel SMS integration
+app.include_router(webhook_router)
 
 @app.get("/")
 def read_root():
