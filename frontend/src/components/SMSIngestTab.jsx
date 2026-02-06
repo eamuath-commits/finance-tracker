@@ -387,19 +387,21 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
     };
 
     const retryBlocked = async () => {
-        // Get IDs of blocked/waiting items to retry (in their current order in results)
-        const blockedOrWaitingIds = results
-            .filter(r => r.status === 'blocked' || r.result?.status === 'blocked' || r.status === 'waiting')
+        // Get IDs of blocked/waiting/failed items to retry (in their current order in results)
+        const retryableIds = results
+            .filter(r => r.status === 'blocked' || r.result?.status === 'blocked' ||
+                r.status === 'waiting' ||
+                r.status === 'failed' || r.result?.status === 'failed')
             .map(r => r.id);
 
-        if (blockedOrWaitingIds.length === 0) return;
+        if (retryableIds.length === 0) return;
 
         setIsProcessing(true);
         setCurrentIndex(0);
 
         // Process each blocked/waiting item ONE AT A TIME, updating IN-PLACE (no removal/re-add)
-        for (let i = 0; i < blockedOrWaitingIds.length; i++) {
-            const itemId = blockedOrWaitingIds[i];
+        for (let i = 0; i < retryableIds.length; i++) {
+            const itemId = retryableIds[i];
 
             // Get current item from results (may have changed during processing)
             let currentItem = null;
@@ -413,7 +415,7 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
             const msg = currentItem.sms;
 
             setCurrentIndex(i);
-            setAgentStatus(`🤖 Gemini: Retrying SMS ${i + 1} of ${blockedOrWaitingIds.length}...`);
+            setAgentStatus(`🤖 Gemini: Retrying SMS ${i + 1} of ${retryableIds.length}...`);
 
             // Update this item to 'parsing' status in-place
             setResults(prev => prev.map(r =>
@@ -512,6 +514,8 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
     };
 
     const hasBlockedMessages = results.some(r => r.status === 'blocked' || r.result?.status === 'blocked');
+    const hasFailedMessages = results.some(r => r.status === 'failed' || r.result?.status === 'failed');
+    const hasRetryableMessages = hasBlockedMessages || hasFailedMessages;
     const totalMessages = parseSMSMessages(smsInput).length;
     const allItems = [...processingQueue, ...results];
 
@@ -593,13 +597,13 @@ AlRajhiBank —— Credit Transfer Internal | Amount:SAR 5000 | To:7772"
                             Processing Results ({allItems.length})
                         </h3>
                         <div className="flex gap-2">
-                            {hasBlockedMessages && !isProcessing && (
+                            {hasRetryableMessages && !isProcessing && (
                                 <button
                                     type="button"
                                     onClick={retryBlocked}
                                     className="bg-orange-600 hover:bg-orange-700 text-white text-sm px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition"
                                 >
-                                    <RefreshCw size={14} /> Retry Blocked
+                                    <RefreshCw size={14} /> Retry Failed
                                 </button>
                             )}
                             <button

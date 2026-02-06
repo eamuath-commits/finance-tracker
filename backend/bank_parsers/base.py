@@ -58,6 +58,9 @@ class BaseBankParser(ABC):
         if result.get("ambiguous"):
             result = self.handle_ambiguous(result, sms_text)
         
+        # Resolve transaction direction based on known accounts
+        result = self._resolve_transaction_direction(db, result)
+        
         # Apply default account if needed
         result = self._apply_default_account(result)
         
@@ -126,3 +129,59 @@ class BaseBankParser(ABC):
         if not last4 and self.DEFAULT_ACCOUNT_LAST4:
             return self.DEFAULT_ACCOUNT_LAST4
         return last4
+    
+    def _resolve_transaction_direction(self, db: Session, result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Resolve transaction direction based on known accounts.
+        
+        For internal transfers where transaction_type isn't set:
+        - If destination is known but source unknown → CREDIT to destination
+        - If source is known but destination unknown → DEBIT from source
+        - If both known → DEBIT (assuming user sent money)
+        - If neither known → keep as-is (will go to pending_action)
+        """
+        import crud
+        
+        # Only apply if transaction_type is not already set
+        if result.get('transaction_type'):
+            return result
+        
+        source_last4 = result.get('source_account_last4')
+        dest_last4 = result.get('destination_account_last4')
+        
+        # Check which accounts are known
+        source_account = None
+        dest_account = None
+        
+        if source_last4:
+            source_account = crud.get_account_by_last_4(db, source_last4)
+        if dest_last4:
+            dest_account = crud.get_account_by_last_4(db, dest_last4)
+        
+        logger.info(f"[{self.BANK_NAME}] Account resolution: source={source_last4}->{'KNOWN' if source_account else 'UNKNOWN'}, "
+                   f"dest={dest_last4}->{'KNOWN' if dest_account else 'UNKNOWN'}")
+        
+        if dest_account and not source_account:
+            # Destination is known, source is unknown → Credit to destination
+            result['transaction_type'] = 'credit'
+            # Swap fields so destination becomes the primary account
+            result['destination_account_last4'] = dest_last4
+            result['source_account_last4'] = None  # Unknown external source
+            logger.info(f"[{self.BANK_NAME}] Resolved as CREDIT to known account {dest_last4}")
+        
+        elif source_account and not dest_account:
+            # Source is known, destination is unknown → Debit from source
+            result['transaction_type'] = 'debit'
+            logger.info(f"[{self.BANK_NAME}] Resolved as DEBIT from known account {source_last4}")
+        
+        elif source_account and dest_account:
+            # Both known → Internal transfer, treat as debit from source
+            result['transaction_type'] = 'debit'
+            logger.info(f"[{self.BANK_NAME}] Both accounts known - treating as DEBIT from {source_last4}")
+        
+        else:
+            # Neither known → Default to debit, will go to pending_action
+            result['transaction_type'] = 'debit'
+            logger.info(f"[{self.BANK_NAME}] Neither account known - defaulting to DEBIT")
+        
+        return result

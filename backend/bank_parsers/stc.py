@@ -113,6 +113,10 @@ Now parse this SMS:
         elif 'adding money to account' in sms_lower:
             result['sub_type'] = 'deposit'
             result['transaction_type'] = 'credit'
+        elif 'transfer between my accounts' in sms_lower:
+            # Internal STC transfer - resolve direction based on known accounts
+            result['sub_type'] = 'internal_transfer'
+            result['transaction_type'] = None  # Clear to trigger smart resolution
         elif 'internal transfer' in sms_lower:
             result['sub_type'] = 'internal_transfer'
             result['transaction_type'] = 'debit'
