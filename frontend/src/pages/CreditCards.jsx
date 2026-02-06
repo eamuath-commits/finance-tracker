@@ -31,7 +31,7 @@ const getUtilizationColor = (percent) => {
 };
 
 // Credit Card Visual Component with custom bank themes
-const CreditCardVisual = ({ card, onEdit, onPayment, onClick }) => {
+const CreditCardVisual = ({ card, onEdit, onPayment, onDelete, onClick }) => {
     const utilPercent = card.credit_limit > 0
         ? Math.min(100, (Math.abs(card.current_balance) / card.credit_limit) * 100)
         : 0;
@@ -78,6 +78,13 @@ const CreditCardVisual = ({ card, onEdit, onPayment, onClick }) => {
                             className="p-1.5 bg-black/30 hover:bg-black/50 rounded-full backdrop-blur-md transition"
                         >
                             <Edit3 size={14} />
+                        </button>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onDelete(card.id); }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="p-1.5 bg-red-500/60 hover:bg-red-600 rounded-full backdrop-blur-md transition"
+                        >
+                            <Trash2 size={14} />
                         </button>
                     </div>
 
@@ -401,6 +408,7 @@ function CreditCards() {
                                 card={card}
                                 onEdit={openEditModal}
                                 onPayment={openPaymentModal}
+                                onDelete={handleDelete}
                                 onClick={() => navigate(`/transactions?credit_card_id=${card.id}`)}
                             />
 

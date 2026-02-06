@@ -314,12 +314,24 @@ function Transactions() {
                     timestamp
                 });
             } else {
-                // Regular transaction
-                await axios.post(`${API_URL}/transactions/`, {
-                    ...txForm,
+                // Regular transaction - only send backend-expected fields
+                const payload = {
                     amount,
+                    merchant: txForm.merchant,
+                    category: txForm.category || 'Other',
+                    type: txForm.type,
+                    notes: txForm.notes,
                     timestamp
-                });
+                };
+
+                // Add the correct source ID based on source_type
+                if (txForm.source_type === 'credit_card' && txForm.credit_card_id) {
+                    payload.credit_card_id = txForm.credit_card_id;
+                } else if (txForm.account_id) {
+                    payload.account_id = txForm.account_id;
+                }
+
+                await axios.post(`${API_URL}/transactions/`, payload);
             }
             setShowTxModal(false);
             fetchData();
