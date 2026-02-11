@@ -178,6 +178,23 @@ Respond ONLY with valid JSON.
         elif 'credit transfer' in sms_lower:
             result['transaction_type'] = 'credit'
             result['sub_type'] = 'transfer'
+            
+            # Extract Sender Name (marks this as EXTERNAL, not internal transfer)
+            sender_match = re.search(r'Sender\s*Name:\s*(.+?)(?:\n|$)', sms_text, re.IGNORECASE)
+            if sender_match:
+                result['sender_name'] = sender_match.group(1).strip()
+            
+            # Extract Sender Bank
+            sender_bank_match = re.search(r'Sender\s*Bank:\s*(.+?)(?:\n|$)', sms_text, re.IGNORECASE)
+            if sender_bank_match:
+                result['sender_bank'] = sender_bank_match.group(1).strip()
+            
+            # Extract destination account (To: XXXX)
+            to_match = re.search(r'To:\s*(\d{4})', sms_text, re.IGNORECASE)
+            if to_match:
+                result['destination_account_last4'] = to_match.group(1)
+            
+            logger.info(f"[Jazira] Credit transfer to {result.get('destination_account_last4')} from {result.get('sender_name', 'unknown')}")
         
         # Outgoing transfer
         elif 'outgoing funds transfer' in sms_lower:
