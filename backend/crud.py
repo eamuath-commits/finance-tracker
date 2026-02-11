@@ -1030,11 +1030,16 @@ def delete_transaction(db: Session, transaction_id: str):
         # Compare type as string (db stores 'credit'/'debit', not enum)
         cc_tx_type = str(db_tx.type).lower() if db_tx.type else 'debit'
         if cc_tx_type == 'credit' or db_tx.type == models.TransactionType.CREDIT:
-            # Original was CREDIT (payment), so removal increases balance (undo the payment)
-            credit_card.current_balance += db_tx.amount
-        else:
-            # Original was DEBIT (charge), so removal decreases balance (undo the charge)
+            # Original credit ADDED to balance, so removal SUBTRACTS
             credit_card.current_balance -= db_tx.amount
+        else:
+            # Original debit SUBTRACTED from balance, so removal ADDS back
+            credit_card.current_balance += db_tx.amount
+        
+        # Revert fees (fees always subtracted, so add them back)
+        if db_tx.fees and db_tx.fees > 0:
+            credit_card.current_balance += db_tx.fees
+        
         logger.info(f"[DELETE_TX] Credit Card {credit_card.name}: {old_cc_balance} -> {credit_card.current_balance}")
         db.add(credit_card)
     else:
