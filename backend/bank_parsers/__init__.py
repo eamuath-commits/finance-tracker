@@ -21,6 +21,7 @@ def get_parser(sender: str):
     """
     from .alrajhi import AlRajhiParser
     from .stc import STCParser
+    from .jazira import JaziraParser
     from .default import DefaultParser
     
     # Mapping of sender patterns to parser classes
@@ -32,6 +33,10 @@ def get_parser(sender: str):
         "STC BANK": STCParser,
         "stc bank": STCParser,
         "stc": STCParser,
+        "Jazira": JaziraParser,
+        "BJAZ": JaziraParser,
+        "Bank Al Jazira": JaziraParser,
+        "AlJazira": JaziraParser,
     }
     
     # Try exact match first

@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Body
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import text, inspect
+from sqlalchemy import text, inspect, func
 from typing import List, Optional
 from datetime import datetime
 import re
@@ -756,7 +756,7 @@ def unlink_payment_transaction(payment_id: int, db: Session = Depends(get_db)):
 
 # --- Transaction Endpoints ---
 @app.get("/transactions/", response_model=List[schemas.Transaction])
-def read_transactions(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def read_transactions(skip: int = 0, limit: int = 1000, db: Session = Depends(get_db)):
     return crud.get_transactions(db, skip=skip, limit=limit)
 
 @app.put("/transactions/{transaction_id}", response_model=schemas.Transaction)
@@ -804,6 +804,30 @@ def complete_pending_transfer(transaction_id: str, source_account_id: str, db: S
     
     if pending_tx.status != "pending_action":
         raise HTTPException(status_code=400, detail="Transaction is not pending")
+    
+    # Handle "external" source - just complete the credit without creating debit
+    if source_account_id == "external":
+        pending_tx.status = "completed"
+        pending_tx.merchant = pending_tx.merchant or "External Transfer"
+        
+        # Apply balance update for the credit
+        queue_processor.apply_balance_update(db, pending_tx)
+        
+        # Update TransactionQueue entry to processed
+        queue_entry = db.query(models.TransactionQueue).filter(
+            models.TransactionQueue.transaction_id == transaction_id
+        ).first()
+        if queue_entry:
+            queue_entry.status = "processed"
+            queue_entry.processed_at = func.now()
+        
+        db.commit()
+        return {
+            "status": "completed",
+            "message": "Transfer marked as from external source",
+            "credit_transaction_id": str(pending_tx.id),
+            "debit_transaction_id": None
+        }
     
     # Validate source account
     source_account = db.query(models.Account).filter(models.Account.id == source_account_id).first()

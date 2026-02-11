@@ -1253,9 +1253,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 # Update credit card balance
                 if tx.type == "credit":
-                    cc.current_balance -= tx.amount  # Credits reduce balance owed
+                    cc.current_balance += tx.amount  # Credits add to balance
                 else:
-                    cc.current_balance += tx.amount  # Debits increase balance owed
+                    cc.current_balance -= tx.amount  # Debits subtract from balance
+                
+                if tx.fees:
+                    cc.current_balance -= tx.fees
                 
                 tx.balance_after_transaction = cc.current_balance
                 db.commit()
