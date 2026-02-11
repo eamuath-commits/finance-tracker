@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Body
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import text, inspect
+from sqlalchemy import text, inspect, func
 from typing import List, Optional
 from datetime import datetime
 import re
@@ -756,7 +756,7 @@ def unlink_payment_transaction(payment_id: int, db: Session = Depends(get_db)):
 
 # --- Transaction Endpoints ---
 @app.get("/transactions/", response_model=List[schemas.Transaction])
-def read_transactions(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def read_transactions(skip: int = 0, limit: int = 1000, db: Session = Depends(get_db)):
     return crud.get_transactions(db, skip=skip, limit=limit)
 
 @app.put("/transactions/{transaction_id}", response_model=schemas.Transaction)
@@ -804,6 +804,30 @@ def complete_pending_transfer(transaction_id: str, source_account_id: str, db: S
     
     if pending_tx.status != "pending_action":
         raise HTTPException(status_code=400, detail="Transaction is not pending")
+    
+    # Handle "external" source - just complete the credit without creating debit
+    if source_account_id == "external":
+        pending_tx.status = "completed"
+        pending_tx.merchant = pending_tx.merchant or "External Transfer"
+        
+        # Apply balance update for the credit
+        queue_processor.apply_balance_update(db, pending_tx)
+        
+        # Update TransactionQueue entry to processed
+        queue_entry = db.query(models.TransactionQueue).filter(
+            models.TransactionQueue.transaction_id == transaction_id
+        ).first()
+        if queue_entry:
+            queue_entry.status = "processed"
+            queue_entry.processed_at = func.now()
+        
+        db.commit()
+        return {
+            "status": "completed",
+            "message": "Transfer marked as from external source",
+            "credit_transaction_id": str(pending_tx.id),
+            "debit_transaction_id": None
+        }
     
     # Validate source account
     source_account = db.query(models.Account).filter(models.Account.id == source_account_id).first()
@@ -1193,10 +1217,31 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
     db.refresh(raw_msg)
 
     
-    # 2. AI Parse
+    # 2. Extract sender from header if present (WebUI format: "2025-09-20 09:39:36 from STC Bank")
+    effective_sender = payload.sender
+    body_for_parsing = payload.body
+    
+    # Check first line for header pattern
+    first_line = body_lines[0] if body_lines else ""
+    import re
+    header_match = re.search(r'^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+from\s+(.+)$', first_line.strip(), re.IGNORECASE)
+    if header_match:
+        extracted_sender = header_match.group(1).strip()
+        logger.info(f"[SMS-INGEST] Extracted sender from header: {extracted_sender}")
+        effective_sender = extracted_sender
+        # Remove header line from body for cleaner parsing
+        body_for_parsing = '\n'.join(body_lines[1:]).strip()
+    
+    # Update raw message with effective sender
+    raw_msg.sender = effective_sender
+    db.commit()
+
+    # 2b. Use bank-specific parser based on sender
     try:
-        result = await sms_agent.parse_with_ai(db, payload.body)
-        result = sms_agent.validate_parsed_digits(payload.body, result)  # Validate account numbers
+        from bank_parsers import get_parser
+        parser = get_parser(effective_sender)
+        result = await parser.parse(db, body_for_parsing)
+        result = sms_agent.validate_parsed_digits(body_for_parsing, result)  # Validate account numbers
         logger.info(f"[SMS-INGEST] AI Response: {result}")
     except Exception as e:
         logger.error(f"[SMS-INGEST] AI Error: {str(e)}")

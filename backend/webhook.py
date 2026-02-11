@@ -99,8 +99,10 @@ async def receive_sms(
         db.commit()
         db.refresh(raw_msg)
         
-        # Parse with AI
-        result = await sms_agent.parse_with_ai(db, request.message)
+        # Use bank-specific parser based on sender
+        from bank_parsers import get_parser
+        parser = get_parser(request.sender or "Unknown")
+        result = await parser.parse(db, request.message)
         
         if "error" in result:
             raw_msg.status = models.MessageStatus.FAILED

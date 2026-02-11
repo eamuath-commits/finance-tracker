@@ -819,6 +819,17 @@ function Transactions() {
                                     const isTransfer = tx.category === 'Transfer';
                                     const isCreditCardTx = !!cc;
 
+                                    // Check for balance discrepancy from SMS
+                                    let balanceDiscrepancy = null;
+                                    if (tx.parsed_data) {
+                                        try {
+                                            const parsed = typeof tx.parsed_data === 'string' ? JSON.parse(tx.parsed_data) : tx.parsed_data;
+                                            if (parsed.balance_discrepancy) {
+                                                balanceDiscrepancy = parsed.balance_discrepancy;
+                                            }
+                                        } catch (e) { }
+                                    }
+
                                     return (
                                         <tr key={tx.id} className={`hover:bg-slate-700/50 transition-colors ${selectedTxIds.has(tx.id) ? 'bg-blue-900/20' : ''}`}>
                                             {isSelectionMode && (
@@ -891,6 +902,7 @@ function Transactions() {
                                                             }}
                                                         >
                                                             <option value="">Select source...</option>
+                                                            <option value="external" className="text-gray-400">— Unknown / External —</option>
                                                             {accounts.filter(a => a.id !== tx.account_id).map(a => (
                                                                 <option key={a.id} value={a.id}>{a.name} {a.last_4_digits ? `•${a.last_4_digits}` : ''}</option>
                                                             ))}
@@ -917,11 +929,24 @@ function Transactions() {
                                                 {tx.original_amount && tx.original_currency && tx.original_currency !== 'SAR' && (
                                                     <div className="text-[10px] text-gray-500 font-normal">({tx.original_amount} {tx.original_currency})</div>
                                                 )}
+                                                {tx.fees > 0 && (
+                                                    <div className="text-[10px] text-amber-400 font-normal">+ {formatCurrency(tx.fees)} fees</div>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-400 font-mono">
-                                                {tx.balance_after_transaction !== null && tx.balance_after_transaction !== undefined
-                                                    ? formatCurrency(tx.balance_after_transaction)
-                                                    : '-'}
+                                                <div className="flex items-center justify-end gap-1">
+                                                    {tx.balance_after_transaction !== null && tx.balance_after_transaction !== undefined
+                                                        ? formatCurrency(tx.balance_after_transaction)
+                                                        : '-'}
+                                                    {balanceDiscrepancy && (
+                                                        <span
+                                                            className="text-amber-400 cursor-help"
+                                                            title={`⚠️ Balance mismatch!\nDB: ${formatCurrency(balanceDiscrepancy.db_balance)}\nSMS: ${formatCurrency(balanceDiscrepancy.sms_balance)}\nDiff: ${formatCurrency(balanceDiscrepancy.difference)}`}
+                                                        >
+                                                            ⚠️
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                                                 <div className="flex justify-end gap-2">

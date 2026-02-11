@@ -169,10 +169,17 @@ def validate_parsed_digits(original_sms: str, parsed_data: dict) -> dict:
     
     return parsed_data
 
-async def parse_with_ai(db: Session, text: str):
+async def parse_with_ai(db: Session, text: str, custom_prompt: str = None):
     """
     Sends SMS text to Gemini AI and expects a JSON response.
     Retries on 429 errors.
+    
+    Args:
+        db: Database session
+        text: SMS text to parse
+        custom_prompt: Optional bank-specific prompt. If provided, uses this
+                      prompt directly with the SMS text appended. If None,
+                      uses the default comprehensive prompt.
     """
     if not model:
         return {"error": "AI_NOT_CONFIGURED"}
@@ -360,6 +367,22 @@ async def parse_with_ai(db: Session, text: str):
         Output: {{"is_financial_event":true,"is_transaction":true,"transaction_type":"debit","sub_type":"transfer","source_bank":"Jazira Bank","source_account_last4":"8001","destination_bank":"AlRajhi Bank","destination_account_last4":"7772","amount":2000,"currency":"SAR","beneficiary":"MUATH ALASIRI","category":"Transfer","timestamp":"2026-01-17 14:19","description":"Transfer to AlRajhi"}}
     """
 
+    # If custom prompt provided (from bank-specific parser), use it
+    if custom_prompt:
+        prompt = f"""{custom_prompt}
+
+**USER'S ACCOUNTS (for matching)**:
+{accounts_json_str}
+
+**Context**: Date={today_date}, Year={current_year}
+
+**SMS to parse**:
+"{text}"
+
+Respond with JSON only.
+"""
+        logger.info(f"Using custom bank-specific prompt")
+    
     MAX_RETRIES = 5
     base_delay = 4
     
@@ -1230,9 +1253,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 # Update credit card balance
                 if tx.type == "credit":
-                    cc.current_balance -= tx.amount  # Credits reduce balance owed
+                    cc.current_balance += tx.amount  # Credits add to balance
                 else:
-                    cc.current_balance += tx.amount  # Debits increase balance owed
+                    cc.current_balance -= tx.amount  # Debits subtract from balance
+                
+                if tx.fees:
+                    cc.current_balance -= tx.fees
                 
                 tx.balance_after_transaction = cc.current_balance
                 db.commit()

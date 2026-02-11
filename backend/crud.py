@@ -264,12 +264,12 @@ def recalculate_account_balances(db: Session, account_id: str = None, credit_car
                     is_credit = str(tx.type).lower() == "credit"
                 
                 if is_credit:
-                    running_balance += tx.amount  # Reverse payment
+                    running_balance -= tx.amount  # Reverse payment (was +)
                 else:
-                    running_balance -= tx.amount  # Reverse purchase
+                    running_balance += tx.amount  # Reverse purchase (was -)
                 
                 if tx.fees:
-                    running_balance -= tx.fees
+                    running_balance += tx.fees
     
     # Now recalculate forward
     for tx in transactions:
@@ -286,13 +286,13 @@ def recalculate_account_balances(db: Session, account_id: str = None, credit_car
             if tx.fees:
                 running_balance -= tx.fees
         else:
-            # Credit card logic (inverted)
+            # Credit card logic (same as bank: credit adds, debit subtracts)
             if is_credit:
-                running_balance -= tx.amount  # Payment
+                running_balance += tx.amount  # Payment adds
             else:
-                running_balance += tx.amount  # Purchase
+                running_balance -= tx.amount  # Purchase subtracts
             if tx.fees:
-                running_balance += tx.fees
+                running_balance -= tx.fees
         
         tx.balance_after_transaction = running_balance
         db.add(tx)
@@ -361,17 +361,43 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate):
         except:
              is_credit = str(transaction.type).lower() == "credit"
         
-        # For credit cards: Credit = payment (reduces balance), Debit = purchase (increases balance)
+        # For credit cards: Credit = payment (adds to balance), Debit = purchase (subtracts from balance)
         if is_credit:
-            credit_card.current_balance -= transaction.amount  # Payment reduces debt
+            credit_card.current_balance += transaction.amount  # Payment adds to balance
         else:
-            credit_card.current_balance += transaction.amount  # Purchase increases debt
+            credit_card.current_balance -= transaction.amount  # Purchase subtracts from balance
         
         if transaction.fees:
-            credit_card.current_balance += transaction.fees
+            credit_card.current_balance -= transaction.fees  # Fees subtract from balance
         
         new_balance = credit_card.current_balance
         db.add(credit_card)
+        
+        # Discrepancy check: compare DB balance with SMS available_balance
+        if transaction.parsed_data:
+            import json as _json
+            import logging
+            _logger = logging.getLogger(__name__)
+            try:
+                parsed = _json.loads(transaction.parsed_data) if isinstance(transaction.parsed_data, str) else transaction.parsed_data
+                sms_balance = parsed.get('available_balance')
+                if sms_balance is not None:
+                    diff = abs(new_balance - sms_balance)
+                    if diff > 0.01:
+                        _logger.warning(
+                            f"⚠️ CC {credit_card.last_4_digits} BALANCE DISCREPANCY: "
+                            f"DB={new_balance:.2f}, SMS={sms_balance:.2f}, diff={diff:.2f}"
+                        )
+                        parsed['balance_discrepancy'] = {
+                            'db_balance': round(new_balance, 2),
+                            'sms_balance': round(sms_balance, 2),
+                            'difference': round(diff, 2)
+                        }
+                        transaction.parsed_data = _json.dumps(parsed)
+                    else:
+                        _logger.info(f"CC {credit_card.last_4_digits}: Balance matches SMS ({sms_balance})")
+            except Exception as e:
+                pass
 
     db_transaction = models.Transaction(
         account_id=transaction.account_id,
@@ -1004,11 +1030,16 @@ def delete_transaction(db: Session, transaction_id: str):
         # Compare type as string (db stores 'credit'/'debit', not enum)
         cc_tx_type = str(db_tx.type).lower() if db_tx.type else 'debit'
         if cc_tx_type == 'credit' or db_tx.type == models.TransactionType.CREDIT:
-            # Original was CREDIT (payment), so removal increases balance (undo the payment)
-            credit_card.current_balance += db_tx.amount
-        else:
-            # Original was DEBIT (charge), so removal decreases balance (undo the charge)
+            # Original credit ADDED to balance, so removal SUBTRACTS
             credit_card.current_balance -= db_tx.amount
+        else:
+            # Original debit SUBTRACTED from balance, so removal ADDS back
+            credit_card.current_balance += db_tx.amount
+        
+        # Revert fees (fees always subtracted, so add them back)
+        if db_tx.fees and db_tx.fees > 0:
+            credit_card.current_balance += db_tx.fees
+        
         logger.info(f"[DELETE_TX] Credit Card {credit_card.name}: {old_cc_balance} -> {credit_card.current_balance}")
         db.add(credit_card)
     else:

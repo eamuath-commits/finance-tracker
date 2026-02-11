@@ -153,6 +153,8 @@ def apply_balance_update(db: Session, transaction: models.Transaction) -> bool:
                 account.current_balance = old_balance - amount
             
             # Calculate balance_after_transaction
+            if transaction.fees:
+                account.current_balance -= transaction.fees
             transaction.balance_after_transaction = account.current_balance
             logger.info(f"Account {account.last_4_digits}: {old_balance} -> {account.current_balance}")
     
@@ -164,14 +166,43 @@ def apply_balance_update(db: Session, transaction: models.Transaction) -> bool:
         
         if credit_card:
             old_balance = credit_card.current_balance or 0
+            
+            # Always calculate from DB (credit adds, debit subtracts)
             if tx_type == 'credit':
-                # Credit on CC = payment, reduces what you owe
-                credit_card.current_balance = old_balance - amount
-            else:  # debit = purchase, increases what you owe
                 credit_card.current_balance = old_balance + amount
+            else:  # debit = purchase, subtracts from balance
+                credit_card.current_balance = old_balance - amount
+            
+            if transaction.fees:
+                credit_card.current_balance -= transaction.fees
             
             transaction.balance_after_transaction = credit_card.current_balance
             logger.info(f"CC {credit_card.last_4_digits}: {old_balance} -> {credit_card.current_balance}")
+            
+            # Discrepancy check: compare with SMS available_balance if present
+            if transaction.parsed_data:
+                try:
+                    import json
+                    parsed = json.loads(transaction.parsed_data) if isinstance(transaction.parsed_data, str) else transaction.parsed_data
+                    sms_balance = parsed.get('available_balance')
+                    if sms_balance is not None:
+                        diff = abs(credit_card.current_balance - sms_balance)
+                        if diff > 0.01:
+                            logger.warning(
+                                f"⚠️ CC {credit_card.last_4_digits} BALANCE DISCREPANCY: "
+                                f"DB={credit_card.current_balance:.2f}, SMS={sms_balance:.2f}, diff={diff:.2f}"
+                            )
+                            # Store discrepancy info in parsed_data for frontend display
+                            parsed['balance_discrepancy'] = {
+                                'db_balance': round(credit_card.current_balance, 2),
+                                'sms_balance': round(sms_balance, 2),
+                                'difference': round(diff, 2)
+                            }
+                            transaction.parsed_data = json.dumps(parsed)
+                        else:
+                            logger.info(f"CC {credit_card.last_4_digits}: Balance matches SMS ({sms_balance})")
+                except Exception as e:
+                    logger.debug(f"Could not check SMS balance: {e}")
     
     return True
 
