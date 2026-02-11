@@ -755,9 +755,34 @@ def unlink_payment_transaction(payment_id: int, db: Session = Depends(get_db)):
     return {"message": "Transaction unlinked"}
 
 # --- Transaction Endpoints ---
-@app.get("/transactions/", response_model=List[schemas.Transaction])
+@app.get("/transactions/")
 def read_transactions(skip: int = 0, limit: int = 1000, db: Session = Depends(get_db)):
-    return crud.get_transactions(db, skip=skip, limit=limit)
+    txs = crud.get_transactions(db, skip=skip, limit=limit)
+    result = []
+    for tx in txs:
+        tx_dict = {c.name: getattr(tx, c.name) for c in tx.__table__.columns}
+        # Add counterparty display info
+        if tx.merchant_ref:
+            tx_dict["merchant_info"] = {"id": tx.merchant_ref.id, "name": tx.merchant_ref.display_name or tx.merchant_ref.name, "type": "merchant"}
+        if tx.beneficiary_ref:
+            tx_dict["beneficiary_info"] = {"id": tx.beneficiary_ref.id, "name": tx.beneficiary_ref.display_name or tx.beneficiary_ref.name, "bank_name": tx.beneficiary_ref.bank_name, "type": "beneficiary"}
+        if tx.biller_ref:
+            tx_dict["biller_info"] = {"id": tx.biller_ref.id, "name": tx.biller_ref.display_name or tx.biller_ref.name, "type": "biller"}
+        result.append(tx_dict)
+    return result
+
+# --- Counterparty Endpoints ---
+@app.get("/merchants/")
+def list_merchants(db: Session = Depends(get_db)):
+    return crud.get_merchants(db)
+
+@app.get("/beneficiaries/")
+def list_beneficiaries(db: Session = Depends(get_db)):
+    return crud.get_beneficiaries(db)
+
+@app.get("/billers/")
+def list_billers(db: Session = Depends(get_db)):
+    return crud.get_billers(db)
 
 @app.put("/transactions/{transaction_id}", response_model=schemas.Transaction)
 def update_transaction(transaction_id: str, transaction_update: schemas.TransactionUpdate, db: Session = Depends(get_db)):

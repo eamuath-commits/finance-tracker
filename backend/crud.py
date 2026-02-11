@@ -415,7 +415,10 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate):
         original_amount=transaction.original_amount,
         original_currency=transaction.original_currency,
         exchange_rate=transaction.exchange_rate,
-        source=transaction.source  # Track where transaction came from
+        source=transaction.source,  # Track where transaction came from
+        merchant_id=getattr(transaction, 'merchant_id', None),
+        beneficiary_id=getattr(transaction, 'beneficiary_id', None),
+        biller_id=getattr(transaction, 'biller_id', None),
     )
     db.add(db_transaction)
 
@@ -1910,3 +1913,158 @@ def link_distribution_to_transaction(db: Session, distribution_id: str, transact
     db.commit()
     db.refresh(db_distribution)
     return db_distribution
+
+
+# --- Merchant CRUD ---
+
+def get_merchants(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Merchant).offset(skip).limit(limit).all()
+
+def get_merchant(db: Session, merchant_id: str):
+    return db.query(models.Merchant).filter(models.Merchant.id == merchant_id).first()
+
+def create_merchant(db: Session, merchant: schemas.MerchantCreate):
+    db_merchant = models.Merchant(**merchant.dict())
+    db.add(db_merchant)
+    db.commit()
+    db.refresh(db_merchant)
+    return db_merchant
+
+def update_merchant(db: Session, merchant_id: str, update: schemas.MerchantUpdate):
+    db_merchant = get_merchant(db, merchant_id)
+    if not db_merchant:
+        return None
+    for key, value in update.dict(exclude_unset=True).items():
+        setattr(db_merchant, key, value)
+    db.commit()
+    db.refresh(db_merchant)
+    return db_merchant
+
+def delete_merchant(db: Session, merchant_id: str):
+    db_merchant = get_merchant(db, merchant_id)
+    if db_merchant:
+        db.delete(db_merchant)
+        db.commit()
+    return db_merchant
+
+def find_or_create_merchant(db: Session, name: str, category: str = None) -> models.Merchant:
+    """Find existing merchant by name (case-insensitive) or create new one."""
+    existing = db.query(models.Merchant).filter(
+        func.lower(models.Merchant.name) == name.lower().strip()
+    ).first()
+    if existing:
+        return existing
+    new_merchant = models.Merchant(name=name.strip(), category=category)
+    db.add(new_merchant)
+    db.flush()  # Get ID without committing (caller will commit)
+    return new_merchant
+
+
+# --- Beneficiary CRUD ---
+
+def get_beneficiaries(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Beneficiary).offset(skip).limit(limit).all()
+
+def get_beneficiary(db: Session, beneficiary_id: str):
+    return db.query(models.Beneficiary).filter(models.Beneficiary.id == beneficiary_id).first()
+
+def create_beneficiary(db: Session, beneficiary: schemas.BeneficiaryCreate):
+    db_beneficiary = models.Beneficiary(**beneficiary.dict())
+    db.add(db_beneficiary)
+    db.commit()
+    db.refresh(db_beneficiary)
+    return db_beneficiary
+
+def update_beneficiary(db: Session, beneficiary_id: str, update: schemas.BeneficiaryUpdate):
+    db_beneficiary = get_beneficiary(db, beneficiary_id)
+    if not db_beneficiary:
+        return None
+    for key, value in update.dict(exclude_unset=True).items():
+        setattr(db_beneficiary, key, value)
+    db.commit()
+    db.refresh(db_beneficiary)
+    return db_beneficiary
+
+def delete_beneficiary(db: Session, beneficiary_id: str):
+    db_beneficiary = get_beneficiary(db, beneficiary_id)
+    if db_beneficiary:
+        db.delete(db_beneficiary)
+        db.commit()
+    return db_beneficiary
+
+def find_or_create_beneficiary(db: Session, name: str, bank_name: str = None, iban: str = None, account_last4: str = None) -> models.Beneficiary:
+    """Find existing beneficiary by name+bank (case-insensitive) or create new one.
+    Same name with different bank = separate records."""
+    query = db.query(models.Beneficiary).filter(
+        func.lower(models.Beneficiary.name) == name.lower().strip()
+    )
+    if bank_name:
+        query = query.filter(
+            func.lower(models.Beneficiary.bank_name) == bank_name.lower().strip()
+        )
+    else:
+        query = query.filter(models.Beneficiary.bank_name.is_(None))
+    
+    existing = query.first()
+    if existing:
+        # Update IBAN/account_last4 if we have new info
+        if iban and not existing.iban:
+            existing.iban = iban
+        if account_last4 and not existing.account_last4:
+            existing.account_last4 = account_last4
+        return existing
+    
+    new_beneficiary = models.Beneficiary(
+        name=name.strip(),
+        bank_name=bank_name.strip() if bank_name else None,
+        iban=iban,
+        account_last4=account_last4
+    )
+    db.add(new_beneficiary)
+    db.flush()
+    return new_beneficiary
+
+
+# --- Biller CRUD ---
+
+def get_billers(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Biller).offset(skip).limit(limit).all()
+
+def get_biller(db: Session, biller_id: str):
+    return db.query(models.Biller).filter(models.Biller.id == biller_id).first()
+
+def create_biller(db: Session, biller: schemas.BillerCreate):
+    db_biller = models.Biller(**biller.dict())
+    db.add(db_biller)
+    db.commit()
+    db.refresh(db_biller)
+    return db_biller
+
+def update_biller(db: Session, biller_id: str, update: schemas.BillerUpdate):
+    db_biller = get_biller(db, biller_id)
+    if not db_biller:
+        return None
+    for key, value in update.dict(exclude_unset=True).items():
+        setattr(db_biller, key, value)
+    db.commit()
+    db.refresh(db_biller)
+    return db_biller
+
+def delete_biller(db: Session, biller_id: str):
+    db_biller = get_biller(db, biller_id)
+    if db_biller:
+        db.delete(db_biller)
+        db.commit()
+    return db_biller
+
+def find_or_create_biller(db: Session, name: str, category: str = None) -> models.Biller:
+    """Find existing biller by name (case-insensitive) or create new one."""
+    existing = db.query(models.Biller).filter(
+        func.lower(models.Biller.name) == name.lower().strip()
+    ).first()
+    if existing:
+        return existing
+    new_biller = models.Biller(name=name.strip(), category=category)
+    db.add(new_biller)
+    db.flush()
+    return new_biller

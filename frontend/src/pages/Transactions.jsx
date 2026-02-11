@@ -802,8 +802,8 @@ function Transactions() {
                                             </span>
                                         </span>
                                     </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Account / Card</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Beneficiary / Source</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">From:</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">To:</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Category</th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Amount</th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Balance</th>
@@ -911,7 +911,26 @@ function Transactions() {
                                                 ) : (
                                                     <>
                                                         {isTransfer && <span className="text-xs text-blue-400 mr-2 uppercase font-bold tracking-wider">{txIsCredit ? 'FROM:' : 'TO:'}</span>}
-                                                        {tx.merchant || 'Unknown'}
+                                                        {/* Counterparty display with type badge */}
+                                                        {tx.beneficiary_info ? (
+                                                            <span className="inline-flex items-center gap-1.5">
+                                                                <span className="text-[10px] bg-blue-600/30 text-blue-300 px-1.5 py-0.5 rounded font-medium">Beneficiary</span>
+                                                                <span>{tx.beneficiary_info.name}</span>
+                                                                {tx.beneficiary_info.bank_name && <span className="text-xs text-gray-500">({tx.beneficiary_info.bank_name})</span>}
+                                                            </span>
+                                                        ) : tx.biller_info ? (
+                                                            <span className="inline-flex items-center gap-1.5">
+                                                                <span className="text-[10px] bg-amber-600/30 text-amber-300 px-1.5 py-0.5 rounded font-medium">Biller</span>
+                                                                <span>{tx.biller_info.name}</span>
+                                                            </span>
+                                                        ) : tx.merchant_info ? (
+                                                            <span className="inline-flex items-center gap-1.5">
+                                                                <span className="text-[10px] bg-emerald-600/30 text-emerald-300 px-1.5 py-0.5 rounded font-medium">Merchant</span>
+                                                                <span>{tx.merchant_info.name}</span>
+                                                            </span>
+                                                        ) : (
+                                                            <span>{tx.merchant || 'Unknown'}</span>
+                                                        )}
                                                         {tx.status === 'pending_transfer' && (
                                                             <span className="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-900/40 text-amber-400 border border-amber-700">⏳ Pending</span>
                                                         )}

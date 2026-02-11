@@ -74,6 +74,76 @@ class CreditCard(CreditCardBase):
     class Config:
         from_attributes = True
 
+# --- Counterparty Schemas ---
+class MerchantBase(BaseModel):
+    name: str
+    display_name: Optional[str] = None
+    category: Optional[str] = None
+    logo_url: Optional[str] = None
+    notes: Optional[str] = None
+
+class MerchantCreate(MerchantBase):
+    pass
+
+class MerchantUpdate(BaseModel):
+    name: Optional[str] = None
+    display_name: Optional[str] = None
+    category: Optional[str] = None
+    logo_url: Optional[str] = None
+    notes: Optional[str] = None
+
+class Merchant(MerchantBase):
+    id: str
+    created_at: Optional[datetime] = None
+    class Config:
+        from_attributes = True
+
+class BeneficiaryBase(BaseModel):
+    name: str
+    display_name: Optional[str] = None
+    bank_name: Optional[str] = None
+    iban: Optional[str] = None
+    account_last4: Optional[str] = None
+    notes: Optional[str] = None
+
+class BeneficiaryCreate(BeneficiaryBase):
+    pass
+
+class BeneficiaryUpdate(BaseModel):
+    name: Optional[str] = None
+    display_name: Optional[str] = None
+    bank_name: Optional[str] = None
+    iban: Optional[str] = None
+    account_last4: Optional[str] = None
+    notes: Optional[str] = None
+
+class Beneficiary(BeneficiaryBase):
+    id: str
+    created_at: Optional[datetime] = None
+    class Config:
+        from_attributes = True
+
+class BillerBase(BaseModel):
+    name: str
+    display_name: Optional[str] = None
+    category: Optional[str] = None
+    notes: Optional[str] = None
+
+class BillerCreate(BillerBase):
+    pass
+
+class BillerUpdate(BaseModel):
+    name: Optional[str] = None
+    display_name: Optional[str] = None
+    category: Optional[str] = None
+    notes: Optional[str] = None
+
+class Biller(BillerBase):
+    id: str
+    created_at: Optional[datetime] = None
+    class Config:
+        from_attributes = True
+
 # --- Transaction Schemas ---
 class TransactionBase(BaseModel):
     amount: float
@@ -95,6 +165,9 @@ class TransactionCreate(TransactionBase):
     parsed_data: Optional[str] = None  # JSON string of all AI-extracted fields
     timestamp: datetime
     source: Optional[str] = None  # Source: 'telegram', 'webui', 'manual'
+    merchant_id: Optional[str] = None
+    beneficiary_id: Optional[str] = None
+    biller_id: Optional[str] = None
 
 class TransactionUpdate(BaseModel):
     account_id: Optional[str] = None
@@ -111,6 +184,9 @@ class TransactionUpdate(BaseModel):
     original_currency: Optional[str] = None
     exchange_rate: Optional[float] = None
     previous_balance: Optional[float] = None  # If set, recalculate from this balance
+    merchant_id: Optional[str] = None
+    beneficiary_id: Optional[str] = None
+    biller_id: Optional[str] = None
 
 class Transaction(TransactionBase):
     id: str
@@ -121,6 +197,13 @@ class Transaction(TransactionBase):
     raw_sms_content: Optional[str] = None  # Include raw SMS in response
     parsed_data: Optional[str] = None  # JSON string of all AI-extracted fields
     source: Optional[str] = None  # Source: 'telegram', 'webui', 'manual'
+    merchant_id: Optional[str] = None
+    beneficiary_id: Optional[str] = None
+    biller_id: Optional[str] = None
+    # Nested counterparty objects (populated from relationships)
+    merchant_info: Optional[Merchant] = None
+    beneficiary_info: Optional[Beneficiary] = None
+    biller_info: Optional[Biller] = None
 
     class Config:
         from_attributes = True

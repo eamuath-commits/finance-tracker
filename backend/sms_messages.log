@@ -250,3 +250,70 @@
 2026-02-04 20:32:50,587 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— PoS | By:4390;mada-Apple Pay | Amount:SAR 1552.37 | At:SAUDI MAR | 5/2/26 20:33
 2026-02-04 22:38:40,641 | FROM: Channel_-1003635708322 | SMS: STC Bank —— 7958 is your OTP | For: Transfer to contact | Amount: 1.00 SAR | *Do not share the code
 2026-02-04 22:38:47,037 | FROM: Channel_-1003635708322 | SMS: STC Bank —— Internal outward transfer | Amount:1.00SAR | To:SARAH ALALMAEE | Acc:3537* | At:04/02/26 22:39
+2026-02-06 15:05:13,486 | FROM: Webhook-STC Bank | SMS: Transfer between my accounts | Amount: 1.00 SAR | from: ***0863 | To: ***2067 | At: 06/02/26 15:05
+2026-02-06 15:42:50,079 | FROM: Webhook-STC Bank | SMS: Apple Pay Purchase | Via: *8574 | Amount: 32.64 SAR | From: HUNGERSTATION LLC | At: 16/07/25 07:20
+2026-02-06 15:43:08,520 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:9365;mada-Apple Pay | Amount:SAR 25 | At:Starbucks | 06/2/26 15:40
+2026-02-06 16:00:08,566 | FROM: Webhook-STC Bank | SMS: Outcome Transfer to Sponsored  | Amount:1500.00SAR  | To:NORMA CAFE  | Acc:6566*  | At:01/02/26 03:17
+2026-02-06 16:01:25,391 | FROM: Webhook-STC Bank | SMS: Outcome Transfer to Sponsored  | Amount:1500.00SAR  | To:NORMA CAFE  | Acc:6566*  | At:01/02/26 03:17
+2026-02-06 16:24:40,418 | FROM: Webhook-AlRajhiBank | SMS: Transfer Between Your Accounts | Amount: SAR 1 | To: 1505 | 26/2/6 16:24
+2026-02-06 16:26:13,537 | FROM: Webhook-STC Bank | SMS: Transfer between my accounts | Amount: 5.00 SAR | from: ***2067 | To: ***0863 | At: 06/02/26 16:26
+2026-02-06 16:37:08,506 | FROM: Webhook-AlRajhiBank | SMS: OTP Code:0805 | Reason:Rajhi Transfer - Mobile App | Amount:150.00 SAR
+2026-02-06 16:37:39,409 | FROM: Webhook-AlRajhiBank | SMS: Debit Internal Transfer | From:1505 | Amount:SAR 150 | To:SABAH ABDULLAH | To:0450 | 26/2/6 16:37
+2026-02-06 17:37:11,654 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:9365;mada-Apple Pay | Amount:SAR 110 | At:Gifts Mal | 6/2/26 17:37
+2026-02-06 17:40:03,328 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:9365;mada-Apple Pay | Amount:SAR 368 | At:Gifts Mal | 6/2/26 17:40
+2026-02-06 23:04:58,642 | FROM: Webhook-AlRajhiBank | SMS: OTP Code:2890 | Reason:Rajhi Transfer - Mobile App | Amount:150.00 SAR
+2026-02-06 23:05:28,323 | FROM: Webhook-AlRajhiBank | SMS: Debit Internal Transfer | From:1505 | Amount:SAR 150 | To:RAJEV BHUIYAN | To:0486 | 26/2/6 23:05
+2026-02-07 12:00:04,897 | FROM: Webhook-AlRajhiBank | SMS: PoS International purchase | Card:7868 ;Visa | Amount:3.99 USD | At: PAYPAL *N | Country:USA | Balance:11.73 USD | 7/2/26 12:00
+2026-02-07 13:40:22,344 | FROM: Webhook-AlRajhiBank | SMS: Transfer Between Your Accounts | Amount: SAR 3000 | To: 1505 | 26/2/7 13:40
+2026-02-07 13:41:05,160 | FROM: Webhook-AlRajhiBank | SMS: OTP Code:8320 | Reason:Local Transfer - Mobile App | Amount:1,900.00 SAR
+2026-02-07 13:41:35,138 | FROM: Webhook-AlRajhiBank | SMS: Debit Transfer Local | Bank:SAIB | From:1505 | Amount:SAR 1900 | To:RASHA AMER ALASIRI | To:0001 | Fees:SAR 0.58 | 26/2/7 13:41
+2026-02-07 16:13:58,974 | FROM: Webhook-AlRajhiBank | SMS: Online Purchase | By:9365;mada-Apple Pay | From:1505 | Amount:SAR 3.45 | At:Riyadh Pa | 7/2/26 16:14
+2026-02-07 16:47:26,511 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:9365;mada-Apple Pay | Amount:SAR 80.50 | At:ASARITRAD | 7/2/26 16:48
+2026-02-07 17:37:14,120 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:9365;mada-Apple Pay | Amount:SAR 22 | At:Gala Star | 7/2/26 17:37
+2026-02-07 17:42:23,152 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:9365;mada-Apple Pay | Amount:SAR 23 | At:jenan co | 7/2/26 17:42
+2026-02-07 17:53:42,143 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:9365;mada-Apple Pay | Amount:SAR 52 | At:MAMA NOUR | 7/2/26 17:54
+2026-02-07 19:06:50,311 | FROM: Webhook-Jazira Bank | SMS: Sama Court Order Deduction | Order Reference: 26271079435267 | Amount : SAR 150.00 | Date: 2026-02-07 19:07 | From A/C: 8001
+2026-02-07 19:07:07,698 | FROM: Webhook-AlRajhiBank | SMS: Debit | From:3264 | Amount:SAR 150 | 26/2/7 19:07 | Based on article 75 of the Traffic Law,Violation Number:6592543917
+2026-02-07 19:07:11,599 | FROM: Webhook-AlRajhiBank | SMS: Government dues refund | To:3264 | Amount:SAR 150 | 26/2/7 19:07
+2026-02-07 19:11:06,798 | FROM: Webhook-Jazira Bank | SMS: One Time Password | Code: 5566 | Reason: To Pay Your Card With Amount 22871.84 | Date: 2026-02-07 19:11
+2026-02-07 19:11:26,172 | FROM: Webhook-Jazira Bank | SMS: One Time Password | Code: 9654 | Reason: To Pay Your Card With Amount 22871.84 | Date: 2026-02-07 19:11
+2026-02-07 19:11:53,111 | FROM: Webhook-Jazira Bank | SMS: Credit Card: Payment | Card: 4897;Credit Card | Amount: SAR 22,871.84 | From: 8001 | Date: 2026-02-07 19:12
+2026-02-07 19:12:42,904 | FROM: Webhook-Jazira Bank | SMS: Credit Card: Payment | Card: 1645;Credit Card | Amount: SAR 5,763.22 | From: 8001 | Date: 2026-02-07 19:12
+2026-02-07 19:18:40,064 | FROM: Webhook-AlRajhiBank | SMS: Bill Payment | From:9384 | Amount:SAR 137.71 | Biller:044 | Service:ZAIN | Bill:596992025 | 26/2/7 19:18
+2026-02-07 19:18:44,299 | FROM: Webhook-AlRajhiBank | SMS: Bill Payment | From:9384 | Amount:SAR 1120.79 | Biller:001 | Service:STC BILL | Bill:05064478739 | 26/2/7 19:18
+2026-02-07 19:18:47,598 | FROM: Webhook-AlRajhiBank | SMS: Bill Payment | From:9384 | Amount:SAR 85.01 | Biller:001 | Service:STC BILL | Bill:05224907461 | 26/2/7 19:18
+2026-02-07 19:18:50,387 | FROM: Webhook-AlRajhiBank | SMS: Bill Payment | From:9384 | Amount:SAR 531.32 | Biller:138 | Service:NWC | Bill:9634555162 | 26/2/7 19:18
+2026-02-07 22:53:37,574 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:9365;mada-Apple Pay | Amount:SAR 22 | At:Aswaq Zad | 8/2/26 22:54
+2026-02-08 02:31:17,703 | FROM: Webhook-AlRajhiBank | SMS: OTP Code:2434 | Reason:Rajhi Transfer - Mobile App | Amount:33.00 SAR
+2026-02-08 02:31:43,781 | FROM: Webhook-AlRajhiBank | SMS: Debit Internal Transfer | From:1505 | Amount:SAR 33 | To:YAZEED ALSHAMI | To:6967 | 26/2/8 02:32
+2026-02-08 03:41:52,809 | FROM: Webhook-AlRajhiBank | SMS: Online Purchase | By:9365;mada-Apple Pay | From:1505 | Amount:SAR 299 | At:Rawafshop | 8/2/26 03:42
+2026-02-08 12:37:08,469 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— Online Purchase | By:4390;mada-Apple Pay | From:2104 | Amount:SAR 100 | At:COMMERCIA | 8/2/26 12:37
+2026-02-08 12:37:11,312 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— Online Purchase | By:4390;mada-Apple Pay | From:2104 | Amount:SAR 100 | At:COMMERCIA | 8/2/26 12:37
+2026-02-08 12:52:47,720 | FROM: Webhook-AlRajhiBank | SMS: Online Purchase | Card:7868 ;Visa | Amount:55.99 SAR | At: Microsoft | Country:Ireland | Balance:114.7 SAR | 8/2/26 12:53
+2026-02-08 12:53:59,154 | FROM: Webhook-Jazira Bank | SMS: Credit Card: Payment | Card: 4897; Credit Card | Amount: SAR 22,870.84 | From: 8001 | Date: 2026-02-08 12:54
+2026-02-08 15:04:06,670 | FROM: Webhook-Jazira Bank | SMS: Internet Purchase Credit card: 1645 of: 8.99 GBP At Amazon Prime on: 2026-02-08 15:04 | Country: GBR  | FX Markup: 1.06 Exchange Rate: 5.112347 | Available Balance: 23954.19 SAR Due Amount: 20998.79 SAR
+2026-02-08 17:40:38,180 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:9365;mada-Apple Pay | Amount:SAR 50 | At:SHAMAL AL | 8/2/26 17:41
+2026-02-08 19:03:08,944 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— PoS | By:4390;mada-Atheer | Amount:SAR 153.50 | At:PANDA RET  | 8/2/26 19:03
+2026-02-08 19:09:52,318 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— PoS | By:4390;mada-Atheer | Amount:SAR 321.27 | At:AlDawaa P  | 8/2/26 19:10
+2026-02-09 03:11:41,543 | FROM: Webhook-AlRajhiBank | SMS: Notification : Declined due to insufficient fund | Transaction : PoS | Card: 7868 | Amount : USD 69 | Merchant : OPENAI *C | Date : 9/2/26 3:11
+2026-02-09 08:30:13,822 | FROM: Webhook-AlRajhiBank | SMS: Notification : Declined due to insufficient fund | Transaction : PoS | Card: 7868 | Amount : USD 33.35 | Merchant : PADDLE.NE | Date : 9/2/26 8:30
+2026-02-09 10:47:14,375 | FROM: Webhook-Jazira Bank | SMS: Credit transfer Internal  | Amount: SAR 5,763.22  | To: 8001  | Sender Name:  | Date:2026-02-09 10:47
+2026-02-09 13:28:01,878 | FROM: Webhook-Jazira Bank | SMS: POS Purchase (Apple Pay)  | Credit Card: 4897  | at :HUDUOA MEDICAL CENTRE  | of: 350.00 SAR  | on : 2026-02-09 13:28  | Available Balance: 33281.64 SAR  | Due Amount: 41368.36 SAR
+2026-02-09 15:50:19,251 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:9365;mada-Apple Pay | Amount:SAR 13 | At:Repositor | 9/2/26 15:50
+2026-02-09 15:51:54,869 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:9365;mada-Apple Pay | Amount:SAR 56 | At:Repositor | 9/2/26 15:52
+2026-02-09 16:57:23,707 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— PoS | By:4390;mada-Apple Pay | Amount:SAR 67.85 | At:Start of C | 9/2/26 16:58
+2026-02-09 16:58:55,597 | FROM: Webhook-AlRajhiBank | SMS: Credit Card:Payment | Card:Visa 7868 | Amount:USD 48 | Balance:59.73 USD | 9/2/26 16:59
+2026-02-09 16:59:14,659 | FROM: Webhook-AlRajhiBank | SMS: Online Purchase | Card:7868 ;Visa | Amount:59 USD | At: COLLOV AI | Country:USA | Balance:0.73 USD | 9/2/26 16:59
+2026-02-09 17:07:54,376 | FROM: Webhook-AlRajhiBank | SMS: Online Purchase | By:9365;mada-Apple Pay | From:1505 | Amount:SAR 72 | At:Jahez | 9/2/26 17:08
+2026-02-09 23:33:53,585 | FROM: Webhook-Jazira Bank | SMS: POS Purchase (Apple Pay)  | Credit Card: 4897  | at :Sasco Palm Qanah Narjis  | of: 880.00 SAR  | on : 2026-02-09 23:34  | Available Balance: 32401.64 SAR  | Due Amount: 41368.36 SAR
+2026-02-09 23:35:19,040 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:9365;mada-Apple Pay | Amount:SAR 45 | At:Shayaa Ne | 10/2/26 23:35
+2026-02-09 23:43:00,517 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:9365;mada-Apple Pay | Amount:SAR 15 | At:Shayaa Ne | 10/2/26 23:43
+2026-02-10 10:05:10,010 | FROM: Webhook-AlRajhiBank | SMS: Online Purchase | By:9365;mada-Apple Pay | From:1505 | Amount:SAR 3.45 | At:Riyadh Pa | 10/2/26 10:05
+2026-02-10 11:41:29,401 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— PoS | By:4390;mada-Atheer | Amount:SAR 158.43 | At:DANUBE 13  | 10/2/26 11:42
+2026-02-10 12:02:15,493 | FROM: Webhook-Jazira Bank | SMS: POS Purchase (Apple Pay)  | Credit Card: 4897  | at :SASCO Qena station  | of: 194.12 SAR  | on : 2026-02-10 12:02  | Available Balance: 32207.52 SAR  | Due Amount: 41368.36 SAR
+2026-02-10 12:31:51,607 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:9365;mada-Apple Pay | Amount:SAR 50 | At:Altrq Alk | 10/2/26 12:32
+2026-02-10 19:30:17,185 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— PoS | By:4390;mada-Atheer | Amount:SAR 27.60 | At:Health Ho  | 10/2/26 19:30
+2026-02-10 21:37:44,142 | FROM: Channel_-1003635708322 | SMS: AlRajhiBank—— PoS | By:4390;mada-Atheer | Amount:SAR 57 | At:Establish  | 11/2/26 21:38
+2026-02-11 09:11:35,987 | FROM: Webhook-AlRajhiBank | SMS: Notification : Declined due to insufficient fund | Transaction : PoS | Card: 7868 | Amount : USD 33.35 | Merchant : PADDLE.NE | Date : 11/2/26 9:11
+2026-02-11 11:56:20,393 | FROM: Webhook-Jazira Bank | SMS: Credit Card Statement Issued  | Card: 1645 بطاقة إئتمانية  | Total Due Amount: 27155.62 SAR  | The Minimum Due Amount: 4218.29 SAR  | Due: 07/03/2026
+2026-02-11 11:57:09,861 | FROM: Webhook-Jazira Bank | SMS: Credit Card: Statement Issued  | Card: 4897 Credit  | Total Due Amount: 21491.58 SAR  | Due: 07/03/2026

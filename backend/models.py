@@ -112,6 +112,51 @@ class CurrencyWallet(Base):
     account = relationship("Account", back_populates="wallets")
 
 
+# --- Counterparty Reference Tables ---
+
+class Merchant(Base):
+    """Stores/shops for POS and online purchases"""
+    __tablename__ = "merchants"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False, unique=True)  # Canonical name
+    display_name = Column(String, nullable=True)         # User-friendly override
+    category = Column(String, nullable=True)             # Default category
+    logo_url = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    transactions = relationship("Transaction", back_populates="merchant_ref")
+
+class Beneficiary(Base):
+    """People/companies you transfer money to"""
+    __tablename__ = "beneficiaries"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False)                # Full name from SMS
+    display_name = Column(String, nullable=True)         # Nickname e.g. "Dad"
+    bank_name = Column(String, nullable=True)            # e.g. "AlRajhi"
+    iban = Column(String, nullable=True)                 # Full IBAN if available
+    account_last4 = Column(String, nullable=True)        # For matching
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    transactions = relationship("Transaction", back_populates="beneficiary_ref")
+
+class Biller(Base):
+    """Service providers for bill payments (telecom, utilities, government)"""
+    __tablename__ = "billers"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False, unique=True)   # e.g. "STC", "NWC"
+    display_name = Column(String, nullable=True)
+    category = Column(String, nullable=True)             # e.g. "Telecom", "Water"
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    transactions = relationship("Transaction", back_populates="biller_ref")
+
+
 class TransactionType(enum.Enum):
     DEBIT = "debit"
     CREDIT = "credit"
@@ -141,9 +186,17 @@ class Transaction(Base):
     parsed_data = Column(Text, nullable=True)  # JSON: Full AI-extracted data from SMS
     source = Column(String, nullable=True)  # Source of transaction: 'telegram', 'webui', 'manual'
     
+    # Counterparty references (only ONE should be set per transaction)
+    merchant_id = Column(String, ForeignKey("merchants.id"), nullable=True)
+    beneficiary_id = Column(String, ForeignKey("beneficiaries.id"), nullable=True)
+    biller_id = Column(String, ForeignKey("billers.id"), nullable=True)
+    
     # Relationships
     account = relationship("Account", back_populates="transactions")
     credit_card = relationship("CreditCard", back_populates="transactions")  # NEW
+    merchant_ref = relationship("Merchant", back_populates="transactions")
+    beneficiary_ref = relationship("Beneficiary", back_populates="transactions")
+    biller_ref = relationship("Biller", back_populates="transactions")
     payments = relationship("Payment", back_populates="transaction")
 
 class Loan(Base):

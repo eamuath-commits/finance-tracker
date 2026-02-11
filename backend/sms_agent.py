@@ -1052,6 +1052,54 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
                 # Log the cross-bank transfer but keep as completed
                 logger.info(f"Cross-bank transfer detected (completed): {source_account.name if source_account else 'Unknown'} -> {dest_is_yours.name}")
     
+    # --- 5a. Counterparty Resolution (find-or-create) ---
+    counterparty_merchant_id = None
+    counterparty_beneficiary_id = None
+    counterparty_biller_id = None
+    
+    try:
+        if sub_type in ['purchase', 'refund', 'atm', 'pos', 'online'] or (sub_type == 'cc_payment'):
+            # POS / online purchases → merchants table
+            merchant_name = result.get('merchant') or merchant_raw
+            if merchant_name and merchant_name not in ['Unknown', 'POS Purchase']:
+                m = crud.find_or_create_merchant(db, merchant_name, category=category)
+                counterparty_merchant_id = m.id
+                logger.info(f"Linked to merchant: {m.name} ({m.id})")
+        
+        elif sub_type in ['transfer', 'internal_transfer']:
+            if tx_type_str == 'debit' and not dest_account:
+                # Outgoing to external = beneficiary
+                beneficiary_name = result.get('beneficiary') or result.get('merchant') or merchant_raw
+                if beneficiary_name and not beneficiary_name.startswith('Transfer'):
+                    dest_bank = result.get('destination_bank')
+                    b = crud.find_or_create_beneficiary(
+                        db, beneficiary_name, 
+                        bank_name=dest_bank,
+                        account_last4=result.get('destination_account_last4')
+                    )
+                    counterparty_beneficiary_id = b.id
+                    logger.info(f"Linked to beneficiary: {b.name} @ {b.bank_name} ({b.id})")
+            elif tx_type_str == 'credit' and result.get('sender_name'):
+                # Incoming from external = beneficiary (sender)
+                sender_name = result.get('sender_name')
+                sender_bank = result.get('sender_bank') or result.get('source_bank')
+                b = crud.find_or_create_beneficiary(
+                    db, sender_name,
+                    bank_name=sender_bank,
+                    account_last4=result.get('source_account_last4')
+                )
+                counterparty_beneficiary_id = b.id
+                logger.info(f"Linked to beneficiary (sender): {b.name} @ {b.bank_name} ({b.id})")
+        
+        elif sub_type in ['bill_payment', 'payment'] or (category and category.lower() in ['bills', 'utilities', 'telecom']):
+            biller_name = result.get('merchant') or merchant_raw
+            if biller_name and biller_name not in ['Unknown']:
+                bl = crud.find_or_create_biller(db, biller_name, category=category)
+                counterparty_biller_id = bl.id
+                logger.info(f"Linked to biller: {bl.name} ({bl.id})")
+    except Exception as e:
+        logger.warning(f"Counterparty resolution failed (non-fatal): {e}")
+    
     transaction_data = schemas.TransactionCreate(
         account_id=account_id,
         credit_card_id=credit_card_id,  # NEW: Credit card support
@@ -1068,7 +1116,10 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
         type=tx_type_str,
         status=tx_status,
         fees=result.get('fees', 0.0),
-        source=source  # Track transaction source (telegram, webui, manual)
+        source=source,  # Track transaction source (telegram, webui, manual)
+        merchant_id=counterparty_merchant_id,
+        beneficiary_id=counterparty_beneficiary_id,
+        biller_id=counterparty_biller_id,
     )
     
     tx = crud.create_transaction(db, transaction_data)
