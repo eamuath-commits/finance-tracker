@@ -54,6 +54,18 @@ STC DATE FORMATS (convert to YYYY-MM-DD HH:MM):
 - DD/MM/YY HH:MM (e.g., 16/07/25 07:20)
 - DD/MM/YYYY HH:MM (e.g., 07/09/2025 14:20)
 
+MERCHANT NAME RESOLUTION:
+SMS often truncates or uses legal entity names. If you recognize the brand, output the FULL brand name and domain:
+- "HUNGERSTATION LLC" → brand_name: "HungerStation", brand_domain: "hungerstation.com"
+- "HUNGERSTA" → brand_name: "HungerStation", brand_domain: "hungerstation.com"
+- "GOT COOKIES" or "GOT COOKI" → brand_name: "Got Cookie", brand_domain: null
+- "STARBUCKS" → brand_name: "Starbucks", brand_domain: "starbucks.com"
+- "AMAZON" → brand_name: "Amazon", brand_domain: "amazon.sa"
+- "JARIR" → brand_name: "Jarir Bookstore", brand_domain: "jarir.com"
+- "TAMIMI" or "TAMIMI MARKETS" → brand_name: "Tamimi Markets", brand_domain: "tamimimarkets.com"
+If you don't recognize the brand, set brand_name and brand_domain to null.
+The "merchant" field should contain the EXACT text from the SMS (raw).
+
 EXAMPLES:
 
 SMS: "Inward transfer (SARIE)
@@ -70,7 +82,7 @@ Via: *8574
 Amount: 32.64 SAR
 From: HUNGERSTATION LLC
 At: 16/07/25 07:20"
-JSON: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "card_info": "Apple Pay 8574", "source_account_last4": "8574", "amount": 32.64, "currency": "SAR", "merchant": "HUNGERSTATION LLC", "timestamp": "2025-07-16 07:20", "category": "Food & Dining"}
+JSON: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "purchase", "card_info": "Apple Pay 8574", "source_account_last4": "8574", "amount": 32.64, "currency": "SAR", "merchant": "HUNGERSTATION LLC", "brand_name": "HungerStation", "brand_domain": "hungerstation.com", "timestamp": "2025-07-16 07:20", "category": "Food & Dining"}
 
 SMS: "Internal transfer
 Amount:5000.00SAR
@@ -93,7 +105,7 @@ To: ***6070; Apple Pay
 Amount: 7 SAR
 At: GOT COOKIES
 Date: 16/07/25 12:24"
-JSON: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "refund", "card_info": "Apple Pay 6070", "destination_account_last4": "6070", "amount": 7.0, "currency": "SAR", "merchant": "GOT COOKIES", "timestamp": "2025-07-16 12:24", "category": "Refund"}
+JSON: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "refund", "card_info": "Apple Pay 6070", "destination_account_last4": "6070", "amount": 7.0, "currency": "SAR", "merchant": "GOT COOKIES", "brand_name": "Got Cookie", "brand_domain": null, "timestamp": "2025-07-16 12:24", "category": "Refund"}
 
 Now parse this SMS:
 '''

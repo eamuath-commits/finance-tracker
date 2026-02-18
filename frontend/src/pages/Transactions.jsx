@@ -29,6 +29,9 @@ function Transactions() {
     const [inboxMessages, setInboxMessages] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    // Confirm modal state (replaces window.confirm for Chrome compatibility)
+    const [confirmModal, setConfirmModal] = useState({ open: false, message: '', onConfirm: null });
+
     // Modal State
     const [showTxModal, setShowTxModal] = useState(false);
     const [editingTx, setEditingTx] = useState(null);
@@ -60,7 +63,8 @@ function Transactions() {
     const [typeFilter, setTypeFilter] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('');
     const [dateRange, setDateRange] = useState({ start: '', end: '' });
-    const [sortOrder, setSortOrder] = useState('desc'); // 'asc' or 'desc' for date sorting
+    const [sortColumn, setSortColumn] = useState('date'); // 'date', 'category', 'amount', 'balance'
+    const [sortDir, setSortDir] = useState('desc'); // 'asc' or 'desc'
     const [countLimit, setCountLimit] = useState(''); // '' = all, '10', '25', '50', '100'
 
     // Initialize filter from URL params (for navigation from account/credit card pages)
@@ -79,6 +83,22 @@ function Transactions() {
             // Ensure we're on the 'all' tab to see filtered transactions
             if (activeTab !== 'all') {
                 setSearchParams({ tab: 'all', credit_card_id: creditCardId });
+            }
+        }
+
+        const categoryParam = searchParams.get('category');
+        if (categoryParam) {
+            setCategoryFilter(categoryParam);
+            if (activeTab !== 'all') {
+                setSearchParams({ tab: 'all', category: categoryParam });
+            }
+        }
+
+        const merchantParam = searchParams.get('merchant');
+        if (merchantParam) {
+            setSearchTerm(merchantParam);
+            if (activeTab !== 'all') {
+                setSearchParams({ tab: 'all', merchant: merchantParam });
             }
         }
     }, [searchParams]);
@@ -155,11 +175,25 @@ function Transactions() {
             return true;
         });
 
-        // Sort by date
+        // Sort by selected column
         const sorted = filtered.sort((a, b) => {
-            const dateA = new Date(a.timestamp);
-            const dateB = new Date(b.timestamp);
-            return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+            let cmp = 0;
+            switch (sortColumn) {
+                case 'category':
+                    cmp = (a.category || '').localeCompare(b.category || '');
+                    break;
+                case 'amount':
+                    cmp = a.amount - b.amount;
+                    break;
+                case 'balance':
+                    cmp = (a.balance_after ?? 0) - (b.balance_after ?? 0);
+                    break;
+                case 'date':
+                default:
+                    cmp = new Date(a.timestamp) - new Date(b.timestamp);
+                    break;
+            }
+            return sortDir === 'asc' ? cmp : -cmp;
         });
 
         // Apply count limit if set
@@ -167,7 +201,7 @@ function Transactions() {
             return sorted.slice(0, parseInt(countLimit));
         }
         return sorted;
-    }, [transactions, searchTerm, accountFilter, typeFilter, categoryFilter, dateRange, sortOrder, countLimit]);
+    }, [transactions, searchTerm, accountFilter, typeFilter, categoryFilter, dateRange, sortColumn, sortDir, countLimit]);
 
     // Calculate totals based on filtered transactions
     const totals = useMemo(() => {
@@ -183,14 +217,20 @@ function Transactions() {
         return { totalCredit, totalDebit, net: totalCredit - totalDebit };
     }, [filteredTransactions]);
 
-    const handleDeleteTx = async (id) => {
-        if (!window.confirm("Are you sure?")) return;
-        try {
-            await axios.delete(`${API_URL}/transactions/${id}`);
-            setTransactions(transactions.filter(t => t.id !== id));
-        } catch (e) {
-            console.error("Delete failed:", e);
-        }
+    const handleDeleteTx = (id) => {
+        setConfirmModal({
+            open: true,
+            message: 'Delete this transaction?',
+            onConfirm: async () => {
+                try {
+                    await axios.delete(`${API_URL}/transactions/${id}`);
+                    setTransactions(prev => prev.filter(t => t.id !== id));
+                } catch (e) {
+                    console.error("Delete failed:", e);
+                }
+                setConfirmModal({ open: false, message: '', onConfirm: null });
+            }
+        });
     };
 
     const handleDeleteMsg = async (id) => {
@@ -343,20 +383,26 @@ function Transactions() {
 
     const handleBulkDelete = async () => {
         const ids = activeTab === 'inbox' ? Array.from(selectedMsgIds) : Array.from(selectedTxIds);
-        if (!window.confirm(`Delete ${ids.length} items?`)) return;
-        try {
-            if (activeTab === 'inbox') {
-                await axios.post(`${API_URL}/messages/bulk-delete`, { ids });
-                setSelectedMsgIds(new Set());
-            } else {
-                await axios.post(`${API_URL}/transactions/bulk-delete`, { ids });
-                setSelectedTxIds(new Set());
+        setConfirmModal({
+            open: true,
+            message: `Delete ${ids.length} items?`,
+            onConfirm: async () => {
+                try {
+                    if (activeTab === 'inbox') {
+                        await axios.post(`${API_URL}/messages/bulk-delete`, { ids });
+                        setSelectedMsgIds(new Set());
+                    } else {
+                        await axios.post(`${API_URL}/transactions/bulk-delete`, { ids });
+                        setSelectedTxIds(new Set());
+                    }
+                    setIsSelectionMode(false);
+                    fetchData();
+                } catch (e) {
+                    console.error("Bulk delete failed", e);
+                }
+                setConfirmModal({ open: false, message: '', onConfirm: null });
             }
-            setIsSelectionMode(false);
-            fetchData();
-        } catch (e) {
-            console.error("Bulk delete failed", e);
-        }
+        });
     };
 
     const handleRetry = async (msgId) => {
@@ -791,23 +837,37 @@ function Transactions() {
                                             />
                                         </th>
                                     )}
-                                    <th
-                                        className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors group"
-                                        onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-                                    >
-                                        <span className="flex items-center gap-1">
-                                            Date
-                                            <span className="text-blue-400 group-hover:text-blue-300">
-                                                {sortOrder === 'asc' ? '↑' : '↓'}
+                                    {[
+                                        { key: 'date', label: 'Date', align: 'left' },
+                                        { key: null, label: 'From:', align: 'left' },
+                                        { key: null, label: 'To:', align: 'left' },
+                                        { key: 'category', label: 'Category', align: 'left' },
+                                        { key: 'amount', label: 'Amount', align: 'right' },
+                                        { key: 'balance', label: 'Balance', align: 'right' },
+                                        { key: null, label: 'Actions', align: 'right' },
+                                    ].map(col => (
+                                        <th
+                                            key={col.label}
+                                            className={`px-6 py-3 text-${col.align} text-xs font-medium text-gray-400 uppercase tracking-wider ${col.key ? 'cursor-pointer hover:text-white transition-colors group' : ''}`}
+                                            onClick={col.key ? () => {
+                                                if (sortColumn === col.key) {
+                                                    setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+                                                } else {
+                                                    setSortColumn(col.key);
+                                                    setSortDir(col.key === 'date' ? 'desc' : 'asc');
+                                                }
+                                            } : undefined}
+                                        >
+                                            <span className={`flex items-center gap-1 ${col.align === 'right' ? 'justify-end' : ''}`}>
+                                                {col.label}
+                                                {col.key && sortColumn === col.key && (
+                                                    <span className="text-blue-400 group-hover:text-blue-300">
+                                                        {sortDir === 'asc' ? '↑' : '↓'}
+                                                    </span>
+                                                )}
                                             </span>
-                                        </span>
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">From:</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">To:</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Category</th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Amount</th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Balance</th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                                        </th>
+                                    ))}
                                 </tr>
                             </thead>
                             <tbody className="bg-slate-800 divide-y divide-slate-700">
@@ -925,6 +985,14 @@ function Transactions() {
                                                             </span>
                                                         ) : tx.merchant_info ? (
                                                             <span className="inline-flex items-center gap-1.5">
+                                                                {tx.merchant_info.logo_url && (
+                                                                    <img
+                                                                        src={tx.merchant_info.logo_url}
+                                                                        alt=""
+                                                                        className="w-6 h-6 rounded-sm"
+                                                                        onError={(e) => { e.target.style.display = 'none'; }}
+                                                                    />
+                                                                )}
                                                                 <span className="text-[10px] bg-emerald-600/30 text-emerald-300 px-1.5 py-0.5 rounded font-medium">Merchant</span>
                                                                 <span>{tx.merchant_info.name}</span>
                                                             </span>
@@ -1362,6 +1430,29 @@ function Transactions() {
                     </div>
                 </form>
             </Modal>
+
+            {/* Confirm Modal (replaces window.confirm for Chrome compatibility) */}
+            {confirmModal.open && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-sm mx-4 shadow-2xl">
+                        <p className="text-white text-lg font-medium mb-6">{confirmModal.message}</p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setConfirmModal({ open: false, message: '', onConfirm: null })}
+                                className="flex-1 bg-slate-700 text-white py-2.5 rounded-lg font-medium hover:bg-slate-600 transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmModal.onConfirm}
+                                className="flex-1 bg-red-600 text-white py-2.5 rounded-lg font-medium hover:bg-red-500 transition"
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -14,6 +14,7 @@ import Accounts from './pages/Accounts';
 import Loans from './pages/Loans';
 import CreditCards from './pages/CreditCards';
 import Categories from './pages/Categories';
+import Merchants from './pages/Merchants';
 import Audit from './pages/Audit';
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
                     <Route path="credit-cards" element={<CreditCards />} />
                     <Route path="allocation" element={<Allocation />} />
                     <Route path="transactions" element={<Transactions />} />
+                    <Route path="merchants" element={<Merchants />} />
                     <Route path="loans" element={<Loans />} />
                     <Route path="obligations" element={<Obligations />} />
                     <Route path="reports" element={<Reports />} />

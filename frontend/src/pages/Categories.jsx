@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { useSearchParams } from 'react-router-dom';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Plus, Edit2, Trash2, Search } from 'lucide-react';
 import { inputClass } from '../components/UI';
 
 const Categories = () => {
     const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
     const activeTab = searchParams.get('tab') || 'OBLIGATION';
 
     const setActiveTab = (tab) => {
@@ -16,6 +17,9 @@ const Categories = () => {
     const [loading, setLoading] = useState(true);
     const [newCategoryName, setNewCategoryName] = useState('');
     const [editingCategory, setEditingCategory] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [sortColumn, setSortColumn] = useState('name'); // 'name' or 'transactions'
+    const [sortDir, setSortDir] = useState('asc');
 
     // Environment API URL
     const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
@@ -39,15 +43,25 @@ const Categories = () => {
         e.preventDefault();
         if (!newCategoryName.trim()) return;
 
+        // Check if category already exists (possibly under a different type)
+        const existing = categories.find(c => c.name.toLowerCase() === newCategoryName.trim().toLowerCase());
+        if (existing) {
+            const typeLabel = existing.type === 'BOTH' ? 'Shared' : existing.type === 'OBLIGATION' ? 'Obligation' : 'Transaction';
+            if (confirm(`"${existing.name}" already exists as a ${typeLabel} category. Would you like to change it to Shared (visible in both tabs)?`)) {
+                await handleUpdateCategory(existing.id, { type: 'BOTH' });
+            }
+            return;
+        }
+
         try {
             await axios.post(`${API_URL}/categories`, {
-                name: newCategoryName,
+                name: newCategoryName.trim(),
                 type: activeTab
             });
             setNewCategoryName('');
             fetchCategories();
         } catch (error) {
-            alert("Failed to add category. Name might be duplicate.");
+            alert("Failed to add category.");
         }
     };
 
@@ -72,9 +86,27 @@ const Categories = () => {
     };
 
     const filteredCategories = categories.filter(c => {
-        if (!c.type || c.type === 'BOTH') return true;
-        return c.type === activeTab;
+        if (c.type && c.type !== 'BOTH' && c.type !== activeTab) return false;
+        if (searchTerm && !c.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+        return true;
+    }).sort((a, b) => {
+        let cmp = 0;
+        if (sortColumn === 'name') {
+            cmp = a.name.localeCompare(b.name);
+        } else if (sortColumn === 'transactions') {
+            cmp = (a.transaction_count || 0) - (b.transaction_count || 0);
+        }
+        return sortDir === 'asc' ? cmp : -cmp;
     });
+
+    const handleSort = (col) => {
+        if (sortColumn === col) {
+            setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortColumn(col);
+            setSortDir(col === 'name' ? 'asc' : 'desc');
+        }
+    };
 
     if (loading && categories.length === 0) return <div className="p-10 text-white">Loading...</div>;
 
@@ -104,6 +136,23 @@ const Categories = () => {
                     </button>
                 </div>
 
+                {/* Search Filter */}
+                <div className="relative mb-6">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                    <input
+                        type="text"
+                        placeholder="Search categories..."
+                        className={`${inputClass} pl-10 w-full`}
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                    />
+                    {searchTerm && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">
+                            {filteredCategories.length} found
+                        </span>
+                    )}
+                </div>
+
                 {/* Add Category Card */}
                 <div className="bg-slate-800 rounded-xl border border-slate-700 p-6 mb-8">
                     <h3 className="text-xl font-bold text-white mb-4">Add New {activeTab === 'OBLIGATION' ? 'Obligation' : 'Transaction'} Category</h3>
@@ -129,8 +178,25 @@ const Categories = () => {
                     <table className="min-w-full divide-y divide-slate-700">
                         <thead className="bg-slate-900">
                             <tr>
-                                <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Category Name</th>
+                                <th
+                                    className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors group"
+                                    onClick={() => handleSort('name')}
+                                >
+                                    <span className="flex items-center gap-1">
+                                        Category Name
+                                        {sortColumn === 'name' && <span className="text-blue-400">{sortDir === 'asc' ? '↑' : '↓'}</span>}
+                                    </span>
+                                </th>
                                 <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Type</th>
+                                <th
+                                    className="px-6 py-4 text-center text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors group"
+                                    onClick={() => handleSort('transactions')}
+                                >
+                                    <span className="flex items-center justify-center gap-1">
+                                        Transactions
+                                        {sortColumn === 'transactions' && <span className="text-blue-400">{sortDir === 'asc' ? '↑' : '↓'}</span>}
+                                    </span>
+                                </th>
                                 <th className="px-6 py-4 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
@@ -150,8 +216,9 @@ const Categories = () => {
                                             />
                                         ) : (
                                             <span
-                                                className="text-white font-medium cursor-text"
-                                                onClick={() => setEditingCategory(cat)}
+                                                className="text-blue-400 font-medium cursor-pointer hover:text-blue-300 hover:underline transition-colors"
+                                                onClick={() => navigate(`/transactions?category=${encodeURIComponent(cat.name)}`)}
+                                                title={`View ${cat.transaction_count || 0} transactions`}
                                             >
                                                 {cat.name}
                                             </span>
@@ -178,6 +245,14 @@ const Categories = () => {
                                             </span>
                                         )}
                                     </td>
+                                    <td className="px-6 py-4 text-center">
+                                        <span
+                                            className={`inline-flex items-center justify-center min-w-[2rem] px-2 py-0.5 rounded-full text-xs font-medium ${cat.transaction_count > 0 ? 'bg-blue-900/40 text-blue-300 cursor-pointer hover:bg-blue-800/50 transition-colors' : 'bg-slate-700/50 text-gray-500'}`}
+                                            onClick={() => cat.transaction_count > 0 && navigate(`/transactions?category=${encodeURIComponent(cat.name)}`)}
+                                        >
+                                            {cat.transaction_count || 0}
+                                        </span>
+                                    </td>
                                     <td className="px-6 py-4 text-right flex justify-end gap-3 opacity-60 group-hover:opacity-100 transition-opacity">
                                         <button
                                             onClick={() => setEditingCategory(cat)}
@@ -199,7 +274,7 @@ const Categories = () => {
 
                             {filteredCategories.length === 0 && (
                                 <tr>
-                                    <td colSpan="3" className="px-6 py-8 text-center text-gray-500 italic">No categories found for {activeTab.toLowerCase()}.</td>
+                                    <td colSpan="4" className="px-6 py-8 text-center text-gray-500 italic">No categories found for {activeTab.toLowerCase()}.</td>
                                 </tr>
                             )}
                         </tbody>

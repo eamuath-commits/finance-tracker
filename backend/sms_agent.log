@@ -9961,3 +9961,1829 @@ Amount:SAR 5...
 2026-02-11 16:26:53,868 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
 2026-02-11 16:26:53,871 - sms_agent - INFO - Linked to merchant: SASCO Qena station (f9bf9bd6-e0a7-4058-8f07-d4848d73d1da)
 2026-02-11 16:26:53,882 - sms_agent - INFO - Saved training example for: SASCO Qena station
+2026-02-11 16:36:24,462 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-11 16:37:08,627 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-11 16:37:40,086 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-11 16:38:15,524 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-11 16:39:11,113 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-11 16:40:26,171 - sms_agent - INFO - 📊 Token Usage - Input: 5860, Output: 229, Total: 6089
+2026-02-11 16:40:26,182 - sms_agent - INFO - Using SMS timestamp for WebUI: 2026-02-06 21:20:00
+2026-02-11 16:40:26,184 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-11 16:40:26,187 - sms_agent - INFO - Linked to merchant: HungerStation (c262cbd2-bd29-48cc-a681-6ed24d9ce48e), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-11 16:40:26,207 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-11 17:12:05,542 - sms_agent - INFO - 📊 Token Usage - Input: 5860, Output: 251, Total: 6111
+2026-02-11 23:54:57,272 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank—— Online Purchase
+By:4390;mada-Apple P...
+2026-02-11 23:54:57,627 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-02-11 23:55:00,948 - sms_agent - INFO - 📊 Token Usage - Input: 5353, Output: 196, Total: 5549
+2026-02-11 23:55:00,955 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 2104, Account: House
+2026-02-11 23:55:00,960 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=House
+2026-02-11 23:55:00,972 - sms_agent - INFO - Saved training example for: Jahez
+2026-02-11 23:55:01,154 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank—— Online Purchase
+By:4390;mada-Apple P...
+2026-02-11 23:55:01,310 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-02-11 23:55:03,093 - sms_agent - INFO - 📊 Token Usage - Input: 5353, Output: 166, Total: 5519
+2026-02-11 23:55:03,096 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 2104, Account: House
+2026-02-11 23:55:03,100 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=House
+2026-02-11 23:55:03,105 - sms_agent - INFO - Saved training example for: Jahez
+2026-02-12 00:05:52,529 - sms_agent - INFO - 📊 Token Usage - Input: 5847, Output: 157, Total: 6004
+2026-02-12 00:05:52,531 - sms_agent - INFO - Converted 9.0 EUR to 36.45 SAR using rate 4.05
+2026-02-12 00:05:52,534 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 00:05:52,536 - sms_agent - INFO - Linked to biller: Credit Card Payment (c37d4dd7-4220-43d9-9d0c-28155ced0e7b)
+2026-02-12 00:05:52,545 - sms_agent - INFO - Auto-linking CC 7868 payment: Creating debit on Expense account for 36.45 SAR
+2026-02-12 00:05:52,552 - sms_agent - INFO - Auto-created debit transaction 5110c47b-9fb7-4cca-a61a-8169e135b225 on Expense account
+2026-02-12 00:05:52,553 - sms_agent - INFO - Saved training example for: Credit Card Payment
+2026-02-12 00:06:40,349 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 239, Total: 6097
+2026-02-12 00:06:40,353 - sms_agent - INFO - Converted 9 EUR to 36.45 SAR using rate 4.05
+2026-02-12 00:06:40,354 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 00:06:40,356 - sms_agent - INFO - Linked to merchant: REAL-DEBR (2c93d37f-a2f3-417e-bb14-a3bcf4b0a095), logo=None
+2026-02-12 00:06:40,367 - sms_agent - INFO - Saved training example for: REAL-DEBR
+2026-02-12 08:29:28,073 - sms_agent - INFO - Using custom bank-specific prompt
+2026-02-12 08:29:31,115 - sms_agent - INFO - 📊 Token Usage - Input: 2530, Output: 208, Total: 2738
+2026-02-12 08:29:31,121 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-10 12:02:37
+2026-02-12 08:29:31,121 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 08:29:31,122 - sms_agent - INFO - Linked to merchant: SASCO Qena station (f9bf9bd6-e0a7-4058-8f07-d4848d73d1da), logo=None
+2026-02-12 08:29:31,133 - sms_agent - INFO - Saved training example for: SASCO Qena station
+2026-02-12 08:31:57,434 - sms_agent - INFO - Using custom bank-specific prompt
+2026-02-12 08:31:59,555 - sms_agent - INFO - 📊 Token Usage - Input: 2530, Output: 208, Total: 2738
+2026-02-12 08:31:59,560 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-10 12:02:37
+2026-02-12 08:31:59,562 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 08:31:59,563 - sms_agent - INFO - Linked to merchant: SASCO Qena station (f9bf9bd6-e0a7-4058-8f07-d4848d73d1da), logo=None
+2026-02-12 08:31:59,570 - sms_agent - INFO - Saved training example for: SASCO Qena station
+2026-02-12 08:32:30,225 - sms_agent - INFO - Using custom bank-specific prompt
+2026-02-12 08:32:32,474 - sms_agent - INFO - 📊 Token Usage - Input: 2533, Output: 214, Total: 2747
+2026-02-12 08:32:32,479 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-16 17:04:07
+2026-02-12 08:32:32,482 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 08:32:32,484 - sms_agent - INFO - Linked to merchant: S155 TAMIMI MARKETS (de7edd2b-da17-4cc7-9fe6-57634482374b), logo=None
+2026-02-12 08:32:32,493 - sms_agent - INFO - Saved training example for: S155 TAMIMI MARKETS
+2026-02-12 08:33:40,717 - sms_agent - INFO - Using custom bank-specific prompt
+2026-02-12 08:33:43,451 - sms_agent - INFO - 📊 Token Usage - Input: 2517, Output: 211, Total: 2728
+2026-02-12 08:33:43,457 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-16 18:05:43
+2026-02-12 08:33:43,458 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 08:33:43,459 - sms_agent - INFO - Linked to merchant: HUNGERSTATION LLC (bec21f2e-74da-4641-ac57-4c9ac7f7def2), logo=None
+2026-02-12 08:33:43,469 - sms_agent - INFO - Saved training example for: HUNGERSTATION LLC
+2026-02-12 08:37:50,749 - sms_agent - INFO - Using custom bank-specific prompt
+2026-02-12 08:37:54,152 - sms_agent - INFO - 📊 Token Usage - Input: 2517, Output: 205, Total: 2722
+2026-02-12 08:37:54,158 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-16 18:05:43
+2026-02-12 08:37:54,159 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 08:37:54,160 - sms_agent - INFO - Linked to merchant: HUNGERSTATION LLC (bec21f2e-74da-4641-ac57-4c9ac7f7def2), logo=None
+2026-02-12 08:37:54,165 - sms_agent - INFO - Saved training example for: HUNGERSTATION LLC
+2026-02-12 08:40:48,217 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-12 08:45:10,554 - sms_agent - INFO - 📊 Token Usage - Input: 5845, Output: 219, Total: 6064
+2026-02-12 08:45:40,182 - sms_agent - INFO - 📊 Token Usage - Input: 5847, Output: 219, Total: 6066
+2026-02-12 08:45:50,184 - sms_agent - INFO - 📊 Token Usage - Input: 5848, Output: 219, Total: 6067
+2026-02-12 08:46:40,093 - sms_agent - INFO - 📊 Token Usage - Input: 5848, Output: 240, Total: 6088
+2026-02-12 08:46:40,103 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-07 14:00:20
+2026-02-12 08:46:40,107 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 08:46:40,110 - sms_agent - INFO - Linked to merchant: Got Cookie (9d688d30-aa73-4855-932a-99951d78ed13), logo=None
+2026-02-12 08:46:40,119 - sms_agent - INFO - Saved training example for: Got Cookie
+2026-02-12 08:47:19,407 - sms_agent - INFO - 📊 Token Usage - Input: 5871, Output: 244, Total: 6115
+2026-02-12 08:47:22,185 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-12 08:47:37,460 - sms_agent - INFO - 📊 Token Usage - Input: 5848, Output: 243, Total: 6091
+2026-02-12 08:47:46,648 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 229, Total: 6083
+2026-02-12 08:47:46,658 - sms_agent - INFO - Using SMS timestamp for WebUI: 2026-02-12 08:00:00
+2026-02-12 08:47:46,660 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 08:47:46,661 - sms_agent - INFO - Linked to merchant: HungerStation (c262cbd2-bd29-48cc-a681-6ed24d9ce48e), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-12 08:47:46,671 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-12 08:48:19,234 - sms_agent - INFO - 📊 Token Usage - Input: 5848, Output: 219, Total: 6067
+2026-02-12 08:49:08,844 - sms_agent - INFO - 📊 Token Usage - Input: 5848, Output: 219, Total: 6067
+2026-02-12 08:49:52,386 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-12 08:50:09,484 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-12 08:50:51,604 - sms_agent - INFO - 📊 Token Usage - Input: 5848, Output: 219, Total: 6067
+2026-02-12 08:50:51,616 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-04 14:04:55
+2026-02-12 08:50:51,618 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 08:50:51,619 - sms_agent - INFO - Linked to merchant: Got Cookie (9d688d30-aa73-4855-932a-99951d78ed13), logo=None
+2026-02-12 08:50:51,634 - sms_agent - INFO - Saved training example for: Got Cookie
+2026-02-12 08:51:12,019 - sms_agent - INFO - 📊 Token Usage - Input: 5845, Output: 219, Total: 6064
+2026-02-12 08:51:12,026 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-04 14:04:55
+2026-02-12 08:51:12,027 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 08:51:12,028 - sms_agent - INFO - Linked to merchant: Got Cookie (9d688d30-aa73-4855-932a-99951d78ed13), logo=None
+2026-02-12 08:51:12,037 - sms_agent - INFO - Saved training example for: Got Cookie
+2026-02-12 08:51:34,752 - sms_agent - INFO - 📊 Token Usage - Input: 5847, Output: 214, Total: 6061
+2026-02-12 08:51:34,760 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-05 21:06:20
+2026-02-12 08:51:34,761 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 08:51:34,763 - sms_agent - INFO - Linked to merchant: MU (00e06dc8-cbee-497a-9bbe-fb96bd8c64ea), logo=None
+2026-02-12 08:51:34,771 - sms_agent - INFO - Saved training example for: MU
+2026-02-12 08:51:36,719 - sms_agent - INFO - 📊 Token Usage - Input: 5850, Output: 226, Total: 6076
+2026-02-12 08:51:36,721 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-05 21:21:38
+2026-02-12 08:51:36,722 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 08:51:36,723 - sms_agent - INFO - Linked to merchant: YAHYA ALM (2512b25d-2515-4433-8856-f2268a89606b), logo=None
+2026-02-12 08:51:36,730 - sms_agent - INFO - Saved training example for: YAHYA ALM
+2026-02-12 08:52:32,452 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 228, Total: 6084
+2026-02-12 08:52:32,459 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-05 21:57:28
+2026-02-12 08:52:32,460 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 08:52:32,461 - sms_agent - INFO - Linked to merchant: HungerStation (c262cbd2-bd29-48cc-a681-6ed24d9ce48e), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-12 08:52:32,467 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-12 08:52:34,371 - sms_agent - INFO - 📊 Token Usage - Input: 5855, Output: 226, Total: 6081
+2026-02-12 08:52:34,377 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-09 23:24:12
+2026-02-12 08:52:34,378 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 08:52:34,378 - sms_agent - INFO - Linked to merchant: HungerStation (c262cbd2-bd29-48cc-a681-6ed24d9ce48e), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-12 08:52:34,385 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-12 08:52:36,317 - sms_agent - INFO - 📊 Token Usage - Input: 5855, Output: 226, Total: 6081
+2026-02-12 08:52:36,321 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-13 19:50:58
+2026-02-12 08:52:36,323 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 08:52:36,324 - sms_agent - INFO - Linked to merchant: HungerStation (c262cbd2-bd29-48cc-a681-6ed24d9ce48e), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-12 08:52:36,331 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-12 08:52:38,315 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 249, Total: 6106
+2026-02-12 08:52:38,320 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-17 17:10:25
+2026-02-12 08:52:38,322 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 08:52:38,323 - sms_agent - INFO - Linked to merchant: HungerStation (c262cbd2-bd29-48cc-a681-6ed24d9ce48e), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-12 08:52:38,328 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-12 08:52:40,192 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 228, Total: 6085
+2026-02-12 08:52:40,197 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 01:11:42
+2026-02-12 08:52:40,199 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 08:52:40,200 - sms_agent - INFO - Linked to merchant: HungerStation (c262cbd2-bd29-48cc-a681-6ed24d9ce48e), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-12 08:52:40,206 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-12 08:54:12,303 - sms_agent - INFO - Using custom bank-specific prompt
+2026-02-12 08:54:14,184 - sms_agent - INFO - 📊 Token Usage - Input: 2515, Output: 201, Total: 2716
+2026-02-12 08:54:14,190 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-27 10:48:41
+2026-02-12 08:54:14,191 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 08:54:14,192 - sms_agent - INFO - Linked to merchant: Tamara (f080b6b8-27d8-45ea-82de-1067155a3592), logo=None
+2026-02-12 08:54:14,198 - sms_agent - INFO - Saved training example for: Tamara
+2026-02-12 08:54:29,259 - sms_agent - INFO - Using custom bank-specific prompt
+2026-02-12 08:54:31,248 - sms_agent - INFO - 📊 Token Usage - Input: 2516, Output: 209, Total: 2725
+2026-02-12 08:54:31,253 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-16 02:21:29
+2026-02-12 08:54:31,254 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 08:54:31,256 - sms_agent - INFO - Linked to merchant: HUNGERSTATION LLC (bec21f2e-74da-4641-ac57-4c9ac7f7def2), logo=None
+2026-02-12 08:54:31,266 - sms_agent - INFO - Saved training example for: HUNGERSTATION LLC
+2026-02-12 08:54:50,656 - sms_agent - INFO - Using custom bank-specific prompt
+2026-02-12 08:54:52,755 - sms_agent - INFO - 📊 Token Usage - Input: 2516, Output: 200, Total: 2716
+2026-02-12 08:54:52,760 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-16 02:21:29
+2026-02-12 08:54:52,762 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 08:54:52,763 - sms_agent - INFO - Linked to merchant: HUNGERSTATION LLC (bec21f2e-74da-4641-ac57-4c9ac7f7def2), logo=None
+2026-02-12 08:54:52,769 - sms_agent - INFO - Saved training example for: HUNGERSTATION LLC
+2026-02-12 08:55:02,789 - sms_agent - INFO - 📊 Token Usage - Input: 5863, Output: 224, Total: 6087
+2026-02-12 08:55:02,791 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-14 15:42:33
+2026-02-12 08:55:02,792 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 08:55:02,793 - sms_agent - INFO - Linked to merchant: Google (d9f1da41-f775-44ce-8246-d6805dbcf296), logo=https://www.google.com/s2/favicons?domain=google.com&sz=64
+2026-02-12 08:55:02,799 - sms_agent - INFO - Saved training example for: Google
+2026-02-12 08:55:31,280 - sms_agent - INFO - 📊 Token Usage - Input: 5866, Output: 223, Total: 6089
+2026-02-12 08:55:31,284 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-08 10:04:15
+2026-02-12 08:55:31,285 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 08:55:31,287 - sms_agent - INFO - Linked to merchant: Microsoft (2811fb1e-439f-4f24-b105-252b4efd9af3), logo=https://www.google.com/s2/favicons?domain=microsoft.com&sz=64
+2026-02-12 08:55:31,294 - sms_agent - INFO - Saved training example for: Microsoft
+2026-02-12 08:58:04,716 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-12 08:58:37,581 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-12 08:59:15,384 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-12 08:59:32,765 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-12 08:59:37,496 - sms_agent - INFO - 📊 Token Usage - Input: 5874, Output: 219, Total: 6093
+2026-02-12 08:59:57,720 - sms_agent - INFO - Using custom bank-specific prompt
+2026-02-12 08:59:59,828 - sms_agent - INFO - 📊 Token Usage - Input: 2843, Output: 231, Total: 3074
+2026-02-12 08:59:59,833 - sms_agent - INFO - Using SMS timestamp for WebUI: 2026-01-16 02:21:00
+2026-02-12 08:59:59,836 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 08:59:59,836 - sms_agent - INFO - Linked to merchant: HungerStation (bec21f2e-74da-4641-ac57-4c9ac7f7def2), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-12 08:59:59,849 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-12 09:00:40,717 - sms_agent - INFO - 📊 Token Usage - Input: 5944, Output: 437, Total: 6381
+2026-02-12 09:01:18,427 - sms_agent - INFO - 📊 Token Usage - Input: 5847, Output: 214, Total: 6061
+2026-02-12 09:01:18,435 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-05 21:06:20
+2026-02-12 09:01:18,436 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:01:18,437 - sms_agent - INFO - Linked to merchant: MU (00e06dc8-cbee-497a-9bbe-fb96bd8c64ea), logo=None
+2026-02-12 09:01:18,446 - sms_agent - INFO - Saved training example for: MU
+2026-02-12 09:01:20,486 - sms_agent - INFO - 📊 Token Usage - Input: 5850, Output: 221, Total: 6071
+2026-02-12 09:01:20,489 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-05 21:21:38
+2026-02-12 09:01:20,490 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:01:20,490 - sms_agent - INFO - Linked to merchant: YAHYA ALM (2512b25d-2515-4433-8856-f2268a89606b), logo=None
+2026-02-12 09:01:20,496 - sms_agent - INFO - Saved training example for: YAHYA ALM
+2026-02-12 09:02:19,148 - sms_agent - INFO - 📊 Token Usage - Input: 5890, Output: 212, Total: 6102
+2026-02-12 09:02:50,902 - sms_agent - INFO - 📊 Token Usage - Input: 5884, Output: 225, Total: 6109
+2026-02-12 09:04:25,666 - sms_agent - INFO - 📊 Token Usage - Input: 5891, Output: 214, Total: 6105
+2026-02-12 09:04:25,671 - sms_agent - WARNING - Past year detected (2025), keeping as-is (would be future)
+2026-02-12 09:04:25,671 - sms_agent - INFO - Using SMS timestamp for WebUI: 2025-10-01 00:21:00
+2026-02-12 09:04:25,673 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:04:25,675 - sms_agent - INFO - Linked to merchant: Jahez (dc89755d-c923-4fc0-9da7-d94fe1147af9), logo=None
+2026-02-12 09:04:25,685 - sms_agent - INFO - Saved training example for: Jahez
+2026-02-12 09:05:55,749 - sms_agent - INFO - 📊 Token Usage - Input: 7717, Output: 5709, Total: 13426
+2026-02-12 09:06:01,517 - sms_agent - INFO - 📊 Token Usage - Input: 5860, Output: 246, Total: 6106
+2026-02-12 09:06:12,238 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 246, Total: 6104
+2026-02-12 09:06:29,216 - sms_agent - INFO - 📊 Token Usage - Input: 5855, Output: 237, Total: 6092
+2026-02-12 09:07:48,119 - sms_agent - INFO - 📊 Token Usage - Input: 5860, Output: 245, Total: 6105
+2026-02-12 09:07:48,126 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-21 18:25:40
+2026-02-12 09:07:48,126 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:07:48,133 - sms_agent - INFO - Saved training example for: Withdrawal at CA-AL YASAMINE BRANCH 1
+2026-02-12 09:07:50,376 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 229, Total: 6087
+2026-02-12 09:07:50,382 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-23 20:55:15
+2026-02-12 09:07:50,384 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:07:50,386 - sms_agent - INFO - Linked to merchant: SASCO (f9bf9bd6-e0a7-4058-8f07-d4848d73d1da), logo=https://www.google.com/s2/favicons?domain=sasco.com.sa&sz=64
+2026-02-12 09:07:50,393 - sms_agent - INFO - Saved training example for: SASCO
+2026-02-12 09:07:53,018 - sms_agent - INFO - 📊 Token Usage - Input: 5855, Output: 220, Total: 6075
+2026-02-12 09:07:53,024 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-24 02:33:09
+2026-02-12 09:07:53,025 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:07:53,026 - sms_agent - INFO - Linked to merchant: STC Pay (ad912663-85e2-4268-9ae4-0c55b846af86), logo=None
+2026-02-12 09:07:53,033 - sms_agent - INFO - Saved training example for: STC Pay
+2026-02-12 09:07:55,316 - sms_agent - INFO - 📊 Token Usage - Input: 5855, Output: 237, Total: 6092
+2026-02-12 09:07:55,322 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-25 11:13:51
+2026-02-12 09:07:55,324 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:07:55,325 - sms_agent - INFO - Linked to merchant: STC Pay (ad912663-85e2-4268-9ae4-0c55b846af86), logo=None
+2026-02-12 09:07:55,332 - sms_agent - INFO - Saved training example for: STC Pay
+2026-02-12 09:07:57,375 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 220, Total: 6074
+2026-02-12 09:07:57,381 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-26 12:37:02
+2026-02-12 09:07:57,382 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:07:57,383 - sms_agent - INFO - Linked to merchant: ROSE CAFE (32c462c0-db7f-43c9-b440-7e0300c627c6), logo=None
+2026-02-12 09:07:57,390 - sms_agent - INFO - Saved training example for: ROSE CAFE
+2026-02-12 09:07:59,442 - sms_agent - INFO - 📊 Token Usage - Input: 5859, Output: 243, Total: 6102
+2026-02-12 09:07:59,446 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-26 20:20:27
+2026-02-12 09:07:59,448 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:07:59,449 - sms_agent - INFO - Linked to merchant: ARAMEX SA (a373c6d3-88e2-42f9-b11d-592200fe2345), logo=None
+2026-02-12 09:07:59,455 - sms_agent - INFO - Saved training example for: ARAMEX SA
+2026-02-12 09:08:01,353 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 220, Total: 6078
+2026-02-12 09:08:01,360 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-27 12:20:19
+2026-02-12 09:08:01,361 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:01,363 - sms_agent - INFO - Linked to merchant: MEED 1129 (5cf8f32a-74fc-4101-a51d-89f3b3510d66), logo=None
+2026-02-12 09:08:01,368 - sms_agent - INFO - Saved training example for: MEED 1129
+2026-02-12 09:08:03,299 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 220, Total: 6074
+2026-02-12 09:08:03,308 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-27 12:26:27
+2026-02-12 09:08:03,309 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:03,310 - sms_agent - INFO - Linked to merchant: ROSE CAFE (32c462c0-db7f-43c9-b440-7e0300c627c6), logo=None
+2026-02-12 09:08:03,317 - sms_agent - INFO - Saved training example for: ROSE CAFE
+2026-02-12 09:08:05,299 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 217, Total: 6071
+2026-02-12 09:08:05,303 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-27 13:38:52
+2026-02-12 09:08:05,304 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:05,305 - sms_agent - INFO - Linked to merchant: ROSE CAFE (32c462c0-db7f-43c9-b440-7e0300c627c6), logo=None
+2026-02-12 09:08:05,313 - sms_agent - INFO - Saved training example for: ROSE CAFE
+2026-02-12 09:08:07,263 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 235, Total: 6091
+2026-02-12 09:08:07,268 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-27 16:45:41
+2026-02-12 09:08:07,269 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:07,270 - sms_agent - INFO - Linked to merchant: STC Pay (ad912663-85e2-4268-9ae4-0c55b846af86), logo=None
+2026-02-12 09:08:07,277 - sms_agent - INFO - Saved training example for: STC Pay
+2026-02-12 09:08:09,224 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 216, Total: 6069
+2026-02-12 09:08:09,231 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-29 15:19:23
+2026-02-12 09:08:09,232 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:09,233 - sms_agent - INFO - Linked to merchant: ROSE CAFE (32c462c0-db7f-43c9-b440-7e0300c627c6), logo=None
+2026-02-12 09:08:09,240 - sms_agent - INFO - Saved training example for: ROSE CAFE
+2026-02-12 09:08:09,940 - sms_agent - INFO - 📊 Token Usage - Input: 5860, Output: 245, Total: 6105
+2026-02-12 09:08:09,945 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-21 18:25:40
+2026-02-12 09:08:09,946 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:09,954 - sms_agent - INFO - Saved training example for: Cash withdrawal at CA-AL YASAMINE BRANCH 1
+2026-02-12 09:08:11,173 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 220, Total: 6074
+2026-02-12 09:08:11,179 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-29 15:19:42
+2026-02-12 09:08:11,181 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:11,182 - sms_agent - INFO - Linked to merchant: ROSE CAFE (32c462c0-db7f-43c9-b440-7e0300c627c6), logo=None
+2026-02-12 09:08:11,188 - sms_agent - INFO - Saved training example for: ROSE CAFE
+2026-02-12 09:08:11,926 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 229, Total: 6087
+2026-02-12 09:08:11,932 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-23 20:55:15
+2026-02-12 09:08:11,934 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:11,935 - sms_agent - INFO - Linked to merchant: SASCO (f9bf9bd6-e0a7-4058-8f07-d4848d73d1da), logo=https://www.google.com/s2/favicons?domain=sasco.com.sa&sz=64
+2026-02-12 09:08:11,943 - sms_agent - INFO - Saved training example for: SASCO
+2026-02-12 09:08:13,215 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 251, Total: 6104
+2026-02-12 09:08:13,218 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-30 23:30:25
+2026-02-12 09:08:13,218 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:13,220 - sms_agent - INFO - Linked to merchant: PRIME BIT (8ee5715a-3611-4ee2-8bdd-be63546030ac), logo=None
+2026-02-12 09:08:13,226 - sms_agent - INFO - Saved training example for: PRIME BIT
+2026-02-12 09:08:13,935 - sms_agent - INFO - 📊 Token Usage - Input: 5855, Output: 232, Total: 6087
+2026-02-12 09:08:13,944 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-24 02:33:09
+2026-02-12 09:08:13,945 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:13,945 - sms_agent - INFO - Linked to merchant: STC Pay (ad912663-85e2-4268-9ae4-0c55b846af86), logo=None
+2026-02-12 09:08:13,954 - sms_agent - INFO - Saved training example for: STC Pay
+2026-02-12 09:08:15,293 - sms_agent - INFO - 📊 Token Usage - Input: 5862, Output: 213, Total: 6075
+2026-02-12 09:08:15,298 - sms_agent - INFO - Using header timestamp from WebUI: 2025-02-01 16:11:49
+2026-02-12 09:08:15,299 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:15,300 - sms_agent - INFO - Linked to merchant: STC Pay (ad912663-85e2-4268-9ae4-0c55b846af86), logo=None
+2026-02-12 09:08:15,306 - sms_agent - INFO - Saved training example for: STC Pay
+2026-02-12 09:08:16,202 - sms_agent - INFO - 📊 Token Usage - Input: 5855, Output: 248, Total: 6103
+2026-02-12 09:08:16,209 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-25 11:13:51
+2026-02-12 09:08:16,211 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:16,212 - sms_agent - INFO - Linked to merchant: STC Pay (ad912663-85e2-4268-9ae4-0c55b846af86), logo=None
+2026-02-12 09:08:16,220 - sms_agent - INFO - Saved training example for: STC Pay
+2026-02-12 09:08:17,515 - sms_agent - INFO - 📊 Token Usage - Input: 5861, Output: 241, Total: 6102
+2026-02-12 09:08:17,520 - sms_agent - INFO - Using header timestamp from WebUI: 2025-02-01 22:00:49
+2026-02-12 09:08:17,521 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:17,521 - sms_agent - INFO - Linked to merchant: STC Pay (ad912663-85e2-4268-9ae4-0c55b846af86), logo=None
+2026-02-12 09:08:17,528 - sms_agent - INFO - Saved training example for: STC Pay
+2026-02-12 09:08:18,459 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 234, Total: 6088
+2026-02-12 09:08:18,465 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-26 12:37:02
+2026-02-12 09:08:18,466 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:18,466 - sms_agent - INFO - Linked to merchant: ROSE CAFE (32c462c0-db7f-43c9-b440-7e0300c627c6), logo=None
+2026-02-12 09:08:18,475 - sms_agent - INFO - Saved training example for: ROSE CAFE
+2026-02-12 09:08:19,728 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 236, Total: 6089
+2026-02-12 09:08:19,734 - sms_agent - INFO - Using header timestamp from WebUI: 2025-02-02 22:38:31
+2026-02-12 09:08:19,735 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:19,736 - sms_agent - INFO - Linked to merchant: 30 DEGREE (57c18fdd-dcf9-4614-99a1-e959bfff0de4), logo=None
+2026-02-12 09:08:19,744 - sms_agent - INFO - Saved training example for: 30 DEGREE
+2026-02-12 09:08:20,551 - sms_agent - INFO - 📊 Token Usage - Input: 5859, Output: 222, Total: 6081
+2026-02-12 09:08:20,553 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-26 20:20:27
+2026-02-12 09:08:20,554 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:20,555 - sms_agent - INFO - Linked to merchant: ARAMEX SA (a373c6d3-88e2-42f9-b11d-592200fe2345), logo=None
+2026-02-12 09:08:20,563 - sms_agent - INFO - Saved training example for: ARAMEX SA
+2026-02-12 09:08:21,761 - sms_agent - INFO - 📊 Token Usage - Input: 5860, Output: 215, Total: 6075
+2026-02-12 09:08:21,766 - sms_agent - INFO - Using header timestamp from WebUI: 2025-02-03 07:36:57
+2026-02-12 09:08:21,767 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:21,769 - sms_agent - INFO - Linked to merchant: TABBY (f1f0e52e-5152-49ab-8e9f-cf1e703b5d00), logo=None
+2026-02-12 09:08:21,775 - sms_agent - INFO - Saved training example for: TABBY
+2026-02-12 09:08:22,533 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 225, Total: 6083
+2026-02-12 09:08:22,539 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-27 12:20:19
+2026-02-12 09:08:22,540 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:22,542 - sms_agent - INFO - Linked to merchant: MEED 1129 (5cf8f32a-74fc-4101-a51d-89f3b3510d66), logo=None
+2026-02-12 09:08:22,551 - sms_agent - INFO - Saved training example for: MEED 1129
+2026-02-12 09:08:23,925 - sms_agent - INFO - 📊 Token Usage - Input: 5845, Output: 203, Total: 6048
+2026-02-12 09:08:24,957 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 241, Total: 6095
+2026-02-12 09:08:24,963 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-27 12:26:27
+2026-02-12 09:08:24,964 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:24,965 - sms_agent - INFO - Linked to merchant: ROSE CAFE (32c462c0-db7f-43c9-b440-7e0300c627c6), logo=None
+2026-02-12 09:08:24,974 - sms_agent - INFO - Saved training example for: ROSE CAFE
+2026-02-12 09:08:26,249 - sms_agent - INFO - 📊 Token Usage - Input: 5864, Output: 219, Total: 6083
+2026-02-12 09:08:26,256 - sms_agent - INFO - Using header timestamp from WebUI: 2025-02-03 07:51:39
+2026-02-12 09:08:26,257 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:26,259 - sms_agent - INFO - Linked to merchant: LT Techno (8188a501-062a-494b-9b3c-d22fb5cf9292), logo=None
+2026-02-12 09:08:26,265 - sms_agent - INFO - Saved training example for: LT Techno
+2026-02-12 09:08:27,343 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 237, Total: 6091
+2026-02-12 09:08:27,350 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-27 13:38:52
+2026-02-12 09:08:27,352 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:27,352 - sms_agent - INFO - Linked to merchant: ROSE CAFE (32c462c0-db7f-43c9-b440-7e0300c627c6), logo=None
+2026-02-12 09:08:27,363 - sms_agent - INFO - Saved training example for: ROSE CAFE
+2026-02-12 09:08:28,483 - sms_agent - INFO - 📊 Token Usage - Input: 5852, Output: 219, Total: 6071
+2026-02-12 09:08:28,489 - sms_agent - INFO - Using header timestamp from WebUI: 2025-02-03 11:55:38
+2026-02-12 09:08:28,491 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:28,493 - sms_agent - INFO - Linked to merchant: DR CAFE (e87dde93-a6b8-4afc-9a25-fc374cfb77d4), logo=None
+2026-02-12 09:08:28,500 - sms_agent - INFO - Saved training example for: DR CAFE
+2026-02-12 09:08:29,619 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 230, Total: 6086
+2026-02-12 09:08:29,623 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-27 16:45:41
+2026-02-12 09:08:29,623 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:29,624 - sms_agent - INFO - Linked to merchant: STC Pay (ad912663-85e2-4268-9ae4-0c55b846af86), logo=None
+2026-02-12 09:08:29,633 - sms_agent - INFO - Saved training example for: STC Pay
+2026-02-12 09:08:31,732 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 240, Total: 6093
+2026-02-12 09:08:31,737 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-29 15:19:23
+2026-02-12 09:08:31,739 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:31,739 - sms_agent - INFO - Linked to merchant: ROSE CAFE (32c462c0-db7f-43c9-b440-7e0300c627c6), logo=None
+2026-02-12 09:08:31,748 - sms_agent - INFO - Saved training example for: ROSE CAFE
+2026-02-12 09:08:33,696 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 217, Total: 6071
+2026-02-12 09:08:33,703 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-29 15:19:42
+2026-02-12 09:08:33,705 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:33,706 - sms_agent - INFO - Linked to merchant: ROSE CAFE (32c462c0-db7f-43c9-b440-7e0300c627c6), logo=None
+2026-02-12 09:08:33,716 - sms_agent - INFO - Saved training example for: ROSE CAFE
+2026-02-12 09:08:35,909 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 214, Total: 6067
+2026-02-12 09:08:35,915 - sms_agent - INFO - Using header timestamp from WebUI: 2025-01-30 23:30:25
+2026-02-12 09:08:35,917 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:35,918 - sms_agent - INFO - Linked to merchant: PRIME BIT (8ee5715a-3611-4ee2-8bdd-be63546030ac), logo=None
+2026-02-12 09:08:35,929 - sms_agent - INFO - Saved training example for: PRIME BIT
+2026-02-12 09:08:38,462 - sms_agent - INFO - 📊 Token Usage - Input: 5862, Output: 235, Total: 6097
+2026-02-12 09:08:38,467 - sms_agent - INFO - Using header timestamp from WebUI: 2025-02-01 16:11:49
+2026-02-12 09:08:38,469 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:38,469 - sms_agent - INFO - Linked to merchant: STC Pay (ad912663-85e2-4268-9ae4-0c55b846af86), logo=None
+2026-02-12 09:08:38,480 - sms_agent - INFO - Saved training example for: STC Pay
+2026-02-12 09:08:40,955 - sms_agent - INFO - 📊 Token Usage - Input: 5861, Output: 211, Total: 6072
+2026-02-12 09:08:40,961 - sms_agent - INFO - Using header timestamp from WebUI: 2025-02-01 22:00:49
+2026-02-12 09:08:40,962 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:40,963 - sms_agent - INFO - Linked to merchant: STC Pay (ad912663-85e2-4268-9ae4-0c55b846af86), logo=None
+2026-02-12 09:08:40,976 - sms_agent - INFO - Saved training example for: STC Pay
+2026-02-12 09:08:43,341 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 236, Total: 6089
+2026-02-12 09:08:43,347 - sms_agent - INFO - Using header timestamp from WebUI: 2025-02-02 22:38:31
+2026-02-12 09:08:43,348 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:43,348 - sms_agent - INFO - Linked to merchant: 30 DEGREE (57c18fdd-dcf9-4614-99a1-e959bfff0de4), logo=None
+2026-02-12 09:08:43,359 - sms_agent - INFO - Saved training example for: 30 DEGREE
+2026-02-12 09:08:45,222 - sms_agent - INFO - 📊 Token Usage - Input: 5860, Output: 218, Total: 6078
+2026-02-12 09:08:45,224 - sms_agent - INFO - Using header timestamp from WebUI: 2025-02-03 07:36:57
+2026-02-12 09:08:45,225 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:45,226 - sms_agent - INFO - Linked to merchant: TABBY (f1f0e52e-5152-49ab-8e9f-cf1e703b5d00), logo=None
+2026-02-12 09:08:45,236 - sms_agent - INFO - Saved training example for: TABBY
+2026-02-12 09:08:47,443 - sms_agent - INFO - 📊 Token Usage - Input: 5845, Output: 239, Total: 6084
+2026-02-12 09:08:49,304 - sms_agent - INFO - 📊 Token Usage - Input: 5864, Output: 219, Total: 6083
+2026-02-12 09:08:49,311 - sms_agent - INFO - Using header timestamp from WebUI: 2025-02-03 07:51:39
+2026-02-12 09:08:49,311 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:49,312 - sms_agent - INFO - Linked to merchant: LT Techno (8188a501-062a-494b-9b3c-d22fb5cf9292), logo=None
+2026-02-12 09:08:49,322 - sms_agent - INFO - Saved training example for: LT Techno
+2026-02-12 09:08:51,431 - sms_agent - INFO - 📊 Token Usage - Input: 5852, Output: 256, Total: 6108
+2026-02-12 09:08:51,439 - sms_agent - INFO - Using header timestamp from WebUI: 2025-02-03 11:55:38
+2026-02-12 09:08:51,440 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 09:08:51,441 - sms_agent - INFO - Linked to merchant: DR CAFE (e87dde93-a6b8-4afc-9a25-fc374cfb77d4), logo=None
+2026-02-12 09:08:51,447 - sms_agent - INFO - Saved training example for: DR CAFE
+2026-02-12 09:09:37,408 - sms_agent - INFO - Using custom bank-specific prompt
+2026-02-12 09:09:39,581 - sms_agent - INFO - 📊 Token Usage - Input: 2844, Output: 223, Total: 3067
+2026-02-12 09:09:39,583 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-16 18:05:43
+2026-02-12 09:09:39,586 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 09:09:39,587 - sms_agent - INFO - Linked to merchant: HungerStation (bec21f2e-74da-4641-ac57-4c9ac7f7def2), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-12 09:09:39,592 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-12 09:16:56,919 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-12 09:17:55,863 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-12 09:18:55,971 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-12 09:22:30,603 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-12 09:24:44,129 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-12 09:25:40,795 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-12 10:29:36,772 - sms_agent - INFO - 📊 Token Usage - Input: 5850, Output: 239, Total: 6089
+2026-02-12 10:29:36,786 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 10:29:36,788 - sms_agent - INFO - Linked to merchant: BARBER HA (9d4e3ec2-29ea-4d82-947c-653b8536c21c), logo=None
+2026-02-12 10:29:36,799 - sms_agent - INFO - Saved training example for: BARBER HA
+2026-02-12 10:29:40,775 - sms_agent - INFO - 📊 Token Usage - Input: 5844, Output: 148, Total: 5992
+2026-02-12 10:29:40,777 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=Expense
+2026-02-12 10:29:40,777 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to Expense
+2026-02-12 10:29:40,783 - sms_agent - INFO - DEBUG: Created transaction d7662c3f-9154-4480-811f-a816833dd1d5 with status pending_action
+2026-02-12 10:44:18,780 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-12 10:44:41,770 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-12 11:12:05,603 - sms_agent - INFO - 📊 Token Usage - Input: 5860, Output: 235, Total: 6095
+2026-02-12 12:08:19,831 - sms_agent - INFO - 📊 Token Usage - Input: 5992, Output: 203, Total: 6195
+2026-02-12 13:55:05,026 - sms_agent - INFO - 📊 Token Usage - Input: 5850, Output: 219, Total: 6069
+2026-02-12 13:55:05,041 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 13:55:05,042 - sms_agent - INFO - Linked to merchant: Dr. Cafe (e87dde93-a6b8-4afc-9a25-fc374cfb77d4), logo=None
+2026-02-12 13:55:05,055 - sms_agent - INFO - Saved training example for: DR CAFE
+2026-02-12 15:07:43,387 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank—— Transfer Between Your Accounts
+Amoun...
+2026-02-12 15:07:43,737 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-02-12 15:07:46,181 - sms_agent - INFO - 📊 Token Usage - Input: 5341, Output: 183, Total: 5524
+2026-02-12 15:07:46,188 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 2104, Account: House
+2026-02-12 15:07:46,190 - sms_agent - INFO - Incoming Credit detected to own account House. ensure primary.
+2026-02-12 15:07:46,190 - sms_agent - INFO - DEBUG: Credit Logic Applied. Primary Account: House
+2026-02-12 15:07:46,192 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=House
+2026-02-12 15:07:46,193 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to House
+2026-02-12 15:07:46,200 - sms_agent - INFO - DEBUG: Created transaction 1d8e3eaa-ceac-4eb4-9b71-a2fc10fba0eb with status pending_action
+2026-02-12 15:07:46,202 - sms_agent - INFO - DEBUG: Sending inline buttons to user - 9 accounts
+2026-02-12 15:07:46,357 - sms_agent - INFO - DEBUG: Inline buttons sent successfully
+2026-02-12 15:09:16,550 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank—— PoS
+By:4390;mada-Atheer
+Amount:SAR 2...
+2026-02-12 15:09:16,986 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-02-12 15:09:18,730 - sms_agent - INFO - 📊 Token Usage - Input: 5355, Output: 174, Total: 5529
+2026-02-12 15:09:18,736 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 4390, Account: House
+2026-02-12 15:09:18,737 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=House
+2026-02-12 15:09:18,743 - sms_agent - INFO - Saved training example for: DANUBE 13
+2026-02-12 15:58:18,418 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank—— PoS
+By:4390;mada-Atheer
+Amount:SAR 2...
+2026-02-12 15:58:18,769 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-02-12 15:58:21,277 - sms_agent - INFO - 📊 Token Usage - Input: 5354, Output: 226, Total: 5580
+2026-02-12 15:58:21,282 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 4390, Account: House
+2026-02-12 15:58:21,283 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=House
+2026-02-12 15:58:21,294 - sms_agent - INFO - Saved training example for: LULU HYPE
+2026-02-12 16:35:41,725 - sms_agent - INFO - Using custom bank-specific prompt
+2026-02-12 16:35:44,325 - sms_agent - INFO - 📊 Token Usage - Input: 2844, Output: 226, Total: 3070
+2026-02-12 16:35:44,332 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-16 18:05:43
+2026-02-12 16:35:44,333 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 16:35:44,336 - sms_agent - INFO - Linked to merchant: HungerStation (d7f0e834-941c-4b0a-a636-8011cc7b051a), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-12 16:35:44,343 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-12 16:36:04,890 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 226, Total: 6084
+2026-02-12 16:36:04,895 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-09 23:24:12
+2026-02-12 16:36:04,897 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 16:36:04,898 - sms_agent - INFO - Linked to merchant: HungerStation (d7f0e834-941c-4b0a-a636-8011cc7b051a), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-12 16:36:04,906 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-12 16:39:36,281 - sms_agent - INFO - 📊 Token Usage - Input: 5851, Output: 247, Total: 6098
+2026-02-12 16:39:43,422 - sms_agent - INFO - 📊 Token Usage - Input: 5852, Output: 226, Total: 6078
+2026-02-12 16:42:05,513 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 228, Total: 6085
+2026-02-12 16:42:05,519 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-29 16:14:36
+2026-02-12 16:42:05,521 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 16:42:05,522 - sms_agent - INFO - Linked to merchant: HungerStation (d7f0e834-941c-4b0a-a636-8011cc7b051a), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-12 16:42:05,529 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-12 17:18:58,789 - sms_agent - INFO - 📊 Token Usage - Input: 5878, Output: 226, Total: 6104
+2026-02-12 17:18:58,798 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 09:50:58
+2026-02-12 17:18:58,799 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Payroll
+2026-02-12 17:18:58,802 - sms_agent - INFO - Linked to beneficiary (sender): DELL TECHNOLOGIES SINGLE LLC @ AlRajhi (f9c810ea-ee7b-42be-911c-c5ec48e81f44)
+2026-02-12 17:18:58,809 - sms_agent - INFO - Saved training example for: DELL TECHNOLOGIES SINGLE LLC
+2026-02-12 17:19:01,042 - sms_agent - INFO - 📊 Token Usage - Input: 5848, Output: 234, Total: 6082
+2026-02-12 17:19:01,043 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 10:55:18
+2026-02-12 17:19:01,043 - sms_agent - INFO - Converted 9.77 AED to 9.97 SAR using rate 1.02
+2026-02-12 17:19:01,043 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 17:19:01,045 - sms_agent - INFO - Linked to biller: Credit Card Payment (c37d4dd7-4220-43d9-9d0c-28155ced0e7b)
+2026-02-12 17:19:01,050 - sms_agent - INFO - Auto-linking CC 7868 payment: Creating debit on Expense account for 9.97 SAR
+2026-02-12 17:19:01,056 - sms_agent - INFO - Auto-created debit transaction 1e3221fb-e50e-428d-bc5e-b8da44b4d356 on Expense account
+2026-02-12 17:19:01,057 - sms_agent - INFO - Saved training example for: Credit Card Payment
+2026-02-12 17:19:03,263 - sms_agent - INFO - 📊 Token Usage - Input: 5847, Output: 226, Total: 6073
+2026-02-12 17:19:03,268 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 10:55:40
+2026-02-12 17:19:03,268 - sms_agent - INFO - Converted 10 AED to 10.2 SAR using rate 1.02
+2026-02-12 17:19:03,269 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 17:19:03,276 - sms_agent - INFO - Saved training example for: POS Purchase
+2026-02-12 17:19:05,376 - sms_agent - INFO - 📊 Token Usage - Input: 5850, Output: 233, Total: 6083
+2026-02-12 17:19:05,382 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 12:47:07
+2026-02-12 17:19:05,384 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 17:19:05,391 - sms_agent - INFO - Saved training example for: POS Purchase
+2026-02-12 17:19:07,338 - sms_agent - WARNING - AI 429 Rate Limit. Retrying in 4s... (Attempt 1/5)
+2026-02-12 17:19:13,363 - sms_agent - INFO - 📊 Token Usage - Input: 5868, Output: 244, Total: 6112
+2026-02-12 17:19:13,368 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 17:05:01
+2026-02-12 17:19:13,372 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=STC Wallet
+2026-02-12 17:19:13,375 - sms_agent - INFO - Linked to beneficiary (sender): MUATH ALASIRI @ AlRajhi (78cb6116-8252-4d16-b299-827c8d0560a6)
+2026-02-12 17:19:13,381 - sms_agent - INFO - Saved training example for: Transfer from STC Wallet
+2026-02-12 17:19:15,523 - sms_agent - INFO - 📊 Token Usage - Input: 5843, Output: 231, Total: 6074
+2026-02-12 17:19:15,529 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 17:47:25
+2026-02-12 17:19:15,530 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Liability
+2026-02-12 17:19:15,532 - sms_agent - INFO - Linked to beneficiary: Outgoing Transfer @ None (f5e25b80-6772-4db4-b315-cec18dac0b41)
+2026-02-12 17:19:15,539 - sms_agent - INFO - Saved training example for: Outgoing Transfer
+2026-02-12 17:19:17,688 - sms_agent - INFO - 📊 Token Usage - Input: 5842, Output: 230, Total: 6072
+2026-02-12 17:19:17,693 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 17:48:38
+2026-02-12 17:19:17,695 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Auto Lease
+2026-02-12 17:19:17,702 - sms_agent - INFO - Saved training example for: Loan Instalment Payment
+2026-02-12 17:19:19,852 - sms_agent - INFO - 📊 Token Usage - Input: 5840, Output: 235, Total: 6075
+2026-02-12 17:19:19,857 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 17:49:51
+2026-02-12 17:19:19,858 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=Expense
+2026-02-12 17:19:19,858 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to Expense
+2026-02-12 17:19:19,861 - sms_agent - INFO - DEBUG: Created transaction f362a8a8-6947-4b4d-8a8b-4b475599b0d0 with status pending_action
+2026-02-12 17:20:45,870 - sms_agent - INFO - 📊 Token Usage - Input: 5870, Output: 245, Total: 6115
+2026-02-12 17:20:45,875 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 17:51:06
+2026-02-12 17:20:45,877 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Payroll
+2026-02-12 17:20:45,878 - sms_agent - INFO - Cross-bank transfer detected (completed): Payroll -> Jazira Checking
+2026-02-12 17:20:45,885 - sms_agent - INFO - Saved training example for: Transfer to Jazira Checking
+2026-02-12 17:20:48,086 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 252, Total: 6106
+2026-02-12 17:20:48,090 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 19:18:14
+2026-02-12 17:20:48,092 - sms_agent - INFO - Swapping Primary Account for Credit: Liability -> House
+2026-02-12 17:20:48,093 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=House
+2026-02-12 17:20:48,100 - sms_agent - INFO - Saved training example for: Transfer from Liability
+2026-02-12 17:20:50,718 - sms_agent - INFO - 📊 Token Usage - Input: 5859, Output: 239, Total: 6098
+2026-02-12 17:20:50,722 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 20:48:19
+2026-02-12 17:20:50,723 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Auto Lease
+2026-02-12 17:20:50,728 - sms_agent - INFO - Saved training example for: Loan Instalment Payment
+2026-02-12 17:20:52,722 - sms_agent - INFO - 📊 Token Usage - Input: 5860, Output: 166, Total: 6026
+2026-02-12 17:20:52,728 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 21:30:42
+2026-02-12 17:20:52,730 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=General
+2026-02-12 17:20:52,732 - sms_agent - INFO - Linked to beneficiary (sender): RASHA AMER ALASIRI @ AlRajhi (e7e899cd-433a-4882-b28c-5386ed8344ae)
+2026-02-12 17:20:52,739 - sms_agent - INFO - Saved training example for: RASHA AMER ALASIRI
+2026-02-12 17:20:55,113 - sms_agent - INFO - 📊 Token Usage - Input: 5847, Output: 239, Total: 6086
+2026-02-12 17:20:55,119 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 23:21:46
+2026-02-12 17:20:55,122 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:20:55,122 - sms_agent - INFO - Linked to merchant: BARBER HA (9d4e3ec2-29ea-4d82-947c-653b8536c21c), logo=None
+2026-02-12 17:20:55,130 - sms_agent - INFO - Saved training example for: BARBER HA
+2026-02-12 17:20:57,569 - sms_agent - INFO - 📊 Token Usage - Input: 5852, Output: 221, Total: 6073
+2026-02-12 17:20:57,571 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 23:26:37
+2026-02-12 17:20:57,572 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:20:57,574 - sms_agent - INFO - Linked to merchant: ADAM PHAR (bc96f608-19dd-4800-bc73-fb1562b2e343), logo=None
+2026-02-12 17:20:57,580 - sms_agent - INFO - Saved training example for: ADAM PHAR
+2026-02-12 17:20:59,929 - sms_agent - INFO - 📊 Token Usage - Input: 5852, Output: 222, Total: 6074
+2026-02-12 17:20:59,934 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 23:34:24
+2026-02-12 17:20:59,936 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:20:59,937 - sms_agent - INFO - Linked to merchant: MEED (5cf8f32a-74fc-4101-a51d-89f3b3510d66), logo=None
+2026-02-12 17:20:59,945 - sms_agent - INFO - Saved training example for: MEED Jawh
+2026-02-12 17:21:02,547 - sms_agent - INFO - 📊 Token Usage - Input: 5851, Output: 250, Total: 6101
+2026-02-12 17:21:02,553 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 23:36:09
+2026-02-12 17:21:02,556 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:21:02,558 - sms_agent - INFO - Linked to merchant: Petromin (33e28962-c23a-4b20-9eff-7464242698df), logo=https://www.google.com/s2/favicons?domain=petromin.com&sz=64
+2026-02-12 17:21:02,565 - sms_agent - INFO - Saved training example for: Petromin
+2026-02-12 17:21:04,889 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 228, Total: 6085
+2026-02-12 17:21:04,895 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 01:11:42
+2026-02-12 17:21:04,896 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:21:04,898 - sms_agent - INFO - Linked to merchant: HungerStation (d7f0e834-941c-4b0a-a636-8011cc7b051a), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-12 17:21:04,903 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-12 17:21:07,201 - sms_agent - INFO - 📊 Token Usage - Input: 5855, Output: 218, Total: 6073
+2026-02-12 17:22:19,180 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 239, Total: 6092
+2026-02-12 17:22:19,186 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 15:03:42
+2026-02-12 17:22:19,188 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:22:19,190 - sms_agent - INFO - Linked to beneficiary: MOHAMMED ISLAM @ None (aa0bc9c7-012b-4d22-8663-80e8994c0cff)
+2026-02-12 17:22:19,195 - sms_agent - INFO - Saved training example for: MOHAMMED ISLAM
+2026-02-12 17:22:21,884 - sms_agent - INFO - 📊 Token Usage - Input: 5855, Output: 237, Total: 6092
+2026-02-12 17:22:21,889 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 16:23:13
+2026-02-12 17:22:21,890 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:22:21,893 - sms_agent - INFO - Linked to merchant: Yazysa (33862647-7b92-476c-b07d-21838807ed1a), logo=None
+2026-02-12 17:22:21,900 - sms_agent - INFO - Saved training example for: Yazysa
+2026-02-12 17:22:24,119 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 171, Total: 6024
+2026-02-12 17:22:24,124 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 17:22:54
+2026-02-12 17:22:24,126 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:22:24,127 - sms_agent - INFO - Linked to beneficiary: SABAH ABDULLAH @ None (c8196fd4-e73a-480e-abf9-3839a19fbe08)
+2026-02-12 17:22:24,133 - sms_agent - INFO - Saved training example for: SABAH ABDULLAH
+2026-02-12 17:22:26,742 - sms_agent - INFO - 📊 Token Usage - Input: 5851, Output: 221, Total: 6072
+2026-02-12 17:22:26,751 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 19:52:10
+2026-02-12 17:22:26,754 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:22:26,755 - sms_agent - INFO - Linked to merchant: MEED (5cf8f32a-74fc-4101-a51d-89f3b3510d66), logo=None
+2026-02-12 17:22:26,760 - sms_agent - INFO - Saved training example for: MEED Jawh
+2026-02-12 17:22:29,118 - sms_agent - INFO - 📊 Token Usage - Input: 5808, Output: 189, Total: 5997
+2026-02-12 17:22:31,747 - sms_agent - INFO - 📊 Token Usage - Input: 5855, Output: 217, Total: 6072
+2026-02-12 17:22:31,753 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-27 11:11:17
+2026-02-12 17:22:31,754 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:22:31,756 - sms_agent - INFO - Linked to merchant: STC (875912f2-c582-422d-8755-f8cfe9c20291), logo=None
+2026-02-12 17:22:31,763 - sms_agent - INFO - Saved training example for: STC Bank
+2026-02-12 17:22:34,519 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 239, Total: 6092
+2026-02-12 17:22:34,520 - sms_agent - WARNING - Digit validation: destination_account_last4 corrected from '1964' to '1967' (original SMS didn't contain '1964')
+2026-02-12 17:22:34,525 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-27 11:15:36
+2026-02-12 17:22:34,527 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:22:34,529 - sms_agent - INFO - Linked to beneficiary: MUHAMMAD AKRAM @ None (04938432-3901-49ab-b962-b23d19408173)
+2026-02-12 17:22:34,535 - sms_agent - INFO - Saved training example for: MUHAMMAD AKRAM
+2026-02-12 17:22:36,999 - sms_agent - INFO - 📊 Token Usage - Input: 5846, Output: 219, Total: 6065
+2026-02-12 17:22:37,004 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-27 12:39:43
+2026-02-12 17:22:37,006 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:22:37,006 - sms_agent - INFO - Linked to merchant: Got Cookie (9d688d30-aa73-4855-932a-99951d78ed13), logo=None
+2026-02-12 17:22:37,012 - sms_agent - INFO - Saved training example for: Got Cookie
+2026-02-12 17:22:39,672 - sms_agent - INFO - 📊 Token Usage - Input: 5846, Output: 240, Total: 6086
+2026-02-12 17:22:39,678 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-27 15:22:31
+2026-02-12 17:22:39,680 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:22:39,681 - sms_agent - INFO - Linked to merchant: Got Cookie (9d688d30-aa73-4855-932a-99951d78ed13), logo=None
+2026-02-12 17:22:39,688 - sms_agent - INFO - Saved training example for: Got Cookie
+2026-02-12 17:22:42,110 - sms_agent - INFO - 📊 Token Usage - Input: 5847, Output: 216, Total: 6063
+2026-02-12 17:22:42,116 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-27 15:23:22
+2026-02-12 17:22:42,117 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:22:42,119 - sms_agent - INFO - Linked to merchant: CITY FRES (9440154d-0d7b-43d0-92e1-45ed4e6435a6), logo=None
+2026-02-12 17:22:42,125 - sms_agent - INFO - Saved training example for: CITY FRES
+2026-02-12 17:22:44,895 - sms_agent - INFO - 📊 Token Usage - Input: 5849, Output: 257, Total: 6106
+2026-02-12 17:22:44,900 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-27 20:41:55
+2026-02-12 17:22:44,901 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:22:44,903 - sms_agent - INFO - Linked to merchant: HABIBAH S (a5ef888c-9679-4d6c-996a-5b96d77a1df5), logo=None
+2026-02-12 17:22:44,909 - sms_agent - INFO - Saved training example for: HABIBAH S
+2026-02-12 17:22:47,470 - sms_agent - INFO - 📊 Token Usage - Input: 5851, Output: 221, Total: 6072
+2026-02-12 17:22:47,475 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-27 21:07:15
+2026-02-12 17:22:47,477 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:22:47,478 - sms_agent - INFO - Linked to merchant: Alsawadi R (30c1b7c2-a71a-4bc3-b573-b47fc88adddf), logo=None
+2026-02-12 17:22:47,485 - sms_agent - INFO - Saved training example for: Alsawadi R
+2026-02-12 17:22:50,261 - sms_agent - INFO - 📊 Token Usage - Input: 5852, Output: 217, Total: 6069
+2026-02-12 17:22:50,264 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-27 22:45:15
+2026-02-12 17:22:50,266 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 17:22:50,266 - sms_agent - INFO - Linked to biller: Credit Card Payment (c37d4dd7-4220-43d9-9d0c-28155ced0e7b)
+2026-02-12 17:22:50,273 - sms_agent - INFO - Auto-linking CC 7868 payment: Creating debit on Expense account for 539.99 SAR
+2026-02-12 17:22:50,276 - sms_agent - INFO - Auto-created debit transaction 004c778b-08cd-4518-a3f4-b92759c2610a on Expense account
+2026-02-12 17:22:50,278 - sms_agent - INFO - Saved training example for: Credit Card Payment
+2026-02-12 17:22:52,738 - sms_agent - INFO - 📊 Token Usage - Input: 5847, Output: 212, Total: 6059
+2026-02-12 17:22:52,741 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-27 22:46:05
+2026-02-12 17:22:52,743 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 17:22:52,745 - sms_agent - INFO - Linked to biller: Credit Card Payment (c37d4dd7-4220-43d9-9d0c-28155ced0e7b)
+2026-02-12 17:22:52,751 - sms_agent - INFO - Auto-linking CC 7868 payment: Creating debit on Expense account for 1 SAR
+2026-02-12 17:22:52,755 - sms_agent - INFO - Auto-created debit transaction 4ff90bdb-1b27-49cd-be9b-e9cb64a6460c on Expense account
+2026-02-12 17:22:52,756 - sms_agent - INFO - Saved training example for: Credit Card Payment
+2026-02-12 17:22:55,288 - sms_agent - INFO - 📊 Token Usage - Input: 5849, Output: 235, Total: 6084
+2026-02-12 17:22:55,291 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-27 22:47:33
+2026-02-12 17:22:55,295 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 17:22:55,296 - sms_agent - INFO - Linked to biller: Credit Card Payment (c37d4dd7-4220-43d9-9d0c-28155ced0e7b)
+2026-02-12 17:22:55,301 - sms_agent - INFO - Auto-linking CC 7868 payment: Creating debit on Expense account for 100 SAR
+2026-02-12 17:22:55,305 - sms_agent - INFO - Auto-created debit transaction 835af368-f94c-4fed-85ea-dc2817a33f23 on Expense account
+2026-02-12 17:22:55,307 - sms_agent - INFO - Saved training example for: Credit Card Payment
+2026-02-12 17:22:58,050 - sms_agent - INFO - 📊 Token Usage - Input: 5861, Output: 246, Total: 6107
+2026-02-12 17:22:58,055 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-27 22:47:58
+2026-02-12 17:22:58,056 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 17:22:58,057 - sms_agent - INFO - Linked to merchant: Google (d9f1da41-f775-44ce-8246-d6805dbcf296), logo=https://www.google.com/s2/favicons?domain=google.com&sz=64
+2026-02-12 17:22:58,065 - sms_agent - INFO - Saved training example for: Google
+2026-02-12 17:23:00,805 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 241, Total: 6094
+2026-02-12 17:23:00,806 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-27 22:54:31
+2026-02-12 17:23:00,807 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 17:23:00,808 - sms_agent - INFO - Linked to merchant: Google (d9f1da41-f775-44ce-8246-d6805dbcf296), logo=https://www.google.com/s2/favicons?domain=google.com&sz=64
+2026-02-12 17:23:00,815 - sms_agent - INFO - Saved training example for: Google
+2026-02-12 17:23:03,515 - sms_agent - INFO - 📊 Token Usage - Input: 5848, Output: 239, Total: 6087
+2026-02-12 17:23:03,521 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-28 11:03:39
+2026-02-12 17:23:03,522 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:23:03,523 - sms_agent - INFO - Linked to merchant: IQFAL ALA (a804039f-766c-4eae-b26a-fcd2a50b6a9c), logo=None
+2026-02-12 17:23:03,529 - sms_agent - INFO - Saved training example for: IQFAL ALA
+2026-02-12 17:23:06,023 - sms_agent - INFO - 📊 Token Usage - Input: 5851, Output: 220, Total: 6071
+2026-02-12 17:23:06,030 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-28 17:46:01
+2026-02-12 17:23:06,031 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:23:06,033 - sms_agent - INFO - Linked to merchant: BERAIN CO (883da412-5f6d-4404-befb-8b2a8962c073), logo=None
+2026-02-12 17:23:06,040 - sms_agent - INFO - Saved training example for: BERAIN CO
+2026-02-12 17:23:08,698 - sms_agent - INFO - 📊 Token Usage - Input: 5844, Output: 230, Total: 6074
+2026-02-12 17:23:08,701 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-28 18:51:42
+2026-02-12 17:23:08,702 - sms_agent - INFO - Converted 50 USD to 187.5 SAR using rate 3.75
+2026-02-12 17:23:08,705 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 17:23:08,705 - sms_agent - INFO - Linked to biller: Credit Card Payment (c37d4dd7-4220-43d9-9d0c-28155ced0e7b)
+2026-02-12 17:23:08,710 - sms_agent - INFO - Auto-linking CC 7868 payment: Creating debit on Expense account for 187.5 SAR
+2026-02-12 17:23:08,716 - sms_agent - INFO - Auto-created debit transaction 0d6f13e4-e4d9-463b-8ca5-0d60b9c1c34c on Expense account
+2026-02-12 17:23:08,717 - sms_agent - INFO - Saved training example for: Credit Card Payment
+2026-02-12 17:23:11,346 - sms_agent - INFO - 📊 Token Usage - Input: 5860, Output: 224, Total: 6084
+2026-02-12 17:23:11,351 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-28 18:52:14
+2026-02-12 17:23:11,351 - sms_agent - INFO - Converted 49.99 USD to 187.46 SAR using rate 3.75
+2026-02-12 17:23:11,351 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 17:23:11,354 - sms_agent - INFO - Linked to merchant: PADDLE.NE (3d9f71fb-e9fd-4a84-95f0-ef807f569e01), logo=None
+2026-02-12 17:23:11,361 - sms_agent - INFO - Saved training example for: PADDLE.NE
+2026-02-12 17:23:13,731 - sms_agent - INFO - 📊 Token Usage - Input: 5849, Output: 214, Total: 6063
+2026-02-12 17:23:13,734 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-28 22:24:20
+2026-02-12 17:23:13,738 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 17:23:13,739 - sms_agent - INFO - Linked to biller: Credit Card Payment (c37d4dd7-4220-43d9-9d0c-28155ced0e7b)
+2026-02-12 17:23:13,745 - sms_agent - INFO - Auto-linking CC 7868 payment: Creating debit on Expense account for 649 SAR
+2026-02-12 17:23:13,749 - sms_agent - INFO - Auto-created debit transaction e6b3e56c-f66a-4b9c-b579-8d81de4a6d02 on Expense account
+2026-02-12 17:23:13,750 - sms_agent - INFO - Saved training example for: Credit Card Payment
+2026-02-12 17:23:16,420 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 224, Total: 6078
+2026-02-12 17:23:16,426 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-28 22:24:32
+2026-02-12 17:23:16,428 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 17:23:16,430 - sms_agent - INFO - Linked to merchant: Amazon (1795949d-9fdf-463a-a464-5059713f0311), logo=https://www.google.com/s2/favicons?domain=amazon.sa&sz=64
+2026-02-12 17:23:16,437 - sms_agent - INFO - Saved training example for: Amazon
+2026-02-12 17:23:18,896 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 227, Total: 6083
+2026-02-12 17:23:18,902 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-29 07:52:32
+2026-02-12 17:23:18,904 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:23:18,906 - sms_agent - INFO - Linked to beneficiary: MUZAMAL HUSSAIN @ None (02598c4f-294b-46b1-9019-9b788efbf1c2)
+2026-02-12 17:23:18,912 - sms_agent - INFO - Saved training example for: MUZAMAL HUSSAIN
+2026-02-12 17:23:21,583 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 228, Total: 6081
+2026-02-12 17:23:21,589 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-29 10:41:48
+2026-02-12 17:23:21,591 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:23:21,593 - sms_agent - INFO - Linked to merchant: Aldrees (33a13c16-7ed7-4697-b9c9-9b0a485533a2), logo=https://www.google.com/s2/favicons?domain=aldrees.com&sz=64
+2026-02-12 17:23:21,600 - sms_agent - INFO - Saved training example for: Aldrees
+2026-02-12 17:23:24,409 - sms_agent - INFO - 📊 Token Usage - Input: 5869, Output: 224, Total: 6093
+2026-02-12 17:23:24,414 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-29 15:33:42
+2026-02-12 17:23:24,417 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:23:24,419 - sms_agent - INFO - Linked to beneficiary: أكاديمية فارس رياضية @ None (42cac938-7a9b-4944-9875-5eba74cb8330)
+2026-02-12 17:23:24,425 - sms_agent - INFO - Saved training example for: أكاديمية فارس رياضية
+2026-02-12 17:23:26,831 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 228, Total: 6085
+2026-02-12 17:23:26,836 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-29 16:14:36
+2026-02-12 17:23:26,838 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:23:26,839 - sms_agent - INFO - Linked to merchant: HungerStation (d7f0e834-941c-4b0a-a636-8011cc7b051a), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-12 17:23:26,845 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-12 17:23:29,658 - sms_agent - INFO - 📊 Token Usage - Input: 5850, Output: 235, Total: 6085
+2026-02-12 17:23:29,660 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-29 17:38:51
+2026-02-12 17:23:29,662 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=General
+2026-02-12 17:23:29,664 - sms_agent - INFO - Linked to beneficiary (sender): Executive Craft @ AlRajhi (6ffd251e-5dbd-4100-8f80-68501406bfc8)
+2026-02-12 17:23:29,670 - sms_agent - INFO - Saved training example for: Executive Craft
+2026-02-12 17:23:32,067 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 228, Total: 6085
+2026-02-12 17:23:32,072 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-30 03:42:36
+2026-02-12 17:23:32,074 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:23:32,075 - sms_agent - INFO - Linked to merchant: HungerStation (d7f0e834-941c-4b0a-a636-8011cc7b051a), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-12 17:23:32,082 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-12 17:23:34,451 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 229, Total: 6082
+2026-02-12 17:23:34,456 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-30 19:03:44
+2026-02-12 17:23:34,458 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:23:34,459 - sms_agent - INFO - Linked to beneficiary: SABAH ABDULLAH @ None (c8196fd4-e73a-480e-abf9-3839a19fbe08)
+2026-02-12 17:23:34,466 - sms_agent - INFO - Saved training example for: SABAH ABDULLAH
+2026-02-12 17:23:36,896 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 236, Total: 6090
+2026-02-12 17:23:36,902 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-30 19:04:20
+2026-02-12 17:23:36,904 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=Liability
+2026-02-12 17:23:36,904 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to Liability
+2026-02-12 17:23:36,907 - sms_agent - INFO - DEBUG: Created transaction 409c74e9-ce51-4c60-8186-1718c859eb12 with status pending_action
+2026-02-12 17:24:33,529 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 215, Total: 6069
+2026-02-12 17:24:33,531 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-30 20:49:33
+2026-02-12 17:24:33,532 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:24:33,533 - sms_agent - INFO - Linked to merchant: Keeta (f80e24c6-ab0a-419d-8662-0d00768a862f), logo=None
+2026-02-12 17:24:33,539 - sms_agent - INFO - Saved training example for: Keeta
+2026-02-12 17:24:35,890 - sms_agent - INFO - 📊 Token Usage - Input: 5852, Output: 229, Total: 6081
+2026-02-12 17:24:35,896 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-30 21:25:42
+2026-02-12 17:24:35,900 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:24:35,902 - sms_agent - INFO - Linked to beneficiary: MOHAMMED ISLAM @ None (aa0bc9c7-012b-4d22-8663-80e8994c0cff)
+2026-02-12 17:24:35,909 - sms_agent - INFO - Saved training example for: MOHAMMED ISLAM
+2026-02-12 17:24:38,619 - sms_agent - INFO - 📊 Token Usage - Input: 5839, Output: 229, Total: 6068
+2026-02-12 17:24:38,624 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-30 21:26:21
+2026-02-12 17:24:38,625 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=Payroll
+2026-02-12 17:24:38,625 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to Payroll
+2026-02-12 17:24:38,629 - sms_agent - INFO - DEBUG: Created transaction 669da3c1-b023-487b-944b-2812df37367a with status pending_action
+2026-02-12 17:29:51,305 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank—— Online Purchase
+By:4390;mada-Apple P...
+2026-02-12 17:29:51,644 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-02-12 17:29:54,274 - sms_agent - INFO - 📊 Token Usage - Input: 5355, Output: 198, Total: 5553
+2026-02-12 17:29:54,276 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 2104, Account: House
+2026-02-12 17:29:54,276 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=House
+2026-02-12 17:29:54,281 - sms_agent - INFO - Saved training example for: Ninja
+2026-02-12 17:29:54,487 - sms_agent - INFO - Received message from Channel_-1003635708322: AlRajhiBank—— Online Purchase
+By:4390;mada-Apple P...
+2026-02-12 17:29:55,404 - sms_agent - INFO - Parsed structured message - Sender: AlRajhiBank (separator: '——')
+2026-02-12 17:29:57,703 - sms_agent - INFO - 📊 Token Usage - Input: 5355, Output: 219, Total: 5574
+2026-02-12 17:29:57,705 - sms_agent - INFO - DEBUG: Source Logic -> Matched Account: 2104, Account: House
+2026-02-12 17:29:57,705 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=House
+2026-02-12 17:29:57,710 - sms_agent - INFO - Saved training example for: Ninja
+2026-02-12 17:35:52,945 - sms_agent - INFO - 📊 Token Usage - Input: 5839, Output: 213, Total: 6052
+2026-02-12 17:35:52,950 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-30 21:27:00
+2026-02-12 17:35:52,951 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=Expense
+2026-02-12 17:35:52,951 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to Expense
+2026-02-12 17:35:52,954 - sms_agent - INFO - DEBUG: Created transaction afa32532-6973-410b-b813-53bf52bfe547 with status pending_action
+2026-02-12 17:44:37,153 - sms_agent - INFO - Using custom bank-specific prompt
+2026-02-12 17:44:39,674 - sms_agent - INFO - 📊 Token Usage - Input: 2838, Output: 212, Total: 3050
+2026-02-12 17:44:39,678 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 17:44:39,680 - sms_agent - INFO - Linked to merchant: Amazon (1795949d-9fdf-463a-a464-5059713f0311), logo=https://www.google.com/s2/favicons?domain=amazon.sa&sz=64
+2026-02-12 17:44:39,689 - sms_agent - INFO - Saved training example for: Amazon
+2026-02-12 17:45:33,136 - sms_agent - INFO - 📊 Token Usage - Input: 5864, Output: 208, Total: 6072
+2026-02-12 17:45:33,141 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-30 21:27:24
+2026-02-12 17:45:33,143 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:45:33,145 - sms_agent - INFO - Linked to beneficiary: my mom @ None (fb0d4cbf-3dbe-475b-8bcf-a3b399dfda2f)
+2026-02-12 17:45:33,152 - sms_agent - INFO - Saved training example for: my mom
+2026-02-12 17:45:35,604 - sms_agent - INFO - 📊 Token Usage - Input: 5847, Output: 227, Total: 6074
+2026-02-12 17:45:35,608 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-31 03:23:40
+2026-02-12 17:45:35,609 - sms_agent - INFO - Converted 9.77 AED to 9.97 SAR using rate 1.02
+2026-02-12 17:45:35,609 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 17:45:35,617 - sms_agent - INFO - Saved training example for: POS Purchase
+2026-02-12 17:45:38,174 - sms_agent - INFO - 📊 Token Usage - Input: 5849, Output: 234, Total: 6083
+2026-02-12 17:45:38,178 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-31 03:33:12
+2026-02-12 17:45:38,179 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:45:38,180 - sms_agent - INFO - Linked to biller: Credit Card Payment (c37d4dd7-4220-43d9-9d0c-28155ced0e7b)
+2026-02-12 17:45:38,186 - sms_agent - INFO - Saved training example for: Credit Card Payment
+2026-02-12 17:45:40,696 - sms_agent - INFO - 📊 Token Usage - Input: 5847, Output: 229, Total: 6076
+2026-02-12 17:45:40,701 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-31 11:49:37
+2026-02-12 17:45:40,702 - sms_agent - INFO - Converted 11 USD to 41.25 SAR using rate 3.75
+2026-02-12 17:45:40,702 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 17:45:40,711 - sms_agent - INFO - Saved training example for: POS Purchase
+2026-02-12 17:45:43,062 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 227, Total: 6084
+2026-02-12 17:45:43,067 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-31 19:28:21
+2026-02-12 17:45:43,068 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:45:43,069 - sms_agent - INFO - Linked to merchant: HungerStation (d7f0e834-941c-4b0a-a636-8011cc7b051a), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-12 17:45:43,076 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-12 17:45:45,627 - sms_agent - INFO - 📊 Token Usage - Input: 5851, Output: 239, Total: 6090
+2026-02-12 17:45:45,632 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-01 01:39:01
+2026-02-12 17:45:45,635 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:45:45,637 - sms_agent - INFO - Linked to beneficiary: YAZEED ALSHAMI @ None (4d73cf2e-2216-4b6b-9a08-a20577e65270)
+2026-02-12 17:45:45,644 - sms_agent - INFO - Saved training example for: YAZEED ALSHAMI
+2026-02-12 17:45:48,149 - sms_agent - INFO - 📊 Token Usage - Input: 5862, Output: 231, Total: 6093
+2026-02-12 17:45:48,153 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-01 03:20:51
+2026-02-12 17:45:48,155 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Liability
+2026-02-12 17:45:48,157 - sms_agent - INFO - Linked to beneficiary (sender): MUATH AMER MOHAMMED ALASIRI @ AlRajhi (fac1f0bc-7ca2-4ae8-9d6a-70efb38bcded)
+2026-02-12 17:45:48,163 - sms_agent - INFO - Saved training example for: MUATH AMER MOHAMMED ALASIRI
+2026-02-12 17:45:50,517 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 214, Total: 6068
+2026-02-12 17:45:50,521 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-01 11:18:19
+2026-02-12 17:45:50,522 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:45:50,523 - sms_agent - INFO - Linked to merchant: STC (875912f2-c582-422d-8755-f8cfe9c20291), logo=None
+2026-02-12 17:45:50,529 - sms_agent - INFO - Saved training example for: STC Bank
+2026-02-12 17:45:52,835 - sms_agent - INFO - 📊 Token Usage - Input: 5850, Output: 220, Total: 6070
+2026-02-12 17:45:52,841 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-01 20:32:54
+2026-02-12 17:45:52,842 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:45:52,843 - sms_agent - INFO - Linked to merchant: BELAL FOR (2ce1ca68-475c-4548-9515-73cf89812b57), logo=None
+2026-02-12 17:45:52,849 - sms_agent - INFO - Saved training example for: BELAL FOR
+2026-02-12 17:45:55,309 - sms_agent - INFO - 📊 Token Usage - Input: 5847, Output: 238, Total: 6085
+2026-02-12 17:45:55,313 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-01 20:39:25
+2026-02-12 17:45:55,314 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:45:55,315 - sms_agent - INFO - Linked to merchant: EASY BAKE (07369b50-84b6-4934-bd35-060490c68d0e), logo=None
+2026-02-12 17:45:55,321 - sms_agent - INFO - Saved training example for: EASY BAKE
+2026-02-12 17:45:57,988 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 241, Total: 6095
+2026-02-12 17:45:57,993 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-02 09:05:34
+2026-02-12 17:45:57,995 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:45:57,995 - sms_agent - INFO - Linked to merchant: STC (875912f2-c582-422d-8755-f8cfe9c20291), logo=None
+2026-02-12 17:45:58,002 - sms_agent - INFO - Saved training example for: STC Bank
+2026-02-12 17:46:00,507 - sms_agent - INFO - 📊 Token Usage - Input: 5845, Output: 219, Total: 6064
+2026-02-12 17:46:00,512 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-02 11:49:01
+2026-02-12 17:46:00,515 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:46:00,515 - sms_agent - INFO - Linked to merchant: Got Cookie (9d688d30-aa73-4855-932a-99951d78ed13), logo=None
+2026-02-12 17:46:00,522 - sms_agent - INFO - Saved training example for: Got Cookie
+2026-02-12 17:46:03,067 - sms_agent - INFO - 📊 Token Usage - Input: 5867, Output: 242, Total: 6109
+2026-02-12 17:46:03,071 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-02 13:22:05
+2026-02-12 17:46:03,072 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=General
+2026-02-12 17:46:03,073 - sms_agent - INFO - Cross-bank transfer detected (completed): General -> STC Wallet
+2026-02-12 17:46:03,078 - sms_agent - INFO - Saved training example for: Transfer to STC Wallet
+2026-02-12 17:46:05,279 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 229, Total: 6086
+2026-02-12 17:46:05,281 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-02 18:36:26
+2026-02-12 17:46:05,282 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:46:05,283 - sms_agent - INFO - Linked to merchant: HungerStation (d7f0e834-941c-4b0a-a636-8011cc7b051a), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-12 17:46:05,290 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-12 17:46:07,246 - sms_agent - WARNING - AI 429 Rate Limit. Retrying in 4s... (Attempt 1/5)
+2026-02-12 17:46:13,194 - sms_agent - INFO - 📊 Token Usage - Input: 5845, Output: 214, Total: 6059
+2026-02-12 17:46:13,199 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-03 06:50:40
+2026-02-12 17:46:13,200 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:46:13,202 - sms_agent - INFO - Linked to merchant: mama nour (34d9a177-703b-4aa3-a93c-090ddcd0f861), logo=None
+2026-02-12 17:46:13,209 - sms_agent - INFO - Saved training example for: mama nour
+2026-02-12 17:46:15,131 - sms_agent - INFO - 📊 Token Usage - Input: 5845, Output: 214, Total: 6059
+2026-02-12 17:46:15,134 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-03 06:54:46
+2026-02-12 17:46:15,135 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:46:15,136 - sms_agent - INFO - Linked to merchant: mama nour (34d9a177-703b-4aa3-a93c-090ddcd0f861), logo=None
+2026-02-12 17:46:15,143 - sms_agent - INFO - Saved training example for: mama nour
+2026-02-12 17:46:18,015 - sms_agent - INFO - 📊 Token Usage - Input: 5845, Output: 219, Total: 6064
+2026-02-12 17:46:18,020 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-03 11:04:50
+2026-02-12 17:46:18,021 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:46:18,021 - sms_agent - INFO - Linked to merchant: Got Cookie (9d688d30-aa73-4855-932a-99951d78ed13), logo=None
+2026-02-12 17:46:18,029 - sms_agent - INFO - Saved training example for: Got Cookie
+2026-02-12 17:46:20,292 - sms_agent - INFO - 📊 Token Usage - Input: 5852, Output: 221, Total: 6073
+2026-02-12 17:46:20,297 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-03 15:07:51
+2026-02-12 17:46:20,300 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:46:20,302 - sms_agent - INFO - Linked to beneficiary: SABAH ABDULLAH @ None (c8196fd4-e73a-480e-abf9-3839a19fbe08)
+2026-02-12 17:46:20,309 - sms_agent - INFO - Saved training example for: SABAH ABDULLAH
+2026-02-12 17:46:22,457 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 227, Total: 6085
+2026-02-12 17:46:22,462 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-03 16:31:12
+2026-02-12 17:46:22,464 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Liability
+2026-02-12 17:46:22,465 - sms_agent - INFO - Linked to biller: Salam (e33265ee-90f1-493a-b5bb-bf607232bac4)
+2026-02-12 17:46:22,472 - sms_agent - INFO - Saved training example for: Bill Payment - Salam
+2026-02-12 17:46:24,763 - sms_agent - INFO - 📊 Token Usage - Input: 5866, Output: 233, Total: 6099
+2026-02-12 17:46:24,768 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-03 16:32:27
+2026-02-12 17:46:24,770 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Liability
+2026-02-12 17:46:24,772 - sms_agent - INFO - Linked to biller: STC BILL (f5529a46-210b-46a7-b558-8791da6880dc)
+2026-02-12 17:46:24,778 - sms_agent - INFO - Saved training example for: Bill Payment - STC
+2026-02-12 17:46:27,271 - sms_agent - INFO - 📊 Token Usage - Input: 5850, Output: 220, Total: 6070
+2026-02-12 17:46:27,279 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-03 18:02:18
+2026-02-12 17:46:27,281 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:46:27,283 - sms_agent - INFO - Linked to merchant: SHAMAL AL (d5139193-67ef-404d-b664-edf683410e00), logo=None
+2026-02-12 17:46:27,289 - sms_agent - INFO - Saved training example for: SHAMAL AL
+2026-02-12 17:46:29,742 - sms_agent - INFO - 📊 Token Usage - Input: 5849, Output: 220, Total: 6069
+2026-02-12 17:46:29,748 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-03 18:39:10
+2026-02-12 17:46:29,749 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:46:29,750 - sms_agent - INFO - Linked to merchant: ASHARQ AL (535d67b9-22d8-47f2-89b3-73f1d84d9e92), logo=None
+2026-02-12 17:46:29,756 - sms_agent - INFO - Saved training example for: ASHARQ AL
+2026-02-12 17:46:32,254 - sms_agent - INFO - 📊 Token Usage - Input: 5852, Output: 217, Total: 6069
+2026-02-12 17:46:32,260 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-03 22:42:02
+2026-02-12 17:46:32,261 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:46:32,262 - sms_agent - INFO - Linked to merchant: Jahez (dc89755d-c923-4fc0-9da7-d94fe1147af9), logo=None
+2026-02-12 17:46:32,269 - sms_agent - INFO - Saved training example for: Jahez
+2026-02-12 17:46:34,773 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 222, Total: 6078
+2026-02-12 17:46:34,779 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-03 23:04:54
+2026-02-12 17:46:34,781 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:46:34,783 - sms_agent - INFO - Linked to merchant: Mrsool (7a442152-75f9-4a9c-ac0d-09a7671b4f50), logo=None
+2026-02-12 17:46:34,789 - sms_agent - INFO - Saved training example for: Mrsool
+2026-02-12 17:46:37,537 - sms_agent - INFO - 📊 Token Usage - Input: 5845, Output: 240, Total: 6085
+2026-02-12 17:46:37,542 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-04 12:51:01
+2026-02-12 17:46:37,545 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:46:37,545 - sms_agent - INFO - Linked to merchant: Got Cookie (9d688d30-aa73-4855-932a-99951d78ed13), logo=None
+2026-02-12 17:46:37,552 - sms_agent - INFO - Saved training example for: Got Cookie
+2026-02-12 17:46:39,950 - sms_agent - INFO - 📊 Token Usage - Input: 5845, Output: 219, Total: 6064
+2026-02-12 17:46:39,955 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-04 15:18:46
+2026-02-12 17:46:39,957 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:46:39,958 - sms_agent - INFO - Linked to merchant: Got Cookie (9d688d30-aa73-4855-932a-99951d78ed13), logo=None
+2026-02-12 17:46:39,964 - sms_agent - INFO - Saved training example for: Got Cookie
+2026-02-12 17:46:42,565 - sms_agent - INFO - 📊 Token Usage - Input: 5845, Output: 238, Total: 6083
+2026-02-12 17:46:42,572 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-04 15:19:39
+2026-02-12 17:46:42,574 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:46:42,575 - sms_agent - INFO - Linked to merchant: CITY FRES (9440154d-0d7b-43d0-92e1-45ed4e6435a6), logo=None
+2026-02-12 17:46:42,582 - sms_agent - INFO - Saved training example for: CITY FRES
+2026-02-12 17:46:45,137 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 228, Total: 6084
+2026-02-12 17:46:45,142 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-04 18:08:00
+2026-02-12 17:46:45,144 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:46:45,145 - sms_agent - INFO - Linked to merchant: HungerStation (d7f0e834-941c-4b0a-a636-8011cc7b051a), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-12 17:46:45,151 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-12 17:46:47,657 - sms_agent - INFO - 📊 Token Usage - Input: 5846, Output: 218, Total: 6064
+2026-02-12 17:46:47,659 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-05 00:46:59
+2026-02-12 17:46:47,660 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:46:47,661 - sms_agent - INFO - Linked to merchant: BARBER HA (9d4e3ec2-29ea-4d82-947c-653b8536c21c), logo=None
+2026-02-12 17:46:47,667 - sms_agent - INFO - Saved training example for: BARBER HA
+2026-02-12 17:46:50,322 - sms_agent - INFO - 📊 Token Usage - Input: 5846, Output: 233, Total: 6079
+2026-02-12 17:46:50,323 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-05 15:11:20
+2026-02-12 17:46:50,323 - sms_agent - INFO - Converted 33 USD to 123.75 SAR using rate 3.75
+2026-02-12 17:46:50,324 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 17:46:50,324 - sms_agent - INFO - Linked to biller: Credit Card Payment (c37d4dd7-4220-43d9-9d0c-28155ced0e7b)
+2026-02-12 17:46:50,329 - sms_agent - INFO - Auto-linking CC 7868 payment: Creating debit on Expense account for 123.75 SAR
+2026-02-12 17:46:50,333 - sms_agent - INFO - Auto-created debit transaction f80fa270-0fe4-40f0-90aa-d4e9df2d033d on Expense account
+2026-02-12 17:46:50,334 - sms_agent - INFO - Saved training example for: Credit Card Payment
+2026-02-12 17:46:52,794 - sms_agent - INFO - 📊 Token Usage - Input: 5845, Output: 225, Total: 6070
+2026-02-12 17:46:52,799 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-05 15:12:12
+2026-02-12 17:46:52,799 - sms_agent - INFO - Converted 2 USD to 7.5 SAR using rate 3.75
+2026-02-12 17:46:52,800 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 17:46:52,809 - sms_agent - INFO - Saved training example for: POS Purchase
+2026-02-12 17:46:55,466 - sms_agent - INFO - 📊 Token Usage - Input: 5848, Output: 239, Total: 6087
+2026-02-12 17:46:55,471 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-05 15:13:04
+2026-02-12 17:46:55,473 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 17:46:55,474 - sms_agent - INFO - Linked to biller: Credit Card Payment (c37d4dd7-4220-43d9-9d0c-28155ced0e7b)
+2026-02-12 17:46:55,479 - sms_agent - INFO - Auto-linking CC 7868 payment: Creating debit on Expense account for 150 SAR
+2026-02-12 17:46:55,482 - sms_agent - INFO - Auto-created debit transaction 8d9c7a74-a096-4484-a5bb-a46a2a82b79d on Expense account
+2026-02-12 17:46:55,484 - sms_agent - INFO - Saved training example for: Credit Card Payment
+2026-02-12 17:46:58,037 - sms_agent - INFO - 📊 Token Usage - Input: 5838, Output: 205, Total: 6043
+2026-02-12 17:47:00,565 - sms_agent - INFO - 📊 Token Usage - Input: 5860, Output: 226, Total: 6086
+2026-02-12 17:47:00,569 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-05 17:11:40
+2026-02-12 17:47:00,569 - sms_agent - INFO - Converted 31.29 USD to 117.34 SAR using rate 3.75
+2026-02-12 17:47:00,570 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 17:47:00,572 - sms_agent - INFO - Linked to merchant: Adobe (ed26c6dd-1224-48ff-b5bc-0c6fd125c186), logo=https://www.google.com/s2/favicons?domain=adobe.com&sz=64
+2026-02-12 17:47:00,578 - sms_agent - INFO - Saved training example for: Adobe
+2026-02-12 17:47:03,163 - sms_agent - INFO - 📊 Token Usage - Input: 5846, Output: 239, Total: 6085
+2026-02-12 17:47:03,170 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-05 18:50:32
+2026-02-12 17:47:03,171 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:47:03,173 - sms_agent - INFO - Linked to merchant: zone one m (dc56e8ad-c39c-4c87-9c78-2b59142b756d), logo=None
+2026-02-12 17:47:03,179 - sms_agent - INFO - Saved training example for: zone one m
+2026-02-12 17:47:05,772 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 229, Total: 6086
+2026-02-12 17:47:05,777 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-05 21:20:03
+2026-02-12 17:47:05,779 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:47:05,780 - sms_agent - INFO - Linked to merchant: HungerStation (d7f0e834-941c-4b0a-a636-8011cc7b051a), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-12 17:47:05,786 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-12 17:47:08,644 - sms_agent - INFO - 📊 Token Usage - Input: 5849, Output: 241, Total: 6090
+2026-02-12 17:47:08,651 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-06 13:55:38
+2026-02-12 17:47:08,653 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 17:47:08,654 - sms_agent - INFO - Linked to merchant: Haniz Al a (468af86d-d2d9-4064-9ded-ce063559143d), logo=None
+2026-02-12 17:47:08,660 - sms_agent - INFO - Saved training example for: Haniz Al a
+2026-02-12 17:47:11,161 - sms_agent - INFO - 📊 Token Usage - Input: 5835, Output: 227, Total: 6062
+2026-02-12 17:47:11,166 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-06 16:25:01
+2026-02-12 17:47:11,168 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=Expense
+2026-02-12 17:47:11,168 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to Expense
+2026-02-12 17:47:11,172 - sms_agent - INFO - DEBUG: Created transaction ac2b811e-58cd-427d-b62a-5fa8223afece with status pending_action
+2026-02-12 20:01:25,760 - sms_agent - INFO - 📊 Token Usage - Input: 5852, Output: 211, Total: 6063
+2026-02-12 20:01:25,767 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-06 16:38:00
+2026-02-12 20:01:25,769 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 20:01:25,770 - sms_agent - INFO - Linked to beneficiary: SABAH ABDULLAH @ None (c8196fd4-e73a-480e-abf9-3839a19fbe08)
+2026-02-12 20:01:25,777 - sms_agent - INFO - Saved training example for: SABAH ABDULLAH
+2026-02-12 20:01:27,386 - sms_agent - WARNING - AI 429 Rate Limit. Retrying in 4s... (Attempt 1/5)
+2026-02-12 20:01:33,935 - sms_agent - INFO - 📊 Token Usage - Input: 5847, Output: 253, Total: 6100
+2026-02-12 20:01:33,941 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-06 17:37:32
+2026-02-12 20:01:33,942 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 20:01:33,944 - sms_agent - INFO - Linked to merchant: Gifts Mal (d86ac294-01c9-4137-a9aa-a446720c0ff2), logo=None
+2026-02-12 20:01:33,952 - sms_agent - INFO - Saved training example for: Gifts Mal
+2026-02-12 20:01:36,316 - sms_agent - INFO - 📊 Token Usage - Input: 5847, Output: 216, Total: 6063
+2026-02-12 20:01:36,322 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-06 17:40:24
+2026-02-12 20:01:36,325 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 20:01:36,325 - sms_agent - INFO - Linked to merchant: Gifts Mal (d86ac294-01c9-4137-a9aa-a446720c0ff2), logo=None
+2026-02-12 20:01:36,332 - sms_agent - INFO - Saved training example for: Gifts Mal
+2026-02-12 20:01:38,913 - sms_agent - INFO - 📊 Token Usage - Input: 5851, Output: 239, Total: 6090
+2026-02-12 20:01:38,915 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-06 23:05:49
+2026-02-12 20:01:38,917 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 20:01:38,918 - sms_agent - INFO - Linked to beneficiary: RAJEV BHUIYAN @ None (1271d13c-8fe4-40fa-a321-3826412202d4)
+2026-02-12 20:01:38,925 - sms_agent - INFO - Saved training example for: RAJEV BHUIYAN
+2026-02-12 20:01:41,501 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 246, Total: 6104
+2026-02-12 20:01:41,506 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-07 12:00:25
+2026-02-12 20:01:41,506 - sms_agent - INFO - Converted 3.99 USD to 14.96 SAR using rate 3.75
+2026-02-12 20:01:41,507 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 20:01:41,510 - sms_agent - INFO - Linked to merchant: Paypal (df5533a8-412f-4d42-90fc-3f6664298475), logo=https://www.google.com/s2/favicons?domain=paypal.com&sz=64
+2026-02-12 20:01:41,516 - sms_agent - INFO - Saved training example for: Paypal
+2026-02-12 20:01:44,042 - sms_agent - INFO - 📊 Token Usage - Input: 5838, Output: 230, Total: 6068
+2026-02-12 20:01:44,047 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-07 13:40:43
+2026-02-12 20:01:44,049 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=Expense
+2026-02-12 20:01:44,049 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to Expense
+2026-02-12 20:01:44,053 - sms_agent - INFO - DEBUG: Created transaction f8cff689-a546-44a8-8b34-450857380b9d with status pending_action
+2026-02-12 20:02:09,955 - sms_agent - INFO - 📊 Token Usage - Input: 5868, Output: 218, Total: 6086
+2026-02-12 20:02:09,959 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-07 13:41:56
+2026-02-12 20:02:09,961 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 20:02:09,962 - sms_agent - INFO - Linked to beneficiary: RASHA AMER ALASIRI @ None (b56f4f53-b89b-4010-92b3-271c429defbf)
+2026-02-12 20:02:09,969 - sms_agent - INFO - Saved training example for: RASHA AMER ALASIRI
+2026-02-12 20:02:12,046 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 218, Total: 6074
+2026-02-12 20:02:12,048 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-07 16:14:19
+2026-02-12 20:02:12,048 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 20:02:12,050 - sms_agent - INFO - Linked to merchant: Riyadh Pa (b0fc69e1-426d-4696-81b9-3d7d15d55073), logo=None
+2026-02-12 20:02:12,055 - sms_agent - INFO - Saved training example for: Riyadh Pa
+2026-02-12 20:02:14,059 - sms_agent - INFO - 📊 Token Usage - Input: 5850, Output: 241, Total: 6091
+2026-02-12 20:02:14,065 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-07 16:47:45
+2026-02-12 20:02:14,066 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 20:02:14,067 - sms_agent - INFO - Linked to merchant: ASARITRAD (f0b3f69b-a218-4ec5-98da-2be51036a7d4), logo=None
+2026-02-12 20:02:14,074 - sms_agent - INFO - Saved training example for: ASARITRAD
+2026-02-12 20:02:16,209 - sms_agent - INFO - 📊 Token Usage - Input: 5846, Output: 236, Total: 6082
+2026-02-12 20:02:16,215 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-07 17:37:34
+2026-02-12 20:02:16,216 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 20:02:16,218 - sms_agent - INFO - Linked to merchant: Gala Star (7dde8e48-6974-41a3-8621-8d025e48f72d), logo=None
+2026-02-12 20:02:16,223 - sms_agent - INFO - Saved training example for: Gala Star
+2026-02-12 20:02:18,318 - sms_agent - INFO - 📊 Token Usage - Input: 5846, Output: 237, Total: 6083
+2026-02-12 20:02:18,324 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-07 17:42:43
+2026-02-12 20:02:18,326 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 20:02:18,328 - sms_agent - INFO - Linked to merchant: jenan co (e217a777-eca1-4028-b4b4-5c344a1f0c27), logo=None
+2026-02-12 20:02:18,334 - sms_agent - INFO - Saved training example for: jenan co
+2026-02-12 20:02:20,485 - sms_agent - INFO - 📊 Token Usage - Input: 5847, Output: 239, Total: 6086
+2026-02-12 20:02:20,493 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-07 17:54:01
+2026-02-12 20:02:20,494 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 20:02:20,495 - sms_agent - INFO - Linked to merchant: mama nour (34d9a177-703b-4aa3-a93c-090ddcd0f861), logo=None
+2026-02-12 20:02:20,504 - sms_agent - INFO - Saved training example for: MAMA NOUR
+2026-02-12 20:02:22,480 - sms_agent - INFO - 📊 Token Usage - Input: 5861, Output: 220, Total: 6081
+2026-02-12 20:02:24,595 - sms_agent - INFO - 📊 Token Usage - Input: 5836, Output: 227, Total: 6063
+2026-02-12 20:02:24,601 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-07 19:07:32
+2026-02-12 20:02:24,603 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=Payroll
+2026-02-12 20:02:24,604 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to Payroll
+2026-02-12 20:02:24,608 - sms_agent - INFO - DEBUG: Created transaction 25fce8b8-7255-4477-b607-c11792124a95 with status pending_action
+2026-02-12 20:03:14,350 - sms_agent - INFO - 📊 Token Usage - Input: 5863, Output: 232, Total: 6095
+2026-02-12 20:03:14,355 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-07 19:19:00
+2026-02-12 20:03:14,357 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Liability
+2026-02-12 20:03:14,359 - sms_agent - INFO - Linked to biller: ZAIN (99f2823e-a814-4a1a-9bbb-24470a46214b)
+2026-02-12 20:03:14,366 - sms_agent - INFO - Saved training example for: Bill Payment - ZAIN
+2026-02-12 20:03:16,512 - sms_agent - INFO - 📊 Token Usage - Input: 5867, Output: 234, Total: 6101
+2026-02-12 20:03:16,517 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-07 19:19:02
+2026-02-12 20:03:16,519 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Liability
+2026-02-12 20:03:16,520 - sms_agent - INFO - Linked to biller: STC BILL (f5529a46-210b-46a7-b558-8791da6880dc)
+2026-02-12 20:03:16,528 - sms_agent - INFO - Saved training example for: Bill Payment - STC
+2026-02-12 20:03:18,560 - sms_agent - INFO - 📊 Token Usage - Input: 5865, Output: 232, Total: 6097
+2026-02-12 20:03:18,565 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-07 19:19:04
+2026-02-12 20:03:18,567 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Liability
+2026-02-12 20:03:18,568 - sms_agent - INFO - Linked to biller: STC BILL (f5529a46-210b-46a7-b558-8791da6880dc)
+2026-02-12 20:03:18,575 - sms_agent - INFO - Saved training example for: Bill Payment - STC
+2026-02-12 20:03:20,777 - sms_agent - INFO - 📊 Token Usage - Input: 5864, Output: 230, Total: 6094
+2026-02-12 20:03:20,782 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-07 19:19:05
+2026-02-12 20:03:20,784 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Liability
+2026-02-12 20:03:20,785 - sms_agent - INFO - Linked to biller: American Express (98272a04-029e-4ab2-8833-e0a13f0af581)
+2026-02-12 20:03:20,792 - sms_agent - INFO - Saved training example for: Bill Payment - American Express
+2026-02-12 20:03:22,840 - sms_agent - INFO - 📊 Token Usage - Input: 5864, Output: 232, Total: 6096
+2026-02-12 20:03:22,842 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-07 19:19:07
+2026-02-12 20:03:22,843 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Liability
+2026-02-12 20:03:22,844 - sms_agent - INFO - Linked to biller: NWC (07ce446b-6e9d-4b0a-8fc1-2443828cf332)
+2026-02-12 20:03:22,850 - sms_agent - INFO - Saved training example for: Bill Payment - NWC
+2026-02-12 20:03:24,942 - sms_agent - INFO - 📊 Token Usage - Input: 5847, Output: 238, Total: 6085
+2026-02-12 20:03:24,948 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-07 22:53:58
+2026-02-12 20:03:24,949 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 20:03:24,950 - sms_agent - INFO - Linked to merchant: Aswaq Zad (9fcf85b5-ef4d-46f9-98eb-9134832e02d5), logo=None
+2026-02-12 20:03:24,956 - sms_agent - INFO - Saved training example for: Aswaq Zad
+2026-02-12 20:03:27,698 - sms_agent - INFO - 📊 Token Usage - Input: 5851, Output: 239, Total: 6090
+2026-02-12 20:03:27,703 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-08 02:32:05
+2026-02-12 20:03:27,705 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 20:03:27,706 - sms_agent - INFO - Linked to beneficiary: YAZEED ALSHAMI @ None (4d73cf2e-2216-4b6b-9a08-a20577e65270)
+2026-02-12 20:03:27,713 - sms_agent - INFO - Saved training example for: YAZEED ALSHAMI
+2026-02-12 20:03:30,197 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 217, Total: 6071
+2026-02-12 20:03:30,199 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-08 03:42:14
+2026-02-12 20:03:30,199 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 20:03:30,201 - sms_agent - INFO - Linked to merchant: Rawafshop (2e73cef6-f8ec-4592-856b-02353fb6a5d7), logo=None
+2026-02-12 20:03:30,206 - sms_agent - INFO - Saved training example for: Rawafshop
+2026-02-12 20:03:32,512 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 222, Total: 6078
+2026-02-12 20:03:32,516 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-08 12:53:08
+2026-02-12 20:03:32,517 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 20:03:32,518 - sms_agent - INFO - Linked to merchant: Microsoft (2811fb1e-439f-4f24-b105-252b4efd9af3), logo=https://www.google.com/s2/favicons?domain=microsoft.com&sz=64
+2026-02-12 20:03:32,526 - sms_agent - INFO - Saved training example for: Microsoft
+2026-02-12 20:03:34,455 - sms_agent - INFO - 📊 Token Usage - Input: 5847, Output: 128, Total: 5975
+2026-02-12 20:03:34,461 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-08 17:40:58
+2026-02-12 20:03:34,463 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 20:03:34,464 - sms_agent - INFO - Linked to merchant: SHAMAL AL (d5139193-67ef-404d-b664-edf683410e00), logo=None
+2026-02-12 20:03:34,470 - sms_agent - INFO - Saved training example for: SHAMAL AL
+2026-02-12 20:03:37,581 - sms_agent - INFO - 📊 Token Usage - Input: 5845, Output: 236, Total: 6081
+2026-02-12 20:03:37,584 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-09 15:50:39
+2026-02-12 20:03:37,584 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 20:03:37,585 - sms_agent - INFO - Linked to merchant: Repositor (ae7f5cce-49de-422e-b268-b67edc41ed68), logo=None
+2026-02-12 20:03:37,592 - sms_agent - INFO - Saved training example for: Repositor
+2026-02-12 20:03:40,165 - sms_agent - INFO - 📊 Token Usage - Input: 5845, Output: 236, Total: 6081
+2026-02-12 20:03:40,172 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-09 15:52:16
+2026-02-12 20:03:40,174 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 20:03:40,175 - sms_agent - INFO - Linked to merchant: Repositor (ae7f5cce-49de-422e-b268-b67edc41ed68), logo=None
+2026-02-12 20:03:40,182 - sms_agent - INFO - Saved training example for: Repositor
+2026-02-12 20:03:42,647 - sms_agent - INFO - 📊 Token Usage - Input: 5846, Output: 233, Total: 6079
+2026-02-12 20:03:42,652 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-09 16:59:15
+2026-02-12 20:03:42,652 - sms_agent - INFO - Converted 48 USD to 180.0 SAR using rate 3.75
+2026-02-12 20:03:42,654 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 20:03:42,655 - sms_agent - INFO - Linked to biller: Credit Card Payment (c37d4dd7-4220-43d9-9d0c-28155ced0e7b)
+2026-02-12 20:03:42,660 - sms_agent - INFO - Auto-linking CC 7868 payment: Creating debit on Expense account for 180.0 SAR
+2026-02-12 20:03:42,665 - sms_agent - INFO - Auto-created debit transaction 5ea380c8-b632-4cd1-a329-f93f68bf4fd0 on Expense account
+2026-02-12 20:03:42,666 - sms_agent - INFO - Saved training example for: Credit Card Payment
+2026-02-12 20:03:45,033 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 217, Total: 6071
+2026-02-12 20:03:45,039 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-09 16:59:37
+2026-02-12 20:03:45,039 - sms_agent - INFO - Converted 59 USD to 221.25 SAR using rate 3.75
+2026-02-12 20:03:45,039 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-12 20:03:45,041 - sms_agent - INFO - Linked to merchant: COLLOV AI (2be1fcb1-fc69-491e-9d30-65cb97458e2a), logo=None
+2026-02-12 20:03:45,048 - sms_agent - INFO - Saved training example for: COLLOV AI
+2026-02-12 20:03:47,951 - sms_agent - INFO - 📊 Token Usage - Input: 5852, Output: 217, Total: 6069
+2026-02-12 20:03:47,956 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-09 17:08:15
+2026-02-12 20:03:47,958 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 20:03:47,959 - sms_agent - INFO - Linked to merchant: Jahez (dc89755d-c923-4fc0-9da7-d94fe1147af9), logo=None
+2026-02-12 20:03:47,965 - sms_agent - INFO - Saved training example for: Jahez
+2026-02-12 20:03:50,550 - sms_agent - INFO - 📊 Token Usage - Input: 5848, Output: 239, Total: 6087
+2026-02-12 20:03:50,553 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-09 23:35:41
+2026-02-12 20:03:50,553 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 20:03:50,555 - sms_agent - INFO - Linked to merchant: Shayaa Ne (ed34d716-a7db-43bc-be6a-932143bbcddd), logo=None
+2026-02-12 20:03:50,562 - sms_agent - INFO - Saved training example for: Shayaa Ne
+2026-02-12 20:03:53,251 - sms_agent - INFO - 📊 Token Usage - Input: 5848, Output: 255, Total: 6103
+2026-02-12 20:03:53,257 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-09 23:43:22
+2026-02-12 20:03:53,259 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 20:03:53,260 - sms_agent - INFO - Linked to merchant: Shayaa Ne (ed34d716-a7db-43bc-be6a-932143bbcddd), logo=None
+2026-02-12 20:03:53,266 - sms_agent - INFO - Saved training example for: Shayaa Ne
+2026-02-12 20:03:55,689 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 218, Total: 6075
+2026-02-12 20:03:55,694 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-10 10:05:31
+2026-02-12 20:03:55,695 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 20:03:55,696 - sms_agent - INFO - Linked to merchant: Riyadh Pa (b0fc69e1-426d-4696-81b9-3d7d15d55073), logo=None
+2026-02-12 20:03:55,702 - sms_agent - INFO - Saved training example for: Riyadh Pa
+2026-02-12 20:03:58,131 - sms_agent - INFO - 📊 Token Usage - Input: 5848, Output: 218, Total: 6066
+2026-02-12 20:03:58,137 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-10 12:32:13
+2026-02-12 20:03:58,140 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-12 20:03:58,141 - sms_agent - INFO - Linked to merchant: Altrq Alk (c80ce538-325a-414c-a3ab-e3296747f9e6), logo=None
+2026-02-12 20:03:58,148 - sms_agent - INFO - Saved training example for: Altrq Alk
+2026-02-12 20:46:38,162 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 245, Total: 6103
+2026-02-12 20:46:38,168 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 19:18:14
+2026-02-12 20:46:38,170 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Liability
+2026-02-12 20:46:38,171 - sms_agent - INFO - Cross-bank transfer detected (completed): Liability -> House
+2026-02-12 20:46:38,180 - sms_agent - INFO - Saved training example for: Transfer to House
+2026-02-12 20:48:59,455 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 245, Total: 6103
+2026-02-12 20:48:59,460 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 19:18:14
+2026-02-12 20:48:59,463 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Liability
+2026-02-12 20:48:59,463 - sms_agent - INFO - Cross-bank transfer detected (completed): Liability -> Grocery
+2026-02-12 20:48:59,470 - sms_agent - INFO - Saved training example for: Transfer to Grocery
+2026-02-12 20:51:29,604 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 244, Total: 6097
+2026-02-12 20:51:29,610 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 19:18:13
+2026-02-12 20:51:29,613 - sms_agent - INFO - Swapping Primary Account for Credit: Liability -> Grocery
+2026-02-12 20:51:29,614 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:51:29,615 - sms_agent - INFO - Linked to beneficiary (sender): MUATH ALASIRI @ AlRajhi (78cb6116-8252-4d16-b299-827c8d0560a6)
+2026-02-12 20:51:29,624 - sms_agent - INFO - Saved training example for: Transfer from Liability
+2026-02-12 20:51:31,816 - sms_agent - INFO - 📊 Token Usage - Input: 5851, Output: 227, Total: 6078
+2026-02-12 20:51:31,822 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 09:50:45
+2026-02-12 20:51:31,825 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:51:31,826 - sms_agent - INFO - Linked to merchant: SASCO (f9bf9bd6-e0a7-4058-8f07-d4848d73d1da), logo=https://www.google.com/s2/favicons?domain=sasco.com.sa&sz=64
+2026-02-12 20:51:31,833 - sms_agent - INFO - Saved training example for: SASCO
+2026-02-12 20:51:33,931 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 213, Total: 6066
+2026-02-12 20:51:33,936 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 10:57:09
+2026-02-12 20:51:33,938 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:51:33,941 - sms_agent - INFO - Linked to merchant: Noon (1f8bf13d-c8e6-498f-a6af-a57a0c3bf9f5), logo=None
+2026-02-12 20:51:33,949 - sms_agent - INFO - Saved training example for: noon
+2026-02-12 20:51:35,696 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 173, Total: 6029
+2026-02-12 20:51:35,701 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 11:04:12
+2026-02-12 20:51:35,703 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:51:35,703 - sms_agent - INFO - Linked to merchant: Amazon (1795949d-9fdf-463a-a464-5059713f0311), logo=https://www.google.com/s2/favicons?domain=amazon.sa&sz=64
+2026-02-12 20:51:35,710 - sms_agent - INFO - Saved training example for: Amazon
+2026-02-12 20:51:37,970 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 234, Total: 6088
+2026-02-12 20:51:37,975 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 11:29:16
+2026-02-12 20:51:37,976 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:51:37,978 - sms_agent - INFO - Linked to merchant: LuLu Hypermarket (053df604-b6bd-4591-b376-243d906fb924), logo=https://www.google.com/s2/favicons?domain=luluhypermarket.com&sz=64
+2026-02-12 20:51:37,984 - sms_agent - INFO - Saved training example for: LuLu Hypermarket
+2026-02-12 20:51:39,899 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 188, Total: 6041
+2026-02-12 20:51:39,905 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 11:51:52
+2026-02-12 20:51:39,906 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:51:39,907 - sms_agent - INFO - Linked to merchant: ADAM PHAR (bc96f608-19dd-4800-bc73-fb1562b2e343), logo=None
+2026-02-12 20:51:39,916 - sms_agent - INFO - Saved training example for: ADAM PHAR
+2026-02-12 20:51:41,757 - sms_agent - INFO - 📊 Token Usage - Input: 5851, Output: 219, Total: 6070
+2026-02-12 20:51:41,763 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 11:55:40
+2026-02-12 20:51:41,765 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:51:41,767 - sms_agent - INFO - Linked to merchant: Health Ho (d4324bc3-d9c4-464d-91d0-499777d0eca2), logo=None
+2026-02-12 20:51:41,774 - sms_agent - INFO - Saved training example for: Health Ho
+2026-02-12 20:51:44,179 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 238, Total: 6095
+2026-02-12 20:51:44,184 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 17:26:07
+2026-02-12 20:51:44,185 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:51:44,186 - sms_agent - INFO - Linked to merchant: Keeta (f80e24c6-ab0a-419d-8662-0d00768a862f), logo=None
+2026-02-12 20:51:44,194 - sms_agent - INFO - Saved training example for: Keeta
+2026-02-12 20:51:46,400 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 217, Total: 6070
+2026-02-12 20:51:46,406 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 23:16:55
+2026-02-12 20:51:46,408 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:51:46,409 - sms_agent - INFO - Linked to merchant: Jahez (dc89755d-c923-4fc0-9da7-d94fe1147af9), logo=None
+2026-02-12 20:51:46,416 - sms_agent - INFO - Saved training example for: Jahez
+2026-02-12 20:51:48,859 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 221, Total: 6074
+2026-02-12 20:51:48,865 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-27 11:59:36
+2026-02-12 20:51:48,867 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:51:48,868 - sms_agent - INFO - Linked to merchant: BERAIN CO (883da412-5f6d-4404-befb-8b2a8962c073), logo=None
+2026-02-12 20:51:48,874 - sms_agent - INFO - Saved training example for: BERAIN CO
+2026-02-12 20:51:51,077 - sms_agent - INFO - 📊 Token Usage - Input: 5849, Output: 220, Total: 6069
+2026-02-12 20:51:51,083 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-27 21:01:37
+2026-02-12 20:51:51,084 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:51:51,085 - sms_agent - INFO - Linked to merchant: HABIBAH S (a5ef888c-9679-4d6c-996a-5b96d77a1df5), logo=None
+2026-02-12 20:51:51,091 - sms_agent - INFO - Saved training example for: HABIBAH S
+2026-02-12 20:51:53,537 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 219, Total: 6076
+2026-02-12 20:51:53,543 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-28 14:28:45
+2026-02-12 20:51:53,544 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:51:53,546 - sms_agent - INFO - Linked to merchant: Keemart (02242a1f-46ff-466a-8210-9404a5177a58), logo=None
+2026-02-12 20:51:53,552 - sms_agent - INFO - Saved training example for: Keemart
+2026-02-12 20:51:55,832 - sms_agent - INFO - 📊 Token Usage - Input: 5855, Output: 227, Total: 6082
+2026-02-12 20:51:55,838 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-28 15:30:37
+2026-02-12 20:51:55,839 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:51:55,841 - sms_agent - INFO - Linked to merchant: Danube (c36ff6e6-6af1-4025-90a3-c474468a66df), logo=https://www.google.com/s2/favicons?domain=danube.sa&sz=64
+2026-02-12 20:51:55,849 - sms_agent - INFO - Saved training example for: Danube
+2026-02-12 20:51:58,207 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 217, Total: 6070
+2026-02-12 20:51:58,212 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-28 21:00:22
+2026-02-12 20:51:58,214 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:51:58,214 - sms_agent - INFO - Linked to merchant: Jahez (dc89755d-c923-4fc0-9da7-d94fe1147af9), logo=None
+2026-02-12 20:51:58,223 - sms_agent - INFO - Saved training example for: Jahez
+2026-02-12 20:52:00,570 - sms_agent - INFO - 📊 Token Usage - Input: 5859, Output: 222, Total: 6081
+2026-02-12 20:52:00,575 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-29 04:51:32
+2026-02-12 20:52:00,576 - sms_agent - INFO - Converted 14.99 USD to 56.21 SAR using rate 3.75
+2026-02-12 20:52:00,577 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:52:00,578 - sms_agent - INFO - Linked to merchant: Amazon (1795949d-9fdf-463a-a464-5059713f0311), logo=https://www.google.com/s2/favicons?domain=amazon.sa&sz=64
+2026-02-12 20:52:00,586 - sms_agent - INFO - Saved training example for: Amazon
+2026-02-12 20:52:02,546 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 218, Total: 6072
+2026-02-12 20:52:02,551 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-29 23:55:12
+2026-02-12 20:52:02,552 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:52:02,553 - sms_agent - INFO - Linked to merchant: Jahez (dc89755d-c923-4fc0-9da7-d94fe1147af9), logo=None
+2026-02-12 20:52:02,561 - sms_agent - INFO - Saved training example for: Jahez
+2026-02-12 20:52:04,565 - sms_agent - INFO - 📊 Token Usage - Input: 5852, Output: 220, Total: 6072
+2026-02-12 20:52:04,572 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-30 14:06:19
+2026-02-12 20:52:04,574 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:52:04,574 - sms_agent - INFO - Linked to merchant: Health Ho (d4324bc3-d9c4-464d-91d0-499777d0eca2), logo=None
+2026-02-12 20:52:04,581 - sms_agent - INFO - Saved training example for: Health Ho
+2026-02-12 20:52:06,671 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 217, Total: 6073
+2026-02-12 20:52:06,677 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-31 19:03:03
+2026-02-12 20:52:06,678 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:52:06,679 - sms_agent - INFO - Linked to merchant: Keeta (f80e24c6-ab0a-419d-8662-0d00768a862f), logo=None
+2026-02-12 20:52:06,685 - sms_agent - INFO - Saved training example for: Keeta
+2026-02-12 20:52:08,838 - sms_agent - INFO - 📊 Token Usage - Input: 5855, Output: 227, Total: 6082
+2026-02-12 20:52:08,846 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-31 19:06:45
+2026-02-12 20:52:08,847 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:52:08,848 - sms_agent - INFO - Linked to merchant: Danube (c36ff6e6-6af1-4025-90a3-c474468a66df), logo=https://www.google.com/s2/favicons?domain=danube.sa&sz=64
+2026-02-12 20:52:08,853 - sms_agent - INFO - Saved training example for: Danube
+2026-02-12 20:52:10,907 - sms_agent - INFO - 📊 Token Usage - Input: 5851, Output: 220, Total: 6071
+2026-02-12 20:52:10,912 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-31 19:21:51
+2026-02-12 20:52:10,914 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:52:10,915 - sms_agent - INFO - Linked to merchant: Hjeen Tra (a780784f-5310-4adb-9716-229ca81afeaa), logo=None
+2026-02-12 20:52:10,922 - sms_agent - INFO - Saved training example for: Hjeen Tra
+2026-02-12 20:52:12,979 - sms_agent - INFO - 📊 Token Usage - Input: 5850, Output: 219, Total: 6069
+2026-02-12 20:52:12,984 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-31 19:34:42
+2026-02-12 20:52:12,987 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:52:12,990 - sms_agent - INFO - Linked to merchant: Alttwyr W (0e87d46a-4f3b-4f52-8a13-a41d21b2d271), logo=None
+2026-02-12 20:52:12,996 - sms_agent - INFO - Saved training example for: Alttwyr W
+2026-02-12 20:52:15,097 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 226, Total: 6079
+2026-02-12 20:52:15,104 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-31 21:15:50
+2026-02-12 20:52:15,107 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:52:15,108 - sms_agent - INFO - Linked to merchant: SASCO (f9bf9bd6-e0a7-4058-8f07-d4848d73d1da), logo=https://www.google.com/s2/favicons?domain=sasco.com.sa&sz=64
+2026-02-12 20:52:15,114 - sms_agent - INFO - Saved training example for: SASCO
+2026-02-12 20:52:17,615 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 218, Total: 6074
+2026-02-12 20:52:17,620 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-01 16:07:47
+2026-02-12 20:52:17,621 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:52:17,622 - sms_agent - INFO - Linked to merchant: Keemart (02242a1f-46ff-466a-8210-9404a5177a58), logo=None
+2026-02-12 20:52:17,630 - sms_agent - INFO - Saved training example for: Keemart
+2026-02-12 20:52:20,294 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 248, Total: 6102
+2026-02-12 20:52:20,297 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-02 11:00:31
+2026-02-12 20:52:20,298 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:52:20,299 - sms_agent - INFO - Linked to merchant: Danube (c36ff6e6-6af1-4025-90a3-c474468a66df), logo=https://www.google.com/s2/favicons?domain=danube.sa&sz=64
+2026-02-12 20:52:20,304 - sms_agent - INFO - Saved training example for: Danube
+2026-02-12 20:52:22,563 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 220, Total: 6077
+2026-02-12 20:52:22,566 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-02 11:15:36
+2026-02-12 20:52:22,566 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:52:22,567 - sms_agent - INFO - Linked to merchant: Keemart (02242a1f-46ff-466a-8210-9404a5177a58), logo=None
+2026-02-12 20:52:22,573 - sms_agent - INFO - Saved training example for: Keemart
+2026-02-12 20:52:24,834 - sms_agent - INFO - 📊 Token Usage - Input: 5851, Output: 225, Total: 6076
+2026-02-12 20:52:24,842 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-02 11:26:23
+2026-02-12 20:52:24,844 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:52:24,846 - sms_agent - INFO - Linked to merchant: Panda (b80a712c-a8c7-43c2-89b6-57a8cb2019b0), logo=https://www.google.com/s2/favicons?domain=panda.com.sa&sz=64
+2026-02-12 20:52:24,851 - sms_agent - INFO - Saved training example for: Panda
+2026-02-12 20:52:28,802 - sms_agent - WARNING - AI 429 Rate Limit. Retrying in 4s... (Attempt 1/5)
+2026-02-12 20:52:35,002 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 217, Total: 6071
+2026-02-12 20:52:35,009 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-02 12:28:46
+2026-02-12 20:52:35,010 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:52:35,012 - sms_agent - INFO - Linked to merchant: COMMERCIA (fd69269a-2a6d-444d-922c-ffb6679ea04d), logo=None
+2026-02-12 20:52:35,019 - sms_agent - INFO - Saved training example for: COMMERCIA
+2026-02-12 20:52:37,379 - sms_agent - INFO - 📊 Token Usage - Input: 5852, Output: 223, Total: 6075
+2026-02-12 20:52:37,384 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-04 20:33:09
+2026-02-12 20:52:37,386 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:52:37,388 - sms_agent - INFO - Linked to merchant: SAUDI MAR (bbb29693-9832-4fb9-9dc9-08e9203f6c80), logo=None
+2026-02-12 20:52:37,395 - sms_agent - INFO - Saved training example for: SAUDI MAR
+2026-02-12 20:52:39,791 - sms_agent - INFO - 📊 Token Usage - Input: 5847, Output: 217, Total: 6064
+2026-02-12 20:52:39,796 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-06 18:01:04
+2026-02-12 20:52:39,797 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:52:39,799 - sms_agent - INFO - Linked to merchant: Bustan Jo (cd0ed9d0-6530-423e-a726-e0d07d63a25b), logo=None
+2026-02-12 20:52:39,808 - sms_agent - INFO - Saved training example for: Bustan Jo
+2026-02-12 20:52:42,212 - sms_agent - INFO - 📊 Token Usage - Input: 5849, Output: 219, Total: 6068
+2026-02-12 20:52:42,217 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-06 19:54:08
+2026-02-12 20:52:42,219 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:52:42,221 - sms_agent - INFO - Linked to merchant: GHADAH AL (45fb0111-2a7d-4106-b837-72345ee36113), logo=None
+2026-02-12 20:52:42,227 - sms_agent - INFO - Saved training example for: GHADAH AL
+2026-02-12 20:52:44,321 - sms_agent - INFO - 📊 Token Usage - Input: 5849, Output: 229, Total: 6078
+2026-02-12 20:53:22,761 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 217, Total: 6071
+2026-02-12 20:53:22,767 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-08 12:37:28
+2026-02-12 20:53:22,768 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:53:22,769 - sms_agent - INFO - Linked to merchant: COMMERCIA (fd69269a-2a6d-444d-922c-ffb6679ea04d), logo=None
+2026-02-12 20:53:22,779 - sms_agent - INFO - Saved training example for: COMMERCIA
+2026-02-12 20:53:25,137 - sms_agent - INFO - 📊 Token Usage - Input: 5852, Output: 226, Total: 6078
+2026-02-12 20:53:25,143 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-08 19:03:30
+2026-02-12 20:53:25,145 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:53:25,146 - sms_agent - INFO - Linked to merchant: Panda (b80a712c-a8c7-43c2-89b6-57a8cb2019b0), logo=https://www.google.com/s2/favicons?domain=panda.com.sa&sz=64
+2026-02-12 20:53:25,152 - sms_agent - INFO - Saved training example for: Panda
+2026-02-12 20:53:27,456 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 221, Total: 6075
+2026-02-12 20:53:27,461 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-08 19:10:13
+2026-02-12 20:53:27,464 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:53:27,465 - sms_agent - INFO - Linked to merchant: AlDawaa P (590e6d0e-a2d5-4bbf-98fd-386b30d1d55d), logo=None
+2026-02-12 20:53:27,472 - sms_agent - INFO - Saved training example for: AlDawaa P
+2026-02-12 20:53:30,022 - sms_agent - INFO - 📊 Token Usage - Input: 5849, Output: 240, Total: 6089
+2026-02-12 20:53:30,028 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-09 16:57:44
+2026-02-12 20:53:30,029 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:53:30,031 - sms_agent - INFO - Linked to merchant: Start of C (7868df5e-bb39-4007-9513-5b3f22f4a138), logo=None
+2026-02-12 20:53:30,038 - sms_agent - INFO - Saved training example for: Start of C
+2026-02-12 20:53:32,443 - sms_agent - INFO - 📊 Token Usage - Input: 5855, Output: 227, Total: 6082
+2026-02-12 20:53:32,448 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-10 11:41:49
+2026-02-12 20:53:32,450 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:53:32,451 - sms_agent - INFO - Linked to merchant: Danube (c36ff6e6-6af1-4025-90a3-c474468a66df), logo=https://www.google.com/s2/favicons?domain=danube.sa&sz=64
+2026-02-12 20:53:32,457 - sms_agent - INFO - Saved training example for: Danube
+2026-02-12 20:53:34,911 - sms_agent - INFO - 📊 Token Usage - Input: 5851, Output: 218, Total: 6069
+2026-02-12 20:53:34,917 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-10 19:30:37
+2026-02-12 20:53:34,918 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:53:34,919 - sms_agent - INFO - Linked to merchant: Health Ho (d4324bc3-d9c4-464d-91d0-499777d0eca2), logo=None
+2026-02-12 20:53:34,925 - sms_agent - INFO - Saved training example for: Health Ho
+2026-02-12 20:53:37,302 - sms_agent - INFO - 📊 Token Usage - Input: 5847, Output: 213, Total: 6060
+2026-02-12 20:53:37,309 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-10 21:38:04
+2026-02-12 20:53:37,310 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:53:37,311 - sms_agent - INFO - Linked to merchant: Establish (94af3420-7468-4610-b027-05d30f9222b8), logo=None
+2026-02-12 20:53:37,317 - sms_agent - INFO - Saved training example for: Establish
+2026-02-12 20:53:39,672 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 214, Total: 6067
+2026-02-12 20:53:39,677 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-11 23:55:18
+2026-02-12 20:53:39,678 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:53:39,679 - sms_agent - INFO - Linked to merchant: Jahez (dc89755d-c923-4fc0-9da7-d94fe1147af9), logo=None
+2026-02-12 20:53:39,685 - sms_agent - INFO - Saved training example for: Jahez
+2026-02-12 20:53:42,498 - sms_agent - INFO - 📊 Token Usage - Input: 5839, Output: 242, Total: 6081
+2026-02-12 20:53:42,504 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-12 15:07:29
+2026-02-12 20:53:42,506 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=Grocery
+2026-02-12 20:53:42,506 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to Grocery
+2026-02-12 20:53:42,511 - sms_agent - INFO - DEBUG: Created transaction 6f0ad03b-b76b-4ce4-97f3-0679618e1770 with status pending_action
+2026-02-12 20:54:07,525 - sms_agent - INFO - 📊 Token Usage - Input: 5855, Output: 227, Total: 6082
+2026-02-12 20:54:07,528 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-12 15:09:39
+2026-02-12 20:54:07,528 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:54:07,529 - sms_agent - INFO - Linked to merchant: Danube (c36ff6e6-6af1-4025-90a3-c474468a66df), logo=https://www.google.com/s2/favicons?domain=danube.sa&sz=64
+2026-02-12 20:54:07,536 - sms_agent - INFO - Saved training example for: Danube
+2026-02-12 20:54:09,783 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 201, Total: 6055
+2026-02-12 20:54:09,790 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-12 15:58:41
+2026-02-12 20:54:09,792 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:54:09,793 - sms_agent - INFO - Linked to merchant: LuLu Hypermarket (053df604-b6bd-4591-b376-243d906fb924), logo=https://www.google.com/s2/favicons?domain=luluhypermarket.com&sz=64
+2026-02-12 20:54:09,800 - sms_agent - INFO - Saved training example for: LuLu Hypermarket
+2026-02-12 20:54:47,230 - sms_agent - INFO - 📊 Token Usage - Input: 5849, Output: 226, Total: 6075
+2026-02-12 20:54:47,235 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-08 08:29:37
+2026-02-12 20:54:47,237 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 20:54:47,238 - sms_agent - INFO - Linked to merchant: SASCO (f9bf9bd6-e0a7-4058-8f07-d4848d73d1da), logo=https://www.google.com/s2/favicons?domain=sasco.com.sa&sz=64
+2026-02-12 20:54:47,248 - sms_agent - INFO - Saved training example for: SASCO
+2026-02-12 21:14:32,908 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-12 21:25:30,050 - sms_agent - INFO - 📊 Token Usage - Input: 5852, Output: 219, Total: 6071
+2026-02-12 21:25:30,062 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-09 16:57:44
+2026-02-12 21:25:30,063 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 21:25:30,065 - sms_agent - INFO - Linked to merchant: Start of C (7868df5e-bb39-4007-9513-5b3f22f4a138), logo=None
+2026-02-12 21:25:30,078 - sms_agent - INFO - Saved training example for: Start of C
+2026-02-12 21:32:11,662 - sms_agent - INFO - 📊 Token Usage - Input: 5850, Output: 217, Total: 6067
+2026-02-12 21:32:11,667 - sms_agent - INFO - Using header timestamp from WebUI: 2025-11-16 18:54:41
+2026-02-12 21:32:11,668 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 21:32:11,668 - sms_agent - INFO - Linked to merchant: Start of C (7868df5e-bb39-4007-9513-5b3f22f4a138), logo=None
+2026-02-12 21:32:11,683 - sms_agent - INFO - Saved training example for: Start of C
+2026-02-12 21:49:34,965 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-12 21:50:34,649 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-12 21:51:23,353 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-12 21:52:19,991 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 215, Total: 6073
+2026-02-12 21:52:19,998 - sms_agent - INFO - Using header timestamp from WebUI: 2024-02-12 17:30:30
+2026-02-12 21:52:19,999 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 21:52:20,001 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant Ninja
+2026-02-12 21:52:20,002 - sms_agent - INFO - Linked to merchant: Ninja (a537fd21-e635-4343-a06b-f685072b8bc8), logo=None
+2026-02-12 21:52:20,020 - sms_agent - INFO - Saved training example for: Ninja
+2026-02-12 21:53:05,834 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 215, Total: 6073
+2026-02-12 21:53:05,839 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-12 17:30:30
+2026-02-12 21:53:05,841 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 21:53:05,842 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant Ninja
+2026-02-12 21:53:05,842 - sms_agent - INFO - Linked to merchant: Ninja (a537fd21-e635-4343-a06b-f685072b8bc8), logo=None
+2026-02-12 21:53:05,849 - sms_agent - INFO - Saved training example for: Ninja
+2026-02-12 21:54:32,114 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 213, Total: 6069
+2026-02-12 21:54:32,119 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-12 17:30:30
+2026-02-12 21:54:32,120 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 21:54:32,121 - sms_agent - INFO - Inherited category 'Groceries' from merchant Ninja
+2026-02-12 21:54:32,121 - sms_agent - INFO - Linked to merchant: Ninja (a537fd21-e635-4343-a06b-f685072b8bc8), logo=None
+2026-02-12 21:54:32,128 - sms_agent - INFO - Saved training example for: Ninja
+2026-02-12 22:05:24,471 - sms_agent - INFO - 📊 Token Usage - Input: 5808, Output: 189, Total: 5997
+2026-02-12 22:08:10,833 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 245, Total: 6103
+2026-02-12 22:08:10,839 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Payroll
+2026-02-12 22:08:10,839 - sms_agent - INFO - Cross-bank transfer detected (completed): Payroll -> Grocery
+2026-02-12 22:08:10,845 - sms_agent - INFO - Saved training example for: Transfer to Grocery
+2026-02-12 22:08:13,734 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 240, Total: 6097
+2026-02-12 22:08:13,738 - sms_agent - INFO - Swapping Primary Account for Credit: Payroll -> Grocery
+2026-02-12 22:08:13,739 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-12 22:08:13,742 - sms_agent - INFO - Linked to beneficiary (sender): MUATH ALASIRI @ AlRajhi (78cb6116-8252-4d16-b299-827c8d0560a6)
+2026-02-12 22:08:13,751 - sms_agent - INFO - Saved training example for: Transfer from Payroll
+2026-02-13 02:23:48,731 - sms_agent - INFO - 📊 Token Usage - Input: 5860, Output: 228, Total: 6088
+2026-02-13 02:23:48,739 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-13 02:23:48,741 - sms_agent - INFO - Linked to merchant: HungerStation (d7f0e834-941c-4b0a-a636-8011cc7b051a), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-13 02:23:48,753 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-13 03:56:36,905 - sms_agent - INFO - 📊 Token Usage - Input: 5863, Output: 218, Total: 6081
+2026-02-13 09:52:13,108 - sms_agent - INFO - 📊 Token Usage - Input: 5863, Output: 235, Total: 6098
+2026-02-13 10:12:11,407 - sms_agent - INFO - 📊 Token Usage - Input: 5860, Output: 231, Total: 6091
+2026-02-13 13:50:40,740 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 220, Total: 6078
+2026-02-13 13:50:40,743 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-13 13:50:40,744 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant STC
+2026-02-13 13:50:40,744 - sms_agent - INFO - Linked to merchant: STC (875912f2-c582-422d-8755-f8cfe9c20291), logo=None
+2026-02-13 13:50:40,752 - sms_agent - INFO - Saved training example for: STC Bank
+2026-02-13 13:50:41,967 - sms_agent - INFO - Using custom bank-specific prompt
+2026-02-13 13:50:42,959 - sms_agent - INFO - 📊 Token Usage - Input: 2574, Output: 80, Total: 2654
+2026-02-13 13:50:42,969 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=STC Wallet
+2026-02-13 13:50:42,982 - sms_agent - INFO - Saved training example for: deposit
+2026-02-13 13:53:31,965 - sms_agent - INFO - Using custom bank-specific prompt
+2026-02-13 13:53:33,072 - sms_agent - INFO - 📊 Token Usage - Input: 2582, Output: 107, Total: 2689
+2026-02-13 13:53:33,079 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=STC Wallet
+2026-02-13 13:53:33,081 - sms_agent - INFO - Linked to beneficiary: MUHAMMAD ALI @ None (8e06de5d-96ee-466f-bf8d-be4847377328)
+2026-02-13 13:53:33,088 - sms_agent - INFO - Saved training example for: MUHAMMAD ALI
+2026-02-13 16:44:25,187 - sms_agent - INFO - 📊 Token Usage - Input: 5850, Output: 215, Total: 6065
+2026-02-13 16:44:25,195 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-13 16:44:25,196 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant Company M
+2026-02-13 16:44:25,196 - sms_agent - INFO - Linked to merchant: Company M (2fa85935-2338-47fb-aad9-ac7bf0b4dd64), logo=None
+2026-02-13 16:44:25,202 - sms_agent - INFO - Saved training example for: Company M
+2026-02-13 18:29:58,747 - sms_agent - INFO - 📊 Token Usage - Input: 5849, Output: 214, Total: 6063
+2026-02-13 18:29:58,755 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-13 18:29:58,755 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant Company M
+2026-02-13 18:29:58,755 - sms_agent - INFO - Linked to merchant: Company M (2fa85935-2338-47fb-aad9-ac7bf0b4dd64), logo=None
+2026-02-13 18:29:58,762 - sms_agent - INFO - Saved training example for: Company M
+2026-02-14 02:18:57,295 - sms_agent - INFO - 📊 Token Usage - Input: 5861, Output: 242, Total: 6103
+2026-02-14 02:19:49,112 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 238, Total: 6094
+2026-02-14 02:19:49,114 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-14 02:19:49,115 - sms_agent - INFO - Linked to biller: Credit Card Payment (c37d4dd7-4220-43d9-9d0c-28155ced0e7b)
+2026-02-14 02:19:49,121 - sms_agent - INFO - Auto-linking CC 7868 payment: Creating debit on Expense account for 582.62 SAR
+2026-02-14 02:19:49,124 - sms_agent - INFO - Auto-created debit transaction 30f7709f-c12a-4d09-bdf8-68604c90ed78 on Expense account
+2026-02-14 02:19:49,126 - sms_agent - INFO - Saved training example for: Credit Card Payment
+2026-02-14 02:20:00,747 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 220, Total: 6073
+2026-02-14 02:20:00,751 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-14 02:20:00,753 - sms_agent - INFO - Linked to merchant: Amazon (1795949d-9fdf-463a-a464-5059713f0311), logo=https://www.google.com/s2/favicons?domain=amazon.sa&sz=64
+2026-02-14 02:20:00,762 - sms_agent - INFO - Saved training example for: Amazon
+2026-02-14 02:32:19,120 - sms_agent - INFO - 📊 Token Usage - Input: 5870, Output: 236, Total: 6106
+2026-02-14 02:32:19,126 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Liability
+2026-02-14 02:32:19,127 - sms_agent - INFO - Linked to biller: SAUDI ELECTRIC COMPANY (ec200bdb-38f5-4ccf-a372-0848a18bb3ec)
+2026-02-14 02:32:19,134 - sms_agent - INFO - Saved training example for: Bill Payment - SAUDI ELECTRIC COMPANY
+2026-02-14 02:32:39,077 - sms_agent - INFO - 📊 Token Usage - Input: 5844, Output: 235, Total: 6079
+2026-02-14 02:32:39,082 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=Expense
+2026-02-14 02:32:39,082 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to Expense
+2026-02-14 02:32:39,087 - sms_agent - INFO - DEBUG: Created transaction 52398a5c-79e0-47d7-b34c-973bcf421347 with status pending_action
+2026-02-14 02:33:00,545 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 238, Total: 6094
+2026-02-14 02:33:00,551 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-14 02:33:00,552 - sms_agent - INFO - Linked to biller: Credit Card Payment (c37d4dd7-4220-43d9-9d0c-28155ced0e7b)
+2026-02-14 02:33:00,557 - sms_agent - INFO - Auto-linking CC 7868 payment: Creating debit on Expense account for 535.91 SAR
+2026-02-14 02:33:00,560 - sms_agent - INFO - Auto-created debit transaction f191eb93-5638-4d44-8719-33ae822a8b4a on Expense account
+2026-02-14 02:33:00,562 - sms_agent - INFO - Saved training example for: Credit Card Payment
+2026-02-14 02:33:09,981 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 220, Total: 6073
+2026-02-14 02:33:09,983 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-14 02:33:09,984 - sms_agent - INFO - Linked to merchant: Amazon (1795949d-9fdf-463a-a464-5059713f0311), logo=https://www.google.com/s2/favicons?domain=amazon.sa&sz=64
+2026-02-14 02:33:09,992 - sms_agent - INFO - Saved training example for: Amazon
+2026-02-16 17:02:52,809 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-16 17:02:52,819 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-16 17:02:52,861 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-02-16 17:11:51,838 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-16 17:13:12,499 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-16 17:55:07,503 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 227, Total: 6085
+2026-02-16 17:55:07,519 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-16 17:55:07,521 - sms_agent - INFO - Inherited category 'Groceries' from merchant Danube
+2026-02-16 17:55:07,521 - sms_agent - INFO - Linked to merchant: Danube (c36ff6e6-6af1-4025-90a3-c474468a66df), logo=https://www.google.com/s2/favicons?domain=danube.sa&sz=64
+2026-02-16 17:55:07,533 - sms_agent - INFO - Saved training example for: Danube
+2026-02-16 18:17:11,649 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 226, Total: 6079
+2026-02-16 18:17:11,657 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-16 18:17:11,658 - sms_agent - INFO - Linked to merchant: SASCO (f9bf9bd6-e0a7-4058-8f07-d4848d73d1da), logo=https://www.google.com/s2/favicons?domain=sasco.com.sa&sz=64
+2026-02-16 18:17:11,666 - sms_agent - INFO - Saved training example for: SASCO
+2026-02-16 18:21:10,480 - sms_agent - INFO - 📊 Token Usage - Input: 5855, Output: 205, Total: 6060
+2026-02-16 18:35:33,345 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 246, Total: 6104
+2026-02-16 18:35:33,352 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-16 18:35:33,353 - sms_agent - INFO - Linked to merchant: AlDawaa P (590e6d0e-a2d5-4bbf-98fd-386b30d1d55d), logo=None
+2026-02-16 18:35:33,361 - sms_agent - INFO - Saved training example for: AlDawaa P
+2026-02-16 19:08:12,321 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 236, Total: 6094
+2026-02-16 19:08:12,329 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-16 19:08:12,330 - sms_agent - INFO - Inherited category 'Groceries' from merchant Ninja
+2026-02-16 19:08:12,330 - sms_agent - INFO - Linked to merchant: Ninja (a537fd21-e635-4343-a06b-f685072b8bc8), logo=None
+2026-02-16 19:08:12,337 - sms_agent - INFO - Saved training example for: Ninja
+2026-02-16 19:08:12,370 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 236, Total: 6094
+2026-02-16 19:08:12,372 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-16 19:08:12,373 - sms_agent - INFO - Inherited category 'Groceries' from merchant Ninja
+2026-02-16 19:08:12,373 - sms_agent - INFO - Linked to merchant: Ninja (a537fd21-e635-4343-a06b-f685072b8bc8), logo=None
+2026-02-16 19:08:12,377 - sms_agent - INFO - Saved training example for: Ninja
+2026-02-16 21:23:51,963 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 214, Total: 6070
+2026-02-16 21:23:51,965 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-16 21:23:51,966 - sms_agent - INFO - Inherited category 'Food & Dining' from merchant Jahez
+2026-02-16 21:23:51,966 - sms_agent - INFO - Linked to merchant: Jahez (dc89755d-c923-4fc0-9da7-d94fe1147af9), logo=None
+2026-02-16 21:23:51,972 - sms_agent - INFO - Saved training example for: Jahez
+2026-02-16 21:23:52,120 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 235, Total: 6091
+2026-02-16 21:23:52,127 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-16 21:23:52,128 - sms_agent - INFO - Inherited category 'Food & Dining' from merchant Jahez
+2026-02-16 21:23:52,128 - sms_agent - INFO - Linked to merchant: Jahez (dc89755d-c923-4fc0-9da7-d94fe1147af9), logo=None
+2026-02-16 21:23:52,133 - sms_agent - INFO - Saved training example for: Jahez
+2026-02-16 22:17:57,987 - sms_agent - INFO - 📊 Token Usage - Input: 5860, Output: 228, Total: 6088
+2026-02-16 22:17:57,994 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-16 22:17:57,995 - sms_agent - INFO - Linked to merchant: HungerStation (d7f0e834-941c-4b0a-a636-8011cc7b051a), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-16 22:17:58,003 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-16 22:17:58,018 - sms_agent - INFO - 📊 Token Usage - Input: 5860, Output: 228, Total: 6088
+2026-02-16 22:17:58,020 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-16 22:17:58,021 - sms_agent - INFO - Linked to merchant: HungerStation (d7f0e834-941c-4b0a-a636-8011cc7b051a), logo=https://www.google.com/s2/favicons?domain=hungerstation.com&sz=64
+2026-02-16 22:17:58,025 - sms_agent - INFO - Saved training example for: HungerStation
+2026-02-16 22:51:47,420 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 240, Total: 6096
+2026-02-16 22:51:47,426 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-16 22:51:47,428 - sms_agent - INFO - Linked to beneficiary: MOHAMMED ISLAM @ None (aa0bc9c7-012b-4d22-8663-80e8994c0cff)
+2026-02-16 22:51:47,435 - sms_agent - INFO - Saved training example for: MOHAMMED ISLAM
+2026-02-17 00:13:05,737 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 241, Total: 6099
+2026-02-17 00:13:05,743 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-17 00:13:05,743 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant STC
+2026-02-17 00:13:05,743 - sms_agent - INFO - Linked to merchant: STC (875912f2-c582-422d-8755-f8cfe9c20291), logo=None
+2026-02-17 00:13:05,749 - sms_agent - INFO - Saved training example for: STC Bank
+2026-02-17 00:13:06,503 - sms_agent - INFO - Using custom bank-specific prompt
+2026-02-17 00:13:07,555 - sms_agent - INFO - 📊 Token Usage - Input: 2575, Output: 80, Total: 2655
+2026-02-17 00:13:07,562 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=STC Wallet
+2026-02-17 00:13:07,569 - sms_agent - INFO - Saved training example for: deposit
+2026-02-17 00:13:29,118 - sms_agent - INFO - Using custom bank-specific prompt
+2026-02-17 00:13:30,098 - sms_agent - INFO - 📊 Token Usage - Input: 2584, Output: 95, Total: 2679
+2026-02-17 00:13:30,105 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=STC Wallet
+2026-02-17 00:13:30,106 - sms_agent - INFO - Linked to beneficiary: JWAHR ALASIRI @ None (1ef5467e-e64f-48e1-bc99-4199fa0bb26c)
+2026-02-17 00:13:30,113 - sms_agent - INFO - Saved training example for: JWAHR ALASIRI
+2026-02-17 01:34:04,036 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-17 01:34:25,109 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-17 01:34:52,913 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-17 01:46:40,099 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-17 02:05:48,539 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 254, Total: 6111
+2026-02-17 02:05:48,551 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-25 19:18:13
+2026-02-17 02:05:48,553 - sms_agent - INFO - Swapping Primary Account for Credit: Liability -> Grocery
+2026-02-17 02:05:48,554 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:05:48,557 - sms_agent - INFO - Linked to beneficiary (sender): MUATH ALASIRI @ AlRajhi (78cb6116-8252-4d16-b299-827c8d0560a6)
+2026-02-17 02:05:48,567 - sms_agent - INFO - Saved training example for: Transfer from Liability
+2026-02-17 02:05:50,584 - sms_agent - INFO - 📊 Token Usage - Input: 5851, Output: 217, Total: 6068
+2026-02-17 02:07:30,264 - sms_agent - INFO - 📊 Token Usage - Input: 5860, Output: 219, Total: 6079
+2026-02-17 02:07:37,747 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 227, Total: 6081
+2026-02-17 02:07:37,753 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 09:50:45
+2026-02-17 02:07:37,754 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:07:37,755 - sms_agent - INFO - Linked to merchant: SASCO (f9bf9bd6-e0a7-4058-8f07-d4848d73d1da), logo=https://www.google.com/s2/favicons?domain=sasco.com.sa&sz=64
+2026-02-17 02:07:37,762 - sms_agent - INFO - Saved training example for: SASCO
+2026-02-17 02:07:40,076 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 215, Total: 6071
+2026-02-17 02:07:40,081 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 10:57:09
+2026-02-17 02:07:40,083 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:07:40,084 - sms_agent - INFO - Linked to merchant: Noon (1f8bf13d-c8e6-498f-a6af-a57a0c3bf9f5), logo=None
+2026-02-17 02:07:40,090 - sms_agent - INFO - Saved training example for: noon
+2026-02-17 02:07:43,225 - sms_agent - INFO - 📊 Token Usage - Input: 5859, Output: 242, Total: 6101
+2026-02-17 02:07:43,231 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 11:04:12
+2026-02-17 02:07:43,232 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:07:43,233 - sms_agent - INFO - Linked to merchant: Amazon (1795949d-9fdf-463a-a464-5059713f0311), logo=https://www.google.com/s2/favicons?domain=amazon.sa&sz=64
+2026-02-17 02:07:43,239 - sms_agent - INFO - Saved training example for: Amazon
+2026-02-17 02:07:45,278 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 234, Total: 6091
+2026-02-17 02:07:45,286 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 11:29:16
+2026-02-17 02:07:45,289 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:07:45,291 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant LuLu Hypermarket
+2026-02-17 02:07:45,291 - sms_agent - INFO - Linked to merchant: LuLu Hypermarket (053df604-b6bd-4591-b376-243d906fb924), logo=https://www.google.com/s2/favicons?domain=luluhypermarket.com&sz=64
+2026-02-17 02:07:45,297 - sms_agent - INFO - Saved training example for: LuLu Hypermarket
+2026-02-17 02:07:47,282 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 221, Total: 6077
+2026-02-17 02:07:47,288 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 11:51:52
+2026-02-17 02:07:47,290 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:07:47,291 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant ADAM PHARMACY
+2026-02-17 02:07:47,291 - sms_agent - INFO - Linked to merchant: ADAM PHARMACY (bc96f608-19dd-4800-bc73-fb1562b2e343), logo=None
+2026-02-17 02:07:47,299 - sms_agent - INFO - Saved training example for: ADAM PHAR
+2026-02-17 02:07:49,430 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 218, Total: 6072
+2026-02-17 02:07:49,437 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 11:55:40
+2026-02-17 02:07:49,438 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:07:49,439 - sms_agent - INFO - Inherited category 'Health' from merchant Health Ho
+2026-02-17 02:07:49,439 - sms_agent - INFO - Linked to merchant: Health Ho (d4324bc3-d9c4-464d-91d0-499777d0eca2), logo=None
+2026-02-17 02:07:49,446 - sms_agent - INFO - Saved training example for: Health Ho
+2026-02-17 02:07:51,350 - sms_agent - INFO - 📊 Token Usage - Input: 5839, Output: 194, Total: 6033
+2026-02-17 02:07:54,024 - sms_agent - INFO - 📊 Token Usage - Input: 5860, Output: 218, Total: 6078
+2026-02-17 02:07:54,029 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 17:26:07
+2026-02-17 02:07:54,030 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:07:54,031 - sms_agent - INFO - Inherited category 'Food & Dining' from merchant Keeta
+2026-02-17 02:07:54,031 - sms_agent - INFO - Linked to merchant: Keeta (f80e24c6-ab0a-419d-8662-0d00768a862f), logo=None
+2026-02-17 02:07:54,037 - sms_agent - INFO - Saved training example for: Keeta
+2026-02-17 02:07:56,214 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 235, Total: 6091
+2026-02-17 02:07:56,220 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-26 23:16:55
+2026-02-17 02:07:56,221 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:07:56,222 - sms_agent - INFO - Inherited category 'Food & Dining' from merchant Jahez
+2026-02-17 02:07:56,222 - sms_agent - INFO - Linked to merchant: Jahez (dc89755d-c923-4fc0-9da7-d94fe1147af9), logo=None
+2026-02-17 02:07:56,228 - sms_agent - INFO - Saved training example for: Jahez
+2026-02-17 02:07:58,235 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 221, Total: 6077
+2026-02-17 02:07:58,243 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-27 11:59:36
+2026-02-17 02:07:58,244 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:07:58,245 - sms_agent - INFO - Inherited category 'Groceries' from merchant BERAIN
+2026-02-17 02:07:58,245 - sms_agent - INFO - Linked to merchant: BERAIN (883da412-5f6d-4404-befb-8b2a8962c073), logo=None
+2026-02-17 02:07:58,253 - sms_agent - INFO - Saved training example for: BERAIN CO
+2026-02-17 02:08:00,199 - sms_agent - INFO - 📊 Token Usage - Input: 5852, Output: 220, Total: 6072
+2026-02-17 02:08:00,206 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-27 21:01:37
+2026-02-17 02:08:00,207 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:08:00,208 - sms_agent - INFO - Inherited category 'Food & Dining' from merchant HABIBAH S
+2026-02-17 02:08:00,208 - sms_agent - INFO - Linked to merchant: HABIBAH S (a5ef888c-9679-4d6c-996a-5b96d77a1df5), logo=None
+2026-02-17 02:08:00,215 - sms_agent - INFO - Saved training example for: HABIBAH S
+2026-02-17 02:08:02,122 - sms_agent - INFO - 📊 Token Usage - Input: 5860, Output: 193, Total: 6053
+2026-02-17 02:08:20,119 - sms_agent - INFO - 📊 Token Usage - Input: 5860, Output: 219, Total: 6079
+2026-02-17 02:08:20,125 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-28 14:28:45
+2026-02-17 02:08:20,127 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:08:20,128 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant Keemart
+2026-02-17 02:08:20,128 - sms_agent - INFO - Linked to merchant: Keemart (02242a1f-46ff-466a-8210-9404a5177a58), logo=None
+2026-02-17 02:08:20,134 - sms_agent - INFO - Saved training example for: Keemart
+2026-02-17 02:08:22,195 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 227, Total: 6085
+2026-02-17 02:08:22,200 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-28 15:30:37
+2026-02-17 02:08:22,200 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:08:22,201 - sms_agent - INFO - Inherited category 'Groceries' from merchant Danube
+2026-02-17 02:08:22,201 - sms_agent - INFO - Linked to merchant: Danube (c36ff6e6-6af1-4025-90a3-c474468a66df), logo=https://www.google.com/s2/favicons?domain=danube.sa&sz=64
+2026-02-17 02:08:22,208 - sms_agent - INFO - Saved training example for: Danube
+2026-02-17 02:08:24,221 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 235, Total: 6091
+2026-02-17 02:08:24,227 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-28 21:00:22
+2026-02-17 02:08:24,228 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:08:24,229 - sms_agent - INFO - Inherited category 'Food & Dining' from merchant Jahez
+2026-02-17 02:08:24,230 - sms_agent - INFO - Linked to merchant: Jahez (dc89755d-c923-4fc0-9da7-d94fe1147af9), logo=None
+2026-02-17 02:08:24,235 - sms_agent - INFO - Saved training example for: Jahez
+2026-02-17 02:08:26,456 - sms_agent - INFO - 📊 Token Usage - Input: 5865, Output: 241, Total: 6106
+2026-02-17 02:08:42,715 - sms_agent - INFO - 📊 Token Usage - Input: 5851, Output: 237, Total: 6088
+2026-02-17 02:08:57,508 - sms_agent - INFO - 📊 Token Usage - Input: 5862, Output: 174, Total: 6036
+2026-02-17 02:08:57,513 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-29 04:51:32
+2026-02-17 02:08:57,514 - sms_agent - INFO - Converted 14.99 USD to 56.81 SAR using rate 3.79
+2026-02-17 02:08:57,515 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:08:57,516 - sms_agent - INFO - Linked to merchant: Amazon (1795949d-9fdf-463a-a464-5059713f0311), logo=https://www.google.com/s2/favicons?domain=amazon.sa&sz=64
+2026-02-17 02:08:57,524 - sms_agent - INFO - Saved training example for: Amazon
+2026-02-17 02:08:59,650 - sms_agent - INFO - 📊 Token Usage - Input: 5869, Output: 236, Total: 6105
+2026-02-17 02:09:08,449 - sms_agent - INFO - 📊 Token Usage - Input: 5875, Output: 257, Total: 6132
+2026-02-17 02:09:12,644 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 234, Total: 6092
+2026-02-17 02:09:17,567 - sms_agent - INFO - 📊 Token Usage - Input: 5867, Output: 225, Total: 6092
+2026-02-17 02:09:23,054 - sms_agent - INFO - 📊 Token Usage - Input: 5864, Output: 240, Total: 6104
+2026-02-17 02:09:26,690 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 236, Total: 6093
+2026-02-17 02:09:26,695 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-29 23:55:12
+2026-02-17 02:09:26,696 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:09:26,697 - sms_agent - INFO - Inherited category 'Food & Dining' from merchant Jahez
+2026-02-17 02:09:26,698 - sms_agent - INFO - Linked to merchant: Jahez (dc89755d-c923-4fc0-9da7-d94fe1147af9), logo=None
+2026-02-17 02:09:26,704 - sms_agent - INFO - Saved training example for: Jahez
+2026-02-17 02:09:28,647 - sms_agent - INFO - 📊 Token Usage - Input: 5855, Output: 219, Total: 6074
+2026-02-17 02:09:28,652 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-30 14:06:19
+2026-02-17 02:09:28,654 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:09:28,654 - sms_agent - INFO - Inherited category 'Health' from merchant Health Ho
+2026-02-17 02:09:28,654 - sms_agent - INFO - Linked to merchant: Health Ho (d4324bc3-d9c4-464d-91d0-499777d0eca2), logo=None
+2026-02-17 02:09:28,661 - sms_agent - INFO - Saved training example for: Health Ho
+2026-02-17 02:09:30,681 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 238, Total: 6096
+2026-02-17 02:09:35,843 - sms_agent - INFO - 📊 Token Usage - Input: 5859, Output: 238, Total: 6097
+2026-02-17 02:09:35,848 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-31 19:03:03
+2026-02-17 02:09:35,849 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:09:35,850 - sms_agent - INFO - Inherited category 'Food & Dining' from merchant Keeta
+2026-02-17 02:09:35,850 - sms_agent - INFO - Linked to merchant: Keeta (f80e24c6-ab0a-419d-8662-0d00768a862f), logo=None
+2026-02-17 02:09:35,858 - sms_agent - INFO - Saved training example for: Keeta
+2026-02-17 02:09:38,046 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 248, Total: 6106
+2026-02-17 02:09:38,052 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-31 19:06:45
+2026-02-17 02:09:38,054 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:09:38,055 - sms_agent - INFO - Inherited category 'Groceries' from merchant Danube
+2026-02-17 02:09:38,055 - sms_agent - INFO - Linked to merchant: Danube (c36ff6e6-6af1-4025-90a3-c474468a66df), logo=https://www.google.com/s2/favicons?domain=danube.sa&sz=64
+2026-02-17 02:09:38,063 - sms_agent - INFO - Saved training example for: Danube
+2026-02-17 02:09:39,964 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 220, Total: 6074
+2026-02-17 02:09:39,972 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-31 19:21:51
+2026-02-17 02:09:39,973 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:09:39,974 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant Hjeen Tra
+2026-02-17 02:09:39,974 - sms_agent - INFO - Linked to merchant: Hjeen Tra (a780784f-5310-4adb-9716-229ca81afeaa), logo=None
+2026-02-17 02:09:39,980 - sms_agent - INFO - Saved training example for: Hjeen Tra
+2026-02-17 02:09:42,028 - sms_agent - INFO - 📊 Token Usage - Input: 5853, Output: 239, Total: 6092
+2026-02-17 02:09:42,035 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-31 19:34:42
+2026-02-17 02:09:42,036 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:09:42,037 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant Alttwyr W
+2026-02-17 02:09:42,037 - sms_agent - INFO - Linked to merchant: Alttwyr W (0e87d46a-4f3b-4f52-8a13-a41d21b2d271), logo=None
+2026-02-17 02:09:42,043 - sms_agent - INFO - Saved training example for: Alttwyr W
+2026-02-17 02:09:44,655 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 251, Total: 6107
+2026-02-17 02:09:44,662 - sms_agent - INFO - Using header timestamp from WebUI: 2026-01-31 21:15:50
+2026-02-17 02:09:44,663 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:09:44,664 - sms_agent - INFO - Linked to merchant: SASCO (f9bf9bd6-e0a7-4058-8f07-d4848d73d1da), logo=https://www.google.com/s2/favicons?domain=sasco.com.sa&sz=64
+2026-02-17 02:09:44,671 - sms_agent - INFO - Saved training example for: SASCO
+2026-02-17 02:09:47,109 - sms_agent - INFO - 📊 Token Usage - Input: 5859, Output: 239, Total: 6098
+2026-02-17 02:09:47,114 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-01 16:07:47
+2026-02-17 02:09:47,115 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:09:47,116 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant Keemart
+2026-02-17 02:09:47,116 - sms_agent - INFO - Linked to merchant: Keemart (02242a1f-46ff-466a-8210-9404a5177a58), logo=None
+2026-02-17 02:09:47,123 - sms_agent - INFO - Saved training example for: Keemart
+2026-02-17 02:09:49,676 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 230, Total: 6087
+2026-02-17 02:10:03,901 - sms_agent - INFO - 📊 Token Usage - Input: 5860, Output: 220, Total: 6080
+2026-02-17 02:10:03,911 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-02 11:15:36
+2026-02-17 02:10:03,912 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:10:03,913 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant Keemart
+2026-02-17 02:10:03,913 - sms_agent - INFO - Linked to merchant: Keemart (02242a1f-46ff-466a-8210-9404a5177a58), logo=None
+2026-02-17 02:10:03,921 - sms_agent - INFO - Saved training example for: Keemart
+2026-02-17 02:10:06,519 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 232, Total: 6086
+2026-02-17 02:10:06,525 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-02 11:26:23
+2026-02-17 02:10:06,525 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:10:06,527 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant Panda
+2026-02-17 02:10:06,527 - sms_agent - INFO - Linked to merchant: Panda (b80a712c-a8c7-43c2-89b6-57a8cb2019b0), logo=https://www.google.com/s2/favicons?domain=panda.com.sa&sz=64
+2026-02-17 02:10:06,534 - sms_agent - INFO - Saved training example for: Panda
+2026-02-17 02:10:09,621 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 238, Total: 6095
+2026-02-17 02:10:09,627 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-02 12:28:46
+2026-02-17 02:10:09,629 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:10:09,630 - sms_agent - INFO - Inherited category 'Groceries' from merchant مقصفي
+2026-02-17 02:10:09,630 - sms_agent - INFO - Linked to merchant: مقصفي (fd69269a-2a6d-444d-922c-ffb6679ea04d), logo=None
+2026-02-17 02:10:09,637 - sms_agent - INFO - Saved training example for: COMMERCIA
+2026-02-17 02:10:11,702 - sms_agent - INFO - 📊 Token Usage - Input: 5828, Output: 198, Total: 6026
+2026-02-17 02:10:13,999 - sms_agent - INFO - 📊 Token Usage - Input: 5824, Output: 217, Total: 6041
+2026-02-17 02:10:16,517 - sms_agent - INFO - 📊 Token Usage - Input: 5825, Output: 218, Total: 6043
+2026-02-17 02:10:19,056 - sms_agent - INFO - 📊 Token Usage - Input: 5840, Output: 201, Total: 6041
+2026-02-17 02:10:21,795 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 244, Total: 6102
+2026-02-17 02:10:26,007 - sms_agent - INFO - 📊 Token Usage - Input: 5859, Output: 219, Total: 6078
+2026-02-17 02:10:29,216 - sms_agent - INFO - 📊 Token Usage - Input: 5831, Output: 194, Total: 6025
+2026-02-17 02:10:31,785 - sms_agent - INFO - 📊 Token Usage - Input: 5852, Output: 221, Total: 6073
+2026-02-17 02:10:41,466 - sms_agent - INFO - 📊 Token Usage - Input: 5855, Output: 223, Total: 6078
+2026-02-17 02:10:41,474 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-04 20:33:09
+2026-02-17 02:10:41,475 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:10:41,475 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant SAUDI MAR
+2026-02-17 02:10:41,475 - sms_agent - INFO - Linked to merchant: SAUDI MAR (bbb29693-9832-4fb9-9dc9-08e9203f6c80), logo=None
+2026-02-17 02:10:41,481 - sms_agent - INFO - Saved training example for: SAUDI MAR
+2026-02-17 02:10:43,958 - sms_agent - INFO - 📊 Token Usage - Input: 5847, Output: 213, Total: 6060
+2026-02-17 02:10:47,844 - sms_agent - INFO - 📊 Token Usage - Input: 5847, Output: 213, Total: 6060
+2026-02-17 02:10:51,586 - sms_agent - INFO - 📊 Token Usage - Input: 5863, Output: 243, Total: 6106
+2026-02-17 02:10:54,733 - sms_agent - INFO - 📊 Token Usage - Input: 5828, Output: 194, Total: 6022
+2026-02-17 02:10:57,125 - sms_agent - INFO - 📊 Token Usage - Input: 5815, Output: 195, Total: 6010
+2026-02-17 02:10:59,644 - sms_agent - INFO - 📊 Token Usage - Input: 5815, Output: 198, Total: 6013
+2026-02-17 02:11:02,300 - sms_agent - INFO - 📊 Token Usage - Input: 5840, Output: 215, Total: 6055
+2026-02-17 02:11:41,457 - sms_agent - INFO - 📊 Token Usage - Input: 5870, Output: 248, Total: 6118
+2026-02-17 02:12:31,858 - sms_agent - INFO - 📊 Token Usage - Input: 5860, Output: 219, Total: 6079
+2026-02-17 02:12:42,002 - sms_agent - INFO - 📊 Token Usage - Input: 5850, Output: 217, Total: 6067
+2026-02-17 02:12:42,008 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-06 18:01:04
+2026-02-17 02:12:42,009 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:12:42,009 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant Bustan Jo
+2026-02-17 02:12:42,009 - sms_agent - INFO - Linked to merchant: Bustan Jo (cd0ed9d0-6530-423e-a726-e0d07d63a25b), logo=None
+2026-02-17 02:12:42,016 - sms_agent - INFO - Saved training example for: Bustan Jo
+2026-02-17 02:12:44,002 - sms_agent - INFO - 📊 Token Usage - Input: 5852, Output: 219, Total: 6071
+2026-02-17 02:12:44,006 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-06 19:54:08
+2026-02-17 02:12:44,007 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:12:44,008 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant GHADAH AL
+2026-02-17 02:12:44,008 - sms_agent - INFO - Linked to merchant: GHADAH AL (45fb0111-2a7d-4106-b837-72345ee36113), logo=None
+2026-02-17 02:12:44,014 - sms_agent - INFO - Saved training example for: GHADAH AL
+2026-02-17 02:12:46,576 - sms_agent - INFO - 📊 Token Usage - Input: 5859, Output: 228, Total: 6087
+2026-02-17 02:12:52,273 - sms_agent - INFO - 📊 Token Usage - Input: 5852, Output: 247, Total: 6099
+2026-02-17 02:12:52,279 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-08 08:29:37
+2026-02-17 02:12:52,281 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:12:52,282 - sms_agent - INFO - Linked to merchant: SASCO (f9bf9bd6-e0a7-4058-8f07-d4848d73d1da), logo=https://www.google.com/s2/favicons?domain=sasco.com.sa&sz=64
+2026-02-17 02:12:52,288 - sms_agent - INFO - Saved training example for: SASCO
+2026-02-17 02:12:54,775 - sms_agent - INFO - 📊 Token Usage - Input: 5840, Output: 201, Total: 6041
+2026-02-17 02:12:59,381 - sms_agent - INFO - 📊 Token Usage - Input: 5871, Output: 247, Total: 6118
+2026-02-17 02:13:04,735 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 218, Total: 6075
+2026-02-17 02:13:04,742 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-08 12:37:28
+2026-02-17 02:13:04,743 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:13:04,744 - sms_agent - INFO - Inherited category 'Groceries' from merchant مقصفي
+2026-02-17 02:13:04,744 - sms_agent - INFO - Linked to merchant: مقصفي (fd69269a-2a6d-444d-922c-ffb6679ea04d), logo=None
+2026-02-17 02:13:04,751 - sms_agent - INFO - Saved training example for: COMMERCIA
+2026-02-17 02:13:07,065 - sms_agent - INFO - 📊 Token Usage - Input: 5859, Output: 241, Total: 6100
+2026-02-17 02:13:11,210 - sms_agent - INFO - 📊 Token Usage - Input: 5842, Output: 202, Total: 6044
+2026-02-17 02:13:17,217 - sms_agent - INFO - 📊 Token Usage - Input: 5872, Output: 218, Total: 6090
+2026-02-17 02:13:21,111 - sms_agent - INFO - 📊 Token Usage - Input: 5863, Output: 243, Total: 6106
+2026-02-17 02:13:25,376 - sms_agent - INFO - 📊 Token Usage - Input: 5842, Output: 219, Total: 6061
+2026-02-17 02:13:29,072 - sms_agent - INFO - 📊 Token Usage - Input: 5872, Output: 235, Total: 6107
+2026-02-17 02:13:33,633 - sms_agent - INFO - 📊 Token Usage - Input: 5855, Output: 228, Total: 6083
+2026-02-17 02:13:37,538 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 229, Total: 6086
+2026-02-17 02:13:41,261 - sms_agent - INFO - 📊 Token Usage - Input: 5852, Output: 219, Total: 6071
+2026-02-17 02:13:41,264 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-09 16:57:44
+2026-02-17 02:13:41,266 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:13:41,266 - sms_agent - INFO - Inherited category 'Health & Fitness' from merchant Start of C
+2026-02-17 02:13:41,266 - sms_agent - INFO - Linked to merchant: Start of C (7868df5e-bb39-4007-9513-5b3f22f4a138), logo=None
+2026-02-17 02:13:41,272 - sms_agent - INFO - Saved training example for: Start of C
+2026-02-17 02:13:43,687 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 230, Total: 6088
+2026-02-17 02:14:18,706 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 220, Total: 6074
+2026-02-17 02:14:34,578 - sms_agent - INFO - 📊 Token Usage - Input: 5850, Output: 209, Total: 6059
+2026-02-17 02:14:34,580 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-10 21:38:04
+2026-02-17 02:14:34,581 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:14:34,582 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant Establish
+2026-02-17 02:14:34,582 - sms_agent - INFO - Linked to merchant: Establish (94af3420-7468-4610-b027-05d30f9222b8), logo=None
+2026-02-17 02:14:34,588 - sms_agent - INFO - Saved training example for: Establish
+2026-02-17 02:14:37,066 - sms_agent - INFO - 📊 Token Usage - Input: 5830, Output: 197, Total: 6027
+2026-02-17 02:14:39,673 - sms_agent - INFO - 📊 Token Usage - Input: 5868, Output: 225, Total: 6093
+2026-02-17 02:14:55,154 - sms_agent - INFO - 📊 Token Usage - Input: 5851, Output: 217, Total: 6068
+2026-02-17 02:15:05,463 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 214, Total: 6070
+2026-02-17 02:15:05,470 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-11 23:55:18
+2026-02-17 02:15:05,470 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:15:05,471 - sms_agent - INFO - Inherited category 'Food & Dining' from merchant Jahez
+2026-02-17 02:15:05,471 - sms_agent - INFO - Linked to merchant: Jahez (dc89755d-c923-4fc0-9da7-d94fe1147af9), logo=None
+2026-02-17 02:15:05,479 - sms_agent - INFO - Saved training example for: Jahez
+2026-02-17 02:15:08,016 - sms_agent - INFO - 📊 Token Usage - Input: 5844, Output: 234, Total: 6078
+2026-02-17 02:15:08,020 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-12 15:07:29
+2026-02-17 02:15:08,021 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=Grocery
+2026-02-17 02:15:08,021 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to Grocery
+2026-02-17 02:15:08,026 - sms_agent - INFO - DEBUG: Created transaction e5d667ce-d03c-467b-a921-58576ea3b099 with status pending_action
+2026-02-17 02:15:51,702 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 248, Total: 6106
+2026-02-17 02:15:51,712 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-12 15:09:39
+2026-02-17 02:15:51,714 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:15:51,715 - sms_agent - INFO - Inherited category 'Groceries' from merchant Danube
+2026-02-17 02:15:51,715 - sms_agent - INFO - Linked to merchant: Danube (c36ff6e6-6af1-4025-90a3-c474468a66df), logo=https://www.google.com/s2/favicons?domain=danube.sa&sz=64
+2026-02-17 02:15:51,723 - sms_agent - INFO - Saved training example for: Danube
+2026-02-17 02:15:53,547 - sms_agent - INFO - 📊 Token Usage - Input: 5854, Output: 213, Total: 6067
+2026-02-17 02:18:08,846 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 234, Total: 6091
+2026-02-17 02:18:08,852 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-12 15:58:41
+2026-02-17 02:18:08,853 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:18:08,854 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant LuLu Hypermarket
+2026-02-17 02:18:08,854 - sms_agent - INFO - Linked to merchant: LuLu Hypermarket (053df604-b6bd-4591-b376-243d906fb924), logo=https://www.google.com/s2/favicons?domain=luluhypermarket.com&sz=64
+2026-02-17 02:18:08,862 - sms_agent - INFO - Saved training example for: LuLu Hypermarket
+2026-02-17 02:18:10,765 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 215, Total: 6073
+2026-02-17 02:18:10,770 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-12 17:30:10
+2026-02-17 02:18:10,770 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:18:10,771 - sms_agent - INFO - Inherited category 'Groceries' from merchant Ninja
+2026-02-17 02:18:10,771 - sms_agent - INFO - Linked to merchant: Ninja (a537fd21-e635-4343-a06b-f685072b8bc8), logo=None
+2026-02-17 02:18:10,781 - sms_agent - INFO - Saved training example for: Ninja
+2026-02-17 02:18:12,945 - sms_agent - INFO - 📊 Token Usage - Input: 5856, Output: 239, Total: 6095
+2026-02-17 02:18:28,034 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 248, Total: 6105
+2026-02-17 02:18:28,041 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-12 22:08:34
+2026-02-17 02:18:28,042 - sms_agent - INFO - Swapping Primary Account for Credit: Payroll -> Grocery
+2026-02-17 02:18:28,042 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:18:28,043 - sms_agent - INFO - Linked to beneficiary (sender): MUATH ALASIRI @ AlRajhi (78cb6116-8252-4d16-b299-827c8d0560a6)
+2026-02-17 02:18:28,049 - sms_agent - INFO - Saved training example for: Transfer from Payroll
+2026-02-17 02:18:30,060 - sms_agent - INFO - 📊 Token Usage - Input: 5844, Output: 229, Total: 6073
+2026-02-17 02:18:42,759 - sms_agent - INFO - 📊 Token Usage - Input: 5850, Output: 215, Total: 6065
+2026-02-17 02:18:42,764 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-13 16:44:44
+2026-02-17 02:18:42,765 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:18:42,766 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant Company M
+2026-02-17 02:18:42,766 - sms_agent - INFO - Linked to merchant: Company M (2fa85935-2338-47fb-aad9-ac7bf0b4dd64), logo=None
+2026-02-17 02:18:42,772 - sms_agent - INFO - Saved training example for: Company M
+2026-02-17 02:18:44,729 - sms_agent - INFO - 📊 Token Usage - Input: 5849, Output: 214, Total: 6063
+2026-02-17 02:18:44,736 - sms_agent - INFO - Using header timestamp from WebUI: 2026-02-13 18:30:17
+2026-02-17 02:18:44,737 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Grocery
+2026-02-17 02:18:44,737 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant Company M
+2026-02-17 02:18:44,737 - sms_agent - INFO - Linked to merchant: Company M (2fa85935-2338-47fb-aad9-ac7bf0b4dd64), logo=None
+2026-02-17 02:18:44,744 - sms_agent - INFO - Saved training example for: Company M
+2026-02-17 02:18:46,644 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 216, Total: 6073
+2026-02-17 02:19:13,631 - sms_agent - INFO - 📊 Token Usage - Input: 5857, Output: 216, Total: 6073
+2026-02-17 09:50:07,160 - sms_agent - INFO - 📊 Token Usage - Input: 5844, Output: 234, Total: 6078
+2026-02-17 09:50:07,167 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=True, source_account=Expense
+2026-02-17 09:50:07,167 - sms_agent - INFO - DEBUG: Creating pending_action transaction for internal transfer to Expense
+2026-02-17 09:50:07,172 - sms_agent - INFO - DEBUG: Created transaction ecd7d6a1-bbdc-41e2-9e56-cb4cbd8da8a3 with status pending_action
+2026-02-17 09:50:40,624 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 242, Total: 6100
+2026-02-17 09:50:40,630 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-17 09:50:40,632 - sms_agent - INFO - Linked to beneficiary: SALAH ABDELRAHMAN @ None (e2e5e0d2-00cc-4dc3-95f5-c14adae3dafc)
+2026-02-17 09:50:40,639 - sms_agent - INFO - Saved training example for: SALAH ABDELRAHMAN
+2026-02-17 13:49:52,080 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 245, Total: 6103
+2026-02-17 13:49:52,087 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=General
+2026-02-17 13:49:52,089 - sms_agent - INFO - Linked to beneficiary (sender): THWB KASHKAH EST @ AlRajhi (ed9845d0-5da6-4dc3-851c-27e36c0761ae)
+2026-02-17 13:49:52,095 - sms_agent - INFO - Saved training example for: THWB KASHKAH EST
+2026-02-17 16:30:04,003 - sms_agent - INFO - 📊 Token Usage - Input: 5850, Output: 238, Total: 6088
+2026-02-17 16:30:04,011 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=Expense
+2026-02-17 16:30:04,012 - sms_agent - INFO - Inherited category 'Uncategorized' from merchant Alttwyr W
+2026-02-17 16:30:04,012 - sms_agent - INFO - Linked to merchant: Alttwyr W (0e87d46a-4f3b-4f52-8a13-a41d21b2d271), logo=None
+2026-02-17 16:30:04,022 - sms_agent - INFO - Saved training example for: Alttwyr W
+2026-02-18 02:21:56,220 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-18 02:21:56,240 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-18 02:21:56,261 - sms_agent - INFO - Bot is polling (dropping pending updates to skip old messages)...
+2026-02-18 04:14:58,671 - sms_agent - INFO - Using custom bank-specific prompt
+2026-02-18 04:15:01,362 - sms_agent - INFO - 📊 Token Usage - Input: 2838, Output: 216, Total: 3054
+2026-02-18 04:15:01,384 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-18 04:15:01,386 - sms_agent - INFO - Linked to merchant: Amazon (1795949d-9fdf-463a-a464-5059713f0311), logo=https://www.google.com/s2/favicons?domain=amazon.sa&sz=64
+2026-02-18 04:15:01,406 - sms_agent - INFO - Saved training example for: Amazon
+2026-02-18 04:16:14,787 - sms_agent - INFO - 📊 Token Usage - Input: 5858, Output: 225, Total: 6083
+2026-02-18 04:16:14,790 - sms_agent - INFO - DEBUG: is_internal_transfer_missing_source=False, source_account=None
+2026-02-18 04:16:14,791 - sms_agent - INFO - Linked to merchant: Amazon (1795949d-9fdf-463a-a464-5059713f0311), logo=https://www.google.com/s2/favicons?domain=amazon.sa&sz=64
+2026-02-18 04:16:14,801 - sms_agent - INFO - Saved training example for: Amazon
+2026-02-18 04:57:58,587 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
+2026-02-18 04:58:13,287 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).

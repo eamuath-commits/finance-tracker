@@ -80,6 +80,8 @@ class MerchantBase(BaseModel):
     display_name: Optional[str] = None
     category: Optional[str] = None
     logo_url: Optional[str] = None
+    brand_domain: Optional[str] = None
+    aliases: Optional[List[str]] = []
     notes: Optional[str] = None
 
 class MerchantCreate(MerchantBase):
@@ -90,6 +92,8 @@ class MerchantUpdate(BaseModel):
     display_name: Optional[str] = None
     category: Optional[str] = None
     logo_url: Optional[str] = None
+    brand_domain: Optional[str] = None
+    aliases: Optional[List[str]] = None
     notes: Optional[str] = None
 
 class Merchant(MerchantBase):

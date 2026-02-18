@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Date, Enum, Text, Boolean
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Date, Enum, Text, Boolean, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
@@ -123,6 +123,8 @@ class Merchant(Base):
     display_name = Column(String, nullable=True)         # User-friendly override
     category = Column(String, nullable=True)             # Default category
     logo_url = Column(String, nullable=True)
+    brand_domain = Column(String, nullable=True)
+    aliases = Column(JSON, nullable=True, default=list)  # List of alternative names for matching
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 

@@ -71,6 +71,19 @@ class JaziraParser(BaseBankParser):
 
 **Date Format:** YYYY-MM-DD HH:MM
 
+**MERCHANT NAME RESOLUTION:**
+SMS often truncates or uses legal entity names. If you recognize the brand, output the FULL brand name and domain:
+- "HUNGERSTATION LLC" → brand_name: "HungerStation", brand_domain: "hungerstation.com"
+- "HUNGERSTA" → brand_name: "HungerStation", brand_domain: "hungerstation.com"
+- "GOT COOKI" → brand_name: "Got Cookie", brand_domain: null
+- "STARBUCKS" → brand_name: "Starbucks", brand_domain: "starbucks.com"
+- "AMAZON" → brand_name: "Amazon", brand_domain: "amazon.sa"
+- "JARIR" → brand_name: "Jarir Bookstore", brand_domain: "jarir.com"
+- "TAMIMI" or "TAMIMI MARKETS" → brand_name: "Tamimi Markets", brand_domain: "tamimimarkets.com"
+- "REAL-DEBR" → brand_name: "Real-Debrid", brand_domain: "real-debrid.com"
+If you don't recognize the brand, set brand_name and brand_domain to null.
+The "merchant" field should contain the EXACT text from the SMS (raw).
+
 **OUTPUT JSON:**
 {
   "is_financial_event": boolean,
@@ -87,6 +100,8 @@ class JaziraParser(BaseBankParser):
   "timestamp": "YYYY-MM-DD HH:MM",
   "available_balance": numberOrNull,
   "merchant": stringOrNull,
+  "brand_name": stringOrNull,
+  "brand_domain": stringOrNull,
   "category": stringOrNull,
   "description": stringOrNull
 }
@@ -103,7 +118,7 @@ class JaziraParser(BaseBankParser):
 
 3. POS Purchase:
    Input: "POS Purchase (Apple Pay)\\nCard: 8001;mada\\nAmount: SAR 50.00\\nAt: STARBUCKS\\nDate: 2026-02-07 10:30"
-   Output: {"is_financial_event":true,"is_transaction":true,"transaction_type":"debit","sub_type":"purchase","source_bank":"Jazira","source_account_last4":"8001","card_info":"mada 8001","amount":50.0,"currency":"SAR","timestamp":"2026-02-07 10:30","merchant":"STARBUCKS","category":"Food & Dining","description":"POS purchase at STARBUCKS"}
+   Output: {"is_financial_event":true,"is_transaction":true,"transaction_type":"debit","sub_type":"purchase","source_bank":"Jazira","source_account_last4":"8001","card_info":"mada 8001","amount":50.0,"currency":"SAR","timestamp":"2026-02-07 10:30","merchant":"STARBUCKS","brand_name":"Starbucks","brand_domain":"starbucks.com","category":"Food & Dining","description":"POS purchase at Starbucks"}
 
 Respond ONLY with valid JSON.
 '''

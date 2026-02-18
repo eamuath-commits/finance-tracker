@@ -763,7 +763,7 @@ def read_transactions(skip: int = 0, limit: int = 1000, db: Session = Depends(ge
         tx_dict = {c.name: getattr(tx, c.name) for c in tx.__table__.columns}
         # Add counterparty display info
         if tx.merchant_ref:
-            tx_dict["merchant_info"] = {"id": tx.merchant_ref.id, "name": tx.merchant_ref.display_name or tx.merchant_ref.name, "type": "merchant"}
+            tx_dict["merchant_info"] = {"id": tx.merchant_ref.id, "name": tx.merchant_ref.display_name or tx.merchant_ref.name, "logo_url": tx.merchant_ref.logo_url, "type": "merchant"}
         if tx.beneficiary_ref:
             tx_dict["beneficiary_info"] = {"id": tx.beneficiary_ref.id, "name": tx.beneficiary_ref.display_name or tx.beneficiary_ref.name, "bank_name": tx.beneficiary_ref.bank_name, "type": "beneficiary"}
         if tx.biller_ref:
@@ -774,7 +774,126 @@ def read_transactions(skip: int = 0, limit: int = 1000, db: Session = Depends(ge
 # --- Counterparty Endpoints ---
 @app.get("/merchants/")
 def list_merchants(db: Session = Depends(get_db)):
-    return crud.get_merchants(db)
+    merchants = crud.get_merchants(db)
+    from sqlalchemy import func as sqla_func
+    counts = dict(
+        db.query(models.Transaction.merchant_id, sqla_func.count(models.Transaction.id))
+        .filter(models.Transaction.merchant_id.isnot(None))
+        .group_by(models.Transaction.merchant_id)
+        .all()
+    )
+    results = []
+    for m in merchants:
+        d = {
+            "id": m.id,
+            "name": m.name,
+            "display_name": m.display_name,
+            "category": m.category,
+            "logo_url": m.logo_url,
+            "brand_domain": m.brand_domain,
+            "aliases": m.aliases or [],
+            "notes": m.notes,
+            "created_at": m.created_at.isoformat() if m.created_at else None,
+            "transaction_count": counts.get(m.id, 0)
+        }
+        results.append(d)
+    return results
+
+@app.get("/merchants/{merchant_id}")
+def get_merchant(merchant_id: str, db: Session = Depends(get_db)):
+    m = db.query(models.Merchant).filter(models.Merchant.id == merchant_id).first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    return m
+
+@app.put("/merchants/{merchant_id}")
+def update_merchant(merchant_id: str, data: dict, db: Session = Depends(get_db)):
+    m = db.query(models.Merchant).filter(models.Merchant.id == merchant_id).first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    for field in ['display_name', 'logo_url', 'category', 'notes']:
+        if field in data:
+            setattr(m, field, data[field])
+    db.commit()
+    db.refresh(m)
+    return m
+
+@app.delete("/merchants/{merchant_id}")
+def delete_merchant(merchant_id: str, db: Session = Depends(get_db)):
+    m = db.query(models.Merchant).filter(models.Merchant.id == merchant_id).first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    db.delete(m)
+    db.commit()
+    return {"status": "deleted"}
+
+@app.post("/merchants/backfill")
+def backfill_merchants(db: Session = Depends(get_db)):
+    """Resolve missing brand data AND merge duplicate merchants (same display_name)."""
+    merchants = db.query(models.Merchant).all()
+    
+    # --- Pass 1: Resolve missing brand data ---
+    updated = []
+    for m in merchants:
+        if not m.display_name or not m.logo_url:
+            brand, domain, logo, cat = crud._resolve_from_known_merchants(m.name)
+            if brand:
+                changed = False
+                if not m.display_name:
+                    m.display_name = brand
+                    changed = True
+                if not m.logo_url and logo:
+                    m.logo_url = logo
+                    changed = True
+                if not m.category and cat:
+                    m.category = cat
+                    changed = True
+                if changed:
+                    updated.append({"name": m.name, "display_name": m.display_name})
+    db.flush()
+    
+    # --- Pass 2: Merge duplicates with same display_name ---
+    merchants = db.query(models.Merchant).all()  # Re-fetch after updates
+    by_display = {}
+    for m in merchants:
+        key = (m.display_name or "").lower().strip()
+        if key:
+            by_display.setdefault(key, []).append(m)
+    
+    merged = []
+    for key, group in by_display.items():
+        if len(group) < 2:
+            continue
+        # Keep the oldest record as canonical
+        group.sort(key=lambda m: m.created_at)
+        canonical = group[0]
+        
+        # Ensure canonical has best data
+        for dup in group[1:]:
+            if dup.logo_url and not canonical.logo_url:
+                canonical.logo_url = dup.logo_url
+            if dup.category and not canonical.category:
+                canonical.category = dup.category
+        
+        # Reassign all transactions from duplicates to canonical
+        for dup in group[1:]:
+            tx_count = db.query(models.Transaction).filter(
+                models.Transaction.merchant_id == dup.id
+            ).update({models.Transaction.merchant_id: canonical.id})
+            merged.append({
+                "removed": dup.name,
+                "kept": canonical.name,
+                "display_name": canonical.display_name,
+                "transactions_moved": tx_count
+            })
+            db.delete(dup)
+    
+    db.commit()
+    return {
+        "resolved": len(updated),
+        "merged": len(merged),
+        "details": {"resolved": updated, "merged": merged}
+    }
 
 @app.get("/beneficiaries/")
 def list_beneficiaries(db: Session = Depends(get_db)):
@@ -1383,23 +1502,65 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
             account = crud.get_account_by_last_4(db, str(last_4))
 
     
-    # 5. Handle unknown account - create pending_action transaction
+    # 5. Handle unknown account - skip if card number is known but unregistered
     if not account and not credit_card:
-        # Create pending_action transaction
+        if last_4:
+            logger.info(f"[SMS-INGEST] SKIP: Card/account {last_4} not registered in system")
+            raw_msg.status = models.MessageStatus.IGNORED
+            raw_msg.error_log = f"Skipped: unregistered card/account {last_4}"
+            db.commit()
+            return {
+                "status": "ignored",
+                "reason": f"Card/account {last_4} is not registered in the system",
+                "parsed": result
+            }
+
+        # Create pending_action transaction only when no card number was extracted at all
         import json as json_lib
         tx_type = result.get("transaction_type") or "debit"
+        
+        # Resolve counterparty (merchant) even for pending_action transactions
+        pending_merchant_id = None
+        merchant_display = result.get("merchant") or result.get("description") or "Unknown"
+        brand_name = result.get("brand_name")
+        brand_domain = result.get("brand_domain")
+        sub_type = result.get("sub_type", "")
+        pending_category = result.get("category", "Uncategorized")
+        
+        try:
+            if sub_type in ['purchase', 'refund', 'atm', 'pos', 'online', 'cc_payment']:
+                raw_merchant = result.get("merchant") or merchant_display
+                if raw_merchant and raw_merchant not in ['Unknown', 'POS Purchase']:
+                    logo_url = f"https://www.google.com/s2/favicons?domain={brand_domain}&sz=64" if brand_domain else None
+                    m = crud.find_or_create_merchant(
+                        db, raw_merchant, 
+                        category=result.get("category"),
+                        brand_name=brand_name,
+                        logo_url=logo_url
+                    )
+                    pending_merchant_id = m.id
+                    if brand_name:
+                        merchant_display = brand_name
+                    # Inherit merchant's category if AI didn't provide one
+                    if m.category and (not pending_category or pending_category.lower() == 'uncategorized'):
+                        pending_category = m.category
+                        logger.info(f"[PENDING] Inherited category '{pending_category}' from merchant {m.display_name or m.name}")
+                    logger.info(f"[PENDING] Linked to merchant: {m.display_name or m.name} ({m.id})")
+        except Exception as e:
+            logger.warning(f"[PENDING] Counterparty resolution failed (non-fatal): {e}")
         
         pending_tx = models.Transaction(
             account_id=None,
             credit_card_id=None,
             amount=result.get("amount", 0),
-            merchant=result.get("merchant") or result.get("description") or "Unknown",
+            merchant=merchant_display,
             raw_sms_content=payload.body,
             parsed_data=json_lib.dumps(result),
             timestamp=datetime.now(),
-            category=result.get("category", "Uncategorized"),
+            category=pending_category,
             type=tx_type,
-            status="pending_action"
+            status="pending_action",
+            merchant_id=pending_merchant_id,
         )
         db.add(pending_tx)
         db.commit()
@@ -1720,9 +1881,25 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
 def create_category(category: schemas.CategoryCreate, db: Session = Depends(get_db)):
     return crud.create_category(db, category)
 
-@app.get("/categories", response_model=List[schemas.Category])
+@app.get("/categories")
 def get_categories(db: Session = Depends(get_db)):
-    return crud.get_categories(db)
+    categories = crud.get_categories(db)
+    # Count transactions per category
+    from sqlalchemy import func as sqla_func
+    counts = dict(
+        db.query(models.Transaction.category, sqla_func.count(models.Transaction.id))
+        .group_by(models.Transaction.category)
+        .all()
+    )
+    return [
+        {
+            "id": cat.id,
+            "name": cat.name,
+            "type": cat.type,
+            "transaction_count": counts.get(cat.name, 0)
+        }
+        for cat in categories
+    ]
 
 @app.put("/categories/{category_id}", response_model=schemas.Category)
 def update_category(category_id: str, payload: schemas.CategoryUpdate, db: Session = Depends(get_db)):

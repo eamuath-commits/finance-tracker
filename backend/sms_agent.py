@@ -275,6 +275,25 @@ async def parse_with_ai(db: Session, text: str, custom_prompt: str = None):
     - BARBER = "Personal Care"
     - Transfer to person = "Transfer"
 
+    **MERCHANT NAME RESOLUTION**:
+    SMS often truncates merchant names. If you recognize the brand, output the FULL brand name and domain:
+    - "HUNGERSTA" → brand_name: "HungerStation", brand_domain: "hungerstation.com"
+    - "GOT COOKI" → brand_name: "Got Cookie", brand_domain: null
+    - "GOOGLE*GO" → brand_name: "Google", brand_domain: "google.com"
+    - "SASCO Qen" → brand_name: "SASCO", brand_domain: "sasco.com.sa"
+    - "DANUBE 13" → brand_name: "Danube", brand_domain: "danube.sa"
+    - "PETROMIN" → brand_name: "Petromin", brand_domain: "petromin.com"
+    - "ALDREES" → brand_name: "Aldrees", brand_domain: "aldrees.com"
+    - "COURSERA" → brand_name: "Coursera", brand_domain: "coursera.org"
+    - "AMAZON" → brand_name: "Amazon", brand_domain: "amazon.sa"
+    - "Starbucks" → brand_name: "Starbucks", brand_domain: "starbucks.com"
+    - "LULU" or "LULU HY" → brand_name: "LuLu Hypermarket", brand_domain: "luluhypermarket.com"
+    - "PANDA" → brand_name: "Panda", brand_domain: "panda.com.sa"
+    - "JARIR" → brand_name: "Jarir Bookstore", brand_domain: "jarir.com"
+    - "EXTRA" → brand_name: "Extra", brand_domain: "extra.com"
+    If you don't recognize the brand, set brand_name and brand_domain to null.
+    The "merchant" field should contain the EXACT text from the SMS (raw/truncated).
+
     **OUTPUT JSON**:
     {{
       "is_financial_event": boolean,
@@ -293,6 +312,8 @@ async def parse_with_ai(db: Session, text: str, custom_prompt: str = None):
       "available_balance": numberOrNull,
       "beneficiary": stringOrNull,
       "merchant": stringOrNull,
+      "brand_name": stringOrNull,
+      "brand_domain": stringOrNull,
       "sender_name": stringOrNull,
       "category": stringOrNull,
       "description": stringOrNull
@@ -304,7 +325,7 @@ async def parse_with_ai(db: Session, text: str, custom_prompt: str = None):
     
     1. AlRajhi PoS Purchase:
        Input: "PoS\\nBy:9365;mada-Apple Pay\\nAmount:SAR 7\\nAt:GOT COOKI\\n27/1/26 12:39"
-       Output: {{"is_financial_event":true,"is_transaction":true,"transaction_type":"debit","sub_type":"purchase","source_bank":"AlRajhiBank","source_account_last4":"9365","card_info":"mada-Apple Pay 9365","amount":7,"currency":"SAR","merchant":"GOT COOKI","category":"Food & Dining","timestamp":"2026-01-27 12:39","description":"Purchase at GOT COOKI"}}
+       Output: {{"is_financial_event":true,"is_transaction":true,"transaction_type":"debit","sub_type":"purchase","source_bank":"AlRajhiBank","source_account_last4":"9365","card_info":"mada-Apple Pay 9365","amount":7,"currency":"SAR","merchant":"GOT COOKI","brand_name":"Got Cookie","brand_domain":null,"category":"Food & Dining","timestamp":"2026-01-27 12:39","description":"Purchase at Got Cookie"}}
     
     2. AlRajhi Internal Transfer (Credit to destination):
        Input: "Transfer Between Your Accounts\\nAmount: SAR 1000\\nTo: 1505\\n26/1/25 17:49"
@@ -320,7 +341,7 @@ async def parse_with_ai(db: Session, text: str, custom_prompt: str = None):
     
     5. AlRajhi Online Purchase (Credit Card):
        Input: "Online Purchase\\nCard:7868 ;Visa\\nAmount:539.99 SAR\\nAt: GOOGLE*GO\\nCountry:USA\\nBalance:88.58 SAR\\n27/1/26 22:47"
-       Output: {{"is_financial_event":true,"is_transaction":true,"transaction_type":"debit","sub_type":"purchase","source_bank":"AlRajhiBank","source_account_last4":"7868","card_info":"Visa 7868","amount":539.99,"currency":"SAR","merchant":"GOOGLE*GO","category":"Subscriptions","available_balance":88.58,"timestamp":"2026-01-27 22:47","description":"Purchase at GOOGLE"}}
+       Output: {{"is_financial_event":true,"is_transaction":true,"transaction_type":"debit","sub_type":"purchase","source_bank":"AlRajhiBank","source_account_last4":"7868","card_info":"Visa 7868","amount":539.99,"currency":"SAR","merchant":"GOOGLE*GO","brand_name":"Google","brand_domain":"google.com","category":"Subscriptions","available_balance":88.58,"timestamp":"2026-01-27 22:47","description":"Purchase at Google"}}
     
     6. AlRajhi Bill Payment:
        Input: "Bill Payment\\nFrom:1505\\nAmount:SAR 973.76\\nBiller:001\\nService:STC BILL\\nBill:00100215438\\n26-1-6 15:40"
@@ -657,6 +678,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                  logger.info(f"DEBUG: Credit Logic Applied. Primary Account: {source_account.name}")
         
         if not source_account and not source_credit_card:
+            # If a card/account number was identified but not found in the system, SKIP
+            if source_last4:
+                logger.info(f"SKIP: Card/account {source_last4} not registered in system. Skipping transaction.")
+                raw_msg.status = models.MessageStatus.IGNORED
+                raw_msg.error_log = f"Skipped: unregistered card/account {source_last4}"
+                db.commit()
+                db.close()
+                if message:
+                    await message.reply_text(f"⏭️ Skipped — card/account •{source_last4} is not registered in the system.")
+                return
+
             # INTERACTIVE FALLBACK - Create PENDING_ACTION transaction with inline buttons
             
             is_credit = result.get('transaction_type') == 'credit'
@@ -1056,15 +1088,30 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
     counterparty_merchant_id = None
     counterparty_beneficiary_id = None
     counterparty_biller_id = None
+    brand_name = result.get('brand_name')
+    brand_domain = result.get('brand_domain')
     
     try:
         if sub_type in ['purchase', 'refund', 'atm', 'pos', 'online'] or (sub_type == 'cc_payment'):
             # POS / online purchases → merchants table
             merchant_name = result.get('merchant') or merchant_raw
             if merchant_name and merchant_name not in ['Unknown', 'POS Purchase']:
-                m = crud.find_or_create_merchant(db, merchant_name, category=category)
+                logo_url = f"https://www.google.com/s2/favicons?domain={brand_domain}&sz=64" if brand_domain else None
+                m = crud.find_or_create_merchant(
+                    db, merchant_name, 
+                    category=category,
+                    brand_name=brand_name,
+                    logo_url=logo_url
+                )
                 counterparty_merchant_id = m.id
-                logger.info(f"Linked to merchant: {m.name} ({m.id})")
+                # Use brand_name as the display merchant_raw if available
+                if brand_name:
+                    merchant_raw = brand_name
+                # Inherit merchant's category if transaction category is unset
+                if m.category and (not category or category.lower() == 'uncategorized'):
+                    category = m.category
+                    logger.info(f"Inherited category '{category}' from merchant {m.display_name or m.name}")
+                logger.info(f"Linked to merchant: {m.display_name or m.name} ({m.id}), logo={logo_url}")
         
         elif sub_type in ['transfer', 'internal_transfer']:
             if tx_type_str == 'debit' and not dest_account:

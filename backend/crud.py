@@ -1356,24 +1356,98 @@ def get_or_create_category(db: Session, category_name: str, category_type: str =
     """
     Get an existing category by name or create it if it doesn't exist.
     Used by SMS parsing to auto-record new categories.
+    
+    Matching strategy (in order):
+    1. Exact case-insensitive match ("Health" == "health")
+    2. Existing category is a prefix of the new name ("Health" matches "Healthcare")
+    3. New name is a prefix of existing category ("Health" matches existing "Healthcare")  
+    4. Normalized match after stripping common suffixes like "& Fitness", "& Medical"
     """
     if not category_name or category_name.strip() == "" or category_name.lower() == "uncategorized":
         return None
     
-    # Check if category exists (case-insensitive)
+    clean_name = category_name.strip()
+    lower_name = clean_name.lower()
+    
+    # 1. Exact match (case-insensitive)
     existing = db.query(models.Category).filter(
-        func.lower(models.Category.name) == category_name.lower()
+        func.lower(models.Category.name) == lower_name
     ).first()
     
     if existing:
         return existing
     
-    # Create new category
+    # 2. Fuzzy match: prefix/substring matching against all existing categories
+    all_cats = db.query(models.Category).all()
+    
+    # Common suffixes the AI appends that shouldn't create new categories
+    NOISE_SUFFIXES = [
+        '& fitness', '& medical', '& wellness', '& beauty', '& dining',
+        '& entertainment', '& leisure', '& services', '& supplies',
+        'care', 'services', 'payment', 'payments',
+    ]
+    
+    def normalize(name):
+        """Strip common AI-appended suffixes to get the core category."""
+        n = name.lower().strip()
+        for suffix in NOISE_SUFFIXES:
+            if n.endswith(suffix):
+                stripped = n[:len(n) - len(suffix)].strip().rstrip('&').strip()
+                if len(stripped) >= 3:
+                    return stripped
+        return n
+    
+    norm_new = normalize(lower_name)
+    
+    best_match = None
+    best_score = 0  # higher = better match
+    
+    for cat in all_cats:
+        cat_lower = cat.name.lower().strip()
+        norm_cat = normalize(cat_lower)
+        
+        # Exact normalized match (e.g., "Health & Fitness" → "health" == "health")
+        if norm_new == norm_cat:
+            best_match = cat
+            break
+        
+        # Existing category name is a prefix of the new name
+        # e.g., existing "Health" matches new "Healthcare" (min 4 chars to avoid false positives)
+        if len(cat_lower) >= 4 and lower_name.startswith(cat_lower):
+            score = len(cat_lower)
+            if score > best_score:
+                best_match = cat
+                best_score = score
+        
+        # New name is a prefix of existing category name
+        # e.g., new "Health" matches existing "Healthcare"
+        if len(lower_name) >= 4 and cat_lower.startswith(lower_name):
+            score = len(lower_name)
+            if score > best_score:
+                best_match = cat
+                best_score = score
+    
+    if best_match:
+        return best_match
+    
+    # 3. No match found - create new category
     db_cat = models.Category(
-        name=category_name,
+        name=clean_name,
         type=category_type
     )
     db.add(db_cat)
+    db.commit()
+    db.refresh(db_cat)
+    return db_cat
+
+def update_category(db: Session, category_id: str, payload: schemas.CategoryUpdate):
+    db_cat = db.query(models.Category).filter(models.Category.id == category_id).first()
+    if not db_cat:
+        return None
+    if payload.name is not None:
+        db_cat.name = payload.name
+    if payload.type is not None:
+        db_cat.type = payload.type
     db.commit()
     db.refresh(db_cat)
     return db_cat
@@ -1947,14 +2021,156 @@ def delete_merchant(db: Session, merchant_id: str):
         db.commit()
     return db_merchant
 
-def find_or_create_merchant(db: Session, name: str, category: str = None) -> models.Merchant:
-    """Find existing merchant by name (case-insensitive) or create new one."""
+# Known merchant mappings for brand resolution fallback
+# Used when AI doesn't return brand_name/brand_domain
+KNOWN_MERCHANTS = {
+    # Food & Dining
+    "hungersta": ("HungerStation", "hungerstation.com", "Food & Dining"),
+    "hungerstation": ("HungerStation", "hungerstation.com", "Food & Dining"),
+    "jahez": ("Jahez", "jahez.net", "Food & Dining"),
+    "got cooki": ("Got Cookie", None, "Food & Dining"),
+    "got cookies": ("Got Cookie", None, "Food & Dining"),
+    "starbucks": ("Starbucks", "starbucks.com", "Food & Dining"),
+    "mcdonald": ("McDonald's", "mcdonalds.com", "Food & Dining"),
+    "dr cafe": ("Dr. Cafe", "drcafe.com.sa", "Food & Dining"),
+    "rose cafe": ("Rose Cafe", None, "Food & Dining"),
+    "30 degree": ("30 Degrees", None, "Food & Dining"),
+    "kudu": ("Kudu", "kudu.com.sa", "Food & Dining"),
+    "albaik": ("Al Baik", "albaik.com", "Food & Dining"),
+    "herfy": ("Herfy", "herfy.com", "Food & Dining"),
+    # Groceries
+    "tamimi": ("Tamimi Markets", "tamimimarkets.com", "Groceries"),
+    "panda": ("Panda", "panda.com.sa", "Groceries"),
+    "danube": ("Danube", "danube.sa", "Groceries"),
+    "carrefour": ("Carrefour", "carrefourksa.com", "Groceries"),
+    "lulu": ("Lulu Hypermarket", "luluhypermarket.com", "Groceries"),
+    "nesto": ("Nesto", "nestogroup.com", "Groceries"),
+    "bin dawood": ("BinDawood", "bindawood.com", "Groceries"),
+    # Transport
+    "sasco": ("SASCO", "sasco.com.sa", "Transportation"),
+    "uber": ("Uber", "uber.com", "Transportation"),
+    "careem": ("Careem", "careem.com", "Transportation"),
+    # Shopping
+    "amazon": ("Amazon", "amazon.sa", "Shopping"),
+    "noon": ("Noon", "noon.com", "Shopping"),
+    "jarir": ("Jarir Bookstore", "jarir.com", "Shopping"),
+    "extra": ("eXtra", "extra.com", "Shopping"),
+    "ikea": ("IKEA", "ikea.com.sa", "Shopping"),
+    "shein": ("SHEIN", "shein.com", "Shopping"),
+    "namshi": ("Namshi", "namshi.com", "Shopping"),
+    # Tech & Subscriptions
+    "google": ("Google", "google.com", "Subscriptions"),
+    "microsoft": ("Microsoft", "microsoft.com", "Subscriptions"),
+    "apple.com": ("Apple", "apple.com", "Subscriptions"),
+    "netflix": ("Netflix", "netflix.com", "Subscriptions"),
+    "spotify": ("Spotify", "spotify.com", "Subscriptions"),
+    "real-debr": ("Real-Debrid", "real-debrid.com", "Subscriptions"),
+    "prime bit": ("Prime Bit", None, "Subscriptions"),
+    # Courier & Logistics
+    "aramex": ("Aramex", "aramex.com", "Shopping"),
+    "smsa": ("SMSA Express", "smsaexpress.com", "Shopping"),
+    "dhl": ("DHL", "dhl.com", "Shopping"),
+    # Payments & BNPL
+    "tamara": ("Tamara", "tamara.co", "Shopping"),
+    "tabby": ("Tabby", "tabby.ai", "Shopping"),
+    "stc pay": ("STC Pay", "stcpay.com.sa", "Transfer"),
+    # Telecom
+    "stc": ("STC", "stc.com.sa", "Bills & Utilities"),
+    "mobily": ("Mobily", "mobily.com.sa", "Bills & Utilities"),
+    "zain": ("Zain", "zain.com", "Bills & Utilities"),
+    # Technology
+    "lt techno": ("LT Technologies", None, None),
+    "meed": ("MEED", None, None),
+}
+
+
+def _resolve_from_known_merchants(name: str):
+    """Resolve brand_name, brand_domain, and category from known merchant mapping."""
+    name_lower = name.lower().strip()
+    for key, (brand, domain, cat) in KNOWN_MERCHANTS.items():
+        if key in name_lower or name_lower in key:
+            logo = f"https://www.google.com/s2/favicons?domain={domain}&sz=64" if domain else None
+            return brand, domain, logo, cat
+    return None, None, None, None
+
+
+def find_or_create_merchant(db: Session, name: str, category: str = None, brand_name: str = None, logo_url: str = None) -> models.Merchant:
+    """Find existing merchant by name or brand_name (case-insensitive) or create new one.
+    Uses substring matching to consolidate truncated names (e.g. HUNGERSTA → HUNGERSTATION LLC).
+    Falls back to KNOWN_MERCHANTS mapping when AI doesn't return brand data."""
+    name_clean = name.lower().strip()
+    
+    # Fallback: if AI didn't resolve, try known merchant mapping
+    if not brand_name:
+        kb_name, kb_domain, kb_logo, kb_cat = _resolve_from_known_merchants(name)
+        if kb_name:
+            brand_name = kb_name
+            logo_url = logo_url or kb_logo
+            category = category or kb_cat
+    
+    # 1. Exact match by raw name
     existing = db.query(models.Merchant).filter(
-        func.lower(models.Merchant.name) == name.lower().strip()
+        func.lower(models.Merchant.name) == name_clean
     ).first()
+    
+    # 2. Match by brand_name (display_name)
+    if not existing and brand_name:
+        existing = db.query(models.Merchant).filter(
+            func.lower(models.Merchant.display_name) == brand_name.lower().strip()
+        ).first()
+    
+    # 3. Match by aliases
+    if not existing:
+        all_merchants = db.query(models.Merchant).all()
+        for m in all_merchants:
+            if m.aliases:
+                for alias in m.aliases:
+                    alias_lower = alias.lower().strip()
+                    if len(alias_lower) >= 3 and (alias_lower == name_clean or alias_lower in name_clean or name_clean in alias_lower):
+                        existing = m
+                        break
+            if existing:
+                break
+    
+    # 4. Substring match: existing name contains this name, or this name contains existing name
+    #    e.g. "HUNGERSTATION LLC" contains "HUNGERSTA", or "HUNGERSTA" contained in "HUNGERSTATION LLC"
+    if not existing and len(name_clean) >= 5:
+        # Check if any existing merchant name is a prefix of this name
+        all_merchants = db.query(models.Merchant).all()
+        for m in all_merchants:
+            m_name = m.name.lower().strip()
+            m_display = (m.display_name or "").lower().strip()
+            # Existing raw name is prefix/substring of new name
+            if len(m_name) >= 5 and (m_name in name_clean or name_clean in m_name):
+                existing = m
+                break
+            # Existing display_name matches
+            if m_display and len(m_display) >= 5 and (m_display in name_clean or name_clean in m_display):
+                existing = m
+                break
+            # brand_name matches existing raw name
+            if brand_name:
+                bn = brand_name.lower().strip()
+                if len(bn) >= 5 and (bn in m_name or m_name in bn or bn in m_display):
+                    existing = m
+                    break
+    
     if existing:
+        # Update display_name and logo if we have new/better info
+        if brand_name and not existing.display_name:
+            existing.display_name = brand_name
+        if logo_url and not existing.logo_url:
+            existing.logo_url = logo_url
+        if category and not existing.category:
+            existing.category = category
         return existing
-    new_merchant = models.Merchant(name=name.strip(), category=category)
+    
+    new_merchant = models.Merchant(
+        name=name.strip(), 
+        display_name=brand_name,
+        category=category,
+        logo_url=logo_url
+    )
     db.add(new_merchant)
     db.flush()  # Get ID without committing (caller will commit)
     return new_merchant
