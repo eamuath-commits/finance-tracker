@@ -944,9 +944,11 @@ function Transactions() {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                                                 {/* For pending_action transfers, show source selection dropdown */}
-                                                {tx.status === 'pending_action' && acc ? (
+                                                {tx.status === 'pending_action' ? (
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-xs text-amber-400 uppercase font-bold tracking-wider">FROM:</span>
+                                                        <span className="text-xs text-amber-400 uppercase font-bold tracking-wider">
+                                                            {!acc && !cc ? 'ASSIGN:' : 'FROM:'}
+                                                        </span>
                                                         <select
                                                             className="bg-slate-700 border border-amber-600 text-amber-400 rounded px-2 py-1 text-xs cursor-pointer"
                                                             defaultValue=""
@@ -954,14 +956,24 @@ function Transactions() {
                                                                 const accountId = e.target.value;
                                                                 if (!accountId) return;
                                                                 try {
-                                                                    await fetch(`${API_URL}/transactions/${tx.id}/complete-transfer?source_account_id=${accountId}`, { method: 'POST' });
+                                                                    if (acc) {
+                                                                        // Has destination already — use complete-transfer
+                                                                        await fetch(`${API_URL}/transactions/${tx.id}/complete-transfer?source_account_id=${accountId}`, { method: 'POST' });
+                                                                    } else {
+                                                                        // No account at all — assign the account
+                                                                        await fetch(`${API_URL}/transactions/queue/${tx.id}/assign`, {
+                                                                            method: 'POST',
+                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                            body: JSON.stringify({ account_id: accountId })
+                                                                        });
+                                                                    }
                                                                     fetchData();
                                                                 } catch (err) {
                                                                     console.error('Failed to assign account:', err);
                                                                 }
                                                             }}
                                                         >
-                                                            <option value="">Select source...</option>
+                                                            <option value="">Select account...</option>
                                                             <option value="external" className="text-gray-400">— Unknown / External —</option>
                                                             {accounts.filter(a => a.id !== tx.account_id).map(a => (
                                                                 <option key={a.id} value={a.id}>{a.name} {a.last_4_digits ? `•${a.last_4_digits}` : ''}</option>
