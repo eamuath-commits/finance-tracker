@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Wallet, PiggyBank, CreditCard, LayoutGrid, List, Receipt, CreditCard as ChipIcon, Edit3, Trash2, Plus, Search, Filter, MessageSquareText, User, Upload } from 'lucide-react';
+import { Wallet, PiggyBank, CreditCard, LayoutGrid, List, Receipt, CreditCard as ChipIcon, Edit3, Trash2, Plus, Search, Filter, MessageSquareText, User, Upload, RefreshCw } from 'lucide-react';
 import { Card, SectionHeader, Modal, formatCurrency, inputClass, selectClass } from '../components/UI';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, rectSortingStrategy, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable';
@@ -1204,13 +1204,40 @@ const Accounts = () => {
 
                         <div className="flex justify-between items-center mt-6 gap-3">
                             {editingId && (
-                                <button
-                                    type="button"
-                                    onClick={handleDeleteAccount}
-                                    className="text-red-400 hover:text-red-300 text-xs flex items-center gap-1 px-3 py-2 hover:bg-red-500/10 rounded-lg transition border border-transparent hover:border-red-500/30"
-                                >
-                                    <Trash2 size={14} /> Delete
-                                </button>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleDeleteAccount}
+                                        className="text-red-400 hover:text-red-300 text-xs flex items-center gap-1 px-3 py-2 hover:bg-red-500/10 rounded-lg transition border border-transparent hover:border-red-500/30"
+                                    >
+                                        <Trash2 size={14} /> Delete
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            try {
+                                                const res = await axios.post(`${API_URL}/accounts/${editingId}/recalculate-balance`);
+                                                const d = res.data;
+                                                const diff = d.new_balance - d.old_balance;
+                                                const diffStr = diff >= 0 ? `+${diff.toFixed(2)}` : diff.toFixed(2);
+                                                alert(
+                                                    `Balance Recalculated ✅\n\n` +
+                                                    `Old: ${d.old_balance.toFixed(2)}\n` +
+                                                    `New: ${d.new_balance.toFixed(2)} (${diffStr})\n\n` +
+                                                    `Credits: ${d.total_credits.toFixed(2)}\n` +
+                                                    `Debits: ${d.total_debits.toFixed(2)}\n` +
+                                                    `Fees: ${d.total_fees.toFixed(2)}\n` +
+                                                    `Transactions: ${d.transaction_count}`
+                                                );
+                                                setAccountForm(prev => ({ ...prev, current_balance: d.new_balance }));
+                                                fetchData();
+                                            } catch (err) { alert('Failed to recalculate: ' + (err.response?.data?.detail || err.message)); }
+                                        }}
+                                        className="text-blue-400 hover:text-blue-300 text-xs flex items-center gap-1 px-3 py-2 hover:bg-blue-500/10 rounded-lg transition border border-transparent hover:border-blue-500/30"
+                                    >
+                                        <RefreshCw size={14} /> Recalculate
+                                    </button>
+                                </div>
                             )}
                             <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-medium flex-1 shadow-md border border-green-500 transition">
                                 Save Account

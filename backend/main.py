@@ -230,42 +230,35 @@ def delete_account(account_id: str, db: Session = Depends(get_db)):
 
 @app.post("/accounts/{account_id}/recalculate-balance")
 def recalculate_account_balance(account_id: str, db: Session = Depends(get_db)):
-    """Recalculate account balance from transaction history"""
+    """Recalculate account balance purely from transaction history (credits - debits - fees)"""
     account = db.query(models.Account).filter(models.Account.id == account_id).first()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
     
-    # Get the most recent transaction with balance_after_transaction
-    latest_tx = db.query(models.Transaction).filter(
-        models.Transaction.account_id == account_id,
-        models.Transaction.balance_after_transaction.isnot(None)
-    ).order_by(models.Transaction.timestamp.desc()).first()
-    
     old_balance = account.current_balance
     
-    if latest_tx and latest_tx.balance_after_transaction is not None:
-        account.current_balance = latest_tx.balance_after_transaction
-    else:
-        # No transactions with balance - calculate from scratch
-        credits = db.query(models.Transaction).filter(
-            models.Transaction.account_id == account_id,
-            models.Transaction.type == "credit"
-        ).all()
-        debits = db.query(models.Transaction).filter(
-            models.Transaction.account_id == account_id,
-            models.Transaction.type == "debit"
-        ).all()
-        account.current_balance = sum(t.amount for t in credits) - sum(t.amount for t in debits)
+    # Always calculate from scratch: sum(credits) - sum(debits) - sum(fees)
+    transactions = db.query(models.Transaction).filter(
+        models.Transaction.account_id == account_id
+    ).all()
     
+    total_credits = sum(t.amount for t in transactions if t.type == "credit")
+    total_debits = sum(t.amount for t in transactions if t.type == "debit")
+    total_fees = sum(t.fees or 0 for t in transactions)
+    
+    account.current_balance = round(total_credits - total_debits - total_fees, 2)
     db.commit()
     db.refresh(account)
     
     return {
-        "message": "Balance recalculated",
+        "message": "Balance recalculated from transactions",
         "account_id": account_id,
-        "old_balance": old_balance,
+        "old_balance": round(old_balance, 2),
         "new_balance": account.current_balance,
-        "source": "latest_transaction" if latest_tx else "calculated"
+        "total_credits": round(total_credits, 2),
+        "total_debits": round(total_debits, 2),
+        "total_fees": round(total_fees, 2),
+        "transaction_count": len(transactions)
     }
 
 @app.post("/accounts/recalculate-all-balances")

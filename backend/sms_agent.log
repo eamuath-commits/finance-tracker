@@ -14131,3 +14131,4 @@ By:4390;mada-Apple P...
 2026-02-22 03:54:59,990 - sms_agent - INFO - Inherited category 'Groceries' from merchant مقصفي
 2026-02-22 03:54:59,990 - sms_agent - INFO - Linked to merchant: مقصفي (fd69269a-2a6d-444d-922c-ffb6679ea04d), logo=None
 2026-02-22 03:54:59,996 - sms_agent - INFO - Saved training example for: COMMERCIA
+2026-02-22 04:05:20,869 - sms_agent - INFO - Gemini AI Configured Successfully (Model: gemini-2.0-flash).
