@@ -148,13 +148,13 @@ def apply_balance_update(db: Session, transaction: models.Transaction) -> bool:
         if account:
             old_balance = account.current_balance or 0
             if tx_type == 'credit':
-                account.current_balance = old_balance + amount
+                account.current_balance = round(old_balance + amount, 2)
             else:  # debit
-                account.current_balance = old_balance - amount
+                account.current_balance = round(old_balance - amount, 2)
             
             # Calculate balance_after_transaction
             if transaction.fees:
-                account.current_balance -= transaction.fees
+                account.current_balance = round(account.current_balance - transaction.fees, 2)
             transaction.balance_after_transaction = account.current_balance
             logger.info(f"Account {account.last_4_digits}: {old_balance} -> {account.current_balance}")
     
@@ -174,7 +174,7 @@ def apply_balance_update(db: Session, transaction: models.Transaction) -> bool:
                 credit_card.current_balance = old_balance - amount
             
             if transaction.fees:
-                credit_card.current_balance -= transaction.fees
+                credit_card.current_balance = round(credit_card.current_balance - transaction.fees, 2)
             
             transaction.balance_after_transaction = credit_card.current_balance
             logger.info(f"CC {credit_card.last_4_digits}: {old_balance} -> {credit_card.current_balance}")

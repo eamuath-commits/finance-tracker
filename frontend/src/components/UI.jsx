@@ -17,14 +17,14 @@ export const formatCurrency = (value) => {
                     WebkitMaskPosition: 'center'
                 }}
             />
-            <span>{Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span>{(Math.round(Number(value) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </span>
     );
 };
 
 // Plain text version for use in <option> elements and other non-JSX contexts
 export const formatCurrencyText = (value) => {
-    return `${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR`;
+    return `${(Math.round(Number(value) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR`;
 };
 
 export const Card = ({ title, value, subtext, color = "blue", children, className = "" }) => {
