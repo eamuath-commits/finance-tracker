@@ -1486,7 +1486,7 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
     has_source_in_sms = bool(result.get("source_account_last4"))
     has_dest_in_sms = bool(result.get("destination_account_last4"))
     
-    if sub_type_check in ("transfer", "internal_transfer") and account and has_dest_in_sms and not has_source_in_sms:
+    if sub_type_check == "internal_transfer" and account and has_dest_in_sms and not has_source_in_sms:
         # The matched account is the destination, NOT the source — need to ask user for source
         import json as json_lib
         dest_account_name = account.name
@@ -1551,8 +1551,8 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
     # 5. Handle unknown account - skip if card number is known but unregistered
     if not account and not credit_card:
         if any_last4:
-            # For internal transfers, don't skip — prompt for account selection instead
-            if sub_type_check in ("transfer", "internal_transfer"):
+            # For internal transfers (between user's own accounts), don't skip — prompt for account selection
+            if sub_type_check == "internal_transfer":
                 logger.info(f"[SMS-INGEST] Transfer with unregistered account {any_last4} — prompting for account selection")
                 import json as json_lib
                 
