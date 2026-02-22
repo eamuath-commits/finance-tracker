@@ -1465,7 +1465,21 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
     # 4. Find account using clean resolve_account logic
     account, credit_card, any_last4 = sms_agent.resolve_account(db, result, payload.body)
     
-    # 4b. Special handling for internal transfers where only destination is known
+    # 4b. Parse SMS timestamp for use in pending transactions
+    import re as _re
+    from dateutil import parser as _date_parser
+    pending_timestamp = datetime.now()
+    header_match = _re.match(r'^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+from\s+', payload.body, _re.IGNORECASE)
+    if header_match:
+        try:
+            pending_timestamp = datetime.strptime(header_match.group(1), "%Y-%m-%d %H:%M:%S")
+        except: pass
+    elif result.get("timestamp"):
+        try:
+            pending_timestamp = _date_parser.parse(result["timestamp"])
+        except: pass
+    
+    # 4c. Special handling for internal transfers where only destination is known
     # If sub_type is 'transfer' and the SMS only has a "To:" field (no "From:"),
     # the matched account is the DESTINATION, not the source. Prompt for source.
     sub_type_check = (result.get("sub_type") or "").lower()
@@ -1492,7 +1506,7 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
             merchant=f"Transfer to {dest_account_name}",
             raw_sms_content=payload.body,
             parsed_data=json_lib.dumps(parsed_with_dest),
-            timestamp=datetime.now(),
+            timestamp=pending_timestamp,
             category="Transfer",
             type="debit",
             status="pending_action",
@@ -1549,7 +1563,7 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
                     merchant=f"Transfer (account x{any_last4})",
                     raw_sms_content=payload.body,
                     parsed_data=json_lib.dumps(result),
-                    timestamp=datetime.now(),
+                    timestamp=pending_timestamp,
                     category="Transfer",
                     type=result.get("transaction_type", "debit"),
                     status="pending_action",
