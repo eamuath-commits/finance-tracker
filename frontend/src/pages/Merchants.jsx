@@ -172,8 +172,8 @@ function Merchants() {
             </div>
 
             {/* Search & Filters */}
-            <div className="flex gap-3 items-center">
-                <div className="relative flex-1">
+            <div className="space-y-3">
+                <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                     <input
                         type="text"
@@ -183,42 +183,44 @@ function Merchants() {
                         className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
                     />
                 </div>
-                <select
-                    value={filterCategory}
-                    onChange={e => setFilterCategory(e.target.value)}
-                    className={`${selectClass} min-w-[160px]`}
-                >
-                    <option value="">All Categories</option>
-                    {uniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <select
-                    value={filterStatus}
-                    onChange={e => setFilterStatus(e.target.value)}
-                    className={`${selectClass} min-w-[140px]`}
-                >
-                    <option value="">All Status</option>
-                    <option value="resolved">Resolved</option>
-                    <option value="unresolved">Unresolved</option>
-                    <option value="has_logo">Has Logo</option>
-                    <option value="no_logo">No Logo</option>
-                </select>
-                <select
-                    value={filterTx}
-                    onChange={e => setFilterTx(e.target.value)}
-                    className={`${selectClass} min-w-[160px]`}
-                >
-                    <option value="">All Transactions</option>
-                    <option value="has_tx">Has Transactions</option>
-                    <option value="no_tx">No Transactions</option>
-                </select>
-                {hasActiveFilters && (
-                    <button
-                        onClick={() => { setFilterCategory(''); setFilterStatus(''); setFilterTx(''); }}
-                        className="flex items-center gap-1 px-3 py-2.5 text-gray-400 hover:text-white bg-slate-800 border border-slate-700 rounded-lg transition-colors text-sm"
+                <div className="flex gap-3 items-center flex-wrap">
+                    <select
+                        value={filterCategory}
+                        onChange={e => setFilterCategory(e.target.value)}
+                        className={`${selectClass} min-w-[160px]`}
                     >
-                        <X size={14} /> Clear
-                    </button>
-                )}
+                        <option value="">All Categories</option>
+                        {uniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <select
+                        value={filterStatus}
+                        onChange={e => setFilterStatus(e.target.value)}
+                        className={`${selectClass} min-w-[140px]`}
+                    >
+                        <option value="">All Status</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="unresolved">Unresolved</option>
+                        <option value="has_logo">Has Logo</option>
+                        <option value="no_logo">No Logo</option>
+                    </select>
+                    <select
+                        value={filterTx}
+                        onChange={e => setFilterTx(e.target.value)}
+                        className={`${selectClass} min-w-[160px]`}
+                    >
+                        <option value="">All Transactions</option>
+                        <option value="has_tx">Has Transactions</option>
+                        <option value="no_tx">No Transactions</option>
+                    </select>
+                    {hasActiveFilters && (
+                        <button
+                            onClick={() => { setFilterCategory(''); setFilterStatus(''); setFilterTx(''); }}
+                            className="flex items-center gap-1 px-3 py-2.5 text-gray-400 hover:text-white bg-slate-800 border border-slate-700 rounded-lg transition-colors text-sm"
+                        >
+                            <X size={14} /> Clear
+                        </button>
+                    )}
+                </div>
             </div>
             {/* Result count */}
             {(search || hasActiveFilters) && (
