@@ -1269,7 +1269,7 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
     body_lower = payload.body.lower()
     otp_keywords = [
         'otp', 'verification code', 'one-time', 'one time', 
-        'رمز التحقق', 'كلمة السر', 'رمز سري',  # Arabic OTP keywords
+        'رمز التحقق', 'كلمة السر', 'رمز سري', 'رمز مؤقت',  # Arabic OTP keywords
         'security code', 'pin code', 'temporary password',
         'verify your', 'confirm your identity', 'authentication code',
         'do not share', 'لا تشاركه', 'expires in'
