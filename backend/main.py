@@ -1472,7 +1472,7 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
     has_source_in_sms = bool(result.get("source_account_last4"))
     has_dest_in_sms = bool(result.get("destination_account_last4"))
     
-    if sub_type_check == "transfer" and account and has_dest_in_sms and not has_source_in_sms:
+    if sub_type_check in ("transfer", "internal_transfer") and account and has_dest_in_sms and not has_source_in_sms:
         # The matched account is the destination, NOT the source — need to ask user for source
         import json as json_lib
         dest_account_name = account.name
@@ -1537,6 +1537,60 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
     # 5. Handle unknown account - skip if card number is known but unregistered
     if not account and not credit_card:
         if any_last4:
+            # For internal transfers, don't skip — prompt for account selection instead
+            if sub_type_check in ("transfer", "internal_transfer"):
+                logger.info(f"[SMS-INGEST] Transfer with unregistered account {any_last4} — prompting for account selection")
+                import json as json_lib
+                
+                pending_tx = models.Transaction(
+                    account_id=None,
+                    credit_card_id=None,
+                    amount=result.get("amount", 0),
+                    merchant=f"Transfer (account x{any_last4})",
+                    raw_sms_content=payload.body,
+                    parsed_data=json_lib.dumps(result),
+                    timestamp=datetime.now(),
+                    category="Transfer",
+                    type=result.get("transaction_type", "debit"),
+                    status="pending_action",
+                )
+                db.add(pending_tx)
+                db.commit()
+                db.refresh(pending_tx)
+                
+                raw_msg.status = models.MessageStatus.PENDING
+                raw_msg.error_log = f"Transfer involving unregistered account x{any_last4} — waiting for account selection"
+                db.commit()
+                
+                accounts_list = crud.get_accounts(db)
+                credit_cards_list = crud.get_credit_cards(db)
+                
+                account_options = [
+                    {"id": acc.id, "name": acc.name, "type": "account", "last_4": acc.last_4_digits}
+                    for acc in accounts_list
+                ]
+                cc_options = [
+                    {"id": cc.id, "name": cc.name, "type": "credit_card", "last_4": cc.last_4_digits}
+                    for cc in credit_cards_list
+                ]
+                
+                return {
+                    "status": "pending_action",
+                    "reason": f"Transfer involving account x{any_last4} (not registered) — select which account to debit",
+                    "transaction_id": pending_tx.id,
+                    "transaction": {
+                        "id": pending_tx.id,
+                        "amount": pending_tx.amount,
+                        "merchant": pending_tx.merchant,
+                        "type": pending_tx.type,
+                        "category": pending_tx.category,
+                        "status": pending_tx.status
+                    },
+                    "accounts": account_options,
+                    "credit_cards": cc_options,
+                    "parsed": result
+                }
+            
             logger.info(f"[SMS-INGEST] SKIP: Card/account {any_last4} not registered in system")
             raw_msg.status = models.MessageStatus.IGNORED
             raw_msg.error_log = f"Skipped: unregistered card/account {any_last4}"
