@@ -15,6 +15,7 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
     const [isProcessing, setIsProcessing] = useState(false);
     const [results, setResults] = useState([]);
     const [expandedRows, setExpandedRows] = useState(new Set());
+    const [statusFilter, setStatusFilter] = useState('all');
 
     // DISABLED: localStorage was causing stale results to accumulate
     // Results now reset on page refresh for cleaner experience
@@ -163,29 +164,12 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
                     );
                 });
 
-                // SEQUENTIAL QUEUE: Stop processing if this item needs resolution
-                // Mark all subsequent items as 'waiting' - they will be processed after resolution
                 if (finalStatus === "pending_action") {
-                    setAgentStatus(`⏳ Waiting: SMS ${i + 1} needs account selection before continuing`);
-                    setProcessingQueue(prev => prev.map((item, idx) =>
-                        idx > i ? {
-                            ...item,
-                            status: "waiting",
-                            result: {
-                                reason: "Waiting for previous SMS to be resolved",
-                                steps: [{ time: new Date().toLocaleTimeString(), action: "Waiting", detail: "Queued - waiting for pending item" }]
-                            }
-                        } : item
-                    ));
-                    break; // Stop processing loop - resume when pending_action is resolved
+                    addStep({ action: "Pending", detail: `SMS ${i + 1} needs account selection — continuing with next SMS` });
                 }
 
                 if (finalStatus === "blocked") {
-                    setAgentStatus(`⚠️ Queue blocked: ${res.data.blocked_count} pending transaction(s) need resolution`);
-                    setProcessingQueue(prev => prev.map((item, idx) =>
-                        idx > i ? { ...item, status: "waiting", result: { reason: "Waiting for blocked item", steps: [{ time: new Date().toLocaleTimeString(), action: "Waiting", detail: "Queued - waiting for blocked item" }] } } : item
-                    ));
-                    break;
+                    addStep({ action: "Blocked", detail: `Queue blocked — continuing with next SMS` });
                 }
 
             } catch (err) {
@@ -519,6 +503,21 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
     const totalMessages = parseSMSMessages(smsInput).length;
     const allItems = [...processingQueue, ...results];
 
+    // Status filter counts
+    const statusCounts = {
+        all: allItems.length,
+        success: allItems.filter(i => (i.result?.status || i.status) === 'success').length,
+        failed: allItems.filter(i => (i.result?.status || i.status) === 'failed').length,
+        ignored: allItems.filter(i => (i.result?.status || i.status) === 'ignored').length,
+        pending_action: allItems.filter(i => (i.result?.status || i.status) === 'pending_action').length,
+        blocked: allItems.filter(i => (i.result?.status || i.status) === 'blocked').length,
+        duplicate: allItems.filter(i => (i.result?.status || i.status) === 'duplicate').length,
+    };
+
+    const filteredItems = statusFilter === 'all'
+        ? allItems
+        : allItems.filter(i => (i.result?.status || i.status) === statusFilter);
+
     return (
         <div className="space-y-6 animate-fade-in">
             {/* Input Section */}
@@ -615,14 +614,41 @@ AlRajhiBank —— Credit Transfer Internal | Amount:SAR 5000 | To:7772"
                             </button>
                         </div>
                     </div>
+                    {/* Status Filter Buttons */}
+                    <div className="px-4 pb-3 flex gap-2 flex-wrap">
+                        {[
+                            { key: 'all', label: 'All', color: 'slate' },
+                            { key: 'success', label: 'Success', color: 'emerald' },
+                            { key: 'failed', label: 'Failed', color: 'red' },
+                            { key: 'ignored', label: 'Ignored', color: 'gray' },
+                            { key: 'pending_action', label: 'Pending', color: 'amber' },
+                            { key: 'blocked', label: 'Blocked', color: 'orange' },
+                            { key: 'duplicate', label: 'Duplicate', color: 'purple' },
+                        ].filter(f => f.key === 'all' || statusCounts[f.key] > 0).map(f => (
+                            <button
+                                key={f.key}
+                                onClick={() => setStatusFilter(f.key)}
+                                className={`px-3 py-1 rounded-lg text-xs font-medium border transition ${statusFilter === f.key
+                                        ? `bg-${f.color}-500/30 text-${f.color}-300 border-${f.color}-500/50`
+                                        : 'bg-slate-700/50 text-gray-400 border-slate-600 hover:text-white'
+                                    }`}
+                            >
+                                {f.label}
+                                <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[10px] ${statusFilter === f.key ? `bg-${f.color}-500/30` : 'bg-slate-600/50'
+                                    }`}>
+                                    {statusCounts[f.key]}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
 
                     {/* SMS Rows with Expandable Details */}
                     <div className="divide-y divide-slate-700">
-                        {processingQueue.map((item, idx) => (
+                        {filteredItems.filter(i => processingQueue.includes(i)).map((item, idx) => (
                             <SMSRow
                                 key={`q-${item.id}`}
                                 item={item}
-                                index={idx}
+                                index={allItems.indexOf(item)}
                                 isExpanded={expandedRows.has(item.id)}
                                 onToggle={() => toggleExpand(item.id)}
                                 getStatusIcon={getStatusIcon}
@@ -632,11 +658,11 @@ AlRajhiBank —— Credit Transfer Internal | Amount:SAR 5000 | To:7772"
                                 accounts={accounts}
                             />
                         ))}
-                        {results.map((item, idx) => (
+                        {filteredItems.filter(i => results.includes(i)).map((item, idx) => (
                             <SMSRow
                                 key={`r-${item.id}`}
                                 item={item}
-                                index={processingQueue.length + idx}
+                                index={allItems.indexOf(item)}
                                 isExpanded={expandedRows.has(item.id)}
                                 onToggle={() => toggleExpand(item.id)}
                                 getStatusIcon={getStatusIcon}

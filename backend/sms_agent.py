@@ -446,6 +446,90 @@ Respond with JSON only.
                 logger.error(f"AI Parse Error: {e}")
                 return {"error": str(e)}
 
+def resolve_account(db, result, msg_text):
+    """
+    Clean account resolution: collect ALL candidate last4 numbers from the AI result
+    and raw SMS text, then match against registered accounts/cards.
+    
+    Returns: (account, credit_card, any_last4_found)
+      - account: matched Account object or None
+      - credit_card: matched CreditCard object or None  
+      - any_last4_found: first last4 number that was extracted (for skip logging), or None
+    """
+    import re
+    
+    def _clean_last4(val):
+        """Extract clean 4-digit number from a value."""
+        if not val:
+            return None
+        digits = "".join(filter(str.isdigit, str(val)))
+        return digits[-4:] if len(digits) >= 4 else None
+    
+    def _lookup(db, last4):
+        """Check a last4 against credit cards first, then accounts (including aliases)."""
+        if not last4:
+            return None, None
+        cc = crud.get_credit_card_by_last4(db, last4)
+        if cc:
+            logger.info(f"[RESOLVE] Matched credit card: {last4} -> {cc.name}")
+            return None, cc
+        acc = crud.get_account_by_last_4(db, last4)
+        if acc:
+            logger.info(f"[RESOLVE] Matched account: {last4} -> {acc.name}")
+            return acc, None
+        return None, None
+    
+    # --- Step 1: Collect ALL candidate last4 numbers ---
+    candidates = []
+    
+    # From AI-parsed fields
+    source_l4 = _clean_last4(result.get('source_account_last4'))
+    dest_l4 = _clean_last4(result.get('destination_account_last4'))
+    card_l4 = _clean_last4(result.get('card_info'))
+    
+    # From raw SMS text (regex fallback when AI misses card numbers)
+    regex_l4 = None
+    if msg_text:
+        m = re.search(r"(?:By|From)[:\s]*(\d{4})", msg_text)
+        if m:
+            regex_l4 = m.group(1)
+        if not regex_l4:
+            m = re.search(r"To[:\s]*(\d{4})", msg_text)
+            if m:
+                regex_l4 = m.group(1)
+    
+    # --- Step 2: Prioritize based on transaction type ---
+    tx_type = (result.get('transaction_type') or 'debit').lower()
+    
+    if tx_type == 'debit':
+        # For debits: money leaves YOUR account → check source first
+        candidates = [source_l4, card_l4, regex_l4, dest_l4]
+    else:
+        # For credits: money enters YOUR account → check destination first
+        candidates = [dest_l4, source_l4, card_l4, regex_l4]
+    
+    # Deduplicate while preserving order
+    seen = set()
+    unique_candidates = []
+    for c in candidates:
+        if c and c not in seen:
+            seen.add(c)
+            unique_candidates.append(c)
+    
+    logger.info(f"[RESOLVE] tx_type={tx_type}, candidates={unique_candidates}")
+    
+    # Track first last4 found for skip reporting
+    any_last4_found = unique_candidates[0] if unique_candidates else None
+    
+    # --- Step 3: Try each candidate, return first match ---
+    for last4 in unique_candidates:
+        acc, cc = _lookup(db, last4)
+        if acc or cc:
+            return acc, cc, last4
+    
+    # No match found
+    return None, None, any_last4_found
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Handles incoming Telegram messages (Private, Group, or Channel).
@@ -593,100 +677,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 2. Save to DB (Only Success Transactions)
     try:
-        # Determine Source Account OR Credit Card
-        source_account = None
-        source_credit_card = None
-        
-        # Heuristic: Try to find any account number in the result fields
-        source_last4 = result.get('source_account_last4') or result.get('destination_account_last4')
-        
-        if source_last4:
-            # Sanitize: Remove spaces, ensure only digits
-            clean_source = "".join(filter(str.isdigit, str(source_last4)))
-            if len(clean_source) >= 4:
-                source_last4 = clean_source[-4:]
-                # Check CREDIT CARDS first, then accounts
-                source_credit_card = crud.get_credit_card_by_last4(db, source_last4)
-                if source_credit_card:
-                    logger.info(f"DEBUG: Source Logic -> Matched CREDIT CARD: {source_last4}, Card: {source_credit_card.name}")
-                else:
-                    source_account = crud.get_account_by_last_4(db, source_last4)
-                    if source_account:
-                        logger.info(f"DEBUG: Source Logic -> Matched Account: {source_last4}, Account: {source_account.name}")
-
-        # Fallback: Check card_info for digits if source undefined (e.g. "By: 9365" or "mada x4390")
-        if not source_account and not source_credit_card and result.get('card_info'):
-             # Extract digits from card_info (e.g. "mada 9365" -> "9365")
-             card_digits = "".join(filter(str.isdigit, str(result.get('card_info'))))
-             if len(card_digits) >= 4:
-                 source_last4 = card_digits[-4:]
-                 source_credit_card = crud.get_credit_card_by_last4(db, source_last4)
-                 if source_credit_card:
-                     logger.info(f"DEBUG: Source Logic -> Card Info CREDIT CARD: {source_last4}, Card: {source_credit_card.name}")
-                 else:
-                     source_account = crud.get_account_by_last_4(db, source_last4)
-                     if source_account:
-                        logger.info(f"DEBUG: Source Logic -> Fallback to Card Info: {source_last4}, Account: {source_account.name}")
-
-        # Last Resort: Manual Regex extraction from raw text if AI and card_info failed
-        if not source_account and not source_credit_card:
-            # Look for "By:4390" or similar
-            regex_match = re.search(r"By:(\d{4})", msg_text)
-            if regex_match:
-                source_last4 = regex_match.group(1)
-                source_credit_card = crud.get_credit_card_by_last4(db, source_last4)
-                if source_credit_card:
-                    logger.info(f"DEBUG: Source Logic -> Regex CREDIT CARD: {source_last4}, Card: {source_credit_card.name}")
-                else:
-                    source_account = crud.get_account_by_last_4(db, source_last4)
-                    if source_account:
-                        logger.info(f"DEBUG: Source Logic -> Manual Regex Match: {source_last4}, Account: {source_account.name}")
-
-        # Smart Handling for Incoming Credits
-        # Heuristic: If message says "Credit Transfer" or "Deposit", likely a CREDIT.
-        is_explicit_credit = "credit transfer" in msg_text.lower() or "deposit" in msg_text.lower()
-        
-        dest_last4 = result.get('destination_account_last4')
-        # Fallback: If AI put account number in merchant field (common in credits)
-        if not dest_last4 and result.get('merchant') and str(result.get('merchant')).isdigit():
-             dest_last4 = result.get('merchant')
-
-        # Swap Logic / Credit Correction:
-        # If explicitly a credit OR AI thinks it's a credit, ensure we target the correct account.
-        if (result.get('transaction_type') == 'credit' or is_explicit_credit):
-             target_dest_last4 = None
-             if dest_last4:
-                  target_dest_last4 = "".join(filter(str.isdigit, str(dest_last4)))[-4:]
-             
-             final_target_acc = None
-             
-             # Case A: Destination matched from extract
-             if target_dest_last4 and len(target_dest_last4) == 4:
-                 final_target_acc = crud.get_account_by_last_4(db, target_dest_last4)
-             
-             # Case B: AI Mistake - Extracted Destination as Source
-             # If no Dest found, but we have a Source Account, and it's definitely a CREDIT...
-             # Then that 'Source' (e.g. 7772) is actually the Destination.
-             if not final_target_acc and source_account:
-                  final_target_acc = source_account
-                  logger.info(f"DEBUG: AI mapped Credit Destination to Source field ({source_account.name}). Correcting.")
-
-             if final_target_acc:
-                 logger.info(f"Incoming Credit detected to own account {final_target_acc.name}. ensure primary.")
-                 source_account = final_target_acc
-                 result['transaction_type'] = 'credit' # Force logic to treat as credit
-                 logger.info(f"DEBUG: Credit Logic Applied. Primary Account: {source_account.name}")
+        # --- Clean Account Resolution ---
+        source_account, source_credit_card, any_last4_found = resolve_account(db, result, msg_text)
         
         if not source_account and not source_credit_card:
             # If a card/account number was identified but not found in the system, SKIP
-            if source_last4:
-                logger.info(f"SKIP: Card/account {source_last4} not registered in system. Skipping transaction.")
+            if any_last4_found:
+                logger.info(f"SKIP: Card/account {any_last4_found} not registered in system. Skipping transaction.")
                 raw_msg.status = models.MessageStatus.IGNORED
-                raw_msg.error_log = f"Skipped: unregistered card/account {source_last4}"
+                raw_msg.error_log = f"Skipped: unregistered card/account {any_last4_found}"
                 db.commit()
                 db.close()
                 if message:
-                    await message.reply_text(f"⏭️ Skipped — card/account •{source_last4} is not registered in the system.")
+                    await message.reply_text(f"⏭️ Skipped — card/account •{any_last4_found} is not registered in the system.")
                 return
 
             # INTERACTIVE FALLBACK - Create PENDING_ACTION transaction with inline buttons
@@ -870,16 +873,8 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
         else:
             logger.warning(f"Could not find exchange rate for {original_currency}. Using original amount as fallback.")
 
-    # --- 1. Resolve Accounts (Context Aware) ---
-    # Skip account resolution if we already have a credit card
-    if not source_credit_card:
-        ai_source_last4 = result.get('source_account_last4')
-        if ai_source_last4:
-            found_source = crud.get_account_by_last_4(db, str(ai_source_last4))
-            if found_source:
-                 source_account = found_source
-    
-    # Resolve Destination Account
+
+    # --- 1. Resolve Destination Account (for transfer naming) ---
     dest_account = None
     ai_dest_last4 = result.get('destination_account_last4')
     if ai_dest_last4:

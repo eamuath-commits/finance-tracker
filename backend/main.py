@@ -1285,16 +1285,10 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
         logger.info(f"[SMS-INGEST] Skipping OTP/verification message")
         return {"status": "ignored", "reason": "OTP/verification message"}
     
-    # 0b. QUEUE CHECK: Block new SMS processing if there are pending transactions
+    # 0b. QUEUE CHECK: Log pending transactions but don't block processing
     queue_status = queue_processor.get_queue_status(db)
     if queue_status["blocked"] > 0:
-        logger.warning(f"[SMS-INGEST] BLOCKED: {queue_status['blocked']} pending transactions need resolution")
-        return {
-            "status": "blocked",
-            "reason": f"Cannot process new SMS. {queue_status['blocked']} pending transaction(s) need your action first.",
-            "blocked_count": queue_status["blocked"],
-            "action_required": "Resolve pending transactions before ingesting new SMS"
-        }
+        logger.info(f"[SMS-INGEST] Note: {queue_status['blocked']} pending transactions exist, but continuing to process")
     
     # 0c. DUPLICATE CHECK: Skip if same SMS body already processed
     # Extract meaningful lines for matching (skip timestamp/sender headers)
@@ -1475,43 +1469,19 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
             }
 
     
-    # 4. Find account - prioritize based on transaction type
-
-    # For DEBIT: money LEAVES your account, so source is YOUR account
-    # For CREDIT: money ENTERS your account, so destination is YOUR account
-    tx_type = (result.get("transaction_type") or "debit").lower()
-    
-    if tx_type == "debit":
-        # For debits, prioritize source account (where money leaves)
-        last_4 = result.get("source_account_last4") or result.get("destination_account_last4")
-    else:
-        # For credits, prioritize destination account (where money enters)
-        last_4 = result.get("destination_account_last4") or result.get("source_account_last4")
-    
-    if not last_4 and result.get("card_info"):
-        card_match = re.search(r"(\d{4})", result["card_info"])
-        if card_match:
-            last_4 = card_match.group(1)
-    
-    account = None
-    credit_card = None
-    if last_4:
-        # Check credit cards first
-        credit_card = crud.get_credit_card_by_last4(db, str(last_4))
-        if not credit_card:
-            account = crud.get_account_by_last_4(db, str(last_4))
-
+    # 4. Find account using clean resolve_account logic
+    account, credit_card, any_last4 = sms_agent.resolve_account(db, result, payload.body)
     
     # 5. Handle unknown account - skip if card number is known but unregistered
     if not account and not credit_card:
-        if last_4:
-            logger.info(f"[SMS-INGEST] SKIP: Card/account {last_4} not registered in system")
+        if any_last4:
+            logger.info(f"[SMS-INGEST] SKIP: Card/account {any_last4} not registered in system")
             raw_msg.status = models.MessageStatus.IGNORED
-            raw_msg.error_log = f"Skipped: unregistered card/account {last_4}"
+            raw_msg.error_log = f"Skipped: unregistered card/account {any_last4}"
             db.commit()
             return {
                 "status": "ignored",
-                "reason": f"Card/account {last_4} is not registered in the system",
+                "reason": f"Card/account {any_last4} is not registered in the system",
                 "parsed": result
             }
 

@@ -377,3 +377,42 @@
 2026-02-17 16:30:01,396 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:9365;mada-Apple Pay | Amount:SAR 4 | At:Alttwyr W | 17/2/26 16:30
 2026-02-18 04:14:58,633 | FROM: Webhook-Jazira Bank | SMS: Internet Purchase Credit card: 1645 of: 16.00 SAR At Amazon SA on: 2026-02-18 04:14  | Available Balance: 17827.38 SAR Due Amount: 27155.62 SAR
 2026-02-18 04:16:12,697 | FROM: Webhook-AlRajhiBank | SMS: Online Purchase | By:7868 ;Visa | Amount:340.97 SAR | At:Amazon SA | Balance:968.35 SAR | 18/2/26 4:16
+2026-02-18 05:55:21,667 | FROM: Webhook-AlRajhiBank | SMS: OTP Code:4236 | Reason:Rajhi Transfer - Mobile App | Amount:1,000.00 SAR
+2026-02-18 05:55:50,455 | FROM: Webhook-AlRajhiBank | SMS: Debit Internal Transfer | From:3264 | Amount:SAR 1000 | To:SALAH ABDELRAHMAN | To:0517 | 26/2/18 05:55
+2026-02-19 02:00:09,043 | FROM: Webhook-AlRajhiBank | SMS: Online Purchase | By:9365;mada-Apple Pay | From:1505 | Amount:SAR 90.78 | At:HUNGERSTA | 19/2/26 02:00
+2026-02-19 17:05:32,403 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:4390;mada-Atheer | Amount:SAR 269.50 | At:my mart  | 19/2/26 17:05
+2026-02-19 17:19:35,551 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:4390;mada-Atheer | Amount:SAR 40.26 | At:DANUBE 13  | 19/2/26 17:19
+2026-02-19 17:34:14,011 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:9365;mada-Apple Pay | Amount:SAR 100 | At:BARBER HA | 19/2/26 17:34
+2026-02-19 19:43:17,368 | FROM: Webhook-AlRajhiBank | SMS: Online Purchase | By:4390;mada-Apple Pay | From:2104 | Amount:SAR 132 | At:mymart | 19/2/26 19:43
+2026-02-19 19:43:17,390 | FROM: Webhook-AlRajhiBank | SMS: Online Purchase | By:4390;mada-Apple Pay | From:2104 | Amount:SAR 132 | At:mymart | 19/2/26 19:43
+2026-02-19 20:04:51,682 | FROM: Webhook-Jazira Bank | SMS: One Time Password | Code: 3574 | Reason: To Transfer | Beneficiary: MYACCRAJHI | Amount:250000.00 SAR | Date: 2026-02-19 20:04
+2026-02-19 20:05:18,875 | FROM: Webhook-Jazira Bank | SMS: Debit transfer Local | From: 8002 | Receiver Bank Name: ALRAJHI BANK | Amount: SAR 250,000.00 | Date: 2026-02-19 20:05
+2026-02-20 00:50:21,653 | FROM: Webhook-AlRajhiBank | SMS: OTP Code:7545 | Reason:Rajhi Transfer - Mobile App | Amount:1,000.00 SAR
+2026-02-20 00:50:47,158 | FROM: Webhook-AlRajhiBank | SMS: Debit Internal Transfer | From:3264 | Amount:SAR 1000 | To:SARAH ALALMAEE | To:2104 | 26/2/20 00:50
+2026-02-20 00:50:50,083 | FROM: Webhook-AlRajhiBank | SMS: Credit Transfer Internal | Amount:SAR 1000 | To:2104 | From:MUATH ALASIRI | From:3264 | 26/2/20 00:50
+2026-02-20 01:23:33,393 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:4390;mada-Apple Pay | Amount:SAR 1308.75 | At:DANUBE 13 | 20/2/26 01:23
+2026-02-20 01:26:19,335 | FROM: Webhook-AlRajhiBank | SMS: Online Purchase | By:9365;mada-Apple Pay | From:1505 | Amount:SAR 159 | At:HUNGERSTA | 20/2/26 01:26
+2026-02-20 01:27:02,961 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:4390;mada-Apple Pay | Amount:SAR 5.50 | At:DANUBE 13 | 20/2/26 01:27
+2026-02-20 03:53:57,462 | FROM: Webhook-AlRajhiBank | SMS: Notification : Declined due to insufficient fund | Transaction : PoS | Card: 7868 | Amount : USD 33.35 | Merchant : PADDLE.NE | Date : 20/2/26 3:53
+2026-02-20 05:00:45,087 | FROM: Webhook-Jazira Bank | SMS: One Time Password | Code: 5579 | Reason: Confirmation to enroll into La Tajil Program | Transaction Amount: 4500 | Date: 2026-02-20 05:00
+2026-02-20 05:03:17,027 | FROM: Webhook-Jazira Bank | SMS: Online Purchase Apple Pay Credit Card: 4897 at :ME.STORE.UI.COM of : 1652.05 AED on : 2026-02-20 05:03 Available Balance is: 21095.61 SAR Due Amount: 52177.48 SAR
+2026-02-20 05:06:55,309 | FROM: Webhook-Jazira Bank | SMS: Online Purchase Apple Pay Credit Card: 4897 at :TABBY of : 1120.05 SAR on : 2026-02-20 05:06 Available Balance is: 19975.56 SAR Due Amount: 52177.48 SAR
+2026-02-20 05:12:29,428 | FROM: Webhook-Jazira Bank | SMS: Online Purchase Apple Pay Credit Card: 4897 at :Tamara of : 2533.33 SAR on : 2026-02-20 05:12 Available Balance is: 17442.23 SAR Due Amount: 52177.48 SAR
+2026-02-20 18:30:15,632 | FROM: Webhook-AMEX-AD | SMS: Dear Cardmember, |  | On the occasion of Founding Day, we are happy to offer you 1,727 Membership Rewards points when you use your card for a total amount of SAR 1,727 from 20 February 2026 until 27 February 2026. |  | For more details, please call us at 8001242229. Terms and Conditions apply. 
+2026-02-20 23:37:32,783 | FROM: Webhook-AlRajhiBank | SMS: Online Purchase | By:9365;mada-Apple Pay | From:1505 | Amount:SAR 350 | At:STC Bank | 21/2/26 23:37
+2026-02-20 23:37:36,770 | FROM: Webhook-STC Bank | SMS: Adding money to account | Amount: 350 SAR | Via: *XXXX | At: 2/20/2026 11:37?PM
+2026-02-20 23:38:23,203 | FROM: Webhook-STC Bank | SMS: Adding money to account | Amount: 300 SAR | Via: *XXXX | At: 2/20/2026 11:38?PM
+2026-02-20 23:38:26,522 | FROM: Webhook-AlRajhiBank | SMS: Online Purchase | By:9365;mada-Apple Pay | From:1505 | Amount:SAR 300 | At:STC Bank | 21/2/26 23:38
+2026-02-20 23:38:34,668 | FROM: Webhook-AlRajhiBank | SMS: Transfer Between Your Accounts | Amount: SAR 1000 | To: 1505 | 26/2/20 23:38
+2026-02-20 23:39:20,962 | FROM: Webhook-STC Bank | SMS: 4108 is your OTP | For: Transfer to contact | Amount: 400.00 SAR | *Do not share the code
+2026-02-20 23:39:27,913 | FROM: Webhook-STC Bank | SMS: Internal outward transfer | Amount:400.00SAR | To:MD ISLAM | Acc:3407* | At:20/02/26 23:39
+2026-02-21 00:15:26,912 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:4390;mada-Atheer | Amount:SAR 130 | At:SASCO sta  | 21/2/26 00:15
+2026-02-21 01:52:32,852 | FROM: Webhook-AlRajhiBank | SMS: PoS International purchase | Card:7868 ;Visa | Amount:269.99 SAR | At: APPLE.COM | Country:Ireland | Balance:692.96 SAR | 21/2/26 1:52
+2026-02-21 14:21:15,812 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:4390;mada-Atheer | Amount:SAR 1.15 | At:zone one m  | 21/2/26 14:21
+2026-02-21 15:21:23,936 | FROM: Webhook-AlRajhiBank | SMS: Online Purchase | By:4390;mada-Apple Pay | From:2104 | Amount:SAR 28.90 | At:Keemart | 21/2/26 15:21
+2026-02-21 15:21:23,956 | FROM: Webhook-AlRajhiBank | SMS: Online Purchase | By:4390;mada-Apple Pay | From:2104 | Amount:SAR 28.90 | At:Keemart | 21/2/26 15:21
+2026-02-22 00:18:28,551 | FROM: Webhook-AlRajhiBank | SMS: Online Purchase | By:7868 ;Visa | Amount:7.11 SAR | At:Amazon SA | Balance:685.85 SAR | 22/2/26 00:18
+2026-02-22 00:21:48,226 | FROM: Webhook-AlRajhiBank | SMS: PoS | By:4390;mada-Atheer | Amount:SAR 46 | At:Bakery Ci  | 22/2/26 00:22
+2026-02-22 00:47:24,579 | FROM: Webhook-AlRajhiBank | SMS: Online Purchase | By:9365;mada-Apple Pay | From:1505 | Amount:SAR 50.64 | At:HUNGERSTA | 22/2/26 00:47
+2026-02-22 01:02:11,525 | FROM: Webhook-Jazira Bank | SMS: Online Purchase Apple Pay Credit Card: 4897 at :ME.STORE.UI.COM of : 538.72 AED on : 2026-02-22 01:02 Available Balance is: 16879.03 SAR Due Amount: 52177.48 SAR
+2026-02-22 01:29:14,665 | FROM: Webhook-AlRajhiBank | SMS: Online Purchase | By:7868 ;Visa | Amount:287.61 SAR | At:Amazon SA | Balance:398.24 SAR | 22/2/26 1:29

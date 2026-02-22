@@ -12,6 +12,9 @@ function Merchants() {
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
+    const [filterCategory, setFilterCategory] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
+    const [filterTx, setFilterTx] = useState('');
     const [editingMerchant, setEditingMerchant] = useState(null);
     const [showModal, setShowModal] = useState(false);
     const [backfilling, setBackfilling] = useState(false);
@@ -50,6 +53,7 @@ function Merchants() {
         e.preventDefault();
         try {
             await axios.put(`${API_URL}/merchants/${editingMerchant.id}`, {
+                name: editingMerchant.name,
                 display_name: editingMerchant.display_name || null,
                 logo_url: editingMerchant.logo_url || null,
                 category: editingMerchant.category || null,
@@ -92,9 +96,20 @@ function Merchants() {
         }
     };
 
+    // Unique categories for the filter dropdown
+    const uniqueCategories = [...new Set(merchants.map(m => m.category).filter(Boolean))].sort();
+
     const filtered = merchants.filter(m => {
         const q = search.toLowerCase();
-        return !q || m.name.toLowerCase().includes(q) || (m.display_name || '').toLowerCase().includes(q) || (m.category || '').toLowerCase().includes(q);
+        if (q && !m.name.toLowerCase().includes(q) && !(m.display_name || '').toLowerCase().includes(q) && !(m.category || '').toLowerCase().includes(q)) return false;
+        if (filterCategory && (m.category || '') !== filterCategory) return false;
+        if (filterStatus === 'resolved' && !m.display_name) return false;
+        if (filterStatus === 'unresolved' && m.display_name) return false;
+        if (filterStatus === 'has_logo' && !m.logo_url) return false;
+        if (filterStatus === 'no_logo' && m.logo_url) return false;
+        if (filterTx === 'has_tx' && !(m.transaction_count > 0)) return false;
+        if (filterTx === 'no_tx' && m.transaction_count > 0) return false;
+        return true;
     }).sort((a, b) => {
         if (!sortColumn) return 0;
         let cmp = 0;
@@ -105,6 +120,8 @@ function Merchants() {
         }
         return sortDir === 'asc' ? cmp : -cmp;
     });
+
+    const hasActiveFilters = filterCategory || filterStatus || filterTx;
 
     const resolved = merchants.filter(m => m.display_name).length;
 
@@ -154,17 +171,61 @@ function Merchants() {
                 ))}
             </div>
 
-            {/* Search */}
-            <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input
-                    type="text"
-                    placeholder="Search merchants..."
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
-                />
+            {/* Search & Filters */}
+            <div className="flex gap-3 items-center">
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <input
+                        type="text"
+                        placeholder="Search merchants..."
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+                    />
+                </div>
+                <select
+                    value={filterCategory}
+                    onChange={e => setFilterCategory(e.target.value)}
+                    className={`${selectClass} min-w-[160px]`}
+                >
+                    <option value="">All Categories</option>
+                    {uniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <select
+                    value={filterStatus}
+                    onChange={e => setFilterStatus(e.target.value)}
+                    className={`${selectClass} min-w-[140px]`}
+                >
+                    <option value="">All Status</option>
+                    <option value="resolved">Resolved</option>
+                    <option value="unresolved">Unresolved</option>
+                    <option value="has_logo">Has Logo</option>
+                    <option value="no_logo">No Logo</option>
+                </select>
+                <select
+                    value={filterTx}
+                    onChange={e => setFilterTx(e.target.value)}
+                    className={`${selectClass} min-w-[160px]`}
+                >
+                    <option value="">All Transactions</option>
+                    <option value="has_tx">Has Transactions</option>
+                    <option value="no_tx">No Transactions</option>
+                </select>
+                {hasActiveFilters && (
+                    <button
+                        onClick={() => { setFilterCategory(''); setFilterStatus(''); setFilterTx(''); }}
+                        className="flex items-center gap-1 px-3 py-2.5 text-gray-400 hover:text-white bg-slate-800 border border-slate-700 rounded-lg transition-colors text-sm"
+                    >
+                        <X size={14} /> Clear
+                    </button>
+                )}
             </div>
+            {/* Result count */}
+            {(search || hasActiveFilters) && (
+                <p className="text-sm text-gray-400">
+                    Showing {filtered.length} of {merchants.length} merchants
+                </p>
+            )}
 
             {/* Table */}
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
@@ -284,7 +345,11 @@ function Merchants() {
                     <form onSubmit={handleSave} className="space-y-4">
                         <div>
                             <label className="block text-sm text-gray-400 mb-1">Raw Name (from SMS)</label>
-                            <input value={editingMerchant.name} disabled className={`${inputClass} opacity-60`} />
+                            <input
+                                value={editingMerchant.name}
+                                onChange={e => setEditingMerchant({ ...editingMerchant, name: e.target.value })}
+                                className={inputClass}
+                            />
                         </div>
                         <div>
                             <label className="block text-sm text-gray-400 mb-1">Display Name (Brand)</label>
