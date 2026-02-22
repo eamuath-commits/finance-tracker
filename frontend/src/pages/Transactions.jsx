@@ -960,12 +960,8 @@ function Transactions() {
                                                                         // Has destination already — use complete-transfer
                                                                         await fetch(`${API_URL}/transactions/${tx.id}/complete-transfer?source_account_id=${accountId}`, { method: 'POST' });
                                                                     } else {
-                                                                        // No account at all — assign the account
-                                                                        await fetch(`${API_URL}/transactions/queue/${tx.id}/assign`, {
-                                                                            method: 'POST',
-                                                                            headers: { 'Content-Type': 'application/json' },
-                                                                            body: JSON.stringify({ account_id: accountId })
-                                                                        });
+                                                                        // No account at all — assign via the sms assign endpoint
+                                                                        await fetch(`${API_URL}/api/sms/assign-account?transaction_id=${tx.id}&account_id=${accountId}`, { method: 'POST' });
                                                                     }
                                                                     fetchData();
                                                                 } catch (err) {
