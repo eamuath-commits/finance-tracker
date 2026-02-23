@@ -792,74 +792,80 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
     # 3. Handle Balance Adjustment if critical fields changed
     # Only if transaction was/is completed
     if old_status == "completed" or db_tx.status == "completed":
-        account = db.query(models.Account).filter(models.Account.id == db_tx.account_id).first()
-        if account:
-            # Revert Old Effect (if it was completed)
-            if old_status == "completed":
-                 is_old_credit = str(old_type).lower() == "credit" or old_type == models.TransactionType.CREDIT
-                 if is_old_credit:
-                     account.current_balance -= old_amount
-                 else:
-                     account.current_balance += old_amount
-                 
-                 # Revert old fee (add it back)
-                 if old_fees:
-                     account.current_balance += old_fees
+        account_changed = old_account_id != db_tx.account_id
+        
+        # Get old and new accounts (may be the same)
+        old_account = db.query(models.Account).filter(models.Account.id == old_account_id).first() if old_account_id else None
+        new_account = db.query(models.Account).filter(models.Account.id == db_tx.account_id).first() if db_tx.account_id else None
+        
+        # Revert Old Effect on OLD account (if it was completed)
+        if old_status == "completed" and old_account:
+             is_old_credit = str(old_type).lower() == "credit" or old_type == models.TransactionType.CREDIT
+             if is_old_credit:
+                 old_account.current_balance -= old_amount
+             else:
+                 old_account.current_balance += old_amount
+             
+             # Revert old fee (add it back)
+             if old_fees:
+                 old_account.current_balance += old_fees
 
-                 # Revert Old Wallet Effect
-                 if old_status == "completed" and old_orig_curr and old_orig_curr.upper() != "SAR":
-                     wallet = db.query(models.CurrencyWallet).filter(
-                         models.CurrencyWallet.account_id == old_account_id,
-                         models.CurrencyWallet.currency_code == old_orig_curr.upper()
-                     ).first()
-                     if wallet:
-                         is_old_credit = str(old_type).lower() == "credit"
-                         if is_old_credit:
-                             wallet.balance -= (old_orig_amt or 0.0)
-                         else:
-                             wallet.balance += (old_orig_amt or 0.0)
-                         db.add(wallet)
+             # Revert Old Wallet Effect
+             if old_orig_curr and old_orig_curr.upper() != "SAR":
+                 wallet = db.query(models.CurrencyWallet).filter(
+                     models.CurrencyWallet.account_id == old_account_id,
+                     models.CurrencyWallet.currency_code == old_orig_curr.upper()
+                 ).first()
+                 if wallet:
+                     is_old_credit = str(old_type).lower() == "credit"
+                     if is_old_credit:
+                         wallet.balance -= (old_orig_amt or 0.0)
+                     else:
+                         wallet.balance += (old_orig_amt or 0.0)
+                     db.add(wallet)
+             
+             db.add(old_account)
 
-            # Apply New Effect (if it is completed)
-            if db_tx.status == "completed":
-                 is_new_credit = str(db_tx.type).lower() == "credit" or db_tx.type == models.TransactionType.CREDIT
-                 if is_new_credit:
-                     account.current_balance += db_tx.amount
-                 else:
-                     account.current_balance -= db_tx.amount
+        # Apply New Effect on NEW account (if it is completed)
+        if db_tx.status == "completed" and new_account:
+             is_new_credit = str(db_tx.type).lower() == "credit" or db_tx.type == models.TransactionType.CREDIT
+             if is_new_credit:
+                 new_account.current_balance += db_tx.amount
+             else:
+                 new_account.current_balance -= db_tx.amount
+            
+             # Deduct new fee
+             if db_tx.fees:
+                 new_account.current_balance -= db_tx.fees
+
+             # Apply New Wallet Effect
+             if db_tx.original_currency and db_tx.original_currency.upper() != "SAR":
+                curr = db_tx.original_currency.upper()
+                wallet = db.query(models.CurrencyWallet).filter(
+                    models.CurrencyWallet.account_id == db_tx.account_id,
+                    models.CurrencyWallet.currency_code == curr
+                ).first()
+                if not wallet:
+                    import uuid
+                    wallet = models.CurrencyWallet(
+                        id=str(uuid.uuid4()),
+                        account_id=db_tx.account_id,
+                        currency_code=curr,
+                        balance=0.0
+                    )
                 
-                 # Deduct new fee
-                 if db_tx.fees:
-                     account.current_balance -= db_tx.fees
-
-                 # Apply New Wallet Effect
-                 if db_tx.status == "completed" and db_tx.original_currency and db_tx.original_currency.upper() != "SAR":
-                    curr = db_tx.original_currency.upper()
-                    wallet = db.query(models.CurrencyWallet).filter(
-                        models.CurrencyWallet.account_id == db_tx.account_id,
-                        models.CurrencyWallet.currency_code == curr
-                    ).first()
-                    if not wallet:
-                        import uuid
-                        wallet = models.CurrencyWallet(
-                            id=str(uuid.uuid4()),
-                            account_id=db_tx.account_id,
-                            currency_code=curr,
-                            balance=0.0
-                        )
-                    
-                    if is_new_credit:
-                        wallet.balance += (db_tx.original_amount or 0.0)
-                    else:
-                        wallet.balance -= (db_tx.original_amount or 0.0)
-                    wallet.last_updated = datetime.utcnow()
-                    db.add(wallet)
+                if is_new_credit:
+                    wallet.balance += (db_tx.original_amount or 0.0)
+                else:
+                    wallet.balance -= (db_tx.original_amount or 0.0)
+                wallet.last_updated = datetime.utcnow()
+                db.add(wallet)
             
-            # Save Account Balance
-            db.add(account)
-            
-            # --- RECALCULATE SNAPSHOTS ---
-            # Get ALL transactions for this account ordered by timestamp
+             db.add(new_account)
+        
+        # --- RECALCULATE SNAPSHOTS ---
+        # Recalculate snapshots for the new account
+        if new_account and db_tx.status == "completed":
             all_txs = db.query(models.Transaction).filter(
                 models.Transaction.account_id == db_tx.account_id,
                 models.Transaction.status == "completed"
@@ -867,12 +873,9 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
             
             # Check if user provided a previous_balance anchor point
             if transaction_update.previous_balance is not None:
-                # User specified previous_balance - use it as anchor for THIS transaction
-                # Find index of this transaction
                 tx_index = next((i for i, t in enumerate(all_txs) if t.id == db_tx.id), None)
                 
                 if tx_index is not None:
-                    # Recalculate from the anchor point forward
                     running_balance = transaction_update.previous_balance
                     for tx in all_txs[tx_index:]:
                         tx_type = str(tx.type).lower() if tx.type else 'debit'
@@ -885,11 +888,9 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
                         tx.balance_after_transaction = running_balance
                         db.add(tx)
                     
-                    # Update current balance to final
-                    account.current_balance = running_balance
+                    new_account.current_balance = running_balance
             else:
-                # No anchor provided - calculate starting balance by reversing from current_balance
-                running_balance = account.current_balance
+                running_balance = new_account.current_balance
                 for tx in reversed(all_txs):
                     tx_type = str(tx.type).lower() if tx.type else 'debit'
                     if tx_type == 'credit':
@@ -899,10 +900,7 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
                     if tx.fees:
                         running_balance += tx.fees
                 
-                # running_balance is now starting balance
                 starting_balance = running_balance
-                
-                # Iterate forward and set correct balance_after for each transaction
                 running_balance = starting_balance
                 for tx in all_txs:
                     tx_type = str(tx.type).lower() if tx.type else 'debit'
