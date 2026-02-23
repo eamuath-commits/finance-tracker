@@ -17,9 +17,14 @@ const Categories = () => {
     const [loading, setLoading] = useState(true);
     const [newCategoryName, setNewCategoryName] = useState('');
     const [editingCategory, setEditingCategory] = useState(null);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [sortColumn, setSortColumn] = useState('name'); // 'name' or 'transactions'
-    const [sortDir, setSortDir] = useState('asc');
+    const _storedCatF = (() => { try { const s = sessionStorage.getItem('filters_categories'); return s ? JSON.parse(s) : {}; } catch { return {}; } })();
+    const _persistCat = (key, val) => { try { const cur = JSON.parse(sessionStorage.getItem('filters_categories') || '{}'); cur[key] = val; sessionStorage.setItem('filters_categories', JSON.stringify(cur)); } catch { } };
+    const [searchTerm, setSearchTermRaw] = useState(_storedCatF.searchTerm || '');
+    const [sortColumn, setSortColumnRaw] = useState(_storedCatF.sortColumn || 'name');
+    const [sortDir, setSortDirRaw] = useState(_storedCatF.sortDir || 'asc');
+    const setSearchTerm = (v) => { setSearchTermRaw(v); _persistCat('searchTerm', v); };
+    const setSortColumn = (v) => { setSortColumnRaw(v); _persistCat('sortColumn', v); };
+    const setSortDir = (v) => { setSortDirRaw(v); _persistCat('sortDir', v); };
 
     // Environment API URL
     const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";

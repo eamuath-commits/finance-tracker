@@ -304,12 +304,19 @@ const Accounts = () => {
     const [accounts, setAccounts] = useState([]);
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
-    // Filtering & Sorting State
-    const [searchTerm, setSearchTerm] = useState('');
-    const [categoryFilter, setCategoryFilter] = useState('');
-    const [accountFilter, setAccountFilter] = useState('');
-    const [typeFilter, setTypeFilter] = useState('');
-    const [dateRange, setDateRange] = useState({ start: '', end: '' });
+    // Filtering & Sorting State — persisted to sessionStorage
+    const _storedAccFilters = (() => { try { const s = sessionStorage.getItem('filters_accounts'); return s ? JSON.parse(s) : {}; } catch { return {}; } })();
+    const _persistAcc = (key, val) => { try { const cur = JSON.parse(sessionStorage.getItem('filters_accounts') || '{}'); cur[key] = val; sessionStorage.setItem('filters_accounts', JSON.stringify(cur)); } catch { } };
+    const [searchTerm, setSearchTermRaw] = useState(_storedAccFilters.searchTerm || '');
+    const [categoryFilter, setCategoryFilterRaw] = useState(_storedAccFilters.categoryFilter || '');
+    const [accountFilter, setAccountFilterRaw] = useState(_storedAccFilters.accountFilter || '');
+    const [typeFilter, setTypeFilterRaw] = useState(_storedAccFilters.typeFilter || '');
+    const [dateRange, setDateRangeRaw] = useState(_storedAccFilters.dateRange || { start: '', end: '' });
+    const setSearchTerm = (v) => { setSearchTermRaw(v); _persistAcc('searchTerm', v); };
+    const setCategoryFilter = (v) => { setCategoryFilterRaw(v); _persistAcc('categoryFilter', v); };
+    const setAccountFilter = (v) => { setAccountFilterRaw(v); _persistAcc('accountFilter', v); };
+    const setTypeFilter = (v) => { setTypeFilterRaw(v); _persistAcc('typeFilter', v); };
+    const setDateRange = (v) => { setDateRangeRaw(v); _persistAcc('dateRange', v); };
 
     // Bulk Selection State
     const [selectedTxIds, setSelectedTxIds] = useState(new Set());

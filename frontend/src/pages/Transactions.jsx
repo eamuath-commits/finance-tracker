@@ -57,15 +57,34 @@ function Transactions() {
     const [selectedMsgIds, setSelectedMsgIds] = useState(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
 
-    // Filter State
-    const [searchTerm, setSearchTerm] = useState('');
-    const [accountFilter, setAccountFilter] = useState('');
-    const [typeFilter, setTypeFilter] = useState('');
-    const [categoryFilter, setCategoryFilter] = useState('');
-    const [dateRange, setDateRange] = useState({ start: '', end: '' });
-    const [sortColumn, setSortColumn] = useState('date'); // 'date', 'category', 'amount', 'balance'
-    const [sortDir, setSortDir] = useState('desc'); // 'asc' or 'desc'
-    const [countLimit, setCountLimit] = useState(''); // '' = all, '10', '25', '50', '100'
+    // Filter State — persisted to sessionStorage
+    const storedFilters = (() => {
+        try {
+            const s = sessionStorage.getItem('filters_transactions');
+            return s ? JSON.parse(s) : {};
+        } catch { return {}; }
+    })();
+    const saveFilters = (f) => { try { sessionStorage.setItem('filters_transactions', JSON.stringify(f)); } catch { } };
+
+    const [searchTerm, setSearchTermRaw] = useState(storedFilters.searchTerm || '');
+    const [accountFilter, setAccountFilterRaw] = useState(storedFilters.accountFilter || '');
+    const [typeFilter, setTypeFilterRaw] = useState(storedFilters.typeFilter || '');
+    const [categoryFilter, setCategoryFilterRaw] = useState(storedFilters.categoryFilter || '');
+    const [dateRange, setDateRangeRaw] = useState(storedFilters.dateRange || { start: '', end: '' });
+    const [sortColumn, setSortColumnRaw] = useState(storedFilters.sortColumn || 'date');
+    const [sortDir, setSortDirRaw] = useState(storedFilters.sortDir || 'desc');
+    const [countLimit, setCountLimitRaw] = useState(storedFilters.countLimit || '');
+
+    // Wrap setters to persist to sessionStorage
+    const persist = (key, val) => { const cur = JSON.parse(sessionStorage.getItem('filters_transactions') || '{}'); cur[key] = val; saveFilters(cur); };
+    const setSearchTerm = (v) => { setSearchTermRaw(v); persist('searchTerm', v); };
+    const setAccountFilter = (v) => { setAccountFilterRaw(v); persist('accountFilter', v); };
+    const setTypeFilter = (v) => { setTypeFilterRaw(v); persist('typeFilter', v); };
+    const setCategoryFilter = (v) => { setCategoryFilterRaw(v); persist('categoryFilter', v); };
+    const setDateRange = (v) => { setDateRangeRaw(v); persist('dateRange', v); };
+    const setSortColumn = (v) => { setSortColumnRaw(v); persist('sortColumn', v); };
+    const setSortDir = (v) => { setSortDirRaw(v); persist('sortDir', v); };
+    const setCountLimit = (v) => { setCountLimitRaw(v); persist('countLimit', v); };
 
     // Initialize filter from URL params (for navigation from account/credit card pages)
     useEffect(() => {
@@ -74,13 +93,11 @@ function Transactions() {
 
         if (accountId) {
             setAccountFilter(accountId);
-            // Ensure we're on the 'all' tab to see filtered transactions
             if (activeTab !== 'all') {
                 setSearchParams({ tab: 'all', account_id: accountId });
             }
         } else if (creditCardId) {
             setAccountFilter(creditCardId);
-            // Ensure we're on the 'all' tab to see filtered transactions
             if (activeTab !== 'all') {
                 setSearchParams({ tab: 'all', credit_card_id: creditCardId });
             }
@@ -436,6 +453,7 @@ function Transactions() {
         setCategoryFilter('');
         setDateRange({ start: '', end: '' });
         setCountLimit('');
+        try { sessionStorage.removeItem('filters_transactions'); } catch { }
     };
 
     const completePendingTransfer = async (txId, sourceAccountId) => {
