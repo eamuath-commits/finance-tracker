@@ -74,6 +74,8 @@ services:
     image: cloudflare/cloudflared:latest
     restart: always
     command: tunnel --no-autoupdate run --token eyJhIjoiODE1YmNmMDJiZDQyMmYxNTZkNzJiYzYzZGRmYjhkODYiLCJ0IjoiMWMwZTlhMjAtNGQ4Zi00ZmMwLWE1OTctYzhhZGE3YWQ3M2M4IiwicyI6Ik9ESTFNVFl4WW1FdE5XSTJZeTAwT0RGbUxXRXlNamt0TldJd1pXWTJNamhoTlRNMSJ9
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - backend
       - frontend
