@@ -804,7 +804,7 @@ def update_merchant(merchant_id: str, data: dict, db: Session = Depends(get_db))
     m = db.query(models.Merchant).filter(models.Merchant.id == merchant_id).first()
     if not m:
         raise HTTPException(status_code=404, detail="Merchant not found")
-    for field in ['display_name', 'logo_url', 'category', 'notes']:
+    for field in ['name', 'display_name', 'logo_url', 'category', 'notes', 'aliases', 'brand_domain']:
         if field in data:
             setattr(m, field, data[field])
     db.commit()
