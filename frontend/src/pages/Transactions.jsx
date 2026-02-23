@@ -207,15 +207,29 @@ function Transactions() {
     const totals = useMemo(() => {
         let totalCredit = 0;
         let totalDebit = 0;
+        let totalFees = 0;
         filteredTransactions.forEach(tx => {
             if (isCredit(tx)) {
                 totalCredit += tx.amount || 0;
             } else {
                 totalDebit += tx.amount || 0;
             }
+            totalFees += tx.fees || 0;
         });
-        return { totalCredit, totalDebit, net: totalCredit - totalDebit };
-    }, [filteredTransactions]);
+
+        // When filtering by account, show actual DB balance instead of calculated net
+        let net = totalCredit - totalDebit - totalFees;
+        let isActualBalance = false;
+        if (accountFilter) {
+            const acc = accounts.find(a => a.id === accountFilter);
+            if (acc && acc.current_balance !== undefined) {
+                net = acc.current_balance;
+                isActualBalance = true;
+            }
+        }
+
+        return { totalCredit, totalDebit, net, isActualBalance };
+    }, [filteredTransactions, accountFilter, accounts]);
 
     const handleDeleteTx = (id) => {
         setConfirmModal({
@@ -760,7 +774,7 @@ function Transactions() {
                                 <span className="text-red-400 font-bold">-{formatCurrency(totals.totalDebit)}</span>
                             </div>
                             <div className="flex items-center gap-2 border-l border-slate-600 pl-6">
-                                <span className="text-gray-400 text-sm">Net:</span>
+                                <span className="text-gray-400 text-sm">{totals.isActualBalance ? 'Balance:' : 'Net:'}</span>
                                 <span className={`font-bold ${totals.net >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                                     {totals.net >= 0 ? '+' : ''}{formatCurrency(totals.net)}
                                 </span>
