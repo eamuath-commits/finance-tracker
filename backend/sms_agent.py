@@ -984,7 +984,8 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
         sub_type in ['transfer', 'internal_transfer'] and 
         tx_type_str == 'credit' and 
         not ai_source_last4 and
-        not result.get('sender_name')  # If sender_name exists, it's an EXTERNAL credit, not internal transfer
+        not result.get('sender_name') and  # If sender_name exists, it's an EXTERNAL credit, not internal transfer
+        not result.get('beneficiary')  # AI sometimes puts sender in beneficiary field instead
     )
 
     
