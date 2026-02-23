@@ -1102,10 +1102,10 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
                 # Use brand_name as the display merchant_raw if available
                 if brand_name:
                     merchant_raw = brand_name
-                # Inherit merchant's category if transaction category is unset
-                if m.category and (not category or category.lower() == 'uncategorized'):
+                # Always use merchant's DB category if it has one (user-defined takes priority over AI guess)
+                if m.category:
                     category = m.category
-                    logger.info(f"Inherited category '{category}' from merchant {m.display_name or m.name}")
+                    logger.info(f"Using merchant's DB category '{category}' from {m.display_name or m.name}")
                 logger.info(f"Linked to merchant: {m.display_name or m.name} ({m.id}), logo={logo_url}")
         
         elif sub_type in ['transfer', 'internal_transfer']:
