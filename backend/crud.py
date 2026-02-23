@@ -987,11 +987,14 @@ def delete_transaction(db: Session, transaction_id: str):
             ).delete()
             db.delete(debit_leg)
 
-    logger.info(f"[DELETE_TX] Found tx: type={db_tx.type}, amount={db_tx.amount}, account_id={db_tx.account_id}, cc_id={db_tx.credit_card_id}")
+    logger.info(f"[DELETE_TX] Found tx: type={db_tx.type}, amount={db_tx.amount}, account_id={db_tx.account_id}, cc_id={db_tx.credit_card_id}, status={db_tx.status}")
     
-    # Revert Account balance change
+    # Skip balance reversal for pending_action transactions — their balance was never applied
+    is_pending = str(db_tx.status).lower() in ('pending_action', 'pending_transfer')
+    
+    # Revert Account balance change (only if balance was actually applied)
     account = db_tx.account
-    if account:
+    if account and not is_pending:
         old_balance = account.current_balance
         # Compare type as string (db stores 'credit'/'debit', not enum)
         tx_type = str(db_tx.type).lower() if db_tx.type else 'debit'
@@ -1026,9 +1029,9 @@ def delete_transaction(db: Session, transaction_id: str):
     else:
         logger.info(f"[DELETE_TX] No account linked to transaction")
     
-    # Revert Credit Card balance change
+    # Revert Credit Card balance change (only if balance was actually applied)
     credit_card = db_tx.credit_card
-    if credit_card:
+    if credit_card and not is_pending:
         old_cc_balance = credit_card.current_balance
         # Compare type as string (db stores 'credit'/'debit', not enum)
         cc_tx_type = str(db_tx.type).lower() if db_tx.type else 'debit'
