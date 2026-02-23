@@ -1278,6 +1278,23 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
         logger.info(f"[SMS-INGEST] Skipping OTP/verification message")
         return {"status": "ignored", "reason": "OTP/verification message"}
     
+    # 0b. Early filter: Skip Arabic SMS with masked account numbers (e.g. 053***611)
+    # These are a different AlRajhi SMS format where account is starred out — can't match registered accounts
+    import re as _re_early
+    masked_account_match = _re_early.search(r'\d{3}\*{3}\d{3}', payload.body)
+    if masked_account_match:
+        logger.info(f"[SMS-INGEST] Skipping SMS with masked account number: {masked_account_match.group()}")
+        raw_msg = models.RawMessage(
+            sender=payload.sender or "Unknown",
+            body=payload.body.strip(),
+            source="webui",
+            status=models.MessageStatus.IGNORED
+        )
+        raw_msg.error_log = f"Skipped: masked account ({masked_account_match.group()}) — not a registered account format"
+        db.add(raw_msg)
+        db.commit()
+        return {"status": "ignored", "reason": f"Masked account number ({masked_account_match.group()}) — cannot match registered accounts"}
+    
     # 0b. QUEUE CHECK: Log pending transactions but don't block processing
     queue_status = queue_processor.get_queue_status(db)
     if queue_status["blocked"] > 0:
