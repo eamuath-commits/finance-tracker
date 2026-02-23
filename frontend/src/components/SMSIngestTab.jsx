@@ -165,7 +165,24 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
                 });
 
                 if (finalStatus === "pending_action") {
-                    addStep({ action: "Pending", detail: `SMS ${i + 1} needs account selection — continuing with next SMS` });
+                    addStep({ action: "Paused", detail: `SMS ${i + 1} needs account selection — pausing for your review` });
+                    setAgentStatus("⏸️ Paused: Resolve pending action to continue");
+                    setIsProcessing(false);
+
+                    // Move remaining items to results so they stay visible, and save state
+                    setProcessingQueue(prev => {
+                        const completed = prev.filter((_, idx) => idx <= i && prev[idx].result);
+                        setResults(prev.filter(p => p.result));
+                        return prev;
+                    });
+
+                    // Store remaining SMS for later resumption
+                    const remainingMessages = messages.slice(i + 1);
+                    if (remainingMessages.length > 0) {
+                        sessionStorage.setItem('sms_ingest_remaining', JSON.stringify(remainingMessages));
+                        setAgentStatus(`⏸️ Paused: ${remainingMessages.length} SMS waiting — resolve pending action to continue`);
+                    }
+                    return; // Exit the loop entirely
                 }
 
                 if (finalStatus === "blocked") {
@@ -296,7 +313,28 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
 
     // Resume processing waiting SMS items (called after pending_action is resolved)
     const resumeWaitingItems = async () => {
-        // Use setResults to get CURRENT state (avoids stale closure issue)
+        // Check sessionStorage for remaining SMS from a paused bulk ingest
+        const storedRemaining = sessionStorage.getItem('sms_ingest_remaining');
+        if (storedRemaining) {
+            try {
+                const remainingMessages = JSON.parse(storedRemaining);
+                sessionStorage.removeItem('sms_ingest_remaining');
+                if (remainingMessages.length > 0) {
+                    // Feed remaining messages back into the input and trigger processing
+                    setSmsInput(remainingMessages.join('\n\n'));
+                    // Use setTimeout to let state update, then trigger processSMS
+                    setTimeout(() => {
+                        // Directly process the remaining messages
+                        processRemainingMessages(remainingMessages);
+                    }, 300);
+                    return;
+                }
+            } catch (e) {
+                sessionStorage.removeItem('sms_ingest_remaining');
+            }
+        }
+
+        // Fallback: check results for waiting items
         let waitingItems = [];
         setResults(prev => {
             waitingItems = prev.filter(r => r.status === 'waiting');
@@ -370,6 +408,72 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
         }
     };
 
+    // Process remaining messages after resolving a pending_action
+    const processRemainingMessages = async (messages) => {
+        if (!messages || messages.length === 0) return;
+
+        setIsProcessing(true);
+        setAgentStatus(`▶️ Resuming: ${messages.length} SMS remaining...`);
+
+        for (let i = 0; i < messages.length; i++) {
+            const msg = messages[i];
+            const itemId = Date.now() + i;
+
+            setAgentStatus(`🤖 Gemini: Parsing SMS ${i + 1} of ${messages.length} (resumed)...`);
+
+            // Add to results as parsing
+            setResults(prev => [...prev, { id: itemId, sms: msg, status: "parsing", result: null }]);
+
+            try {
+                const res = await axios.post(`${API_URL}/api/sms/ingest`, {
+                    sender: "WebUI",
+                    body: msg
+                });
+
+                const result = { id: itemId, sms: msg, ...res.data };
+                if (res.data.status === "pending_action") {
+                    result.accounts = res.data.accounts;
+                    result.credit_cards = res.data.credit_cards;
+                    result.transaction_id = res.data.transaction_id;
+                }
+
+                setResults(prev => prev.map(r =>
+                    r.id === itemId ? {
+                        ...r,
+                        status: res.data.status,
+                        result: { ...result, steps: [{ time: new Date().toLocaleTimeString(), action: "Resumed", detail: `Status: ${res.data.status}` }] }
+                    } : r
+                ));
+
+                // Pause again on pending_action
+                if (res.data.status === "pending_action") {
+                    const remainingMessages = messages.slice(i + 1);
+                    if (remainingMessages.length > 0) {
+                        sessionStorage.setItem('sms_ingest_remaining', JSON.stringify(remainingMessages));
+                        setAgentStatus(`⏸️ Paused: ${remainingMessages.length} SMS waiting — resolve pending action to continue`);
+                    } else {
+                        setAgentStatus("⏸️ Paused: Resolve pending action");
+                    }
+                    setIsProcessing(false);
+                    setSmsInput("");
+                    return;
+                }
+            } catch (err) {
+                setResults(prev => prev.map(r =>
+                    r.id === itemId ? {
+                        ...r,
+                        status: "failed",
+                        result: { status: "failed", reason: err.response?.data?.detail || err.message }
+                    } : r
+                ));
+            }
+        }
+
+        setIsProcessing(false);
+        setAgentStatus("");
+        setSmsInput("");
+        if (onTransactionCreated) setTimeout(() => onTransactionCreated(), 200);
+    };
     const retryBlocked = async () => {
         // Get IDs of blocked/waiting/failed items to retry (in their current order in results)
         const retryableIds = results
@@ -629,8 +733,8 @@ AlRajhiBank —— Credit Transfer Internal | Amount:SAR 5000 | To:7772"
                                 key={f.key}
                                 onClick={() => setStatusFilter(f.key)}
                                 className={`px-3 py-1 rounded-lg text-xs font-medium border transition ${statusFilter === f.key
-                                        ? `bg-${f.color}-500/30 text-${f.color}-300 border-${f.color}-500/50`
-                                        : 'bg-slate-700/50 text-gray-400 border-slate-600 hover:text-white'
+                                    ? `bg-${f.color}-500/30 text-${f.color}-300 border-${f.color}-500/50`
+                                    : 'bg-slate-700/50 text-gray-400 border-slate-600 hover:text-white'
                                     }`}
                             >
                                 {f.label}
