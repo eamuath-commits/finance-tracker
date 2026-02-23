@@ -32,6 +32,8 @@ class AlRajhiParser(BaseBankParser):
         """
         AlRajhi-specific post-processing.
         """
+        import re
+        
         # Set source bank
         result['source_bank'] = 'AlRajhi'
         
@@ -42,6 +44,33 @@ class AlRajhiParser(BaseBankParser):
         # Handle credit card payments
         if 'Credit Card Payment' in sms_text:
             result['sub_type'] = 'credit_card_payment'
+        
+        # --- ENFORCE From/To account mapping from SMS text ---
+        # The AI sometimes swaps source_account_last4 and destination_account_last4.
+        # The SMS text is the source of truth: "From:XXXX" = source, "To:XXXX" = destination.
+        
+        # Extract all From: and To: values (last 4 digits)
+        from_matches = re.findall(r'From:\s*(\d{4})', sms_text)
+        to_matches = re.findall(r'To:\s*(\d{4})', sms_text)
+        
+        # For debit transfers: From = source (your account being debited), To = destination
+        if result.get('transaction_type') == 'debit' and result.get('sub_type') in ('transfer', 'internal_transfer'):
+            if from_matches:
+                result['source_account_last4'] = from_matches[0]
+            if to_matches:
+                result['destination_account_last4'] = to_matches[0]
+        
+        # For credit transfers: To = your account being credited, From = sender's account
+        elif result.get('transaction_type') == 'credit' and result.get('sub_type') in ('transfer', 'internal_transfer'):
+            if to_matches:
+                result['destination_account_last4'] = to_matches[0]
+            if from_matches:
+                result['source_account_last4'] = from_matches[0]
+        
+        # Also extract from By:XXXX pattern (PoS/purchases)
+        by_match = re.search(r'By:\s*(\d{4})', sms_text)
+        if by_match and result.get('sub_type') in ('purchase', 'pos', 'online', 'atm'):
+            result['source_account_last4'] = by_match.group(1)
         
         return result
     
