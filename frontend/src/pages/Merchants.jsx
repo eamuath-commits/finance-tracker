@@ -220,7 +220,7 @@ function Merchants() {
                     </select>
                     {hasActiveFilters && (
                         <button
-                            onClick={() => { setFilterCategory(''); setFilterStatus(''); setFilterTx(''); }}
+                            onClick={() => { setFilterCategoryRaw(''); setFilterStatusRaw(''); setFilterTxRaw(''); try { sessionStorage.removeItem('filters_merchants'); } catch { } }}
                             className="flex items-center gap-1 px-3 py-2.5 text-gray-400 hover:text-white bg-slate-800 border border-slate-700 rounded-lg transition-colors text-sm"
                         >
                             <X size={14} /> Clear

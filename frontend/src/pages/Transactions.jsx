@@ -450,13 +450,13 @@ function Transactions() {
     };
 
     const clearFilters = () => {
-        setSearchTerm('');
-        setAccountFilter('');
-        setTypeFilter('');
-        setCategoryFilter('');
-        setDateRange({ start: '', end: '' });
-        setCountLimit('');
         try { sessionStorage.removeItem('filters_transactions'); } catch { }
+        setSearchTermRaw('');
+        setAccountFilterRaw('');
+        setTypeFilterRaw('');
+        setCategoryFilterRaw('');
+        setDateRangeRaw({ start: '', end: '' });
+        setCountLimitRaw('');
     };
 
     const completePendingTransfer = async (txId, sourceAccountId) => {
