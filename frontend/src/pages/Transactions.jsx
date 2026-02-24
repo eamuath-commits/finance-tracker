@@ -1234,8 +1234,8 @@ function Transactions() {
                         </button>
                     </div>
 
-                    {/* Account Selection - Different UI for transfers */}
-                    {txForm.type === 'transfer' ? (
+                    {/* Account Selection - Transfer UI only for creating new transactions */}
+                    {txForm.type === 'transfer' && !editingTx ? (
                         <div className="bg-slate-900/50 p-3 rounded-lg border border-blue-500/30 space-y-3">
                             {/* Internal/External Toggle */}
                             <div className="flex gap-2">
