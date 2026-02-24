@@ -336,7 +336,9 @@ function Transactions() {
                     payload.account_id = null;
                     payload.credit_card_id = txForm.source_id;
                 } else {
-                    payload.account_id = txForm.source_id;
+                    // For transfers, the From dropdown sets account_id directly
+                    // For regular transactions, source_id is used
+                    payload.account_id = txForm.account_id || txForm.source_id;
                     payload.credit_card_id = null;
                 }
 
@@ -345,7 +347,7 @@ function Transactions() {
                     payload.previous_balance = parseFloat(txForm.previous_balance);
                 }
 
-                console.log('[TX-EDIT] PUT payload:', JSON.stringify(payload), 'source_type:', txForm.source_type, 'source_id:', txForm.source_id);
+                console.log('[TX-EDIT] PUT payload:', JSON.stringify(payload), 'source_type:', txForm.source_type, 'source_id:', txForm.source_id, 'account_id:', txForm.account_id);
                 await axios.put(`${API_URL}/transactions/${editingTx.id}`, payload);
             } else if (txForm.type === 'transfer' && txForm.is_internal && txForm.target_account_id) {
                 // Internal transfer - create TWO transactions
