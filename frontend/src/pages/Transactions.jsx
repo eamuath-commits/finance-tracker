@@ -345,6 +345,7 @@ function Transactions() {
                     payload.previous_balance = parseFloat(txForm.previous_balance);
                 }
 
+                console.log('[TX-EDIT] PUT payload:', JSON.stringify(payload), 'source_type:', txForm.source_type, 'source_id:', txForm.source_id);
                 await axios.put(`${API_URL}/transactions/${editingTx.id}`, payload);
             } else if (txForm.type === 'transfer' && txForm.is_internal && txForm.target_account_id) {
                 // Internal transfer - create TWO transactions
