@@ -216,4 +216,37 @@ Respond ONLY with valid JSON.
             result['transaction_type'] = 'debit'
             result['sub_type'] = 'transfer'
         
+        # --- FOREIGN CURRENCY HANDLING for CC purchases ---
+        # SMS pattern: "of: 8.99 GBP ... FX Markup: 1.06 Exchange Rate: 5.112347"
+        # Total SAR = (original_amount * exchange_rate) + fx_markup
+        fx_rate_match = re.search(r'Exchange\s*Rate:\s*([\d.]+)', sms_text, re.IGNORECASE)
+        fx_markup_match = re.search(r'FX\s*Markup:\s*([\d.]+)', sms_text, re.IGNORECASE)
+        
+        if fx_rate_match:
+            exchange_rate = float(fx_rate_match.group(1))
+            fx_markup = float(fx_markup_match.group(1)) if fx_markup_match else 0.0
+            
+            # Extract original amount and currency: "of: 8.99 GBP" or "of 8.99 GBP"
+            orig_match = re.search(r'of:?\s*([\d,]+\.?\d*)\s+([A-Z]{3})', sms_text)
+            if orig_match:
+                original_amount = float(orig_match.group(1).replace(',', ''))
+                original_currency = orig_match.group(2)
+                
+                # Calculate SAR amount: (original * rate) + markup fee
+                sar_amount = round((original_amount * exchange_rate) + fx_markup, 2)
+                
+                result['original_amount'] = original_amount
+                result['original_currency'] = original_currency
+                result['exchange_rate'] = exchange_rate
+                result['fees'] = fx_markup
+                result['amount'] = sar_amount
+                result['currency'] = 'SAR'
+                
+                logger.info(f"[Jazira] FX CC purchase: {original_amount} {original_currency} × {exchange_rate} + {fx_markup} fee = {sar_amount} SAR")
+        
+        # Extract CC last4 from "Credit card: XXXX" for CC purchases
+        cc_purchase_match = re.search(r'Credit\s*card:\s*(\d{4})', sms_text, re.IGNORECASE)
+        if cc_purchase_match and result.get('sub_type') in ('purchase', None):
+            result['source_account_last4'] = cc_purchase_match.group(1)
+        
         return result
