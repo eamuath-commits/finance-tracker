@@ -373,7 +373,8 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate):
         new_balance = credit_card.current_balance
         db.add(credit_card)
         
-        # Discrepancy check: compare our available balance with SMS available_balance
+        # Discrepancy check: compare CC current_balance with SMS available_balance
+        # current_balance = available balance (not debt)
         if transaction.parsed_data:
             import json as _json
             import logging
@@ -381,41 +382,28 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate):
             try:
                 parsed = _json.loads(transaction.parsed_data) if isinstance(transaction.parsed_data, str) else transaction.parsed_data
                 sms_available = parsed.get('available_balance')
-                sms_due = parsed.get('due_amount')
                 
-                # Auto-update credit_limit if SMS provides both values
-                if sms_available is not None and sms_due is not None:
-                    real_limit = round(sms_available + sms_due, 2)
-                    if credit_card.credit_limit != real_limit:
-                        _logger.info(
-                            f"CC {credit_card.last_4_digits}: Updating credit_limit "
-                            f"{credit_card.credit_limit} → {real_limit} (from SMS)"
-                        )
-                        credit_card.credit_limit = real_limit
-                
-                if sms_available is not None and credit_card.credit_limit:
-                    # Our available = credit_limit - current_balance (debt)
-                    our_available = round(credit_card.credit_limit - credit_card.current_balance, 2)
-                    diff = abs(our_available - sms_available)
+                if sms_available is not None:
+                    diff = abs(credit_card.current_balance - sms_available)
                     
                     if diff <= 0.05:
                         # Small rounding difference — adopt SMS balance
                         if diff > 0:
                             _logger.info(
-                                f"CC {credit_card.last_4_digits}: Small available balance diff ({diff:.2f}), "
-                                f"adjusting: available {our_available:.2f} → {sms_available:.2f}"
+                                f"CC {credit_card.last_4_digits}: Small balance diff ({diff:.2f}), "
+                                f"adopting: {credit_card.current_balance:.2f} → {sms_available:.2f}"
                             )
-                        credit_card.current_balance = round(credit_card.credit_limit - sms_available, 2)
+                        credit_card.current_balance = round(sms_available, 2)
                         new_balance = credit_card.current_balance
                     else:
                         # Large discrepancy — raise warning flag
                         _logger.warning(
                             f"⚠️ CC {credit_card.last_4_digits} BALANCE DISCREPANCY: "
-                            f"Our available={our_available:.2f}, SMS available={sms_available:.2f}, diff={diff:.2f}"
+                            f"DB={credit_card.current_balance:.2f}, SMS={sms_available:.2f}, diff={diff:.2f}"
                         )
                         parsed['balance_discrepancy'] = {
-                            'our_available': round(our_available, 2),
-                            'sms_available': round(sms_available, 2),
+                            'db_balance': round(credit_card.current_balance, 2),
+                            'sms_balance': round(sms_available, 2),
                             'difference': round(diff, 2)
                         }
                         transaction.parsed_data = _json.dumps(parsed)
