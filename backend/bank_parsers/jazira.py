@@ -232,8 +232,8 @@ Respond ONLY with valid JSON.
                 original_amount = float(orig_match.group(1).replace(',', ''))
                 original_currency = orig_match.group(2)
                 
-                # Calculate SAR amount: (original * rate) + markup fee
-                sar_amount = round((original_amount * exchange_rate) + fx_markup, 2)
+                # Calculate SAR amount: original * rate (fees tracked separately)
+                sar_amount = round(original_amount * exchange_rate, 2)
                 
                 result['original_amount'] = original_amount
                 result['original_currency'] = original_currency
