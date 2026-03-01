@@ -913,6 +913,60 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
                     tx.balance_after_transaction = running_balance
                     db.add(tx)
 
+        # --- RECALCULATE CREDIT CARD SNAPSHOTS ---
+        # Handle credit card transactions similarly
+        if db_tx.credit_card_id and db_tx.status == "completed":
+            cc = db.query(models.CreditCard).filter(models.CreditCard.id == db_tx.credit_card_id).first()
+            if cc:
+                cc_txs = db.query(models.Transaction).filter(
+                    models.Transaction.credit_card_id == db_tx.credit_card_id,
+                    models.Transaction.status == "completed"
+                ).order_by(models.Transaction.timestamp.asc()).all()
+                
+                if transaction_update.previous_balance is not None:
+                    tx_index = next((i for i, t in enumerate(cc_txs) if t.id == db_tx.id), None)
+                    
+                    if tx_index is not None:
+                        running_balance = transaction_update.previous_balance
+                        for tx in cc_txs[tx_index:]:
+                            tx_type = str(tx.type).lower() if tx.type else 'debit'
+                            # CC: debit = spending (increases balance), credit = payment (decreases balance)
+                            if tx_type == 'credit':
+                                running_balance -= (tx.amount or 0)
+                            else:
+                                running_balance += (tx.amount or 0)
+                            if tx.fees:
+                                running_balance += tx.fees
+                            tx.balance_after_transaction = running_balance
+                            db.add(tx)
+                        
+                        cc.current_balance = running_balance
+                        db.add(cc)
+                else:
+                    # No anchor — recalculate snapshots from current balance
+                    running_balance = cc.current_balance
+                    for tx in reversed(cc_txs):
+                        tx_type = str(tx.type).lower() if tx.type else 'debit'
+                        if tx_type == 'credit':
+                            running_balance += tx.amount
+                        else:
+                            running_balance -= tx.amount
+                        if tx.fees:
+                            running_balance -= tx.fees
+                    
+                    starting_balance = running_balance
+                    running_balance = starting_balance
+                    for tx in cc_txs:
+                        tx_type = str(tx.type).lower() if tx.type else 'debit'
+                        if tx_type == 'credit':
+                            running_balance -= tx.amount
+                        else:
+                            running_balance += tx.amount
+                        if tx.fees:
+                            running_balance += tx.fees
+                        tx.balance_after_transaction = running_balance
+                        db.add(tx)
+
     db.add(db_tx)
     db.commit()
     db.refresh(db_tx)

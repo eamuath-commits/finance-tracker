@@ -1408,8 +1408,8 @@ function Transactions() {
                         <input type="number" step="0.01" className={inputClass} value={txForm.amount} onChange={e => setTxForm({ ...txForm, amount: e.target.value })} placeholder="0.00" required />
                     </div>
 
-                    {/* Previous Balance - only show when editing existing transaction */}
-                    {editingTx && txForm.source_type === 'account' && (
+                    {/* Previous Balance - show when editing existing transaction (account or credit card) */}
+                    {editingTx && (
                         <div className="bg-slate-900/50 p-3 rounded-lg border border-blue-500/30">
                             <label className="text-blue-400 text-xs mb-1 block">
                                 Previous Balance (Balance Before This Transaction)
