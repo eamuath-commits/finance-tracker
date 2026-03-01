@@ -905,10 +905,17 @@ def update_transaction(transaction_id: str, transaction_update: schemas.Transact
 
 @app.post("/transactions/", response_model=schemas.Transaction)
 def create_transaction(transaction: schemas.TransactionCreate, db: Session = Depends(get_db)):
-    # Verify account exists
-    account = db.query(models.Account).filter(models.Account.id == transaction.account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
+    # Verify account or credit card exists
+    if transaction.account_id:
+        account = db.query(models.Account).filter(models.Account.id == transaction.account_id).first()
+        if not account:
+            raise HTTPException(status_code=404, detail="Account not found")
+    elif transaction.credit_card_id:
+        cc = db.query(models.CreditCard).filter(models.CreditCard.id == transaction.credit_card_id).first()
+        if not cc:
+            raise HTTPException(status_code=404, detail="Credit card not found")
+    else:
+        raise HTTPException(status_code=400, detail="Either account_id or credit_card_id is required")
     return crud.create_transaction(db=db, transaction=transaction)
 
 @app.delete("/transactions/{transaction_id}")
