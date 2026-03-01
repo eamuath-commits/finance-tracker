@@ -186,21 +186,43 @@ def apply_balance_update(db: Session, transaction: models.Transaction) -> bool:
                     parsed = json.loads(transaction.parsed_data) if isinstance(transaction.parsed_data, str) else transaction.parsed_data
                     sms_balance = parsed.get('available_balance')
                     if sms_balance is not None:
-                        diff = abs(credit_card.current_balance - sms_balance)
-                        if diff > 0.01:
+                        # For CC: SMS "Available Balance" = available credit = credit_limit - debt
+                        # Our current_balance = debt (what you owe)
+                        # So expected_debt = credit_limit - sms_available_balance
+                        if credit_card.credit_limit:
+                            expected_balance = credit_card.credit_limit - sms_balance
+                        else:
+                            # If no credit limit set, can't derive debt from available balance
+                            # Use direct comparison as fallback
+                            expected_balance = sms_balance
+                        
+                        diff = abs(credit_card.current_balance - expected_balance)
+                        
+                        if diff <= 0.05:
+                            # Small rounding difference — adopt SMS balance
+                            if diff > 0:
+                                logger.info(
+                                    f"CC {credit_card.last_4_digits}: Small rounding diff ({diff:.2f}), "
+                                    f"adopting SMS balance: {credit_card.current_balance:.2f} → {expected_balance:.2f}"
+                                )
+                            credit_card.current_balance = round(expected_balance, 2)
+                            transaction.balance_after_transaction = credit_card.current_balance
+                        else:
+                            # Large discrepancy — raise warning flag
                             logger.warning(
                                 f"⚠️ CC {credit_card.last_4_digits} BALANCE DISCREPANCY: "
-                                f"DB={credit_card.current_balance:.2f}, SMS={sms_balance:.2f}, diff={diff:.2f}"
+                                f"DB={credit_card.current_balance:.2f}, Expected={expected_balance:.2f}, "
+                                f"SMS_available={sms_balance:.2f}, diff={diff:.2f}"
                             )
                             # Store discrepancy info in parsed_data for frontend display
                             parsed['balance_discrepancy'] = {
                                 'db_balance': round(credit_card.current_balance, 2),
                                 'sms_balance': round(sms_balance, 2),
+                                'expected_balance': round(expected_balance, 2),
                                 'difference': round(diff, 2)
                             }
                             transaction.parsed_data = json.dumps(parsed)
-                        else:
-                            logger.info(f"CC {credit_card.last_4_digits}: Balance matches SMS ({sms_balance})")
+                            transaction.notes = (transaction.notes or '') + f" [⚠️ Balance discrepancy: {diff:.2f} SAR]"
                 except Exception as e:
                     logger.debug(f"Could not check SMS balance: {e}")
     
