@@ -185,6 +185,18 @@ def apply_balance_update(db: Session, transaction: models.Transaction) -> bool:
                     import json
                     parsed = json.loads(transaction.parsed_data) if isinstance(transaction.parsed_data, str) else transaction.parsed_data
                     sms_available = parsed.get('available_balance')
+                    sms_due = parsed.get('due_amount')
+                    
+                    # Auto-update credit_limit if SMS provides both values
+                    if sms_available is not None and sms_due is not None:
+                        real_limit = round(sms_available + sms_due, 2)
+                        if credit_card.credit_limit != real_limit:
+                            logger.info(
+                                f"CC {credit_card.last_4_digits}: Updating credit_limit "
+                                f"{credit_card.credit_limit} → {real_limit} (from SMS)"
+                            )
+                            credit_card.credit_limit = real_limit
+                    
                     if sms_available is not None and credit_card.credit_limit:
                         # Our available = credit_limit - current_balance (debt)
                         our_available = credit_card.credit_limit - credit_card.current_balance
