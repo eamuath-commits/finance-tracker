@@ -399,10 +399,10 @@ function Transactions() {
                 };
 
                 // Add the correct source ID based on source_type
-                if (txForm.source_type === 'credit_card' && txForm.credit_card_id) {
-                    payload.credit_card_id = txForm.credit_card_id;
-                } else if (txForm.account_id) {
-                    payload.account_id = txForm.account_id;
+                if (txForm.source_type === 'credit_card' && txForm.source_id) {
+                    payload.credit_card_id = txForm.source_id;
+                } else if (txForm.source_id || txForm.account_id) {
+                    payload.account_id = txForm.account_id || txForm.source_id;
                 }
 
                 await axios.post(`${API_URL}/transactions/`, payload);
