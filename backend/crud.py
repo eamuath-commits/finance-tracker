@@ -382,20 +382,39 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate):
                 parsed = _json.loads(transaction.parsed_data) if isinstance(transaction.parsed_data, str) else transaction.parsed_data
                 sms_balance = parsed.get('available_balance')
                 if sms_balance is not None:
-                    diff = abs(new_balance - sms_balance)
-                    if diff > 0.01:
+                    # For CC: SMS "Available Balance" = available credit = credit_limit - debt
+                    # Our current_balance = debt (what you owe)
+                    # So expected_debt = credit_limit - sms_available_balance
+                    if credit_card.credit_limit:
+                        expected_balance = credit_card.credit_limit - sms_balance
+                    else:
+                        expected_balance = sms_balance
+                    
+                    diff = abs(new_balance - expected_balance)
+                    
+                    if diff <= 0.05:
+                        # Small rounding difference — adopt SMS balance
+                        if diff > 0:
+                            _logger.info(
+                                f"CC {credit_card.last_4_digits}: Small rounding diff ({diff:.2f}), "
+                                f"adopting SMS balance: {new_balance:.2f} → {expected_balance:.2f}"
+                            )
+                        credit_card.current_balance = round(expected_balance, 2)
+                        new_balance = credit_card.current_balance
+                    else:
+                        # Large discrepancy — raise warning flag
                         _logger.warning(
                             f"⚠️ CC {credit_card.last_4_digits} BALANCE DISCREPANCY: "
-                            f"DB={new_balance:.2f}, SMS={sms_balance:.2f}, diff={diff:.2f}"
+                            f"DB={new_balance:.2f}, Expected={expected_balance:.2f}, "
+                            f"SMS_available={sms_balance:.2f}, diff={diff:.2f}"
                         )
                         parsed['balance_discrepancy'] = {
                             'db_balance': round(new_balance, 2),
                             'sms_balance': round(sms_balance, 2),
+                            'expected_balance': round(expected_balance, 2),
                             'difference': round(diff, 2)
                         }
                         transaction.parsed_data = _json.dumps(parsed)
-                    else:
-                        _logger.info(f"CC {credit_card.last_4_digits}: Balance matches SMS ({sms_balance})")
             except Exception as e:
                 pass
 
