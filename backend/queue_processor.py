@@ -179,46 +179,37 @@ def apply_balance_update(db: Session, transaction: models.Transaction) -> bool:
             transaction.balance_after_transaction = credit_card.current_balance
             logger.info(f"CC {credit_card.last_4_digits}: {old_balance} -> {credit_card.current_balance}")
             
-            # Discrepancy check: compare with SMS available_balance if present
+            # Discrepancy check: compare our available balance with SMS available_balance
             if transaction.parsed_data:
                 try:
                     import json
                     parsed = json.loads(transaction.parsed_data) if isinstance(transaction.parsed_data, str) else transaction.parsed_data
-                    sms_balance = parsed.get('available_balance')
-                    if sms_balance is not None:
-                        # For CC: SMS "Available Balance" = available credit = credit_limit - debt
-                        # Our current_balance = debt (what you owe)
-                        # So expected_debt = credit_limit - sms_available_balance
-                        if credit_card.credit_limit:
-                            expected_balance = credit_card.credit_limit - sms_balance
-                        else:
-                            # If no credit limit set, can't derive debt from available balance
-                            # Use direct comparison as fallback
-                            expected_balance = sms_balance
-                        
-                        diff = abs(credit_card.current_balance - expected_balance)
+                    sms_available = parsed.get('available_balance')
+                    if sms_available is not None and credit_card.credit_limit:
+                        # Our available = credit_limit - current_balance (debt)
+                        our_available = credit_card.credit_limit - credit_card.current_balance
+                        diff = abs(our_available - sms_available)
                         
                         if diff <= 0.05:
                             # Small rounding difference — adopt SMS balance
                             if diff > 0:
                                 logger.info(
-                                    f"CC {credit_card.last_4_digits}: Small rounding diff ({diff:.2f}), "
-                                    f"adopting SMS balance: {credit_card.current_balance:.2f} → {expected_balance:.2f}"
+                                    f"CC {credit_card.last_4_digits}: Small available balance diff ({diff:.2f}), "
+                                    f"adjusting: available {our_available:.2f} → {sms_available:.2f}"
                                 )
-                            credit_card.current_balance = round(expected_balance, 2)
+                            # Set current_balance so that credit_limit - current_balance = sms_available
+                            credit_card.current_balance = round(credit_card.credit_limit - sms_available, 2)
                             transaction.balance_after_transaction = credit_card.current_balance
                         else:
                             # Large discrepancy — raise warning flag
                             logger.warning(
                                 f"⚠️ CC {credit_card.last_4_digits} BALANCE DISCREPANCY: "
-                                f"DB={credit_card.current_balance:.2f}, Expected={expected_balance:.2f}, "
-                                f"SMS_available={sms_balance:.2f}, diff={diff:.2f}"
+                                f"Our available={our_available:.2f}, SMS available={sms_available:.2f}, diff={diff:.2f}"
                             )
                             # Store discrepancy info in parsed_data for frontend display
                             parsed['balance_discrepancy'] = {
-                                'db_balance': round(credit_card.current_balance, 2),
-                                'sms_balance': round(sms_balance, 2),
-                                'expected_balance': round(expected_balance, 2),
+                                'our_available': round(our_available, 2),
+                                'sms_available': round(sms_available, 2),
                                 'difference': round(diff, 2)
                             }
                             transaction.parsed_data = json.dumps(parsed)

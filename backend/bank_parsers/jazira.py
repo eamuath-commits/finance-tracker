@@ -249,4 +249,16 @@ Respond ONLY with valid JSON.
         if cc_purchase_match and result.get('sub_type') in ('purchase', None):
             result['source_account_last4'] = cc_purchase_match.group(1)
         
+        # --- Extract Available Balance and Due Amount from ALL CC SMS ---
+        # "Available Balance: 12654.67 SAR" — available credit
+        # "Due Amount: 32220.24 SAR" — what you owe (= our current_balance)
+        if 'available balance' in sms_lower:
+            avail_match = re.search(r'Available\s*Balance:?\s*(?:is\s*)?([\d,]+\.?\d*)\s*SAR', sms_text, re.IGNORECASE)
+            if avail_match:
+                result['available_balance'] = float(avail_match.group(1).replace(',', ''))
+        
+        due_match = re.search(r'Due\s*Amount:?\s*([\d,]+\.?\d*)\s*SAR', sms_text, re.IGNORECASE)
+        if due_match:
+            result['due_amount'] = float(due_match.group(1).replace(',', ''))
+        
         return result
