@@ -32,6 +32,10 @@ function Transactions() {
     // Confirm modal state (replaces window.confirm for Chrome compatibility)
     const [confirmModal, setConfirmModal] = useState({ open: false, message: '', onConfirm: null });
 
+    // Resolve discrepancy modal state
+    const [resolveModal, setResolveModal] = useState({ open: false, tx: null, discrepancy: null });
+    const [resolveReason, setResolveReason] = useState('');
+
     // Modal State
     const [showTxModal, setShowTxModal] = useState(false);
     const [editingTx, setEditingTx] = useState(null);
@@ -914,13 +918,17 @@ function Transactions() {
                                     const isTransfer = tx.category === 'Transfer';
                                     const isCreditCardTx = !!cc;
 
-                                    // Check for balance discrepancy from SMS
+                                    // Check for balance discrepancy or resolved discrepancy from SMS
                                     let balanceDiscrepancy = null;
+                                    let discrepancyResolved = null;
                                     if (tx.parsed_data) {
                                         try {
                                             const parsed = typeof tx.parsed_data === 'string' ? JSON.parse(tx.parsed_data) : tx.parsed_data;
                                             if (parsed.balance_discrepancy) {
                                                 balanceDiscrepancy = parsed.balance_discrepancy;
+                                            }
+                                            if (parsed.discrepancy_resolved) {
+                                                discrepancyResolved = parsed.discrepancy_resolved;
                                             }
                                         } catch (e) { }
                                     }
@@ -1070,10 +1078,23 @@ function Transactions() {
                                                         : '-'}
                                                     {balanceDiscrepancy && (
                                                         <span
-                                                            className="text-amber-400 cursor-help"
-                                                            title={`⚠️ Balance mismatch!\nDB: ${formatCurrency(balanceDiscrepancy.db_balance)}\nSMS: ${formatCurrency(balanceDiscrepancy.sms_balance)}\nDiff: ${formatCurrency(balanceDiscrepancy.difference)}`}
+                                                            className="text-amber-400 cursor-pointer hover:opacity-80"
+                                                            title={`⚠️ Balance mismatch! Click to resolve\nDB: ${formatCurrency(balanceDiscrepancy.db_balance)}\nSMS: ${formatCurrency(balanceDiscrepancy.sms_balance)}\nDiff: ${formatCurrency(balanceDiscrepancy.difference)}`}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setResolveModal({ open: true, tx, discrepancy: balanceDiscrepancy });
+                                                                setResolveReason('');
+                                                            }}
                                                         >
                                                             ⚠️
+                                                        </span>
+                                                    )}
+                                                    {discrepancyResolved && !balanceDiscrepancy && (
+                                                        <span
+                                                            className="text-green-400 cursor-help text-xs"
+                                                            title={`✅ Resolved: ${formatCurrency(discrepancyResolved.amount)} SAR\nReason: ${discrepancyResolved.reason || 'N/A'}\nResolved: ${discrepancyResolved.resolved_at ? new Date(discrepancyResolved.resolved_at).toLocaleString() : 'N/A'}`}
+                                                        >
+                                                            ✅
                                                         </span>
                                                     )}
                                                 </div>
@@ -1491,6 +1512,70 @@ function Transactions() {
                                 className="flex-1 bg-red-600 text-white py-2.5 rounded-lg font-medium hover:bg-red-500 transition"
                             >
                                 Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Resolve Discrepancy Modal */}
+            {resolveModal.open && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md mx-4 shadow-2xl">
+                        <h3 className="text-white text-lg font-semibold mb-4">⚠️ Resolve Balance Discrepancy</h3>
+
+                        <div className="bg-slate-900/50 rounded-lg p-4 mb-4 space-y-2">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-gray-400">System Balance:</span>
+                                <span className="text-white font-mono">{formatCurrency(resolveModal.discrepancy?.db_balance)} SAR</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                                <span className="text-gray-400">SMS Balance:</span>
+                                <span className="text-green-400 font-mono">{formatCurrency(resolveModal.discrepancy?.sms_balance)} SAR</span>
+                            </div>
+                            <hr className="border-slate-700" />
+                            <div className="flex justify-between text-sm font-semibold">
+                                <span className="text-amber-400">Discrepancy:</span>
+                                <span className="text-amber-400 font-mono">{formatCurrency(resolveModal.discrepancy?.difference)} SAR</span>
+                            </div>
+                        </div>
+
+                        <p className="text-gray-400 text-xs mb-3">
+                            Resolving will adopt the SMS balance and record the discrepancy for your reference.
+                        </p>
+
+                        <label className="block text-sm text-gray-300 mb-1">Reason (optional)</label>
+                        <input
+                            type="text"
+                            className={inputClass}
+                            placeholder="e.g. Bank fee not received via SMS"
+                            value={resolveReason}
+                            onChange={(e) => setResolveReason(e.target.value)}
+                        />
+
+                        <div className="flex gap-3 mt-5">
+                            <button
+                                onClick={() => setResolveModal({ open: false, tx: null, discrepancy: null })}
+                                className="flex-1 bg-slate-700 text-white py-2.5 rounded-lg font-medium hover:bg-slate-600 transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        await axios.put(`${API_URL}/transactions/${resolveModal.tx.id}/resolve-discrepancy`, {
+                                            reason: resolveReason
+                                        });
+                                        setResolveModal({ open: false, tx: null, discrepancy: null });
+                                        fetchData();
+                                    } catch (e) {
+                                        console.error(e);
+                                        alert('Error resolving discrepancy');
+                                    }
+                                }}
+                                className="flex-1 bg-green-600 text-white py-2.5 rounded-lg font-medium hover:bg-green-500 transition"
+                            >
+                                Resolve & Adopt
                             </button>
                         </div>
                     </div>

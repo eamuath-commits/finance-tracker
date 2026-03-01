@@ -925,6 +925,53 @@ def delete_transaction(transaction_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Transaction not found")
     return {"message": "Transaction deleted"}
 
+@app.put("/transactions/{transaction_id}/resolve-discrepancy")
+def resolve_discrepancy(transaction_id: str, body: dict, db: Session = Depends(get_db)):
+    """Resolve a balance discrepancy on a CC transaction."""
+    import json as _json
+    from datetime import datetime as _dt
+    
+    tx = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    if not tx.parsed_data:
+        raise HTTPException(status_code=400, detail="No parsed data on transaction")
+    
+    parsed = _json.loads(tx.parsed_data) if isinstance(tx.parsed_data, str) else tx.parsed_data
+    discrepancy = parsed.get('balance_discrepancy')
+    if not discrepancy:
+        raise HTTPException(status_code=400, detail="No discrepancy to resolve")
+    
+    reason = body.get('reason', '')
+    
+    # Move discrepancy → discrepancy_resolved
+    parsed['discrepancy_resolved'] = {
+        'amount': discrepancy.get('difference', 0),
+        'reason': reason,
+        'resolved_at': _dt.utcnow().isoformat(),
+        'original_db_balance': discrepancy.get('db_balance'),
+        'adopted_sms_balance': discrepancy.get('sms_balance'),
+    }
+    del parsed['balance_discrepancy']
+    
+    # Adopt SMS balance on the credit card
+    if tx.credit_card_id:
+        cc = db.query(models.CreditCard).filter(models.CreditCard.id == tx.credit_card_id).first()
+        if cc:
+            sms_balance = discrepancy.get('sms_balance')
+            if sms_balance is not None:
+                cc.current_balance = round(sms_balance, 2)
+                tx.balance_after_transaction = cc.current_balance
+                db.add(cc)
+    
+    tx.parsed_data = _json.dumps(parsed)
+    db.add(tx)
+    db.commit()
+    db.refresh(tx)
+    
+    return {"message": "Discrepancy resolved", "resolved": parsed['discrepancy_resolved']}
+
 @app.post("/transactions/bulk-delete")
 def bulk_delete_transactions(payload: schemas.BulkDeleteRequest, db: Session = Depends(get_db)):
     deleted_count = 0
