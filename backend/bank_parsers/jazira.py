@@ -261,4 +261,43 @@ Respond ONLY with valid JSON.
         if due_match:
             result['due_amount'] = float(due_match.group(1).replace(',', ''))
         
+        # --- PAYPAL MERCHANT EXTRACTION ---
+        # "PAYPAL *NINTENDOAME" → merchant = "Nintendo", payment_method = "PayPal"
+        # "PAYPAL *ADOBE" → merchant = "Adobe", payment_method = "PayPal"
+        merchant = result.get('merchant', '') or ''
+        paypal_match = re.match(r'PAYPAL\s*\*\s*(.+)', merchant, re.IGNORECASE)
+        if not paypal_match:
+            # Also check raw SMS: "At PAYPAL *XXXXX"
+            sms_paypal = re.search(r'At\s+PAYPAL\s*\*\s*(\S+)', sms_text, re.IGNORECASE)
+            if sms_paypal:
+                paypal_match = sms_paypal
+        
+        if paypal_match:
+            raw_merchant = paypal_match.group(1).strip()
+            result['payment_method'] = 'PayPal'
+            result['merchant'] = raw_merchant
+            # Let AI's brand resolution handle it, but set some common ones
+            brand_map = {
+                'NINTENDOAME': ('Nintendo', 'nintendo.com'),
+                'NINTENDO': ('Nintendo', 'nintendo.com'),
+                'ADOBE': ('Adobe', 'adobe.com'),
+                'SPOTIFY': ('Spotify', 'spotify.com'),
+                'NETFLIX': ('Netflix', 'netflix.com'),
+                'APPLE': ('Apple', 'apple.com'),
+                'GOOGLE': ('Google', 'google.com'),
+                'AMAZON': ('Amazon', 'amazon.com'),
+                'MICROSOF': ('Microsoft', 'microsoft.com'),
+                'MICROSOFT': ('Microsoft', 'microsoft.com'),
+            }
+            # Try matching against known brands (case-insensitive prefix match)
+            raw_upper = raw_merchant.upper()
+            for key, (brand, domain) in brand_map.items():
+                if raw_upper.startswith(key):
+                    result['brand_name'] = brand
+                    result['brand_domain'] = domain
+                    result['merchant'] = brand
+                    break
+            
+            logger.info(f"[Jazira] PayPal merchant: '{raw_merchant}' → '{result.get('merchant')}' (via PayPal)")
+        
         return result
