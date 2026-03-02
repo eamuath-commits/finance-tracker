@@ -1114,8 +1114,21 @@ def delete_transaction(db: Session, transaction_id: str):
     else:
         logger.info(f"[DELETE_TX] No credit card linked to transaction")
     
+    # Capture IDs before deleting the transaction
+    cascade_account_id = db_tx.account_id if account and not is_pending else None
+    cascade_cc_id = db_tx.credit_card_id if credit_card and not is_pending else None
+    
     db.delete(db_tx)
     db.commit()
+    
+    # Cascade: recalculate balance_after_transaction for remaining transactions
+    if cascade_account_id:
+        logger.info(f"[DELETE_TX] Cascading balance recalc for account {cascade_account_id}")
+        recalculate_account_balances(db, account_id=cascade_account_id)
+    if cascade_cc_id:
+        logger.info(f"[DELETE_TX] Cascading balance recalc for CC {cascade_cc_id}")
+        recalculate_account_balances(db, credit_card_id=cascade_cc_id)
+    
     logger.info(f"[DELETE_TX] Transaction deleted and committed")
     return db_tx
 
