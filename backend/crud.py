@@ -941,13 +941,14 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
                         running_balance = transaction_update.previous_balance
                         for tx in cc_txs[tx_index:]:
                             tx_type = str(tx.type).lower() if tx.type else 'debit'
-                            # CC: debit = spending (increases balance), credit = payment (decreases balance)
+                            # CC current_balance = available balance
+                            # credit (payment) adds to available, debit (purchase) subtracts
                             if tx_type == 'credit':
-                                running_balance -= (tx.amount or 0)
-                            else:
                                 running_balance += (tx.amount or 0)
+                            else:
+                                running_balance -= (tx.amount or 0)
                             if tx.fees:
-                                running_balance += tx.fees
+                                running_balance -= tx.fees
                             tx.balance_after_transaction = running_balance
                             db.add(tx)
                         
@@ -955,26 +956,30 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
                         db.add(cc)
                 else:
                     # No anchor — recalculate snapshots from current balance
+                    # Backward pass: reverse each transaction to find starting balance
                     running_balance = cc.current_balance
                     for tx in reversed(cc_txs):
                         tx_type = str(tx.type).lower() if tx.type else 'debit'
-                        if tx_type == 'credit':
-                            running_balance += tx.amount
-                        else:
-                            running_balance -= tx.amount
-                        if tx.fees:
-                            running_balance -= tx.fees
-                    
-                    starting_balance = running_balance
-                    running_balance = starting_balance
-                    for tx in cc_txs:
-                        tx_type = str(tx.type).lower() if tx.type else 'debit'
+                        # Reversing: credit was +, so we -, debit was -, so we +
                         if tx_type == 'credit':
                             running_balance -= tx.amount
                         else:
                             running_balance += tx.amount
                         if tx.fees:
                             running_balance += tx.fees
+                    
+                    # Forward pass: apply transactions in order
+                    starting_balance = running_balance
+                    running_balance = starting_balance
+                    for tx in cc_txs:
+                        tx_type = str(tx.type).lower() if tx.type else 'debit'
+                        # credit (payment) adds, debit (purchase) subtracts
+                        if tx_type == 'credit':
+                            running_balance += tx.amount
+                        else:
+                            running_balance -= tx.amount
+                        if tx.fees:
+                            running_balance -= tx.fees
                         tx.balance_after_transaction = running_balance
                         db.add(tx)
 
