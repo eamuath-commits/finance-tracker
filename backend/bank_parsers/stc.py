@@ -171,23 +171,25 @@ Now parse this SMS:
             else:
                 result['source_account_last4'] = account_digits
         
-        # Extract beneficiary from To: pattern (for transfers)
-        to_match = re.search(r'To:\s*(.+?)\s*(?:\n|Acc:|At:|$)', sms_text, re.IGNORECASE)
-        if to_match:
-            beneficiary = to_match.group(1).strip()
-            if beneficiary:
-                result['beneficiary'] = beneficiary
-                # For transfers, set merchant to beneficiary name if not already set
-                if not result.get('merchant') or result.get('merchant') == 'CC Payment':
-                    result['merchant'] = beneficiary
-        
-        # Extract account from Acc: pattern (e.g., Acc:1386*)
-        acc_match = re.search(r'Acc:\s*([\d]+)', sms_text, re.IGNORECASE)
-        if acc_match:
-            acc_digits = acc_match.group(1)
-            if len(acc_digits) == 3:
-                acc_digits = '0' + acc_digits
-            result['source_account_last4'] = acc_digits
+        # Extract beneficiary from To: pattern (only for transfer types)
+        transfer_subtypes = ('sponsored_transfer', 'internal_transfer', 'western_union')
+        if result.get('sub_type') in transfer_subtypes:
+            to_match = re.search(r'To:\s*(.+?)(?:\s*\n|\s*Acc:|\s*At:|$)', sms_text, re.IGNORECASE)
+            if to_match:
+                beneficiary = to_match.group(1).strip()
+                if beneficiary:
+                    result['beneficiary'] = beneficiary
+                    # For transfers, set merchant to beneficiary name if not already set
+                    if not result.get('merchant') or result.get('merchant') == 'CC Payment':
+                        result['merchant'] = beneficiary
+            
+            # Extract account from Acc: pattern (e.g., Acc:1386*)
+            acc_match = re.search(r'Acc:\s*([\d]+)', sms_text, re.IGNORECASE)
+            if acc_match:
+                acc_digits = acc_match.group(1)
+                if len(acc_digits) == 3:
+                    acc_digits = '0' + acc_digits
+                result['source_account_last4'] = acc_digits
         
         return result
     
