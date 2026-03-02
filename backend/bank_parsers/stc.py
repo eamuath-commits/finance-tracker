@@ -136,6 +136,9 @@ Now parse this SMS:
             # Internal STC transfer - resolve direction based on known accounts
             result['sub_type'] = 'internal_transfer'
             result['transaction_type'] = None  # Clear to trigger smart resolution
+        elif 'internal outward transfer' in sms_lower:
+            result['sub_type'] = 'internal_transfer'
+            result['transaction_type'] = 'debit'
         elif 'internal transfer' in sms_lower:
             result['sub_type'] = 'internal_transfer'
             result['transaction_type'] = 'debit'
@@ -184,12 +187,17 @@ Now parse this SMS:
                         result['merchant'] = beneficiary
             
             # Extract account from Acc: pattern (e.g., Acc:1386*)
+            # For outward transfers, Acc: is the BENEFICIARY's account, not the source
             acc_match = re.search(r'Acc:\s*([\d]+)', sms_text, re.IGNORECASE)
             if acc_match:
                 acc_digits = acc_match.group(1)
                 if len(acc_digits) == 3:
                     acc_digits = '0' + acc_digits
-                result['source_account_last4'] = acc_digits
+                # Store as beneficiary account info, NOT source
+                result['beneficiary_account'] = acc_digits
+                # Clear source_account_last4 so default 0863 is applied by _apply_default_account
+                if result.get('source_account_last4') == acc_digits:
+                    result['source_account_last4'] = None
         
         return result
     
