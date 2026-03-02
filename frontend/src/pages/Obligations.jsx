@@ -4,10 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Modal, formatCurrency, inputClass, selectClass } from '../components/UI';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { Calendar, Trash2, LayoutGrid, List, Receipt, Tag, Plus, Edit2, ArrowLeft, ArrowRight, Filter, X } from 'lucide-react';
-import ObligationsOverview from '../components/ObligationsOverview';
-import ObligationsList from '../components/ObligationsList';
-import ObligationsTable from '../components/ObligationsTable';
-import ObligationsCompact from '../components/ObligationsCompact';
+import ObligationsManager from '../components/ObligationsManager';
 import ObligationsPayments from '../components/ObligationsHistory';
 import PaymentModal from '../components/PaymentModal';
 
@@ -29,7 +26,7 @@ const Obligations = () => {
     const [editingCategory, setEditingCategory] = useState(null);
 
     // --- View Mode State (for Obligations Tab) ---
-    const [viewMode, setViewModeState] = useState(localStorage.getItem('obligationsViewMode') || 'overview');
+    const [viewMode, setViewModeState] = useState(localStorage.getItem('obligationsViewMode') || 'manager');
     const setViewMode = (mode) => {
         setViewModeState(mode);
         localStorage.setItem('obligationsViewMode', mode);
@@ -415,81 +412,73 @@ const Obligations = () => {
             {/* --- OBLIGATIONS TAB CONTENT --- */}
             {activeTab === 'obligations' && (
                 <div className="animate-fade-in">
-                    {/* Sub-Navigation (View Modes) */}
-                    <div className="flex justify-between items-center mb-8 bg-slate-800/50 p-2 rounded-xl border border-slate-700">
+                    {/* Sub-Navigation (2 Views) */}
+                    <div className="flex justify-between items-center mb-6 bg-slate-800/50 p-2 rounded-xl border border-slate-700">
                         <div className="flex gap-2">
-                            <button onClick={() => setViewMode('overview')} className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm transition ${viewMode === 'overview' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>
-                                <LayoutGrid size={16} /> Overview
+                            <button onClick={() => setViewMode('manager')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${viewMode === 'manager' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-gray-400 hover:text-white hover:bg-slate-700/50'}`}>
+                                <LayoutGrid size={16} /> Manager
                             </button>
-                            <button onClick={() => setViewMode('manager')} className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm transition ${viewMode === 'manager' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>
-                                <List size={16} /> List
-                            </button>
-                            <button onClick={() => setViewMode('manager_new')} className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm transition ${viewMode === 'manager_new' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>
-                                <List size={16} /> Table
-                            </button>
-                            <button onClick={() => setViewMode('compact')} className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm transition ${viewMode === 'compact' ? 'bg-emerald-600 text-white' : 'text-gray-400 hover:text-white'}`}>
-                                <List size={16} /> Manager New
-                            </button>
-                            <button onClick={() => setViewMode('payments')} className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm transition ${viewMode === 'payments' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>
-                                <Receipt size={16} /> Payments
+                            <button onClick={() => setViewMode('history')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${viewMode === 'history' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-gray-400 hover:text-white hover:bg-slate-700/50'}`}>
+                                <Receipt size={16} /> History
                             </button>
                         </div>
 
-                        {/* Month Nav for Overview Mode */}
-                        {viewMode !== 'payments' && (
+                        {/* Month Nav */}
+                        {viewMode === 'manager' && (
                             <div className="flex items-center gap-2">
-                                {/* Category Filter Dropdown */}
-                                <div className="relative">
-                                    <select
-                                        className="bg-slate-800 text-xs text-gray-300 border border-slate-600 rounded px-2 py-1 outline-none focus:border-blue-500 mr-2"
-                                        value={categoryFilter || ""}
-                                        onChange={(e) => setSearchParams(prev => {
-                                            const newParams = new URLSearchParams(prev);
-                                            if (e.target.value) newParams.set('category', e.target.value);
-                                            else newParams.delete('category');
-                                            return newParams;
-                                        })}
-                                    >
-                                        <option value="">All Categories</option>
-                                        {categoriesList.map(c => (
-                                            <option key={c.id} value={c.name}>{c.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                                {/* Category Filter */}
+                                <select
+                                    className="bg-slate-800 text-xs text-gray-300 border border-slate-600 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 mr-1"
+                                    value={categoryFilter || ""}
+                                    onChange={(e) => setSearchParams(prev => {
+                                        const newParams = new URLSearchParams(prev);
+                                        if (e.target.value) newParams.set('category', e.target.value);
+                                        else newParams.delete('category');
+                                        return newParams;
+                                    })}
+                                >
+                                    <option value="">All Categories</option>
+                                    {categoriesList.map(c => (
+                                        <option key={c.id} value={c.name}>{c.name}</option>
+                                    ))}
+                                </select>
 
-                                <button onClick={() => setMonthOffset(p => p - 1)} className="p-1 hover:bg-slate-700 rounded text-gray-400"><ArrowLeft size={16} /></button>
-                                <span className="text-sm font-bold text-white min-w-[100px] text-center">{currentDateView}</span>
-                                <button onClick={() => setMonthOffset(p => p + 1)} className="p-1 hover:bg-slate-700 rounded text-gray-400"><ArrowRight size={16} /></button>
-                                <button onClick={() => setMonthOffset(0)} className="ml-2 text-xs bg-blue-900/40 text-blue-400 px-2 py-1 rounded">Today</button>
+                                <button onClick={() => setMonthOffset(p => p - 1)} className="p-1.5 hover:bg-slate-700 rounded-lg text-gray-400 transition"><ArrowLeft size={16} /></button>
+                                <span className="text-sm font-bold text-white min-w-[120px] text-center">{currentDateView}</span>
+                                <button onClick={() => setMonthOffset(p => p + 1)} className="p-1.5 hover:bg-slate-700 rounded-lg text-gray-400 transition"><ArrowRight size={16} /></button>
+                                <button onClick={() => setMonthOffset(0)} className="ml-1 text-xs bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 px-2.5 py-1.5 rounded-lg transition font-medium">Today</button>
                             </div>
                         )}
                     </div>
 
                     {/* View Components */}
-                    {viewMode === 'overview' && <ObligationsOverview obligations={filteredObligations} getMonthStatus={getMonthStatus} monthOffset={monthOffset} />}
-
                     {viewMode === 'manager' && (
-                        <div>
-                            <div className="flex justify-end mb-4"><button onClick={() => openObligationModal(null)} className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded shadow text-sm">+ Add New Obligation</button></div>
-                            <ObligationsList obligations={filteredObligations} getMonthStatus={getMonthStatus} openObligationModal={openObligationModal} openPaymentModal={openPaymentModal} handleQuickPay={handleQuickPay} openHistory={openHistory} handleDeleteHistory={handleDeleteHistory} monthOffset={monthOffset} onReorder={handleReorder} />
-                        </div>
+                        <ObligationsManager
+                            obligations={filteredObligations}
+                            getMonthStatus={getMonthStatus}
+                            monthOffset={monthOffset}
+                            openPaymentModal={openPaymentModal}
+                            handleQuickPay={handleQuickPay}
+                            openObligationModal={openObligationModal}
+                        />
                     )}
 
-                    {viewMode === 'manager_new' && (
-                        <div>
-                            <div className="flex justify-end mb-4"><button onClick={() => openObligationModal(null)} className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded shadow text-sm">+ Add New Obligation</button></div>
-                            <ObligationsTable obligations={filteredObligations} getMonthStatus={getMonthStatus} monthOffset={monthOffset} openPaymentModal={openPaymentModal} handleQuickPay={handleQuickPay} openObligationModal={openObligationModal} />
-                        </div>
+                    {viewMode === 'history' && (
+                        <ObligationsPayments
+                            obligations={filteredObligations}
+                            history={payments}
+                            onEdit={(item) => {
+                                if (item) {
+                                    const o = obligations.find(x => x.id === item.obligation_id);
+                                    if (o) openPaymentModal(o, null, null, item);
+                                } else {
+                                    openPaymentModal(null);
+                                }
+                            }}
+                            onDelete={(item) => handleDeleteHistory(item.id)}
+                            onRefresh={fetchData}
+                        />
                     )}
-
-                    {viewMode === 'compact' && (
-                        <div>
-                            <div className="flex justify-end mb-4"><button onClick={() => openObligationModal(null)} className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded shadow text-sm">+ Add New Obligation</button></div>
-                            <ObligationsCompact obligations={filteredObligations} getMonthStatus={getMonthStatus} monthOffset={monthOffset} openPaymentModal={openPaymentModal} handleQuickPay={handleQuickPay} openObligationModal={openObligationModal} />
-                        </div>
-                    )}
-
-                    {viewMode === 'payments' && <ObligationsPayments obligations={filteredObligations} history={payments} onEdit={(item) => { if (item) { const o = obligations.find(x => x.id === item.obligation_id); if (o) openPaymentModal(o, null, null, item); } else { openPaymentModal(null); } }} onDelete={(item) => handleDeleteHistory(item.id)} onRefresh={fetchData} />}
                 </div>
             )}
 
