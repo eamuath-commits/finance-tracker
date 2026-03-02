@@ -955,20 +955,46 @@ def resolve_discrepancy(transaction_id: str, body: dict, db: Session = Depends(g
     }
     del parsed['balance_discrepancy']
     
-    # Adopt SMS balance on the credit card
+    # Adopt SMS balance on the credit card and cascade
     if tx.credit_card_id:
         cc = db.query(models.CreditCard).filter(models.CreditCard.id == tx.credit_card_id).first()
         if cc:
             sms_balance = discrepancy.get('sms_balance')
             if sms_balance is not None:
-                cc.current_balance = round(sms_balance, 2)
-                tx.balance_after_transaction = cc.current_balance
+                tx.balance_after_transaction = round(sms_balance, 2)
                 db.add(cc)
     
     tx.parsed_data = _json.dumps(parsed)
     db.add(tx)
     db.commit()
-    db.refresh(tx)
+    
+    # Cascade: recalculate all subsequent CC transactions from this new anchor
+    if tx.credit_card_id:
+        # Get all CC transactions after this one and recalculate
+        cc = db.query(models.CreditCard).filter(models.CreditCard.id == tx.credit_card_id).first()
+        if cc:
+            cc_txs = db.query(models.Transaction).filter(
+                models.Transaction.credit_card_id == tx.credit_card_id,
+                models.Transaction.status == "completed"
+            ).order_by(models.Transaction.timestamp.asc()).all()
+            
+            tx_index = next((i for i, t in enumerate(cc_txs) if t.id == tx.id), None)
+            if tx_index is not None:
+                running_balance = tx.balance_after_transaction
+                for subsequent_tx in cc_txs[tx_index + 1:]:
+                    tx_type = str(subsequent_tx.type).lower() if subsequent_tx.type else 'debit'
+                    if tx_type == 'credit':
+                        running_balance += (subsequent_tx.amount or 0)
+                    else:
+                        running_balance -= (subsequent_tx.amount or 0)
+                    if subsequent_tx.fees:
+                        running_balance -= subsequent_tx.fees
+                    subsequent_tx.balance_after_transaction = running_balance
+                    db.add(subsequent_tx)
+                
+                cc.current_balance = running_balance
+                db.add(cc)
+                db.commit()
     
     return {"message": "Discrepancy resolved", "resolved": parsed['discrepancy_resolved']}
 
