@@ -982,6 +982,44 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
                             running_balance -= tx.fees
                         tx.balance_after_transaction = running_balance
                         db.add(tx)
+                
+                # Re-run discrepancy check on all CC transactions after recalculation
+                import json as _json
+                import logging
+                _recheck_logger = logging.getLogger(__name__)
+                for tx in cc_txs:
+                    if not tx.parsed_data:
+                        continue
+                    try:
+                        parsed = _json.loads(tx.parsed_data) if isinstance(tx.parsed_data, str) else tx.parsed_data
+                        sms_available = parsed.get('available_balance')
+                        if sms_available is None:
+                            continue
+                        
+                        diff = abs(tx.balance_after_transaction - sms_available)
+                        had_discrepancy = 'balance_discrepancy' in parsed
+                        
+                        if diff <= 0.05:
+                            # Balance matches SMS — remove any existing discrepancy
+                            if had_discrepancy:
+                                del parsed['balance_discrepancy']
+                                _recheck_logger.info(f"CC {cc.last_4_digits}: Discrepancy RESOLVED after edit (diff={diff:.2f})")
+                            if diff > 0:
+                                tx.balance_after_transaction = round(sms_available, 2)
+                        else:
+                            # Still a discrepancy — update or add warning
+                            parsed['balance_discrepancy'] = {
+                                'db_balance': round(tx.balance_after_transaction, 2),
+                                'sms_balance': round(sms_available, 2),
+                                'difference': round(diff, 2)
+                            }
+                            if not had_discrepancy:
+                                _recheck_logger.warning(f"CC {cc.last_4_digits}: NEW discrepancy after edit: DB={tx.balance_after_transaction:.2f}, SMS={sms_available:.2f}, diff={diff:.2f}")
+                        
+                        tx.parsed_data = _json.dumps(parsed)
+                        db.add(tx)
+                    except Exception:
+                        pass
 
     db.add(db_tx)
     db.commit()
