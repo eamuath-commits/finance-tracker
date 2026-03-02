@@ -107,6 +107,13 @@ At: GOT COOKIES
 Date: 16/07/25 12:24"
 JSON: {"is_financial_event": true, "is_transaction": true, "transaction_type": "credit", "sub_type": "refund", "card_info": "Apple Pay 6070", "destination_account_last4": "6070", "amount": 7.0, "currency": "SAR", "merchant": "GOT COOKIES", "brand_name": "Got Cookie", "brand_domain": null, "timestamp": "2025-07-16 12:24", "category": "Refund"}
 
+SMS: "Outcome Transfer to Sponsored 
+Amount:1900.00SAR 
+To:MOHAMMED ISLAM 
+Acc:1386* 
+At:02/02/26 09:06"
+JSON: {"is_financial_event": true, "is_transaction": true, "transaction_type": "debit", "sub_type": "sponsored_transfer", "amount": 1900.0, "currency": "SAR", "beneficiary": "MOHAMMED ISLAM", "source_account_last4": "1386", "timestamp": "2026-02-02 09:06", "category": "Transfer", "merchant": "MOHAMMED ISLAM"}
+
 Now parse this SMS:
 '''
     
@@ -163,6 +170,24 @@ Now parse this SMS:
                 result['destination_account_last4'] = account_digits
             else:
                 result['source_account_last4'] = account_digits
+        
+        # Extract beneficiary from To: pattern (for transfers)
+        to_match = re.search(r'To:\s*(.+?)\s*(?:\n|Acc:|At:|$)', sms_text, re.IGNORECASE)
+        if to_match:
+            beneficiary = to_match.group(1).strip()
+            if beneficiary:
+                result['beneficiary'] = beneficiary
+                # For transfers, set merchant to beneficiary name if not already set
+                if not result.get('merchant') or result.get('merchant') == 'CC Payment':
+                    result['merchant'] = beneficiary
+        
+        # Extract account from Acc: pattern (e.g., Acc:1386*)
+        acc_match = re.search(r'Acc:\s*([\d]+)', sms_text, re.IGNORECASE)
+        if acc_match:
+            acc_digits = acc_match.group(1)
+            if len(acc_digits) == 3:
+                acc_digits = '0' + acc_digits
+            result['source_account_last4'] = acc_digits
         
         return result
     
