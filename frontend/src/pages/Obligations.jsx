@@ -436,8 +436,8 @@ const Obligations = () => {
                                 ))}
                             </select>
 
-                            {/* Month Nav (shown for Manager and Payments) */}
-                            {(viewMode === 'manager' || viewMode === 'payments') && (
+                            {/* Month Nav (shown for Payments only) */}
+                            {viewMode === 'payments' && (
                                 <>
                                     <button onClick={() => setMonthOffset(p => p - 1)} className="p-1.5 hover:bg-slate-700 rounded-lg text-gray-400 transition"><ArrowLeft size={16} /></button>
                                     <span className="text-sm font-bold text-white min-w-[120px] text-center">{currentDateView}</span>
@@ -452,10 +452,6 @@ const Obligations = () => {
                     {viewMode === 'manager' && (
                         <ObligationsManager
                             obligations={filteredObligations}
-                            getMonthStatus={getMonthStatus}
-                            monthOffset={monthOffset}
-                            openPaymentModal={openPaymentModal}
-                            handleQuickPay={handleQuickPay}
                             openObligationModal={openObligationModal}
                         />
                     )}
@@ -479,7 +475,11 @@ const Obligations = () => {
                     )}
 
                     {viewMode === 'forecast' && (
-                        <ObligationsForecast categoryFilter={categoryFilter} />
+                        <ObligationsForecast
+                            categoryFilter={categoryFilter}
+                            obligations={filteredObligations}
+                            payments={payments}
+                        />
                     )}
                 </div>
             )}
