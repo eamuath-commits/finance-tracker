@@ -398,16 +398,6 @@ const Obligations = () => {
                     <List size={16} />
                     Obligations
                 </button>
-                <button
-                    onClick={() => setSearchParams({ tab: 'categories' })}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'categories'
-                        ? 'bg-purple-600 text-white shadow'
-                        : 'text-gray-400 hover:text-white'
-                        }`}
-                >
-                    <Tag size={16} />
-                    Categories
-                </button>
             </div>
 
             {/* --- OBLIGATIONS TAB CONTENT --- */}
@@ -427,32 +417,35 @@ const Obligations = () => {
                             </button>
                         </div>
 
-                        {/* Month Nav */}
-                        {viewMode === 'manager' && (
-                            <div className="flex items-center gap-2">
-                                {/* Category Filter */}
-                                <select
-                                    className="bg-slate-800 text-xs text-gray-300 border border-slate-600 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 mr-1"
-                                    value={categoryFilter || ""}
-                                    onChange={(e) => setSearchParams(prev => {
-                                        const newParams = new URLSearchParams(prev);
-                                        if (e.target.value) newParams.set('category', e.target.value);
-                                        else newParams.delete('category');
-                                        return newParams;
-                                    })}
-                                >
-                                    <option value="">All Categories</option>
-                                    {categoriesList.map(c => (
-                                        <option key={c.id} value={c.name}>{c.name}</option>
-                                    ))}
-                                </select>
+                        {/* Shared Controls: Category Filter + Month Nav */}
+                        <div className="flex items-center gap-2">
+                            {/* Category Filter (universal across all views) */}
+                            <select
+                                className="bg-slate-800 text-xs text-gray-300 border border-slate-600 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 mr-1"
+                                value={categoryFilter || ""}
+                                onChange={(e) => setSearchParams(prev => {
+                                    const newParams = new URLSearchParams(prev);
+                                    if (e.target.value) newParams.set('category', e.target.value);
+                                    else newParams.delete('category');
+                                    return newParams;
+                                })}
+                            >
+                                <option value="">All Categories</option>
+                                {categoriesList.map(c => (
+                                    <option key={c.id} value={c.name}>{c.name}</option>
+                                ))}
+                            </select>
 
-                                <button onClick={() => setMonthOffset(p => p - 1)} className="p-1.5 hover:bg-slate-700 rounded-lg text-gray-400 transition"><ArrowLeft size={16} /></button>
-                                <span className="text-sm font-bold text-white min-w-[120px] text-center">{currentDateView}</span>
-                                <button onClick={() => setMonthOffset(p => p + 1)} className="p-1.5 hover:bg-slate-700 rounded-lg text-gray-400 transition"><ArrowRight size={16} /></button>
-                                <button onClick={() => setMonthOffset(0)} className="ml-1 text-xs bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 px-2.5 py-1.5 rounded-lg transition font-medium">Today</button>
-                            </div>
-                        )}
+                            {/* Month Nav (shown for Manager and Payments) */}
+                            {(viewMode === 'manager' || viewMode === 'payments') && (
+                                <>
+                                    <button onClick={() => setMonthOffset(p => p - 1)} className="p-1.5 hover:bg-slate-700 rounded-lg text-gray-400 transition"><ArrowLeft size={16} /></button>
+                                    <span className="text-sm font-bold text-white min-w-[120px] text-center">{currentDateView}</span>
+                                    <button onClick={() => setMonthOffset(p => p + 1)} className="p-1.5 hover:bg-slate-700 rounded-lg text-gray-400 transition"><ArrowRight size={16} /></button>
+                                    <button onClick={() => setMonthOffset(0)} className="ml-1 text-xs bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 px-2.5 py-1.5 rounded-lg transition font-medium">Today</button>
+                                </>
+                            )}
+                        </div>
                     </div>
 
                     {/* View Components */}
@@ -485,51 +478,12 @@ const Obligations = () => {
                     )}
 
                     {viewMode === 'forecast' && (
-                        <ObligationsForecast />
+                        <ObligationsForecast categoryFilter={categoryFilter} />
                     )}
                 </div>
             )}
 
-            {/* --- CATEGORIES TAB CONTENT --- */}
-            {activeTab === 'categories' && (
-                <div className="max-w-4xl mx-auto animate-fade-in-up">
-                    <div className="bg-slate-800 rounded-xl border border-slate-700 p-6 mb-8">
-                        <h3 className="text-xl font-bold text-white mb-4">Add New Category</h3>
-                        <form onSubmit={handleAddCategory} className="flex gap-4">
-                            <input type="text" placeholder="Category Name (e.g. Housing, Transport)" className={`${inputClass} flex-1`} value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} />
-                            <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg font-medium flex items-center gap-2"><Plus size={20} /> Add</button>
-                        </form>
-                    </div>
-                    <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-                        <table className="min-w-full divide-y divide-slate-700">
-                            <thead className="bg-slate-900">
-                                <tr>
-                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Category Name</th>
-                                    <th className="px-6 py-4 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-700">
-                                {categoriesList.map(cat => (
-                                    <tr key={cat.id} className="hover:bg-slate-750 transition-colors">
-                                        <td className="px-6 py-4">
-                                            {editingCategory?.id === cat.id ? (
-                                                <input type="text" className={`${inputClass} py-1 text-sm`} defaultValue={cat.name} autoFocus onBlur={(e) => { if (e.target.value !== cat.name) handleUpdateCategory(cat.id, e.target.value); else setEditingCategory(null); }} onKeyDown={(e) => { if (e.key === 'Enter') handleUpdateCategory(cat.id, e.currentTarget.value); }} />
-                                            ) : (
-                                                <span className="text-white font-medium">{cat.name}</span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 text-right flex justify-end gap-3">
-                                            <button onClick={() => setEditingCategory(cat)} className="text-blue-400 hover:text-white transition-colors" title="Rename"><Edit2 size={18} /></button>
-                                            <button onClick={() => handleDeleteCategory(cat.id)} className="text-red-400 hover:text-red-300 transition-colors" title="Delete"><Trash2 size={18} /></button>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {categoriesList.length === 0 && <tr><td colSpan="2" className="px-6 py-8 text-center text-gray-500 italic">No categories defined yet.</td></tr>}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
+
 
             {/* --- MODALS --- */}
             {showObligationModal && (

@@ -22,7 +22,7 @@ const CONFIDENCE_STYLES = {
     none: { bg: 'bg-slate-800/50', text: 'text-slate-600', border: 'border-slate-700/25', label: '—' },
 };
 
-const ObligationsForecast = () => {
+const ObligationsForecast = ({ categoryFilter }) => {
     const [forecast, setForecast] = useState(null);
     const [loading, setLoading] = useState(true);
     const [monthsAhead, setMonthsAhead] = useState(1);
@@ -46,6 +46,15 @@ const ObligationsForecast = () => {
         fetchForecast();
     }, [monthsAhead]);
 
+    // Apply category filter
+    const filteredObligations = useMemo(() => {
+        if (!forecast) return [];
+        if (!categoryFilter) return forecast.obligations;
+        return forecast.obligations.filter(o => o.category === categoryFilter);
+    }, [forecast, categoryFilter]);
+
+    const filteredTotal = useMemo(() => filteredObligations.reduce((s, o) => s + o.forecast_amount, 0), [filteredObligations]);
+
     const toggleCat = (cat) => {
         setExpandedCats(prev => {
             const next = new Set(prev);
@@ -56,14 +65,13 @@ const ObligationsForecast = () => {
     };
 
     const grouped = useMemo(() => {
-        if (!forecast) return {};
-        return forecast.obligations.reduce((acc, obl) => {
+        return filteredObligations.reduce((acc, obl) => {
             const cat = obl.category || "Uncategorized";
             if (!acc[cat]) acc[cat] = [];
             acc[cat].push(obl);
             return acc;
         }, {});
-    }, [forecast]);
+    }, [filteredObligations]);
 
     const sortedCategories = Object.keys(grouped).sort();
 
@@ -95,7 +103,7 @@ const ObligationsForecast = () => {
                     <p className="text-[10px] text-blue-400 uppercase tracking-wider font-semibold mb-1">
                         Expected Total
                     </p>
-                    <p className="text-2xl font-bold text-white font-mono">{formatCurrency(forecast.total_forecast)}</p>
+                    <p className="text-2xl font-bold text-white font-mono">{formatCurrency(filteredTotal)}</p>
                     <p className="text-[10px] text-blue-400/60 mt-1">{forecast.forecast_label}</p>
                 </div>
 
@@ -104,8 +112,8 @@ const ObligationsForecast = () => {
                     <p className="text-[10px] text-purple-400 uppercase tracking-wider font-semibold mb-1">
                         Categories
                     </p>
-                    <p className="text-2xl font-bold text-white font-mono">{Object.keys(forecast.by_category).length}</p>
-                    <p className="text-[10px] text-purple-400/60 mt-1">{forecast.obligations.length} obligations tracked</p>
+                    <p className="text-2xl font-bold text-white font-mono">{Object.keys(grouped).length}</p>
+                    <p className="text-[10px] text-purple-400/60 mt-1">{filteredObligations.length} obligations tracked</p>
                 </div>
 
                 {/* Confidence Overview */}
@@ -115,7 +123,7 @@ const ObligationsForecast = () => {
                     </p>
                     <div className="flex gap-3">
                         {['high', 'medium', 'low'].map(level => {
-                            const count = forecast.obligations.filter(o => o.confidence === level).length;
+                            const count = filteredObligations.filter(o => o.confidence === level).length;
                             const style = CONFIDENCE_STYLES[level];
                             return (
                                 <div key={level} className="flex items-center gap-1.5">
