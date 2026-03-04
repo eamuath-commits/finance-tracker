@@ -387,13 +387,15 @@ const ObligationsManager = ({ obligations, getMonthStatus, monthOffset, openPaym
             const today = new Date();
             const targetMonth = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
             const billingDateStr = `${targetMonth.getFullYear()}-${(targetMonth.getMonth() + 1).toString().padStart(2, '0')}-01`;
+            const txId = tx.transaction_id || tx.id;
+            const txDate = tx.date || tx.timestamp;
             await axios.post(`${API_URL}/obligations/${obl.id}/pay`, {
-                payment_date: tx.timestamp, billing_month: billingDateStr,
+                payment_date: txDate, billing_month: billingDateStr,
                 amount: tx.amount, note: `Linked to: ${tx.merchant}`,
-                status: "PAID", transaction_id: tx.id
+                status: "PAID", transaction_id: txId
             });
             window.location.reload();
-        } catch (e) { alert("Linking failed"); }
+        } catch (e) { alert("Linking failed: " + (e.response?.data?.detail || e.message)); }
     };
 
     const handleLinkPayment = (obl, matchArray) => {
@@ -403,7 +405,7 @@ const ObligationsManager = ({ obligations, getMonthStatus, monthOffset, openPaym
 
     const handleRejectMatch = () => {
         if (!verifyMatch) return;
-        const rejectedTxId = verifyMatch.tx.id;
+        const rejectedTxId = verifyMatch.tx.transaction_id || verifyMatch.tx.id;
         const remaining = verifyMatch.allMatches.slice(1);
         setRejectedMatches(prev => { const s = new Set(prev); s.add(rejectedTxId); return s; });
         setMatches(prev => {
@@ -600,7 +602,7 @@ const ObligationsManager = ({ obligations, getMonthStatus, monthOffset, openPaym
                             <p className="text-blue-300 text-xs mb-1">Matched Transaction</p>
                             <p className="text-white font-semibold">{verifyMatch.tx.merchant}</p>
                             <p className="text-blue-200 font-mono text-xl mt-1">{formatCurrency(verifyMatch.tx.amount)}</p>
-                            <p className="text-slate-400 text-xs mt-1">{new Date(verifyMatch.tx.timestamp).toLocaleDateString()}</p>
+                            <p className="text-slate-400 text-xs mt-1">{new Date(verifyMatch.tx.date || verifyMatch.tx.timestamp).toLocaleDateString()}</p>
                         </div>
                         <p className="text-gray-300 text-sm">Link this transaction and mark as paid?</p>
                         <div className="flex gap-3">
