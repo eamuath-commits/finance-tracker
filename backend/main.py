@@ -445,6 +445,339 @@ def delete_obligation(obligation_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Obligation not found")
     return deleted_obj
 
+@app.get("/obligations/monthly-status")
+def get_obligations_monthly_status(month_offset: int = 0, db: Session = Depends(get_db)):
+    """
+    Get payment status for all obligations for a given month.
+    Returns paid/unpaid/overdue counts and per-obligation status.
+    """
+    from datetime import datetime
+    now = datetime.now()
+    target_date = datetime(now.year, now.month + month_offset, 1) if now.month + month_offset > 0 else datetime(now.year - 1, 12 + now.month + month_offset, 1)
+    # Properly handle month overflow
+    year = now.year + ((now.month - 1 + month_offset) // 12)
+    month = ((now.month - 1 + month_offset) % 12) + 1
+    target_date = datetime(year, month, 1)
+
+    month_str = f"{year}-{str(month).zfill(2)}"
+    month_label = target_date.strftime("%B %Y")
+
+    obligations = db.query(models.MonthlyObligation).order_by(models.MonthlyObligation.display_order).all()
+
+    # Get all payments for this month in one query
+    all_payments = db.query(models.Payment).filter(
+        models.Payment.billing_month == month_str
+    ).all()
+    payments_by_obl = {}
+    for p in all_payments:
+        payments_by_obl[p.obligation_id] = p
+
+    result_obligations = []
+    paid_count = 0
+    unpaid_count = 0
+    overdue_count = 0
+    total_expected = 0.0
+    total_paid = 0.0
+
+    for obl in obligations:
+        expected = obl.amount or 0.0
+        total_expected += expected
+
+        payment = payments_by_obl.get(obl.id)
+
+        if payment and payment.status in (models.PaymentStatus.PAID, "PAID"):
+            status = "PAID"
+            paid_count += 1
+            total_paid += payment.amount or 0.0
+        elif payment and payment.status in (models.PaymentStatus.BUDGET, "BUDGET"):
+            status = "BUDGET"
+            unpaid_count += 1
+        else:
+            # Check if overdue: due_day has passed in current/past month
+            is_past_month = (year < now.year) or (year == now.year and month < now.month)
+            is_overdue = is_past_month or (year == now.year and month == now.month and (obl.due_day or 1) < now.day)
+            status = "OVERDUE" if is_overdue else "UNPAID"
+            if is_overdue:
+                overdue_count += 1
+            unpaid_count += 1
+
+        result_obligations.append({
+            "id": obl.id,
+            "name": obl.name,
+            "category": obl.category,
+            "provider": obl.provider,
+            "expected_amount": expected,
+            "due_day": obl.due_day,
+            "status": status,
+            "is_overdue": status == "OVERDUE",
+            "payment": {
+                "id": payment.id,
+                "amount": payment.amount,
+                "status": payment.status.value if hasattr(payment.status, 'value') else payment.status,
+                "billing_month": payment.billing_month,
+                "payment_date": payment.payment_date.isoformat() if payment.payment_date else None,
+                "note": payment.note,
+            } if payment else None,
+        })
+
+    return {
+        "month": month_str,
+        "month_label": month_label,
+        "total_obligations": len(obligations),
+        "paid_count": paid_count,
+        "unpaid_count": unpaid_count,
+        "overdue_count": overdue_count,
+        "total_expected": round(total_expected, 2),
+        "total_paid": round(total_paid, 2),
+        "remaining": round(total_expected - total_paid, 2),
+        "obligations": result_obligations,
+    }
+
+
+@app.get("/obligations/forecast")
+def get_obligations_forecast(months_ahead: int = 1, db: Session = Depends(get_db)):
+    """
+    Forecast next month's expected expenses based on payment history.
+    Uses up to 6 months of payment history per obligation for trend analysis.
+    """
+    from datetime import datetime
+    now = datetime.now()
+
+    # Target forecast month
+    year = now.year + ((now.month - 1 + months_ahead) // 12)
+    month = ((now.month - 1 + months_ahead) % 12) + 1
+    forecast_month = f"{year}-{str(month).zfill(2)}"
+    forecast_label = datetime(year, month, 1).strftime("%B %Y")
+
+    obligations = db.query(models.MonthlyObligation).order_by(models.MonthlyObligation.display_order).all()
+
+    # Get last 6 months of payments in one query
+    history_months = []
+    for i in range(1, 7):  # 1 to 6 months back
+        hy = now.year + ((now.month - 1 - i) // 12)
+        hm = ((now.month - 1 - i) % 12) + 1
+        history_months.append(f"{hy}-{str(hm).zfill(2)}")
+
+    all_history = db.query(models.Payment).filter(
+        models.Payment.billing_month.in_(history_months),
+        models.Payment.status.in_([models.PaymentStatus.PAID, "PAID"])
+    ).all()
+
+    # Group by obligation_id
+    history_by_obl = {}
+    for p in all_history:
+        history_by_obl.setdefault(p.obligation_id, []).append(p)
+
+    result_obligations = []
+    total_forecast = 0.0
+    by_category = {}
+
+    for obl in obligations:
+        payments = history_by_obl.get(obl.id, [])
+        amounts = [p.amount for p in payments if p.amount]
+
+        if len(amounts) >= 3:
+            avg = sum(amounts) / len(amounts)
+            last_paid = amounts[0] if amounts else None  # Most recent
+            # Sort by billing_month to get trend
+            sorted_payments = sorted(payments, key=lambda p: p.billing_month or "")
+            sorted_amounts = [p.amount for p in sorted_payments if p.amount]
+
+            # Simple trend: compare first half avg vs second half avg
+            mid = len(sorted_amounts) // 2
+            first_half = sum(sorted_amounts[:mid]) / max(mid, 1)
+            second_half = sum(sorted_amounts[mid:]) / max(len(sorted_amounts) - mid, 1)
+            pct_change = ((second_half - first_half) / first_half * 100) if first_half > 0 else 0
+
+            if pct_change > 5:
+                trend = "increasing"
+            elif pct_change < -5:
+                trend = "decreasing"
+            else:
+                trend = "stable"
+
+            # Confidence based on variance
+            variance = sum((a - avg) ** 2 for a in amounts) / len(amounts)
+            std_dev = variance ** 0.5
+            cv = (std_dev / avg * 100) if avg > 0 else 100  # Coefficient of variation
+
+            if cv <= 5:
+                confidence = "high"
+            elif cv <= 20:
+                confidence = "medium"
+            else:
+                confidence = "low"
+
+            forecast_amount = round(avg, 2)
+
+        elif len(amounts) > 0:
+            avg = sum(amounts) / len(amounts)
+            forecast_amount = round(avg, 2)
+            last_paid = amounts[0]
+            trend = "stable"
+            confidence = "low"
+        else:
+            # No history — use obligation.amount as fallback
+            forecast_amount = round(obl.amount or 0, 2)
+            avg = forecast_amount
+            last_paid = None
+            trend = "stable"
+            confidence = "low" if obl.amount else "none"
+
+        total_forecast += forecast_amount
+
+        cat = obl.category or "Uncategorized"
+        if cat not in by_category:
+            by_category[cat] = {"total": 0, "count": 0}
+        by_category[cat]["total"] = round(by_category[cat]["total"] + forecast_amount, 2)
+        by_category[cat]["count"] += 1
+
+        result_obligations.append({
+            "id": obl.id,
+            "name": obl.name,
+            "category": cat,
+            "provider": obl.provider,
+            "forecast_amount": forecast_amount,
+            "confidence": confidence,
+            "avg_recent": round(avg, 2),
+            "last_paid": round(last_paid, 2) if last_paid else None,
+            "trend": trend,
+            "data_points": len(amounts),
+        })
+
+    return {
+        "forecast_month": forecast_month,
+        "forecast_label": forecast_label,
+        "total_forecast": round(total_forecast, 2),
+        "by_category": by_category,
+        "obligations": result_obligations,
+    }
+
+
+@app.get("/obligations/all-matches")
+def get_all_obligation_matches(db: Session = Depends(get_db)):
+    """
+    Find transaction matches for ALL unpaid obligations in the current month.
+    Returns a dict keyed by obligation_id with match arrays.
+    """
+    from datetime import datetime
+    now = datetime.now()
+    month_str = f"{now.year}-{str(now.month).zfill(2)}"
+
+    obligations = db.query(models.MonthlyObligation).all()
+
+    # Get payments for current month to identify unpaid ones
+    current_payments = db.query(models.Payment).filter(
+        models.Payment.billing_month == month_str,
+        models.Payment.status.in_([models.PaymentStatus.PAID, "PAID"])
+    ).all()
+    paid_obl_ids = {p.obligation_id for p in current_payments}
+
+    # Get all linked transaction IDs to exclude
+    linked_tx_ids = set(
+        tid for (tid,) in db.query(models.Payment.transaction_id).filter(
+            models.Payment.transaction_id.isnot(None)
+        ).all()
+    )
+    # Also exclude junction-table linked txs
+    linked_junction_ids = set(
+        tid for (tid,) in db.query(models.PaymentTransaction.transaction_id).all()
+    )
+    all_excluded = linked_tx_ids | linked_junction_ids
+
+    # Get candidate transactions (debit, this month)
+    search_start = datetime(now.year, now.month, 1)
+    candidates = db.query(models.Transaction).filter(
+        models.Transaction.timestamp >= search_start,
+        models.Transaction.type == 'debit'
+    ).all()
+
+    results = {}
+
+    for obl in obligations:
+        if obl.id in paid_obl_ids:
+            continue  # Skip paid obligations
+
+        keyword = obl.name.split(" ")[0].lower()
+        provider_lower = (obl.provider or "").lower()
+        note_keywords = [w.lower() for w in (obl.notes or "").split() if len(w) > 2]
+
+        matches = []
+        for tx in candidates:
+            if tx.id in all_excluded:
+                continue
+
+            score = 0
+            reasons = []
+            merchant_lower = (tx.merchant or "").lower()
+            notes_lower = (tx.notes or "").lower()
+
+            # Name/keyword match
+            if keyword in merchant_lower or keyword in notes_lower:
+                score += 50
+                reasons.append("name_match")
+
+            # Provider match
+            if provider_lower and len(provider_lower) > 2:
+                if provider_lower in merchant_lower or provider_lower in notes_lower:
+                    score += 40
+                    reasons.append("provider_match")
+
+            # Biller reference match
+            if tx.biller_id:
+                biller = tx.biller_ref
+                if biller:
+                    biller_name = (biller.display_name or biller.name or "").lower()
+                    if keyword in biller_name or (provider_lower and provider_lower in biller_name):
+                        score += 45
+                        reasons.append("biller_match")
+
+            # Notes/alias match
+            for k in note_keywords:
+                if k in merchant_lower or k in notes_lower:
+                    score += 50
+                    reasons.append("notes_match")
+                    break
+
+            # Amount match
+            if obl.amount and tx.amount:
+                diff = abs(tx.amount - obl.amount)
+                if obl.amount > 0 and diff / obl.amount <= 0.1:
+                    score += 40
+                    reasons.append("amount_match")
+                    if diff == 0:
+                        score += 20
+                        reasons.append("exact_amount")
+
+            # Category match
+            if obl.category and tx.category and obl.category.lower() == tx.category.lower():
+                score += 20
+                reasons.append("category_match")
+
+            # Due date proximity
+            if tx.timestamp and obl.due_day:
+                days_diff = abs(tx.timestamp.day - obl.due_day)
+                if days_diff <= 3:
+                    score += 15
+                    reasons.append("due_date_proximity")
+
+            if score >= 40:
+                matches.append({
+                    "transaction_id": tx.id,
+                    "merchant": tx.merchant,
+                    "amount": tx.amount,
+                    "date": tx.timestamp.isoformat() if tx.timestamp else None,
+                    "score": score,
+                    "reasons": reasons,
+                })
+
+        if matches:
+            matches.sort(key=lambda x: x["score"], reverse=True)
+            results[obl.id] = matches[:3]  # Top 3 per obligation
+
+    return results
+
+
 @app.get("/obligations/{obligation_id}/matches", response_model=List[schemas.Transaction])
 def get_obligation_matches(obligation_id: str, db: Session = Depends(get_db)):
     # 1. Get Obligation
@@ -480,34 +813,50 @@ def get_obligation_matches(obligation_id: str, db: Session = Depends(get_db)):
             continue
             
         match_score = 0
+        merchant_lower = (tx.merchant or "").lower()
+        notes_lower = (tx.notes or "").lower()
         
-        # A. Name Match
         # A. Name/Keyword Match
-        # Check Name
-        if keyword in (tx.merchant or "").lower() or keyword in (tx.notes or "").lower():
+        if keyword in merchant_lower or keyword in notes_lower:
             match_score += 50
         
-        # Check Notes (User defined aliases)
-        if obligation.notes:
-            note_keywords = [w.lower() for w in obligation.notes.split() if len(w) > 2] # Ignore small words
-            for k in note_keywords:
-                if k in (tx.merchant or "").lower() or k in (tx.notes or "").lower():
-                    match_score += 50
-                    break # Only bonus once for notes match
-            
-        # B. Amount Match (if Obligation has amount)
-        if obligation.amount and tx.amount:
-            # 10% tolerance
-            diff = abs(tx.amount - obligation.amount)
-            if diff / obligation.amount <= 0.1:
+        # B. Provider Match (NEW)
+        provider_lower = (obligation.provider or "").lower()
+        if provider_lower and len(provider_lower) > 2:
+            if provider_lower in merchant_lower or provider_lower in notes_lower:
                 match_score += 40
-            # Exact match bonus
+
+        # C. Biller Reference Match (NEW)
+        if tx.biller_id and tx.biller_ref:
+            biller_name = (tx.biller_ref.display_name or tx.biller_ref.name or "").lower()
+            if keyword in biller_name or (provider_lower and provider_lower in biller_name):
+                match_score += 45
+
+        # D. Notes/Alias Match
+        if obligation.notes:
+            note_keywords = [w.lower() for w in obligation.notes.split() if len(w) > 2]
+            for k in note_keywords:
+                if k in merchant_lower or k in notes_lower:
+                    match_score += 50
+                    break
+            
+        # E. Amount Match (if Obligation has amount)
+        if obligation.amount and tx.amount:
+            diff = abs(tx.amount - obligation.amount)
+            if obligation.amount > 0 and diff / obligation.amount <= 0.1:
+                match_score += 40
             if diff == 0:
                 match_score += 20
         
-        # C. Category Match (if matches obligation category)
+        # F. Category Match
         if obligation.category and tx.category and obligation.category.lower() == tx.category.lower():
             match_score += 20
+
+        # G. Due Date Proximity (NEW)
+        if tx.timestamp and obligation.due_day:
+            days_diff = abs(tx.timestamp.day - obligation.due_day)
+            if days_diff <= 3:
+                match_score += 15
             
         # Threshold
         if match_score >= 40:

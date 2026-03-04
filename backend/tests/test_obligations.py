@@ -116,3 +116,88 @@ class TestObligationsAPI:
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
+
+    def test_monthly_status(self, client):
+        """Test the monthly-status endpoint returns correct structure."""
+        # Create an obligation
+        name = get_unique_name()
+        client.post("/obligations/", json={
+            "name": name,
+            "due_day": 1,
+            "category": "Bills",
+            "amount": 100.0
+        })
+
+        # Get monthly status
+        response = client.get("/obligations/monthly-status?month_offset=0")
+        assert response.status_code == 200
+        data = response.json()
+        assert "month" in data
+        assert "paid_count" in data
+        assert "unpaid_count" in data
+        assert "overdue_count" in data
+        assert "total_expected" in data
+        assert "obligations" in data
+        assert isinstance(data["obligations"], list)
+        assert data["total_obligations"] >= 1
+
+    def test_monthly_status_tracks_paid(self, client):
+        """Test that monthly-status correctly reports paid obligations."""
+        name = get_unique_name()
+        create_resp = client.post("/obligations/", json={
+            "name": name,
+            "due_day": 15,
+            "category": "Bills",
+            "amount": 200.0
+        })
+        ob_id = create_resp.json()["id"]
+
+        # Pay the obligation for current month
+        from datetime import datetime
+        now = datetime.now()
+        billing_month = f"{now.year}-{str(now.month).zfill(2)}"
+        client.post(f"/obligations/{ob_id}/pay", json={
+            "amount": 200.0,
+            "billing_month": billing_month,
+            "status": "PAID"
+        })
+
+        response = client.get("/obligations/monthly-status?month_offset=0")
+        data = response.json()
+        paid_obl = [o for o in data["obligations"] if o["id"] == ob_id]
+        assert len(paid_obl) == 1
+        assert paid_obl[0]["status"] == "PAID"
+
+    def test_forecast(self, client):
+        """Test the forecast endpoint returns predictions."""
+        name = get_unique_name()
+        client.post("/obligations/", json={
+            "name": name,
+            "due_day": 10,
+            "category": "Utilities",
+            "amount": 300.0
+        })
+
+        response = client.get("/obligations/forecast?months_ahead=1")
+        assert response.status_code == 200
+        data = response.json()
+        assert "forecast_month" in data
+        assert "total_forecast" in data
+        assert "by_category" in data
+        assert "obligations" in data
+        assert isinstance(data["obligations"], list)
+
+    def test_all_matches(self, client):
+        """Test the all-matches bulk endpoint returns a dict."""
+        name = get_unique_name()
+        client.post("/obligations/", json={
+            "name": name,
+            "due_day": 15,
+            "category": "Bills"
+        })
+
+        response = client.get("/obligations/all-matches")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, dict)
+

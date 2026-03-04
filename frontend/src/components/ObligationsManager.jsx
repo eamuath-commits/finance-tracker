@@ -3,7 +3,8 @@ import { formatCurrency, Modal } from './UI';
 import {
     CheckCircle, Circle, Box, Home, Zap, Car, Shield, Smartphone,
     Landmark, CreditCard, Clock, Utensils, Banknote, Edit2, Link,
-    ChevronDown, ChevronRight, Plus, Search, Download, TrendingUp
+    ChevronDown, ChevronRight, Plus, Search, Download, TrendingUp,
+    AlertTriangle
 } from 'lucide-react';
 import axios from 'axios';
 import { exportToCSV } from '../utils/csvExport';
@@ -111,8 +112,10 @@ const ObligationRow = ({ obl, getMonthStatus, monthOffset, openPaymentModal, han
         }
     };
 
+    const isOverdue = !currMonth.isPaid && !currMonth.status && obl.due_day && obl.due_day < new Date().getDate() && monthOffset === 0;
+
     return (
-        <tr className="border-b border-slate-700/30 hover:bg-slate-800/50 transition-colors group">
+        <tr className={`border-b border-slate-700/30 hover:bg-slate-800/50 transition-colors group ${isOverdue ? 'bg-red-950/10' : ''}`}>
             {/* Name */}
             <td className="px-4 py-3">
                 <div className="flex items-center gap-3">
@@ -123,6 +126,11 @@ const ObligationRow = ({ obl, getMonthStatus, monthOffset, openPaymentModal, han
                             )}
                             {obl.provider && <span className="text-slate-600 text-[9px]">·</span>}
                             <span className="font-medium text-white text-sm truncate">{obl.name}</span>
+                            {isOverdue && (
+                                <span className="flex items-center gap-0.5 text-[8px] font-bold text-red-400 bg-red-500/15 px-1.5 py-0.5 rounded-full border border-red-500/20 uppercase">
+                                    <AlertTriangle size={8} /> Overdue
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -342,21 +350,33 @@ const ObligationsManager = ({ obligations, getMonthStatus, monthOffset, openPaym
         );
     }, [obligations, searchTerm]);
 
-    // Fetch matches
+    // Monthly status from new API
+    const [monthlyStatus, setMonthlyStatus] = useState(null);
+    useEffect(() => {
+        const fetchStatus = async () => {
+            try {
+                const res = await axios.get(`${API_URL}/obligations/monthly-status?month_offset=${monthOffset}`);
+                setMonthlyStatus(res.data);
+            } catch (e) { console.error('Failed to fetch monthly status', e); }
+        };
+        fetchStatus();
+    }, [obligations, monthOffset]);
+
+    // Fetch matches using bulk endpoint
     useEffect(() => {
         const fetchMatches = async () => {
-            const unpaid = obligations.filter(o => !getMonthStatus(o, monthOffset).isPaid);
-            const newMatches = {};
-            await Promise.all(unpaid.map(async (o) => {
-                try {
-                    const res = await axios.get(`${API_URL}/obligations/${o.id}/matches`);
-                    if (res.data && res.data.length > 0) {
-                        const valid = res.data.filter(tx => !rejectedMatches.has(tx.id));
-                        if (valid.length > 0) newMatches[o.id] = valid;
+            try {
+                const res = await axios.get(`${API_URL}/obligations/all-matches`);
+                if (res.data) {
+                    // Filter out rejected matches
+                    const filtered = {};
+                    for (const [oblId, txMatches] of Object.entries(res.data)) {
+                        const valid = txMatches.filter(tx => !rejectedMatches.has(tx.transaction_id));
+                        if (valid.length > 0) filtered[oblId] = valid;
                     }
-                } catch (e) { }
-            }));
-            setMatches(newMatches);
+                    setMatches(filtered);
+                }
+            } catch (e) { console.error('Failed to fetch matches', e); }
         };
         const timer = setTimeout(fetchMatches, 500);
         return () => clearTimeout(timer);
@@ -448,6 +468,7 @@ const ObligationsManager = ({ obligations, getMonthStatus, monthOffset, openPaym
     };
 
     const matchCount = Object.keys(matches).length;
+    const overdueObls = monthlyStatus?.obligations?.filter(o => o.is_overdue) || [];
 
     return (
         <div className="animate-fade-in space-y-4">
@@ -490,6 +511,26 @@ const ObligationsManager = ({ obligations, getMonthStatus, monthOffset, openPaym
                     <ProgressRing percent={stats.progress} size={56} strokeWidth={4} />
                 </div>
             </div>
+
+            {/* Overdue Alert Banner */}
+            {overdueObls.length > 0 && (
+                <div className="bg-gradient-to-r from-red-900/30 to-red-950/20 border border-red-500/30 rounded-xl p-3 flex items-center gap-3">
+                    <div className="bg-red-500/20 p-2 rounded-lg">
+                        <AlertTriangle size={18} className="text-red-400" />
+                    </div>
+                    <div className="flex-1">
+                        <p className="text-red-300 text-sm font-semibold">
+                            {overdueObls.length} overdue obligation{overdueObls.length > 1 ? 's' : ''}
+                        </p>
+                        <p className="text-red-400/70 text-xs">
+                            {overdueObls.map(o => o.name).join(', ')}
+                        </p>
+                    </div>
+                    <div className="text-red-300 font-mono text-sm font-bold">
+                        {formatCurrency(overdueObls.reduce((sum, o) => sum + (o.expected_amount || 0), 0))}
+                    </div>
+                </div>
+            )}
 
             {/* Toolbar */}
             <div className="flex items-center justify-between gap-3">
