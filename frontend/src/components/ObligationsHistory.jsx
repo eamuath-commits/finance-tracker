@@ -34,10 +34,9 @@ const ObligationsPayments = ({ obligations, history, onEdit, onDelete, onRefresh
         return `${monthNames[monthNum - 1]}-${year}`;
     };
 
-    // Filters - Default to Current Year and Month
-    const currentDate = new Date();
-    const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear().toString());
-    const [selectedMonth, setSelectedMonth] = useState((currentDate.getMonth() + 1).toString().padStart(2, '0'));
+    // Filters - Default to showing ALL history
+    const [selectedYear, setSelectedYear] = useState('All');
+    const [selectedMonth, setSelectedMonth] = useState('All');
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [selectedStatus, setSelectedStatus] = useState('All');
 
@@ -75,7 +74,7 @@ const ObligationsPayments = ({ obligations, history, onEdit, onDelete, onRefresh
             });
         });
 
-        uniqueYears.add(currentDate.getFullYear().toString());
+        uniqueYears.add(new Date().getFullYear().toString());
 
         return {
             allHistory: flattened,
