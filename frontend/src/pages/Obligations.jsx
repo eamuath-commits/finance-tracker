@@ -464,6 +464,7 @@ const Obligations = () => {
                         <ObligationsPayments
                             obligations={filteredObligations}
                             history={payments}
+                            monthOffset={monthOffset}
                             onEdit={(item) => {
                                 if (item) {
                                     const o = obligations.find(x => x.id === item.obligation_id);

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { formatCurrency, selectClass, Modal } from '../components/UI';
 import TransactionDetailModal from '../components/TransactionDetailModal';
 import TransactionSelectorModal from '../components/TransactionSelectorModal';
@@ -8,7 +8,7 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
-const ObligationsPayments = ({ obligations, history, onEdit, onDelete, onRefresh }) => {
+const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDelete, onRefresh }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: 'billing_month', direction: 'desc' });
 
@@ -34,11 +34,30 @@ const ObligationsPayments = ({ obligations, history, onEdit, onDelete, onRefresh
         return `${monthNames[monthNum - 1]}-${year}`;
     };
 
-    // Filters - Default to showing ALL history
-    const [selectedYear, setSelectedYear] = useState('All');
-    const [selectedMonth, setSelectedMonth] = useState('All');
+    // Filters - Sync with parent monthOffset
+    const computeMonthFromOffset = (offset) => {
+        const now = new Date();
+        const target = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+        return {
+            year: target.getFullYear().toString(),
+            month: (target.getMonth() + 1).toString().padStart(2, '0')
+        };
+    };
+
+    const initial = monthOffset !== undefined ? computeMonthFromOffset(monthOffset) : { year: 'All', month: 'All' };
+    const [selectedYear, setSelectedYear] = useState(initial.year);
+    const [selectedMonth, setSelectedMonth] = useState(initial.month);
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [selectedStatus, setSelectedStatus] = useState('All');
+
+    // Sync with parent month navigation arrows
+    useEffect(() => {
+        if (monthOffset !== undefined) {
+            const { year, month } = computeMonthFromOffset(monthOffset);
+            setSelectedYear(year);
+            setSelectedMonth(month);
+        }
+    }, [monthOffset]);
 
     // 1. Flatten Data & Prepare Options
     const { allHistory, years, categories } = useMemo(() => {
