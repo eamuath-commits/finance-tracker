@@ -436,8 +436,8 @@ const Obligations = () => {
                                 ))}
                             </select>
 
-                            {/* Month Nav (shown for Payments only) */}
-                            {viewMode === 'payments' && (
+                            {/* Month Nav (shown for Payments and Forecast) */}
+                            {(viewMode === 'payments' || viewMode === 'forecast') && (
                                 <>
                                     <button onClick={() => setMonthOffset(p => p - 1)} className="p-1.5 hover:bg-slate-700 rounded-lg text-gray-400 transition"><ArrowLeft size={16} /></button>
                                     <span className="text-sm font-bold text-white min-w-[120px] text-center">{currentDateView}</span>
@@ -479,6 +479,7 @@ const Obligations = () => {
                             categoryFilter={categoryFilter}
                             obligations={filteredObligations}
                             payments={payments}
+                            monthOffset={monthOffset}
                         />
                     )}
                 </div>

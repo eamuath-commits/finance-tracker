@@ -33,17 +33,17 @@ const getMonthKey = (offset) => {
     return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
 };
 
-const MONTHS = [
-    { offset: -1, label: getMonthLabel(-1), short: getMonthShort(-1), key: getMonthKey(-1), isPast: true, isCurrent: false },
-    { offset: 0, label: getMonthLabel(0), short: getMonthShort(0), key: getMonthKey(0), isPast: false, isCurrent: true },
-    { offset: 1, label: getMonthLabel(1), short: getMonthShort(1), key: getMonthKey(1), isPast: false, isCurrent: false },
-    { offset: 2, label: getMonthLabel(2), short: getMonthShort(2), key: getMonthKey(2), isPast: false, isCurrent: false },
-];
-
-const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {} }) => {
+const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, monthOffset = 0 }) => {
     const [forecast, setForecast] = useState(null);
     const [loading, setLoading] = useState(true);
     const [expandedCats, setExpandedCats] = useState(new Set());
+
+    // 3 months: previous, selected (current), next — based on monthOffset
+    const months = useMemo(() => [
+        { offset: monthOffset - 1, label: getMonthLabel(monthOffset - 1), short: getMonthShort(monthOffset - 1), key: getMonthKey(monthOffset - 1), isPrev: true, isSelected: false, isNext: false },
+        { offset: monthOffset, label: getMonthLabel(monthOffset), short: getMonthShort(monthOffset), key: getMonthKey(monthOffset), isPrev: false, isSelected: true, isNext: false },
+        { offset: monthOffset + 1, label: getMonthLabel(monthOffset + 1), short: getMonthShort(monthOffset + 1), key: getMonthKey(monthOffset + 1), isPrev: false, isSelected: false, isNext: true },
+    ], [monthOffset]);
 
     useEffect(() => {
         const fetchForecast = async () => {
@@ -76,12 +76,12 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {} }
         return obligations.filter(o => o.category === categoryFilter);
     }, [obligations, categoryFilter]);
 
-    // Build per-obligation per-month data
+    // Per-obligation per-month data
     const oblMonthData = useMemo(() => {
         const result = {};
         filteredObligations.forEach(obl => {
             result[obl.id] = {};
-            MONTHS.forEach(m => {
+            months.forEach(m => {
                 const oblPayments = payments[obl.id] || [];
                 const monthPayments = oblPayments.filter(p => {
                     const bm = p.billing_month || '';
@@ -101,7 +101,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {} }
             });
         });
         return result;
-    }, [filteredObligations, payments, forecast]);
+    }, [filteredObligations, payments, forecast, months]);
 
     // Group by category
     const grouped = useMemo(() => {
@@ -118,31 +118,31 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {} }
     // Totals
     const columnTotals = useMemo(() => {
         const totals = {};
-        MONTHS.forEach(m => {
+        months.forEach(m => {
             totals[m.key] = filteredObligations.reduce((sum, obl) => {
                 return sum + (oblMonthData[obl.id]?.[m.key]?.amount || 0);
             }, 0);
         });
         return totals;
-    }, [filteredObligations, oblMonthData]);
+    }, [filteredObligations, oblMonthData, months]);
 
     const catMonthTotals = useMemo(() => {
         const result = {};
         sortedCategories.forEach(cat => {
             result[cat] = {};
-            MONTHS.forEach(m => {
+            months.forEach(m => {
                 result[cat][m.key] = grouped[cat].reduce((sum, obl) => {
                     return sum + (oblMonthData[obl.id]?.[m.key]?.amount || 0);
                 }, 0);
             });
         });
         return result;
-    }, [sortedCategories, grouped, oblMonthData]);
+    }, [sortedCategories, grouped, oblMonthData, months]);
 
     const handleExport = () => {
         const rows = filteredObligations.map(obl => {
             const row = { Name: obl.name, Category: obl.category, Provider: obl.provider || '' };
-            MONTHS.forEach(m => { row[m.label] = oblMonthData[obl.id]?.[m.key]?.amount || 0; });
+            months.forEach(m => { row[m.label] = oblMonthData[obl.id]?.[m.key]?.amount || 0; });
             return row;
         });
         exportToCSV(rows, `forecast_${new Date().toISOString().split('T')[0]}.csv`);
@@ -155,7 +155,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {} }
     );
 
     // Amount cell renderer
-    const AmountCell = ({ data, isPast }) => {
+    const AmountCell = ({ data, isPrev }) => {
         if (!data || data.amount === 0) {
             return <span className="text-slate-600 text-[11px]">—</span>;
         }
@@ -169,7 +169,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {} }
         }
         return (
             <div className="inline-flex items-center gap-1">
-                {!isPast && TREND_ICONS[data.trend]}
+                {!isPrev && TREND_ICONS[data.trend]}
                 <span className="font-mono text-[11px] text-slate-300">{formatCurrency(data.amount)}</span>
             </div>
         );
@@ -178,35 +178,32 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {} }
     return (
         <div className="space-y-5 animate-fade-in">
             {/* ── Month Summary Cards ── */}
-            <div className="grid grid-cols-4 gap-3">
-                {MONTHS.map(m => {
+            <div className="grid grid-cols-3 gap-3">
+                {months.map(m => {
                     const total = columnTotals[m.key] || 0;
                     return (
                         <div
                             key={m.key}
-                            className={`relative rounded-2xl p-4 transition-all duration-300 overflow-hidden ${m.isCurrent
+                            className={`relative rounded-2xl p-4 transition-all duration-300 overflow-hidden ${m.isSelected
                                     ? 'bg-gradient-to-br from-blue-600/20 via-blue-900/15 to-slate-900 border border-blue-500/30 shadow-lg shadow-blue-500/5'
-                                    : m.isPast
+                                    : m.isPrev
                                         ? 'bg-gradient-to-br from-emerald-600/10 to-slate-900 border border-emerald-500/20'
                                         : 'bg-slate-800/60 border border-slate-700/40'
                                 }`}
                         >
-                            {m.isCurrent && (
+                            {m.isSelected && (
                                 <div className="absolute top-0 right-0 bg-blue-500 text-white text-[8px] font-bold uppercase px-2 py-0.5 rounded-bl-lg tracking-wider">
-                                    Now
+                                    Selected
                                 </div>
                             )}
-                            <p className={`text-[10px] font-semibold uppercase tracking-widest mb-2 ${m.isCurrent ? 'text-blue-400' : m.isPast ? 'text-emerald-400/80' : 'text-slate-500'
+                            <p className={`text-[10px] font-semibold uppercase tracking-widest mb-2 ${m.isSelected ? 'text-blue-400' : m.isPrev ? 'text-emerald-400/80' : 'text-slate-500'
                                 }`}>
                                 {m.label}
                             </p>
-                            <p className={`text-xl font-bold font-mono ${m.isCurrent ? 'text-white' : m.isPast ? 'text-emerald-300' : 'text-slate-300'
+                            <p className={`text-xl font-bold font-mono ${m.isSelected ? 'text-white' : m.isPrev ? 'text-emerald-300' : 'text-slate-300'
                                 }`}>
                                 {formatCurrency(total)}
                             </p>
-                            {m.isPast && (
-                                <p className="text-[9px] text-emerald-500/60 mt-1 font-medium">Actual payments</p>
-                            )}
                         </div>
                     );
                 })}
@@ -225,16 +222,16 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {} }
             {/* ── Forecast Grid ── */}
             <div className="rounded-2xl border border-slate-700/40 overflow-hidden bg-slate-900/50 shadow-xl">
                 {/* Header */}
-                <div className="grid grid-cols-[1fr_repeat(4,minmax(0,1fr))] bg-slate-800/70 border-b border-slate-700/40">
+                <div className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] bg-slate-800/70 border-b border-slate-700/40">
                     <div className="px-5 py-3 text-[10px] text-slate-500 uppercase tracking-widest font-bold">
                         Category / Obligation
                     </div>
-                    {MONTHS.map(m => (
+                    {months.map(m => (
                         <div
                             key={m.key}
-                            className={`px-3 py-3 text-center text-[10px] uppercase tracking-widest font-bold ${m.isCurrent
+                            className={`px-3 py-3 text-center text-[10px] uppercase tracking-widest font-bold ${m.isSelected
                                     ? 'text-blue-400 bg-blue-500/5 border-x border-blue-500/10'
-                                    : m.isPast
+                                    : m.isPrev
                                         ? 'text-emerald-400/70'
                                         : 'text-slate-500'
                                 }`}
@@ -255,7 +252,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {} }
                             <div key={cat} className={!isLast ? 'border-b border-slate-700/25' : ''}>
                                 {/* Category Row */}
                                 <div
-                                    className="grid grid-cols-[1fr_repeat(4,minmax(0,1fr))] cursor-pointer hover:bg-slate-800/40 transition-colors"
+                                    className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] cursor-pointer hover:bg-slate-800/40 transition-colors"
                                     onClick={() => toggleCat(cat)}
                                 >
                                     <div className="px-5 py-3 flex items-center gap-2.5">
@@ -265,10 +262,10 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {} }
                                         <span className="text-white text-[12px] font-semibold">{cat}</span>
                                         <span className="text-[9px] text-slate-600 bg-slate-800 px-1.5 py-0.5 rounded font-mono">{items.length}</span>
                                     </div>
-                                    {MONTHS.map(m => (
+                                    {months.map(m => (
                                         <div
                                             key={m.key}
-                                            className={`px-3 py-3 text-right ${m.isCurrent ? 'bg-blue-500/[0.03] border-x border-blue-500/10' : ''
+                                            className={`px-3 py-3 text-right ${m.isSelected ? 'bg-blue-500/[0.03] border-x border-blue-500/10' : ''
                                                 }`}
                                         >
                                             <span className="text-white font-mono text-[12px] font-semibold">
@@ -284,7 +281,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {} }
                                         {items.map((obl, oblIdx) => (
                                             <div
                                                 key={obl.id}
-                                                className={`grid grid-cols-[1fr_repeat(4,minmax(0,1fr))] hover:bg-slate-800/25 transition-colors ${oblIdx < items.length - 1 ? 'border-b border-slate-800/40' : ''
+                                                className={`grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] hover:bg-slate-800/25 transition-colors ${oblIdx < items.length - 1 ? 'border-b border-slate-800/40' : ''
                                                     }`}
                                             >
                                                 <div className="px-5 py-2.5 pl-12">
@@ -297,15 +294,15 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {} }
                                                         <span className="text-slate-300 text-[12px]">{obl.name}</span>
                                                     </div>
                                                 </div>
-                                                {MONTHS.map(m => {
+                                                {months.map(m => {
                                                     const data = oblMonthData[obl.id]?.[m.key];
                                                     return (
                                                         <div
                                                             key={m.key}
-                                                            className={`px-3 py-2.5 text-right flex items-center justify-end ${m.isCurrent ? 'bg-blue-500/[0.02] border-x border-blue-500/10' : ''
+                                                            className={`px-3 py-2.5 text-right flex items-center justify-end ${m.isSelected ? 'bg-blue-500/[0.02] border-x border-blue-500/10' : ''
                                                                 }`}
                                                         >
-                                                            <AmountCell data={data} isPast={m.isPast} />
+                                                            <AmountCell data={data} isPrev={m.isPrev} />
                                                         </div>
                                                     );
                                                 })}
@@ -318,17 +315,17 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {} }
                     })}
 
                     {/* ── Grand Total ── */}
-                    <div className="grid grid-cols-[1fr_repeat(4,minmax(0,1fr))] bg-slate-800/50 border-t-2 border-slate-600/30">
+                    <div className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] bg-slate-800/50 border-t-2 border-slate-600/30">
                         <div className="px-5 py-4">
                             <span className="text-white text-[12px] font-bold uppercase tracking-wider">Total</span>
                         </div>
-                        {MONTHS.map(m => (
+                        {months.map(m => (
                             <div
                                 key={m.key}
-                                className={`px-3 py-4 text-right ${m.isCurrent ? 'bg-blue-500/[0.05] border-x border-blue-500/10' : ''
+                                className={`px-3 py-4 text-right ${m.isSelected ? 'bg-blue-500/[0.05] border-x border-blue-500/15' : ''
                                     }`}
                             >
-                                <span className={`font-mono text-[13px] font-bold ${m.isCurrent ? 'text-blue-300' : m.isPast ? 'text-emerald-300' : 'text-white'
+                                <span className={`font-mono text-[13px] font-bold ${m.isSelected ? 'text-blue-300' : m.isPrev ? 'text-emerald-300' : 'text-white'
                                     }`}>
                                     {formatCurrency(columnTotals[m.key] || 0)}
                                 </span>
