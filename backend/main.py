@@ -969,10 +969,17 @@ def get_suggested_transactions(payment_id: int, db: Session = Depends(get_db)):
     if not obligation:
         return []
     
-    # Parse billing month (YYYY-MM format)
+    # Parse billing month (YYYY-MM or YYYY-MM-DD format)
     from datetime import datetime, timedelta
     try:
-        billing_date = datetime.strptime(payment.billing_month + "-01", "%Y-%m-%d")
+        bm = payment.billing_month or ""
+        # Handle both YYYY-MM and YYYY-MM-DD formats
+        if len(bm) == 7:  # YYYY-MM
+            billing_date = datetime.strptime(bm + "-01", "%Y-%m-%d")
+        elif len(bm) >= 10:  # YYYY-MM-DD
+            billing_date = datetime.strptime(bm[:10], "%Y-%m-%d")
+        else:
+            return []
     except:
         return []
     
@@ -986,9 +993,9 @@ def get_suggested_transactions(payment_id: int, db: Session = Depends(get_db)):
         last_day = calendar.monthrange(billing_date.year, billing_date.month)[1]
         target_date = billing_date.replace(day=min(due_day, last_day))
     
-    # Search window: ±5 days around due date
-    start_date = target_date - timedelta(days=5)
-    end_date = target_date + timedelta(days=5)
+    # Search window: ±15 days around due date
+    start_date = target_date - timedelta(days=15)
+    end_date = target_date + timedelta(days=15)
     
     # Query transactions in date range
     transactions = db.query(models.Transaction).filter(
@@ -1051,7 +1058,7 @@ def get_suggested_transactions(payment_id: int, db: Session = Depends(get_db)):
     # Sort by score descending
     suggestions.sort(key=lambda x: x["score"], reverse=True)
     
-    return suggestions[:5]  # Return top 5 suggestions
+    return suggestions[:10]  # Return top 10 suggestions
 
 @app.post("/payments/{payment_id}/link-transaction")
 def link_payment_to_transaction(payment_id: int, transaction_id: str, db: Session = Depends(get_db)):
