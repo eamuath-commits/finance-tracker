@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { formatCurrency } from './UI';
 import {
     TrendingUp, TrendingDown, Minus, CheckCircle,
-    Download, ChevronRight, Box
+    Download, ChevronDown, ChevronRight, Box
 } from 'lucide-react';
 import axios from 'axios';
 import { exportToCSV } from '../utils/csvExport';
@@ -10,16 +10,21 @@ import { exportToCSV } from '../utils/csvExport';
 const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
 const TREND_ICONS = {
-    increasing: <TrendingUp size={12} className="text-red-400" />,
-    decreasing: <TrendingDown size={12} className="text-emerald-400" />,
-    stable: <Minus size={12} className="text-slate-400" />,
+    increasing: <TrendingUp size={11} className="text-red-400" />,
+    decreasing: <TrendingDown size={11} className="text-emerald-400" />,
+    stable: <Minus size={11} className="text-slate-500" />,
 };
 
-// Helper to get month label from offset
 const getMonthLabel = (offset) => {
     const d = new Date();
     d.setMonth(d.getMonth() + offset);
-    return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+};
+
+const getMonthShort = (offset) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + offset);
+    return d.toLocaleDateString('en-US', { month: 'short' });
 };
 
 const getMonthKey = (offset) => {
@@ -28,15 +33,13 @@ const getMonthKey = (offset) => {
     return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
 };
 
-// Define 4 months: previous, current, next, +2
 const MONTHS = [
-    { offset: -1, label: getMonthLabel(-1), key: getMonthKey(-1), isPast: true, isCurrent: false },
-    { offset: 0, label: getMonthLabel(0), key: getMonthKey(0), isPast: false, isCurrent: true },
-    { offset: 1, label: getMonthLabel(1), key: getMonthKey(1), isPast: false, isCurrent: false },
-    { offset: 2, label: getMonthLabel(2), key: getMonthKey(2), isPast: false, isCurrent: false },
+    { offset: -1, label: getMonthLabel(-1), short: getMonthShort(-1), key: getMonthKey(-1), isPast: true, isCurrent: false },
+    { offset: 0, label: getMonthLabel(0), short: getMonthShort(0), key: getMonthKey(0), isPast: false, isCurrent: true },
+    { offset: 1, label: getMonthLabel(1), short: getMonthShort(1), key: getMonthKey(1), isPast: false, isCurrent: false },
+    { offset: 2, label: getMonthLabel(2), short: getMonthShort(2), key: getMonthKey(2), isPast: false, isCurrent: false },
 ];
 
-// --- Main Forecast Component ---
 const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {} }) => {
     const [forecast, setForecast] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -48,7 +51,6 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {} }
             try {
                 const res = await axios.get(`${API_URL}/obligations/forecast?months_ahead=1`);
                 setForecast(res.data);
-                // Auto-expand all categories
                 const cats = new Set((res.data.obligations || []).map(o => o.category));
                 setExpandedCats(cats);
             } catch (e) {
@@ -69,13 +71,12 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {} }
         });
     };
 
-    // Filter obligations by category
     const filteredObligations = useMemo(() => {
         if (!categoryFilter) return obligations;
         return obligations.filter(o => o.category === categoryFilter);
     }, [obligations, categoryFilter]);
 
-    // Compute per-obligation per-month data
+    // Build per-obligation per-month data
     const oblMonthData = useMemo(() => {
         const result = {};
         filteredObligations.forEach(obl => {
@@ -114,7 +115,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {} }
 
     const sortedCategories = Object.keys(grouped).sort();
 
-    // Column totals
+    // Totals
     const columnTotals = useMemo(() => {
         const totals = {};
         MONTHS.forEach(m => {
@@ -125,7 +126,6 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {} }
         return totals;
     }, [filteredObligations, oblMonthData]);
 
-    // Category totals per month
     const catMonthTotals = useMemo(() => {
         const result = {};
         sortedCategories.forEach(cat => {
@@ -140,164 +140,208 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {} }
     }, [sortedCategories, grouped, oblMonthData]);
 
     const handleExport = () => {
-        if (!forecast) return;
         const rows = filteredObligations.map(obl => {
-            const row = {
-                Name: obl.name,
-                Category: obl.category,
-                Provider: obl.provider || '',
-            };
-            MONTHS.forEach(m => {
-                row[m.label] = oblMonthData[obl.id]?.[m.key]?.amount || 0;
-            });
+            const row = { Name: obl.name, Category: obl.category, Provider: obl.provider || '' };
+            MONTHS.forEach(m => { row[m.label] = oblMonthData[obl.id]?.[m.key]?.amount || 0; });
             return row;
         });
         exportToCSV(rows, `forecast_${new Date().toISOString().split('T')[0]}.csv`);
     };
 
-    if (loading) return <div className="text-center py-12 text-slate-400 text-sm">Loading forecast...</div>;
+    if (loading) return (
+        <div className="flex items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent" />
+        </div>
+    );
+
+    // Amount cell renderer
+    const AmountCell = ({ data, isPast }) => {
+        if (!data || data.amount === 0) {
+            return <span className="text-slate-600 text-[11px]">—</span>;
+        }
+        if (data.isPaid) {
+            return (
+                <div className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-md">
+                    <CheckCircle size={10} />
+                    <span className="font-mono text-[11px] font-medium">{formatCurrency(data.amount)}</span>
+                </div>
+            );
+        }
+        return (
+            <div className="inline-flex items-center gap-1">
+                {!isPast && TREND_ICONS[data.trend]}
+                <span className="font-mono text-[11px] text-slate-300">{formatCurrency(data.amount)}</span>
+            </div>
+        );
+    };
 
     return (
-        <div className="animate-fade-in space-y-4">
-            {/* Export */}
+        <div className="space-y-5 animate-fade-in">
+            {/* ── Month Summary Cards ── */}
+            <div className="grid grid-cols-4 gap-3">
+                {MONTHS.map(m => {
+                    const total = columnTotals[m.key] || 0;
+                    return (
+                        <div
+                            key={m.key}
+                            className={`relative rounded-2xl p-4 transition-all duration-300 overflow-hidden ${m.isCurrent
+                                    ? 'bg-gradient-to-br from-blue-600/20 via-blue-900/15 to-slate-900 border border-blue-500/30 shadow-lg shadow-blue-500/5'
+                                    : m.isPast
+                                        ? 'bg-gradient-to-br from-emerald-600/10 to-slate-900 border border-emerald-500/20'
+                                        : 'bg-slate-800/60 border border-slate-700/40'
+                                }`}
+                        >
+                            {m.isCurrent && (
+                                <div className="absolute top-0 right-0 bg-blue-500 text-white text-[8px] font-bold uppercase px-2 py-0.5 rounded-bl-lg tracking-wider">
+                                    Now
+                                </div>
+                            )}
+                            <p className={`text-[10px] font-semibold uppercase tracking-widest mb-2 ${m.isCurrent ? 'text-blue-400' : m.isPast ? 'text-emerald-400/80' : 'text-slate-500'
+                                }`}>
+                                {m.label}
+                            </p>
+                            <p className={`text-xl font-bold font-mono ${m.isCurrent ? 'text-white' : m.isPast ? 'text-emerald-300' : 'text-slate-300'
+                                }`}>
+                                {formatCurrency(total)}
+                            </p>
+                            {m.isPast && (
+                                <p className="text-[9px] text-emerald-500/60 mt-1 font-medium">Actual payments</p>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* ── Export Button ── */}
             <div className="flex justify-end">
                 <button
                     onClick={handleExport}
-                    className="flex items-center gap-1.5 text-slate-400 hover:text-white text-xs py-2 px-3 rounded-lg border border-slate-700/50 hover:border-slate-600 transition"
+                    className="flex items-center gap-1.5 text-slate-400 hover:text-white text-[11px] py-1.5 px-3 rounded-lg border border-slate-700/40 hover:border-slate-500 hover:bg-slate-800/50 transition-all"
                 >
-                    <Download size={14} /> Export
+                    <Download size={12} /> Export CSV
                 </button>
             </div>
 
-            {/* Main Table */}
-            <div className="bg-slate-900/70 backdrop-blur-sm border border-slate-700/50 rounded-xl overflow-hidden shadow-lg">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        {/* Column Headers */}
-                        <thead>
-                            <tr className="border-b border-slate-700/50">
-                                <th className="px-4 py-3 text-[10px] text-slate-500 uppercase tracking-wider font-bold w-[30%] bg-slate-800/50">
-                                    Obligation
-                                </th>
-                                {MONTHS.map(m => (
-                                    <th
-                                        key={m.key}
-                                        className={`px-3 py-3 text-center text-[10px] uppercase tracking-wider font-bold w-[17.5%] ${m.isCurrent
-                                                ? 'bg-blue-900/20 text-blue-400 border-x border-blue-500/15'
-                                                : m.isPast
-                                                    ? 'bg-emerald-900/10 text-emerald-400'
-                                                    : 'bg-slate-800/30 text-slate-500'
-                                            }`}
-                                    >
-                                        <div>{m.label}</div>
-                                        {m.isCurrent && <div className="text-[8px] text-blue-500 mt-0.5">Current</div>}
-                                        {m.isPast && <div className="text-[8px] text-emerald-500 mt-0.5">Actual</div>}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
+            {/* ── Forecast Grid ── */}
+            <div className="rounded-2xl border border-slate-700/40 overflow-hidden bg-slate-900/50 shadow-xl">
+                {/* Header */}
+                <div className="grid grid-cols-[1fr_repeat(4,minmax(0,1fr))] bg-slate-800/70 border-b border-slate-700/40">
+                    <div className="px-5 py-3 text-[10px] text-slate-500 uppercase tracking-widest font-bold">
+                        Category / Obligation
+                    </div>
+                    {MONTHS.map(m => (
+                        <div
+                            key={m.key}
+                            className={`px-3 py-3 text-center text-[10px] uppercase tracking-widest font-bold ${m.isCurrent
+                                    ? 'text-blue-400 bg-blue-500/5 border-x border-blue-500/10'
+                                    : m.isPast
+                                        ? 'text-emerald-400/70'
+                                        : 'text-slate-500'
+                                }`}
+                        >
+                            {m.short}
+                        </div>
+                    ))}
+                </div>
 
-                        <tbody>
-                            {sortedCategories.map(cat => {
-                                const items = grouped[cat];
-                                const isExpanded = expandedCats.has(cat);
+                {/* Body */}
+                <div>
+                    {sortedCategories.map((cat, catIdx) => {
+                        const items = grouped[cat];
+                        const isExpanded = expandedCats.has(cat);
+                        const isLast = catIdx === sortedCategories.length - 1;
 
-                                return (
-                                    <React.Fragment key={cat}>
-                                        {/* Category Row */}
-                                        <tr
-                                            className="bg-slate-800/40 hover:bg-slate-800/60 cursor-pointer transition-colors border-b border-slate-700/30"
-                                            onClick={() => toggleCat(cat)}
+                        return (
+                            <div key={cat} className={!isLast ? 'border-b border-slate-700/25' : ''}>
+                                {/* Category Row */}
+                                <div
+                                    className="grid grid-cols-[1fr_repeat(4,minmax(0,1fr))] cursor-pointer hover:bg-slate-800/40 transition-colors"
+                                    onClick={() => toggleCat(cat)}
+                                >
+                                    <div className="px-5 py-3 flex items-center gap-2.5">
+                                        <div className="transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
+                                            <ChevronDown size={13} className="text-slate-500" />
+                                        </div>
+                                        <span className="text-white text-[12px] font-semibold">{cat}</span>
+                                        <span className="text-[9px] text-slate-600 bg-slate-800 px-1.5 py-0.5 rounded font-mono">{items.length}</span>
+                                    </div>
+                                    {MONTHS.map(m => (
+                                        <div
+                                            key={m.key}
+                                            className={`px-3 py-3 text-right ${m.isCurrent ? 'bg-blue-500/[0.03] border-x border-blue-500/10' : ''
+                                                }`}
                                         >
-                                            <td className="px-4 py-2.5">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
-                                                        <ChevronRight size={12} className="text-slate-500" />
-                                                    </div>
-                                                    <span className="text-white text-xs font-bold uppercase tracking-wider">{cat}</span>
-                                                    <span className="text-[9px] text-slate-500 font-mono">{items.length}</span>
-                                                </div>
-                                            </td>
-                                            {MONTHS.map(m => (
-                                                <td
-                                                    key={m.key}
-                                                    className={`px-3 py-2.5 text-right ${m.isCurrent ? 'bg-blue-900/10 border-x border-blue-500/10' : ''
-                                                        }`}
-                                                >
-                                                    <span className="text-white font-mono text-xs font-semibold">
-                                                        {formatCurrency(catMonthTotals[cat]?.[m.key] || 0)}
-                                                    </span>
-                                                </td>
-                                            ))}
-                                        </tr>
+                                            <span className="text-white font-mono text-[12px] font-semibold">
+                                                {formatCurrency(catMonthTotals[cat]?.[m.key] || 0)}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
 
-                                        {/* Individual Obligations */}
-                                        {isExpanded && items.map(obl => (
-                                            <tr key={obl.id} className="hover:bg-slate-800/30 transition-colors border-b border-slate-700/15">
-                                                <td className="px-4 py-2 pl-10">
+                                {/* Expanded Items */}
+                                {isExpanded && (
+                                    <div className="bg-slate-900/30">
+                                        {items.map((obl, oblIdx) => (
+                                            <div
+                                                key={obl.id}
+                                                className={`grid grid-cols-[1fr_repeat(4,minmax(0,1fr))] hover:bg-slate-800/25 transition-colors ${oblIdx < items.length - 1 ? 'border-b border-slate-800/40' : ''
+                                                    }`}
+                                            >
+                                                <div className="px-5 py-2.5 pl-12">
                                                     <div className="flex items-center gap-1.5">
-                                                        {obl.provider && <span className="text-[8px] text-slate-500 uppercase">{obl.provider}</span>}
-                                                        {obl.provider && <span className="text-slate-700 text-[8px]">·</span>}
-                                                        <span className="text-slate-300 text-xs">{obl.name}</span>
+                                                        {obl.provider && (
+                                                            <span className="text-[9px] text-slate-500 uppercase font-medium bg-slate-800/80 px-1.5 py-0.5 rounded">
+                                                                {obl.provider}
+                                                            </span>
+                                                        )}
+                                                        <span className="text-slate-300 text-[12px]">{obl.name}</span>
                                                     </div>
-                                                </td>
+                                                </div>
                                                 {MONTHS.map(m => {
                                                     const data = oblMonthData[obl.id]?.[m.key];
-                                                    if (!data) return <td key={m.key} className="px-3 py-2 text-right"><span className="text-slate-600 text-xs">—</span></td>;
-
                                                     return (
-                                                        <td
+                                                        <div
                                                             key={m.key}
-                                                            className={`px-3 py-2 text-right ${m.isCurrent ? 'bg-blue-900/5 border-x border-blue-500/10' : ''
+                                                            className={`px-3 py-2.5 text-right flex items-center justify-end ${m.isCurrent ? 'bg-blue-500/[0.02] border-x border-blue-500/10' : ''
                                                                 }`}
                                                         >
-                                                            <div className="flex items-center justify-end gap-1.5">
-                                                                {!m.isPast && !data.isPaid && TREND_ICONS[data.trend]}
-                                                                {data.isPaid ? (
-                                                                    <span className="flex items-center gap-1">
-                                                                        <CheckCircle size={10} className="text-emerald-400" />
-                                                                        <span className="font-mono text-emerald-400 text-xs">{formatCurrency(data.amount)}</span>
-                                                                    </span>
-                                                                ) : (
-                                                                    <span className="font-mono text-slate-400 text-xs">{formatCurrency(data.amount)}</span>
-                                                                )}
-                                                            </div>
-                                                        </td>
+                                                            <AmountCell data={data} isPast={m.isPast} />
+                                                        </div>
                                                     );
                                                 })}
-                                            </tr>
+                                            </div>
                                         ))}
-                                    </React.Fragment>
-                                );
-                            })}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
 
-                            {/* Grand Total Row */}
-                            <tr className="bg-slate-800/60 border-t-2 border-slate-600/50">
-                                <td className="px-4 py-3">
-                                    <span className="text-white font-bold text-xs uppercase tracking-wider">Total</span>
-                                </td>
-                                {MONTHS.map(m => (
-                                    <td
-                                        key={m.key}
-                                        className={`px-3 py-3 text-right ${m.isCurrent ? 'bg-blue-900/15 border-x border-blue-500/15' : ''
-                                            }`}
-                                    >
-                                        <span className={`font-mono text-sm font-bold ${m.isCurrent ? 'text-blue-300' : m.isPast ? 'text-emerald-300' : 'text-white'
-                                            }`}>
-                                            {formatCurrency(columnTotals[m.key] || 0)}
-                                        </span>
-                                    </td>
-                                ))}
-                            </tr>
-                        </tbody>
-                    </table>
+                    {/* ── Grand Total ── */}
+                    <div className="grid grid-cols-[1fr_repeat(4,minmax(0,1fr))] bg-slate-800/50 border-t-2 border-slate-600/30">
+                        <div className="px-5 py-4">
+                            <span className="text-white text-[12px] font-bold uppercase tracking-wider">Total</span>
+                        </div>
+                        {MONTHS.map(m => (
+                            <div
+                                key={m.key}
+                                className={`px-3 py-4 text-right ${m.isCurrent ? 'bg-blue-500/[0.05] border-x border-blue-500/10' : ''
+                                    }`}
+                            >
+                                <span className={`font-mono text-[13px] font-bold ${m.isCurrent ? 'text-blue-300' : m.isPast ? 'text-emerald-300' : 'text-white'
+                                    }`}>
+                                    {formatCurrency(columnTotals[m.key] || 0)}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
 
             {/* Empty State */}
             {sortedCategories.length === 0 && (
-                <div className="text-center py-16 text-slate-500">
-                    <Box size={40} className="mx-auto mb-3 opacity-30" />
+                <div className="text-center py-20 text-slate-500">
+                    <Box size={36} className="mx-auto mb-3 opacity-20" />
                     <p className="text-sm">No forecast data available</p>
                 </div>
             )}
