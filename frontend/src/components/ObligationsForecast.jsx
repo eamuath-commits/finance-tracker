@@ -3,7 +3,7 @@ import { formatCurrency, Modal } from './UI';
 import TransactionSelectorModal from './TransactionSelectorModal';
 import {
     TrendingUp, TrendingDown, Minus, CheckCircle,
-    Download, ChevronDown, ChevronRight, Box, Edit3, DollarSign, X, Link2, LinkIcon, List
+    Download, ChevronDown, ChevronRight, Box, Edit3, DollarSign, X, Link2, LinkIcon, List, Trash2
 } from 'lucide-react';
 import axios from 'axios';
 import { exportToCSV } from '../utils/csvExport';
@@ -41,7 +41,7 @@ const getBillingDateStr = (offset) => {
 };
 
 // --- Inline Edit Popover ---
-const EditPopover = ({ obl, monthData, billingDate, onSave, onClose, onLink }) => {
+const EditPopover = ({ obl, monthData, billingDate, onSave, onClose, onLink, onDelete }) => {
     const [amount, setAmount] = useState(monthData?.amount || '');
     const [status, setStatus] = useState(monthData?.isPaid ? 'PAID' : 'BUDGET');
 
@@ -128,6 +128,15 @@ const EditPopover = ({ obl, monthData, billingDate, onSave, onClose, onLink }) =
                 >
                     <Link2 size={12} /> Link
                 </button>
+                {monthData?.paymentId && (
+                    <button
+                        onClick={() => { onClose(); onDelete(monthData.paymentId); }}
+                        className="bg-red-600/80 hover:bg-red-500 text-white text-xs font-bold py-2 px-2 rounded-lg transition shadow-sm flex items-center"
+                        title="Delete Payment"
+                    >
+                        <Trash2 size={12} />
+                    </button>
+                )}
             </div>
         </div>
     );
@@ -229,6 +238,9 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                 const forecastAmount = forecastObl?.forecast_amount || 0;
                 const trend = forecastObl?.trend || 'stable';
 
+                // Get the payment ID (first matching payment for this month)
+                const firstPayment = [...monthPayments, ...budgetPayments][0];
+
                 result[obl.id][m.key] = {
                     isPaid,
                     hasBudget,
@@ -237,6 +249,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                     budgetAmount,
                     forecastAmount,
                     trend,
+                    paymentId: firstPayment?.id || null,
                 };
             });
         });
@@ -281,6 +294,18 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
     const handleInlineSave = async (oblId, amount, billingDate, status) => {
         if (handleQuickPay) {
             await handleQuickPay(oblId, amount, billingDate, status);
+        }
+    };
+
+    // Handle delete payment from forecast
+    const handleDeletePayment = async (paymentId) => {
+        if (!confirm('Delete this payment entry?')) return;
+        try {
+            await axios.delete(`${API_URL}/obligations/history/${paymentId}`);
+            if (onRefresh) onRefresh();
+        } catch (err) {
+            console.error('Error deleting payment:', err);
+            alert('Failed to delete payment');
         }
     };
 
@@ -332,12 +357,15 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
             const tx = suggestedTxs.find(t => t.transaction_id === transactionId);
             const amount = tx?.amount || 0;
 
+            // Use the transaction date as payment date
+            const txDate = tx?.date ? new Date(tx.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+
             // Create a PAID payment for this obligation+month
             const payRes = await axios.post(`${API_URL}/obligations/${linkingObl.id}/payments`, {
                 amount: amount,
                 billing_month: linkingBillingDate,
                 status: 'Paid',
-                payment_date: new Date().toISOString().split('T')[0]
+                payment_date: txDate
             });
 
             // Link the transaction to the newly created payment
@@ -360,17 +388,18 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
         try {
             const txId = transactionIds[0];
 
-            // Fetch transaction details to get amount
+            // Fetch transaction details to get amount and date
             const searchRes = await axios.get(`${API_URL}/transactions/search?limit=50`).catch(() => ({ data: [] }));
             const txData = (searchRes.data || []).find(t => t.id === txId);
             const amount = txData?.amount || 0;
+            const txDate = txData?.timestamp ? new Date(txData.timestamp).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
 
             // Create a PAID payment for this obligation+month
             const payRes = await axios.post(`${API_URL}/obligations/${linkingObl.id}/payments`, {
                 amount: amount,
                 billing_month: linkingBillingDate,
                 status: 'Paid',
-                payment_date: new Date().toISOString().split('T')[0]
+                payment_date: txDate
             });
 
             // Link the transaction to the newly created payment
@@ -425,6 +454,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                             onSave={handleInlineSave}
                             onClose={() => setEditingCell(null)}
                             onLink={openLinkFlow}
+                            onDelete={handleDeletePayment}
                         />
                     )}
                 </div>
@@ -450,6 +480,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                             onSave={handleInlineSave}
                             onClose={() => setEditingCell(null)}
                             onLink={openLinkFlow}
+                            onDelete={handleDeletePayment}
                         />
                     )}
                 </div>
@@ -475,6 +506,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                             onSave={handleInlineSave}
                             onClose={() => setEditingCell(null)}
                             onLink={openLinkFlow}
+                            onDelete={handleDeletePayment}
                         />
                     )}
                 </div>
@@ -499,6 +531,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                         onSave={handleInlineSave}
                         onClose={() => setEditingCell(null)}
                         onLink={openLinkFlow}
+                        onDelete={handleDeletePayment}
                     />
                 )}
             </div>
