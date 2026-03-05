@@ -94,8 +94,8 @@ const EditPopover = ({ obl, monthData, billingDate, onSave, onClose }) => {
                     <button
                         onClick={() => setStatus('PAID')}
                         className={`flex-1 text-xs font-semibold py-1.5 rounded-lg transition ${status === 'PAID'
-                                ? 'bg-emerald-600 text-white shadow-sm'
-                                : 'bg-slate-700/60 text-slate-400 hover:text-white hover:bg-slate-700'
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'bg-slate-700/60 text-slate-400 hover:text-white hover:bg-slate-700'
                             }`}
                     >
                         ✓ Paid
@@ -103,8 +103,8 @@ const EditPopover = ({ obl, monthData, billingDate, onSave, onClose }) => {
                     <button
                         onClick={() => setStatus('BUDGET')}
                         className={`flex-1 text-xs font-semibold py-1.5 rounded-lg transition ${status === 'BUDGET'
-                                ? 'bg-blue-600 text-white shadow-sm'
-                                : 'bg-slate-700/60 text-slate-400 hover:text-white hover:bg-slate-700'
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'bg-slate-700/60 text-slate-400 hover:text-white hover:bg-slate-700'
                             }`}
                     >
                         Budget
@@ -131,17 +131,29 @@ const EditPopover = ({ obl, monthData, billingDate, onSave, onClose }) => {
     );
 };
 
-const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, monthOffset = 0, openPaymentModal, handleQuickPay, onRefresh }) => {
+const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, monthOffset = 0, periodStartDay = 1, openPaymentModal, handleQuickPay, onRefresh }) => {
     const [forecast, setForecast] = useState(null);
     const [loading, setLoading] = useState(true);
     const [expandedCats, setExpandedCats] = useState(new Set());
     const [editingCell, setEditingCell] = useState(null); // { oblId, monthKey }
 
+    // Helper: get period date range label based on periodStartDay
+    const getPeriodRange = (offset) => {
+        if (periodStartDay === 1) return null;
+        const d = new Date();
+        d.setMonth(d.getMonth() + offset);
+        const prevMonth = new Date(d.getFullYear(), d.getMonth() - 1, periodStartDay);
+        const endDay = periodStartDay - 1;
+        const curMonth = new Date(d.getFullYear(), d.getMonth(), endDay);
+        const fmtShort = (dt) => dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return `${fmtShort(prevMonth)} → ${fmtShort(curMonth)}`;
+    };
+
     const months = useMemo(() => [
-        { offset: monthOffset - 1, label: getMonthLabel(monthOffset - 1), short: getMonthShort(monthOffset - 1), key: getMonthKey(monthOffset - 1), billingDate: getBillingDateStr(monthOffset - 1), isPrev: true, isSelected: false, isNext: false },
-        { offset: monthOffset, label: getMonthLabel(monthOffset), short: getMonthShort(monthOffset), key: getMonthKey(monthOffset), billingDate: getBillingDateStr(monthOffset), isPrev: false, isSelected: true, isNext: false },
-        { offset: monthOffset + 1, label: getMonthLabel(monthOffset + 1), short: getMonthShort(monthOffset + 1), key: getMonthKey(monthOffset + 1), billingDate: getBillingDateStr(monthOffset + 1), isPrev: false, isSelected: false, isNext: true },
-    ], [monthOffset]);
+        { offset: monthOffset - 1, label: getMonthLabel(monthOffset - 1), short: getMonthShort(monthOffset - 1), key: getMonthKey(monthOffset - 1), billingDate: getBillingDateStr(monthOffset - 1), periodRange: getPeriodRange(monthOffset - 1), isPrev: true, isSelected: false, isNext: false },
+        { offset: monthOffset, label: getMonthLabel(monthOffset), short: getMonthShort(monthOffset), key: getMonthKey(monthOffset), billingDate: getBillingDateStr(monthOffset), periodRange: getPeriodRange(monthOffset), isPrev: false, isSelected: true, isNext: false },
+        { offset: monthOffset + 1, label: getMonthLabel(monthOffset + 1), short: getMonthShort(monthOffset + 1), key: getMonthKey(monthOffset + 1), billingDate: getBillingDateStr(monthOffset + 1), periodRange: getPeriodRange(monthOffset + 1), isPrev: false, isSelected: false, isNext: true },
+    ], [monthOffset, periodStartDay]);
 
     useEffect(() => {
         const fetchForecast = async () => {
@@ -385,10 +397,10 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                         <div
                             key={m.key}
                             className={`relative rounded-2xl p-4 transition-all duration-300 overflow-hidden ${m.isSelected
-                                    ? 'bg-gradient-to-br from-blue-600/20 via-blue-900/15 to-slate-900 border border-blue-500/30 shadow-lg shadow-blue-500/5'
-                                    : m.isPrev
-                                        ? 'bg-gradient-to-br from-emerald-600/10 to-slate-900 border border-emerald-500/20'
-                                        : 'bg-slate-800/60 border border-slate-700/40'
+                                ? 'bg-gradient-to-br from-blue-600/20 via-blue-900/15 to-slate-900 border border-blue-500/30 shadow-lg shadow-blue-500/5'
+                                : m.isPrev
+                                    ? 'bg-gradient-to-br from-emerald-600/10 to-slate-900 border border-emerald-500/20'
+                                    : 'bg-slate-800/60 border border-slate-700/40'
                                 }`}
                         >
                             {m.isSelected && (
@@ -404,6 +416,9 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                                 }`}>
                                 {formatCurrency(total)}
                             </p>
+                            {m.periodRange && (
+                                <p className="text-[9px] text-slate-500 mt-1 font-mono">{m.periodRange}</p>
+                            )}
                         </div>
                     );
                 })}
@@ -431,10 +446,10 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                             <div
                                 key={m.key}
                                 className={`px-3 py-3 text-center text-[10px] uppercase tracking-widest font-bold ${m.isSelected
-                                        ? 'text-blue-400 bg-blue-500/5 border-x border-blue-500/10'
-                                        : m.isPrev
-                                            ? 'text-emerald-400/70'
-                                            : 'text-slate-500'
+                                    ? 'text-blue-400 bg-blue-500/5 border-x border-blue-500/10'
+                                    : m.isPrev
+                                        ? 'text-emerald-400/70'
+                                        : 'text-slate-500'
                                     }`}
                             >
                                 {m.short}

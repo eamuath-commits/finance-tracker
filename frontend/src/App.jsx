@@ -16,6 +16,7 @@ import CreditCards from './pages/CreditCards';
 import Categories from './pages/Categories';
 import Merchants from './pages/Merchants';
 import Audit from './pages/Audit';
+import Settings from './pages/Settings';
 
 function App() {
     return (
@@ -34,6 +35,7 @@ function App() {
                     <Route path="planning" element={<Planning />} />
                     <Route path="categories" element={<Categories />} />
                     <Route path="audit" element={<Audit />} />
+                    <Route path="settings" element={<Settings />} />
                 </Route>
             </Routes>
         </Router>

@@ -45,10 +45,18 @@ const Sidebar = () => {
             </nav>
 
             <div className="p-4 border-t border-slate-800">
-                <button className="flex items-center gap-3 px-4 py-3 w-full rounded-lg text-gray-400 hover:bg-slate-800 hover:text-gray-200 transition-colors">
+                <NavLink
+                    to="/settings"
+                    className={({ isActive }) =>
+                        `flex items-center gap-3 px-4 py-3 w-full rounded-lg transition-colors ${isActive
+                            ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
+                            : 'text-gray-400 hover:bg-slate-800 hover:text-gray-200'
+                        }`
+                    }
+                >
                     <Settings size={20} />
                     <span className="font-medium">Settings</span>
-                </button>
+                </NavLink>
 
                 <div className="mt-4 px-4 py-2 bg-slate-800 rounded-lg">
                     <p className="text-xs text-gray-500">Logged in as</p>

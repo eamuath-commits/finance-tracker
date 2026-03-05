@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Modal, formatCurrency, inputClass, selectClass } from '../components/UI';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { Calendar, Trash2, LayoutGrid, List, Receipt, Tag, Plus, Edit2, ArrowLeft, ArrowRight, Filter, X } from 'lucide-react';
+import { Calendar, Trash2, LayoutGrid, List, Receipt, Tag, Plus, Edit2, ArrowLeft, ArrowRight, Filter, X, Settings } from 'lucide-react';
 import ObligationsManager from '../components/ObligationsManager';
 import ObligationsPayments from '../components/ObligationsHistory';
 import ObligationsForecast from '../components/ObligationsForecast';
@@ -12,8 +12,12 @@ import PaymentModal from '../components/PaymentModal';
 const Obligations = () => {
     // --- Global State ---
     const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
     const activeTab = searchParams.get('tab') || 'obligations';
     const categoryFilter = searchParams.get('category');
+
+    // --- Period Settings ---
+    const [periodStartDay, setPeriodStartDay] = useState(1);
 
     const [loading, setLoading] = useState(true);
 
@@ -134,6 +138,11 @@ const Obligations = () => {
 
     useEffect(() => {
         fetchData();
+        // Fetch period settings
+        axios.get(`${API_URL}/settings`).then(res => {
+            const psd = res.data?.period_start_day;
+            if (psd) setPeriodStartDay(parseInt(psd.value) || 1);
+        }).catch(() => { });
     }, []);
 
     // Filter Obligations based on URL params
@@ -443,6 +452,9 @@ const Obligations = () => {
                                     <span className="text-sm font-bold text-white min-w-[120px] text-center">{currentDateView}</span>
                                     <button onClick={() => setMonthOffset(p => p + 1)} className="p-1.5 hover:bg-slate-700 rounded-lg text-gray-400 transition"><ArrowRight size={16} /></button>
                                     <button onClick={() => setMonthOffset(0)} className="ml-1 text-xs bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 px-2.5 py-1.5 rounded-lg transition font-medium">Today</button>
+                                    <button onClick={() => navigate('/settings')} className="p-1.5 hover:bg-slate-700 rounded-lg text-gray-500 hover:text-blue-400 transition ml-1" title="Period Settings">
+                                        <Settings size={14} />
+                                    </button>
                                 </>
                             )}
                         </div>
@@ -461,6 +473,7 @@ const Obligations = () => {
                             obligations={filteredObligations}
                             history={payments}
                             monthOffset={monthOffset}
+                            periodStartDay={periodStartDay}
                             onEdit={(item) => {
                                 if (item) {
                                     const o = obligations.find(x => x.id === item.obligation_id);
@@ -480,6 +493,7 @@ const Obligations = () => {
                             obligations={filteredObligations}
                             payments={payments}
                             monthOffset={monthOffset}
+                            periodStartDay={periodStartDay}
                             openPaymentModal={openPaymentModal}
                             handleQuickPay={handleQuickPay}
                             onRefresh={fetchData}
