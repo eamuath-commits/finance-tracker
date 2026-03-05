@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { formatCurrency } from './UI';
+import { formatCurrency, Modal } from './UI';
+import TransactionSelectorModal from './TransactionSelectorModal';
 import {
     TrendingUp, TrendingDown, Minus, CheckCircle,
-    Download, ChevronDown, ChevronRight, Box, Edit3, DollarSign, X
+    Download, ChevronDown, ChevronRight, Box, Edit3, DollarSign, X, Link2, LinkIcon, List
 } from 'lucide-react';
 import axios from 'axios';
 import { exportToCSV } from '../utils/csvExport';
@@ -40,7 +41,7 @@ const getBillingDateStr = (offset) => {
 };
 
 // --- Inline Edit Popover ---
-const EditPopover = ({ obl, monthData, billingDate, onSave, onClose }) => {
+const EditPopover = ({ obl, monthData, billingDate, onSave, onClose, onLink }) => {
     const [amount, setAmount] = useState(monthData?.amount || '');
     const [status, setStatus] = useState(monthData?.isPaid ? 'PAID' : 'BUDGET');
 
@@ -121,10 +122,11 @@ const EditPopover = ({ obl, monthData, billingDate, onSave, onClose }) => {
                     Save
                 </button>
                 <button
-                    onClick={onClose}
-                    className="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium py-2 px-3 rounded-lg transition"
+                    onClick={() => { onClose(); onLink(obl, billingDate); }}
+                    className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold py-2 px-2.5 rounded-lg transition shadow-sm flex items-center gap-1"
+                    title="Link to Transaction"
                 >
-                    Cancel
+                    <Link2 size={12} /> Link
                 </button>
             </div>
         </div>
@@ -136,6 +138,14 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
     const [loading, setLoading] = useState(true);
     const [expandedCats, setExpandedCats] = useState(new Set());
     const [editingCell, setEditingCell] = useState(null); // { oblId, monthKey }
+
+    // --- Link Transaction State ---
+    const [showLinkModal, setShowLinkModal] = useState(false);
+    const [showBrowseModal, setShowBrowseModal] = useState(false);
+    const [linkingObl, setLinkingObl] = useState(null);
+    const [linkingBillingDate, setLinkingBillingDate] = useState(null);
+    const [suggestedTxs, setSuggestedTxs] = useState([]);
+    const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
     // Helper: get period date range label based on periodStartDay
     const getPeriodRange = (offset) => {
@@ -274,6 +284,110 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
         }
     };
 
+    // --- Link Transaction Functions ---
+    const openLinkFlow = async (obl, billingDate) => {
+        setLinkingObl(obl);
+        setLinkingBillingDate(billingDate);
+        setShowLinkModal(true);
+        setLoadingSuggestions(true);
+        setSuggestedTxs([]);
+
+        try {
+            // Find existing payment for this obl+month to get suggestions,
+            // or search transactions by obligation amount/name
+            const oblPayments = payments[obl.id] || [];
+            const monthKey = billingDate.substring(0, 7);
+            const existingPayment = oblPayments.find(p => (p.billing_month || '').startsWith(monthKey));
+
+            if (existingPayment) {
+                const res = await axios.get(`${API_URL}/payments/${existingPayment.id}/suggested-transactions`).catch(() => ({ data: [] }));
+                setSuggestedTxs(res.data);
+            } else {
+                // No payment yet — search by obligation name/amount
+                const params = new URLSearchParams();
+                params.set('query', obl.provider || obl.name);
+                params.set('type', 'debit');
+                params.set('limit', '10');
+                const res = await axios.get(`${API_URL}/transactions/search?${params}`).catch(() => ({ data: [] }));
+                setSuggestedTxs((res.data || []).map(tx => ({
+                    transaction_id: tx.id,
+                    merchant: tx.merchant,
+                    amount: tx.amount,
+                    date: tx.timestamp,
+                    score: 0,
+                    reasons: ['name_search'],
+                    already_linked: !!tx.linked_to_payment_id
+                })));
+            }
+        } catch (err) {
+            console.error('Error fetching suggestions:', err);
+        } finally {
+            setLoadingSuggestions(false);
+        }
+    };
+
+    const handleLinkTransaction = async (transactionId) => {
+        if (!linkingObl) return;
+        try {
+            const tx = suggestedTxs.find(t => t.transaction_id === transactionId);
+            const amount = tx?.amount || 0;
+
+            // Create a PAID payment for this obligation+month
+            const payRes = await axios.post(`${API_URL}/obligations/${linkingObl.id}/payments`, {
+                amount: amount,
+                billing_month: linkingBillingDate,
+                status: 'Paid',
+                payment_date: new Date().toISOString().split('T')[0]
+            });
+
+            // Link the transaction to the newly created payment
+            const paymentId = payRes.data?.id;
+            if (paymentId) {
+                await axios.post(`${API_URL}/payments/${paymentId}/link-transaction?transaction_id=${transactionId}`);
+            }
+
+            setShowLinkModal(false);
+            setLinkingObl(null);
+            if (onRefresh) onRefresh();
+        } catch (err) {
+            console.error('Error linking transaction:', err);
+            alert('Failed to link transaction');
+        }
+    };
+
+    const handleBrowseLink = async (transactionIds) => {
+        if (!linkingObl || !transactionIds.length) return;
+        try {
+            const txId = transactionIds[0];
+
+            // Fetch transaction details to get amount
+            const searchRes = await axios.get(`${API_URL}/transactions/search?limit=50`).catch(() => ({ data: [] }));
+            const txData = (searchRes.data || []).find(t => t.id === txId);
+            const amount = txData?.amount || 0;
+
+            // Create a PAID payment for this obligation+month
+            const payRes = await axios.post(`${API_URL}/obligations/${linkingObl.id}/payments`, {
+                amount: amount,
+                billing_month: linkingBillingDate,
+                status: 'Paid',
+                payment_date: new Date().toISOString().split('T')[0]
+            });
+
+            // Link the transaction to the newly created payment
+            const paymentId = payRes.data?.id;
+            if (paymentId) {
+                await axios.post(`${API_URL}/payments/${paymentId}/link-transaction?transaction_id=${txId}`);
+            }
+
+            setShowBrowseModal(false);
+            setLinkingObl(null);
+            if (onRefresh) onRefresh();
+        } catch (err) {
+            console.error('Error linking from browse:', err);
+            alert('Failed to link transaction');
+        }
+    };
+
     const handleExport = () => {
         const rows = filteredObligations.map(obl => {
             const row = { Name: obl.name, Category: obl.category, Provider: obl.provider || '' };
@@ -310,6 +424,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                             billingDate={month.billingDate}
                             onSave={handleInlineSave}
                             onClose={() => setEditingCell(null)}
+                            onLink={openLinkFlow}
                         />
                     )}
                 </div>
@@ -334,6 +449,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                             billingDate={month.billingDate}
                             onSave={handleInlineSave}
                             onClose={() => setEditingCell(null)}
+                            onLink={openLinkFlow}
                         />
                     )}
                 </div>
@@ -358,6 +474,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                             billingDate={month.billingDate}
                             onSave={handleInlineSave}
                             onClose={() => setEditingCell(null)}
+                            onLink={openLinkFlow}
                         />
                     )}
                 </div>
@@ -381,6 +498,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                         billingDate={month.billingDate}
                         onSave={handleInlineSave}
                         onClose={() => setEditingCell(null)}
+                        onLink={openLinkFlow}
                     />
                 )}
             </div>
@@ -554,6 +672,100 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                     <p className="text-sm">No forecast data available</p>
                 </div>
             )}
+
+            {/* Link Transaction Modal */}
+            <Modal isOpen={showLinkModal} title="Link to Transaction" onClose={() => setShowLinkModal(false)}>
+                <div className="space-y-4">
+                    {linkingObl && (
+                        <div className="bg-slate-700/50 p-3 rounded-lg text-sm">
+                            <div className="text-slate-400 text-xs uppercase font-bold mb-1">Obligation</div>
+                            <div className="text-white font-semibold">{linkingObl.name}</div>
+                            {linkingObl.provider && <div className="text-slate-500 text-xs">{linkingObl.provider}</div>}
+                            <div className="text-slate-500 text-xs mt-1">{linkingBillingDate}</div>
+                        </div>
+                    )}
+
+                    <div className="text-slate-400 text-xs uppercase font-bold">Suggested Transactions</div>
+
+                    {loadingSuggestions ? (
+                        <div className="text-center py-8 text-slate-500">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                            Finding matching transactions...
+                        </div>
+                    ) : suggestedTxs.length > 0 ? (
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {suggestedTxs.map(tx => (
+                                <div
+                                    key={tx.transaction_id}
+                                    className={`p-3 rounded-lg border cursor-pointer transition ${tx.already_linked
+                                        ? 'bg-emerald-500/10 border-emerald-500/30'
+                                        : 'bg-slate-700/50 border-slate-600 hover:border-purple-500 hover:bg-purple-500/10'
+                                        }`}
+                                    onClick={() => !tx.already_linked && handleLinkTransaction(tx.transaction_id)}
+                                >
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <div className="text-white font-semibold text-sm">{tx.merchant || 'Unknown'}</div>
+                                            <div className="text-slate-400 text-xs">
+                                                {tx.date ? new Date(tx.date).toLocaleDateString() : '-'}
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-emerald-400 font-mono text-sm">{formatCurrency(tx.amount)}</div>
+                                            {tx.already_linked ? (
+                                                <span className="text-emerald-400 text-[10px] flex items-center gap-1 justify-end">
+                                                    <CheckCircle size={10} /> Linked
+                                                </span>
+                                            ) : tx.score > 0 ? (
+                                                <div className="text-[10px] text-purple-400">Score: {tx.score}</div>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                    {tx.reasons && tx.reasons.length > 0 && (
+                                        <div className="flex gap-1 mt-2 flex-wrap">
+                                            {tx.reasons.map(r => (
+                                                <span key={r} className="bg-slate-600/50 text-slate-400 text-[9px] px-1.5 py-0.5 rounded">
+                                                    {r.replace('_', ' ')}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-8 text-slate-500">
+                            <LinkIcon className="mx-auto mb-2 opacity-30" size={32} />
+                            <div>No matching transactions found.</div>
+                            <div className="text-xs mt-1">Try Browse All to find manually.</div>
+                        </div>
+                    )}
+
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => { setShowLinkModal(false); setShowBrowseModal(true); }}
+                            className="flex-1 bg-purple-600 hover:bg-purple-500 text-white py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2"
+                        >
+                            <List size={14} /> Browse All Transactions
+                        </button>
+                        <button
+                            onClick={() => setShowLinkModal(false)}
+                            className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm font-medium transition"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Browse All Transactions Modal */}
+            <TransactionSelectorModal
+                isOpen={showBrowseModal}
+                onClose={() => { setShowBrowseModal(false); setLinkingObl(null); }}
+                onSelect={handleBrowseLink}
+                currentLinked={[]}
+                title={`Link Transaction to ${linkingObl?.name || 'Obligation'}`}
+            />
         </div>
     );
 };
