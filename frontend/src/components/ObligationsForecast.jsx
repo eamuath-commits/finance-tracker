@@ -544,6 +544,17 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
             <div className="grid grid-cols-3 gap-3">
                 {months.map(m => {
                     const total = columnTotals[m.key] || 0;
+
+                    // Compute paid, budgeted, forecast breakdown
+                    let paidTotal = 0, budgetTotal = 0, forecastTotal = 0;
+                    filteredObligations.forEach(obl => {
+                        const d = oblMonthData[obl.id]?.[m.key];
+                        if (!d) return;
+                        if (d.isPaid) paidTotal += d.paidAmount || 0;
+                        if (d.hasBudget) budgetTotal += d.budgetAmount || 0;
+                        if (!d.isPaid && !d.hasBudget) forecastTotal += d.forecastAmount || 0;
+                    });
+
                     return (
                         <div
                             key={m.key}
@@ -567,6 +578,24 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                                 }`}>
                                 {formatCurrency(total)}
                             </p>
+                            {/* Paid / Budget / Forecast breakdown */}
+                            <div className="flex gap-3 mt-2 text-[10px] font-mono">
+                                {paidTotal > 0 && (
+                                    <span className="text-emerald-400 flex items-center gap-0.5">
+                                        <CheckCircle size={9} /> {formatCurrency(paidTotal)}
+                                    </span>
+                                )}
+                                {budgetTotal > 0 && (
+                                    <span className="text-blue-400 flex items-center gap-0.5">
+                                        <DollarSign size={9} /> {formatCurrency(budgetTotal)}
+                                    </span>
+                                )}
+                                {forecastTotal > 0 && (
+                                    <span className="text-slate-500 flex items-center gap-0.5">
+                                        ~ {formatCurrency(forecastTotal)}
+                                    </span>
+                                )}
+                            </div>
                             {m.periodRange && (
                                 <p className="text-[9px] text-slate-500 mt-1 font-mono">{m.periodRange}</p>
                             )}
