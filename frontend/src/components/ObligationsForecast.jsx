@@ -471,7 +471,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                                         className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] cursor-pointer hover:bg-slate-800/40 transition-colors"
                                         onClick={() => toggleCat(cat)}
                                     >
-                                        <div className="px-5 py-3 flex items-center gap-2.5">
+                                        <div className="px-5 py-2.5 flex items-center gap-2.5">
                                             <div className="transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
                                                 <ChevronDown size={13} className="text-slate-500" />
                                             </div>
@@ -481,13 +481,8 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                                         {months.map(m => (
                                             <div
                                                 key={m.key}
-                                                className={`px-3 py-3 text-right ${m.isSelected ? 'bg-blue-500/[0.03] border-x border-blue-500/10' : ''
-                                                    }`}
-                                            >
-                                                <span className="text-white font-mono text-[12px] font-semibold">
-                                                    {formatCurrency(catMonthTotals[cat]?.[m.key] || 0)}
-                                                </span>
-                                            </div>
+                                                className={`px-3 py-2.5 ${m.isSelected ? 'bg-blue-500/[0.03] border-x border-blue-500/10' : ''}`}
+                                            />
                                         ))}
                                     </div>
 

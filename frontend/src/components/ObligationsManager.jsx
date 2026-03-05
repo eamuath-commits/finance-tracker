@@ -42,44 +42,33 @@ const CATEGORY_COLORS = {
     "Other": "border-gray-500/40"
 };
 
-// --- Obligation Row (CRUD only) ---
+// --- Obligation Row (CRUD only, compact) ---
 const ObligationRow = ({ obl, openObligationModal }) => {
     return (
-        <tr className="border-b border-slate-700/30 hover:bg-slate-800/50 transition-colors group">
-            {/* Name */}
-            <td className="px-4 py-3">
-                <div className="flex items-center gap-3">
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                            {obl.provider && (
-                                <span className="text-[9px] text-slate-500 font-semibold uppercase tracking-wider">{obl.provider}</span>
-                            )}
-                            {obl.provider && <span className="text-slate-600 text-[9px]">·</span>}
-                            <span className="font-medium text-white text-sm truncate">{obl.name}</span>
-                        </div>
-                    </div>
+        <tr className="border-b border-slate-700/20 hover:bg-slate-800/50 transition-colors group">
+            <td className="px-4 py-1.5">
+                <div className="flex items-center gap-1.5">
+                    {obl.provider && (
+                        <span className="text-[9px] text-slate-500 font-semibold uppercase">{obl.provider}</span>
+                    )}
+                    {obl.provider && <span className="text-slate-600 text-[8px]">·</span>}
+                    <span className="font-medium text-white text-[12px] truncate">{obl.name}</span>
                 </div>
             </td>
-
-            {/* Due Day */}
-            <td className="px-3 py-3 text-center">
-                <span className="text-xs font-mono text-slate-400">{obl.due_day}</span>
+            <td className="px-3 py-1.5 text-center">
+                <span className="text-[11px] font-mono text-slate-400">{obl.due_day}</span>
             </td>
-
-            {/* Notes */}
-            <td className="px-3 py-3">
-                <span className="text-xs text-slate-500 truncate block max-w-[200px]">{obl.notes || '—'}</span>
+            <td className="px-3 py-1.5">
+                <span className="text-[11px] text-slate-500 truncate block max-w-[200px]">{obl.notes || '—'}</span>
             </td>
-
-            {/* Actions */}
-            <td className="px-3 py-3">
-                <div className="flex items-center justify-end gap-2">
+            <td className="px-3 py-1.5">
+                <div className="flex items-center justify-end">
                     <button
                         onClick={() => openObligationModal(obl)}
-                        className="opacity-0 group-hover:opacity-100 bg-slate-700/50 hover:bg-blue-600 text-slate-400 hover:text-white p-1.5 rounded-lg transition flex items-center gap-1 text-xs"
+                        className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-blue-400 p-1 rounded transition"
                         title="Edit"
                     >
-                        <Edit2 size={12} /> Edit
+                        <Edit2 size={12} />
                     </button>
                 </div>
             </td>
@@ -97,15 +86,15 @@ const CategorySection = ({ category, obligations, openObligationModal }) => {
             {/* Category Header */}
             <button
                 onClick={() => setIsCollapsed(!isCollapsed)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-slate-800/50 hover:bg-slate-800/80 transition-colors"
+                className="w-full flex items-center justify-between px-4 py-2 bg-slate-800/50 hover:bg-slate-800/80 transition-colors"
             >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                     <div className="transition-transform duration-200" style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}>
-                        <ChevronRight size={14} className="text-slate-500" />
+                        <ChevronRight size={12} className="text-slate-500" />
                     </div>
-                    {CATEGORY_ICONS[category] || <Box size={16} />}
-                    <h3 className="text-white font-bold text-xs uppercase tracking-wider">{category}</h3>
-                    <span className="px-1.5 py-0.5 bg-slate-700/80 text-slate-400 rounded-full text-[10px] font-mono">{obligations.length}</span>
+                    {CATEGORY_ICONS[category] || <Box size={14} />}
+                    <h3 className="text-white font-semibold text-[11px] uppercase tracking-wider">{category}</h3>
+                    <span className="px-1.5 py-0.5 bg-slate-700/80 text-slate-400 rounded-full text-[9px] font-mono">{obligations.length}</span>
                 </div>
             </button>
 
@@ -114,11 +103,11 @@ const CategorySection = ({ category, obligations, openObligationModal }) => {
                 <div className="animate-fade-in">
                     <table className="w-full text-left table-fixed">
                         <thead className="bg-slate-800/30">
-                            <tr className="text-[9px] uppercase font-bold text-slate-500">
-                                <th className="px-4 py-2 w-[35%]">Name</th>
-                                <th className="px-3 py-2 text-center w-[10%]">Due Day</th>
-                                <th className="px-3 py-2 w-[35%]">Notes</th>
-                                <th className="px-3 py-2 text-right w-[20%]">Actions</th>
+                            <tr className="text-[8px] uppercase font-bold text-slate-500">
+                                <th className="px-4 py-1.5 w-[35%]">Name</th>
+                                <th className="px-3 py-1.5 text-center w-[10%]">Due</th>
+                                <th className="px-3 py-1.5 w-[35%]">Notes</th>
+                                <th className="px-3 py-1.5 text-right w-[20%]"></th>
                             </tr>
                         </thead>
                         <tbody>
