@@ -47,6 +47,12 @@ const EditPopover = ({ obl, monthData, billingDate, onSave, onClose, onLink, onD
 
     const handleSave = () => {
         const val = parseFloat(amount);
+        // If amount is blank or zero and there's an existing payment, delete it
+        if ((!amount || amount === '' || (val === 0) || isNaN(val)) && monthData?.paymentId) {
+            onSave(obl.id, 0, billingDate, 'DELETE');
+            onClose();
+            return;
+        }
         if (isNaN(val) || val <= 0) return;
         onSave(obl.id, val, billingDate, status);
         onClose();
@@ -128,15 +134,6 @@ const EditPopover = ({ obl, monthData, billingDate, onSave, onClose, onLink, onD
                 >
                     <Link2 size={12} /> Link
                 </button>
-                {monthData?.paymentId && (
-                    <button
-                        onClick={() => { onClose(); onDelete(monthData.paymentId); }}
-                        className="bg-red-600/80 hover:bg-red-500 text-white text-xs font-bold py-2 px-2 rounded-lg transition shadow-sm flex items-center"
-                        title="Delete Payment"
-                    >
-                        <Trash2 size={12} />
-                    </button>
-                )}
             </div>
         </div>
     );
@@ -292,6 +289,21 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
 
     // Handle save from inline edit
     const handleInlineSave = async (oblId, amount, billingDate, status) => {
+        // Handle DELETE: clear the amount to remove the payment
+        if (status === 'DELETE') {
+            const oblPayments = payments[oblId] || [];
+            const monthKey = billingDate.substring(0, 7);
+            const existing = oblPayments.find(p => (p.billing_month || '').startsWith(monthKey));
+            if (existing) {
+                try {
+                    await axios.delete(`${API_URL}/obligations/history/${existing.id}`);
+                    if (onRefresh) onRefresh();
+                } catch (err) {
+                    console.error('Error deleting payment:', err);
+                }
+            }
+            return;
+        }
         if (handleQuickPay) {
             await handleQuickPay(oblId, amount, billingDate, status);
         }
@@ -545,14 +557,13 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                 {months.map(m => {
                     const total = columnTotals[m.key] || 0;
 
-                    // Compute paid, budgeted, forecast breakdown
-                    let paidTotal = 0, budgetTotal = 0, forecastTotal = 0;
+                    // Compute paid vs budget (budget = manual budget + system forecast)
+                    let paidTotal = 0, unpaidTotal = 0;
                     filteredObligations.forEach(obl => {
                         const d = oblMonthData[obl.id]?.[m.key];
                         if (!d) return;
                         if (d.isPaid) paidTotal += d.paidAmount || 0;
-                        if (d.hasBudget) budgetTotal += d.budgetAmount || 0;
-                        if (!d.isPaid && !d.hasBudget) forecastTotal += d.forecastAmount || 0;
+                        else unpaidTotal += d.amount || 0;
                     });
 
                     return (
@@ -578,21 +589,16 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                                 }`}>
                                 {formatCurrency(total)}
                             </p>
-                            {/* Paid / Budget / Forecast breakdown */}
+                            {/* Paid / Budget breakdown */}
                             <div className="flex gap-3 mt-2 text-[10px] font-mono">
                                 {paidTotal > 0 && (
                                     <span className="text-emerald-400 flex items-center gap-0.5">
                                         <CheckCircle size={9} /> {formatCurrency(paidTotal)}
                                     </span>
                                 )}
-                                {budgetTotal > 0 && (
+                                {unpaidTotal > 0 && (
                                     <span className="text-blue-400 flex items-center gap-0.5">
-                                        <DollarSign size={9} /> {formatCurrency(budgetTotal)}
-                                    </span>
-                                )}
-                                {forecastTotal > 0 && (
-                                    <span className="text-slate-500 flex items-center gap-0.5">
-                                        ~ {formatCurrency(forecastTotal)}
+                                        <DollarSign size={9} /> {formatCurrency(unpaidTotal)}
                                     </span>
                                 )}
                             </div>
