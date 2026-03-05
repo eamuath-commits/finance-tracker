@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { formatCurrency } from './UI';
 import {
     TrendingUp, TrendingDown, Minus, CheckCircle,
-    Download, ChevronDown, ChevronRight, Box
+    Download, ChevronDown, ChevronRight, Box, Edit3, DollarSign, X
 } from 'lucide-react';
 import axios from 'axios';
 import { exportToCSV } from '../utils/csvExport';
@@ -33,16 +33,114 @@ const getMonthKey = (offset) => {
     return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
 };
 
-const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, monthOffset = 0 }) => {
+const getBillingDateStr = (offset) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + offset);
+    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-01`;
+};
+
+// --- Inline Edit Popover ---
+const EditPopover = ({ obl, monthData, billingDate, onSave, onClose }) => {
+    const [amount, setAmount] = useState(monthData?.amount || '');
+    const [status, setStatus] = useState(monthData?.isPaid ? 'PAID' : 'BUDGET');
+
+    const handleSave = () => {
+        const val = parseFloat(amount);
+        if (isNaN(val) || val <= 0) return;
+        onSave(obl.id, val, billingDate, status);
+        onClose();
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter') handleSave();
+        if (e.key === 'Escape') onClose();
+    };
+
+    return (
+        <div className="absolute z-50 top-full mt-1 right-0 w-56 bg-slate-800 border border-slate-600 rounded-xl shadow-2xl shadow-black/40 p-3 space-y-3 animate-fade-in" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                    <p className="text-white text-xs font-semibold truncate">{obl.name}</p>
+                    {obl.provider && <p className="text-[9px] text-slate-500 uppercase">{obl.provider}</p>}
+                </div>
+                <button onClick={onClose} className="text-slate-500 hover:text-white p-0.5 rounded transition">
+                    <X size={14} />
+                </button>
+            </div>
+
+            {/* Amount */}
+            <div>
+                <label className="text-[9px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Amount</label>
+                <div className="relative">
+                    <DollarSign size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input
+                        autoFocus
+                        type="number"
+                        step="0.01"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        className="w-full bg-slate-900 border border-slate-600 rounded-lg pl-7 pr-3 py-2 text-sm text-white font-mono outline-none focus:border-blue-500 transition"
+                        placeholder="0.00"
+                    />
+                </div>
+            </div>
+
+            {/* Status */}
+            <div>
+                <label className="text-[9px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Status</label>
+                <div className="flex gap-1.5">
+                    <button
+                        onClick={() => setStatus('PAID')}
+                        className={`flex-1 text-xs font-semibold py-1.5 rounded-lg transition ${status === 'PAID'
+                                ? 'bg-emerald-600 text-white shadow-sm'
+                                : 'bg-slate-700/60 text-slate-400 hover:text-white hover:bg-slate-700'
+                            }`}
+                    >
+                        ✓ Paid
+                    </button>
+                    <button
+                        onClick={() => setStatus('BUDGET')}
+                        className={`flex-1 text-xs font-semibold py-1.5 rounded-lg transition ${status === 'BUDGET'
+                                ? 'bg-blue-600 text-white shadow-sm'
+                                : 'bg-slate-700/60 text-slate-400 hover:text-white hover:bg-slate-700'
+                            }`}
+                    >
+                        Budget
+                    </button>
+                </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2">
+                <button
+                    onClick={handleSave}
+                    className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2 rounded-lg transition shadow-sm"
+                >
+                    Save
+                </button>
+                <button
+                    onClick={onClose}
+                    className="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium py-2 px-3 rounded-lg transition"
+                >
+                    Cancel
+                </button>
+            </div>
+        </div>
+    );
+};
+
+const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, monthOffset = 0, openPaymentModal, handleQuickPay, onRefresh }) => {
     const [forecast, setForecast] = useState(null);
     const [loading, setLoading] = useState(true);
     const [expandedCats, setExpandedCats] = useState(new Set());
+    const [editingCell, setEditingCell] = useState(null); // { oblId, monthKey }
 
-    // 3 months: previous, selected (current), next — based on monthOffset
     const months = useMemo(() => [
-        { offset: monthOffset - 1, label: getMonthLabel(monthOffset - 1), short: getMonthShort(monthOffset - 1), key: getMonthKey(monthOffset - 1), isPrev: true, isSelected: false, isNext: false },
-        { offset: monthOffset, label: getMonthLabel(monthOffset), short: getMonthShort(monthOffset), key: getMonthKey(monthOffset), isPrev: false, isSelected: true, isNext: false },
-        { offset: monthOffset + 1, label: getMonthLabel(monthOffset + 1), short: getMonthShort(monthOffset + 1), key: getMonthKey(monthOffset + 1), isPrev: false, isSelected: false, isNext: true },
+        { offset: monthOffset - 1, label: getMonthLabel(monthOffset - 1), short: getMonthShort(monthOffset - 1), key: getMonthKey(monthOffset - 1), billingDate: getBillingDateStr(monthOffset - 1), isPrev: true, isSelected: false, isNext: false },
+        { offset: monthOffset, label: getMonthLabel(monthOffset), short: getMonthShort(monthOffset), key: getMonthKey(monthOffset), billingDate: getBillingDateStr(monthOffset), isPrev: false, isSelected: true, isNext: false },
+        { offset: monthOffset + 1, label: getMonthLabel(monthOffset + 1), short: getMonthShort(monthOffset + 1), key: getMonthKey(monthOffset + 1), billingDate: getBillingDateStr(monthOffset + 1), isPrev: false, isSelected: false, isNext: true },
     ], [monthOffset]);
 
     useEffect(() => {
@@ -62,6 +160,14 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
         fetchForecast();
     }, []);
 
+    // Close popover on click outside
+    useEffect(() => {
+        if (!editingCell) return;
+        const handler = () => setEditingCell(null);
+        document.addEventListener('click', handler);
+        return () => document.removeEventListener('click', handler);
+    }, [editingCell]);
+
     const toggleCat = (cat) => {
         setExpandedCats(prev => {
             const next = new Set(prev);
@@ -76,7 +182,6 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
         return obligations.filter(o => o.category === categoryFilter);
     }, [obligations, categoryFilter]);
 
-    // Per-obligation per-month data
     const oblMonthData = useMemo(() => {
         const result = {};
         filteredObligations.forEach(obl => {
@@ -89,13 +194,26 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                 });
                 const isPaid = monthPayments.length > 0;
                 const paidAmount = monthPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+                // Also check for BUDGET entries
+                const budgetPayments = oblPayments.filter(p => {
+                    const bm = p.billing_month || '';
+                    return bm.startsWith(m.key) && p.status === 'BUDGET';
+                });
+                const hasBudget = budgetPayments.length > 0;
+                const budgetAmount = budgetPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
                 const forecastObl = forecast?.obligations?.find(f => f.id === obl.id);
                 const forecastAmount = forecastObl?.forecast_amount || 0;
                 const trend = forecastObl?.trend || 'stable';
 
                 result[obl.id][m.key] = {
                     isPaid,
-                    amount: isPaid ? paidAmount : forecastAmount,
+                    hasBudget,
+                    amount: isPaid ? paidAmount : (hasBudget ? budgetAmount : forecastAmount),
+                    paidAmount,
+                    budgetAmount,
+                    forecastAmount,
                     trend,
                 };
             });
@@ -103,7 +221,6 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
         return result;
     }, [filteredObligations, payments, forecast, months]);
 
-    // Group by category
     const grouped = useMemo(() => {
         return filteredObligations.reduce((acc, obl) => {
             const cat = obl.category || "Other";
@@ -115,7 +232,6 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
 
     const sortedCategories = Object.keys(grouped).sort();
 
-    // Totals
     const columnTotals = useMemo(() => {
         const totals = {};
         months.forEach(m => {
@@ -139,6 +255,13 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
         return result;
     }, [sortedCategories, grouped, oblMonthData, months]);
 
+    // Handle save from inline edit
+    const handleInlineSave = async (oblId, amount, billingDate, status) => {
+        if (handleQuickPay) {
+            await handleQuickPay(oblId, amount, billingDate, status);
+        }
+    };
+
     const handleExport = () => {
         const rows = filteredObligations.map(obl => {
             const row = { Name: obl.name, Category: obl.category, Provider: obl.provider || '' };
@@ -155,22 +278,99 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
     );
 
     // Amount cell renderer
-    const AmountCell = ({ data, isPrev }) => {
+    const AmountCell = ({ obl, data, month }) => {
+        const isEditing = editingCell?.oblId === obl.id && editingCell?.monthKey === month.key;
+
         if (!data || data.amount === 0) {
-            return <span className="text-slate-600 text-[11px]">—</span>;
-        }
-        if (data.isPaid) {
             return (
-                <div className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-md">
-                    <CheckCircle size={10} />
-                    <span className="font-mono text-[11px] font-medium">{formatCurrency(data.amount)}</span>
+                <div className="relative">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setEditingCell({ oblId: obl.id, monthKey: month.key }); }}
+                        className="text-slate-600 hover:text-slate-400 text-[11px] cursor-pointer transition group/cell flex items-center gap-1"
+                    >
+                        <span>—</span>
+                        <Edit3 size={9} className="opacity-0 group-hover/cell:opacity-100 transition" />
+                    </button>
+                    {isEditing && (
+                        <EditPopover
+                            obl={obl}
+                            monthData={data}
+                            billingDate={month.billingDate}
+                            onSave={handleInlineSave}
+                            onClose={() => setEditingCell(null)}
+                        />
+                    )}
                 </div>
             );
         }
+
+        if (data.isPaid) {
+            return (
+                <div className="relative">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setEditingCell({ oblId: obl.id, monthKey: month.key }); }}
+                        className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-md cursor-pointer hover:bg-emerald-500/20 transition group/cell"
+                    >
+                        <CheckCircle size={10} />
+                        <span className="font-mono text-[11px] font-medium">{formatCurrency(data.amount)}</span>
+                        <Edit3 size={8} className="opacity-0 group-hover/cell:opacity-100 transition ml-0.5" />
+                    </button>
+                    {isEditing && (
+                        <EditPopover
+                            obl={obl}
+                            monthData={data}
+                            billingDate={month.billingDate}
+                            onSave={handleInlineSave}
+                            onClose={() => setEditingCell(null)}
+                        />
+                    )}
+                </div>
+            );
+        }
+
+        if (data.hasBudget) {
+            return (
+                <div className="relative">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setEditingCell({ oblId: obl.id, monthKey: month.key }); }}
+                        className="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-md cursor-pointer hover:bg-blue-500/20 transition group/cell"
+                    >
+                        <DollarSign size={10} />
+                        <span className="font-mono text-[11px] font-medium">{formatCurrency(data.amount)}</span>
+                        <Edit3 size={8} className="opacity-0 group-hover/cell:opacity-100 transition ml-0.5" />
+                    </button>
+                    {isEditing && (
+                        <EditPopover
+                            obl={obl}
+                            monthData={data}
+                            billingDate={month.billingDate}
+                            onSave={handleInlineSave}
+                            onClose={() => setEditingCell(null)}
+                        />
+                    )}
+                </div>
+            );
+        }
+
         return (
-            <div className="inline-flex items-center gap-1">
-                {!isPrev && TREND_ICONS[data.trend]}
-                <span className="font-mono text-[11px] text-slate-300">{formatCurrency(data.amount)}</span>
+            <div className="relative">
+                <button
+                    onClick={(e) => { e.stopPropagation(); setEditingCell({ oblId: obl.id, monthKey: month.key }); }}
+                    className="inline-flex items-center gap-1 cursor-pointer hover:bg-slate-800/60 px-2 py-0.5 rounded-md transition group/cell"
+                >
+                    {!month.isPrev && TREND_ICONS[data.trend]}
+                    <span className="font-mono text-[11px] text-slate-300">{formatCurrency(data.amount)}</span>
+                    <Edit3 size={8} className="opacity-0 group-hover/cell:opacity-100 text-slate-500 transition ml-0.5" />
+                </button>
+                {isEditing && (
+                    <EditPopover
+                        obl={obl}
+                        monthData={data}
+                        billingDate={month.billingDate}
+                        onSave={handleInlineSave}
+                        onClose={() => setEditingCell(null)}
+                    />
+                )}
             </div>
         );
     };
@@ -221,116 +421,118 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
 
             {/* ── Forecast Grid ── */}
             <div className="rounded-2xl border border-slate-700/40 overflow-hidden bg-slate-900/50 shadow-xl">
-                {/* Header */}
-                <div className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] bg-slate-800/70 border-b border-slate-700/40">
-                    <div className="px-5 py-3 text-[10px] text-slate-500 uppercase tracking-widest font-bold">
-                        Category / Obligation
-                    </div>
-                    {months.map(m => (
-                        <div
-                            key={m.key}
-                            className={`px-3 py-3 text-center text-[10px] uppercase tracking-widest font-bold ${m.isSelected
-                                    ? 'text-blue-400 bg-blue-500/5 border-x border-blue-500/10'
-                                    : m.isPrev
-                                        ? 'text-emerald-400/70'
-                                        : 'text-slate-500'
-                                }`}
-                        >
-                            {m.short}
-                        </div>
-                    ))}
-                </div>
-
-                {/* Body */}
-                <div>
-                    {sortedCategories.map((cat, catIdx) => {
-                        const items = grouped[cat];
-                        const isExpanded = expandedCats.has(cat);
-                        const isLast = catIdx === sortedCategories.length - 1;
-
-                        return (
-                            <div key={cat} className={!isLast ? 'border-b border-slate-700/25' : ''}>
-                                {/* Category Row */}
-                                <div
-                                    className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] cursor-pointer hover:bg-slate-800/40 transition-colors"
-                                    onClick={() => toggleCat(cat)}
-                                >
-                                    <div className="px-5 py-3 flex items-center gap-2.5">
-                                        <div className="transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
-                                            <ChevronDown size={13} className="text-slate-500" />
-                                        </div>
-                                        <span className="text-white text-[12px] font-semibold">{cat}</span>
-                                        <span className="text-[9px] text-slate-600 bg-slate-800 px-1.5 py-0.5 rounded font-mono">{items.length}</span>
-                                    </div>
-                                    {months.map(m => (
-                                        <div
-                                            key={m.key}
-                                            className={`px-3 py-3 text-right ${m.isSelected ? 'bg-blue-500/[0.03] border-x border-blue-500/10' : ''
-                                                }`}
-                                        >
-                                            <span className="text-white font-mono text-[12px] font-semibold">
-                                                {formatCurrency(catMonthTotals[cat]?.[m.key] || 0)}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {/* Expanded Items */}
-                                {isExpanded && (
-                                    <div className="bg-slate-900/30">
-                                        {items.map((obl, oblIdx) => (
-                                            <div
-                                                key={obl.id}
-                                                className={`grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] hover:bg-slate-800/25 transition-colors ${oblIdx < items.length - 1 ? 'border-b border-slate-800/40' : ''
-                                                    }`}
-                                            >
-                                                <div className="px-5 py-2.5 pl-12">
-                                                    <div className="flex items-center gap-1.5">
-                                                        {obl.provider && (
-                                                            <span className="text-[9px] text-slate-500 uppercase font-medium bg-slate-800/80 px-1.5 py-0.5 rounded">
-                                                                {obl.provider}
-                                                            </span>
-                                                        )}
-                                                        <span className="text-slate-300 text-[12px]">{obl.name}</span>
-                                                    </div>
-                                                </div>
-                                                {months.map(m => {
-                                                    const data = oblMonthData[obl.id]?.[m.key];
-                                                    return (
-                                                        <div
-                                                            key={m.key}
-                                                            className={`px-3 py-2.5 text-right flex items-center justify-end ${m.isSelected ? 'bg-blue-500/[0.02] border-x border-blue-500/10' : ''
-                                                                }`}
-                                                        >
-                                                            <AmountCell data={data} isPrev={m.isPrev} />
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-
-                    {/* ── Grand Total ── */}
-                    <div className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] bg-slate-800/50 border-t-2 border-slate-600/30">
-                        <div className="px-5 py-4">
-                            <span className="text-white text-[12px] font-bold uppercase tracking-wider">Total</span>
+                <div className="overflow-x-auto">
+                    {/* Header */}
+                    <div className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] bg-slate-800/70 border-b border-slate-700/40">
+                        <div className="px-5 py-3 text-[10px] text-slate-500 uppercase tracking-widest font-bold">
+                            Category / Obligation
                         </div>
                         {months.map(m => (
                             <div
                                 key={m.key}
-                                className={`px-3 py-4 text-right ${m.isSelected ? 'bg-blue-500/[0.05] border-x border-blue-500/15' : ''
+                                className={`px-3 py-3 text-center text-[10px] uppercase tracking-widest font-bold ${m.isSelected
+                                        ? 'text-blue-400 bg-blue-500/5 border-x border-blue-500/10'
+                                        : m.isPrev
+                                            ? 'text-emerald-400/70'
+                                            : 'text-slate-500'
                                     }`}
                             >
-                                <span className={`font-mono text-[13px] font-bold ${m.isSelected ? 'text-blue-300' : m.isPrev ? 'text-emerald-300' : 'text-white'
-                                    }`}>
-                                    {formatCurrency(columnTotals[m.key] || 0)}
-                                </span>
+                                {m.short}
                             </div>
                         ))}
+                    </div>
+
+                    {/* Body */}
+                    <div>
+                        {sortedCategories.map((cat, catIdx) => {
+                            const items = grouped[cat];
+                            const isExpanded = expandedCats.has(cat);
+                            const isLast = catIdx === sortedCategories.length - 1;
+
+                            return (
+                                <div key={cat} className={!isLast ? 'border-b border-slate-700/25' : ''}>
+                                    {/* Category Row */}
+                                    <div
+                                        className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] cursor-pointer hover:bg-slate-800/40 transition-colors"
+                                        onClick={() => toggleCat(cat)}
+                                    >
+                                        <div className="px-5 py-3 flex items-center gap-2.5">
+                                            <div className="transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
+                                                <ChevronDown size={13} className="text-slate-500" />
+                                            </div>
+                                            <span className="text-white text-[12px] font-semibold">{cat}</span>
+                                            <span className="text-[9px] text-slate-600 bg-slate-800 px-1.5 py-0.5 rounded font-mono">{items.length}</span>
+                                        </div>
+                                        {months.map(m => (
+                                            <div
+                                                key={m.key}
+                                                className={`px-3 py-3 text-right ${m.isSelected ? 'bg-blue-500/[0.03] border-x border-blue-500/10' : ''
+                                                    }`}
+                                            >
+                                                <span className="text-white font-mono text-[12px] font-semibold">
+                                                    {formatCurrency(catMonthTotals[cat]?.[m.key] || 0)}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Expanded Items */}
+                                    {isExpanded && (
+                                        <div className="bg-slate-900/30">
+                                            {items.map((obl, oblIdx) => (
+                                                <div
+                                                    key={obl.id}
+                                                    className={`grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] hover:bg-slate-800/25 transition-colors ${oblIdx < items.length - 1 ? 'border-b border-slate-800/40' : ''
+                                                        }`}
+                                                >
+                                                    <div className="px-5 py-2.5 pl-12">
+                                                        <div className="flex items-center gap-1.5">
+                                                            {obl.provider && (
+                                                                <span className="text-[9px] text-slate-500 uppercase font-medium bg-slate-800/80 px-1.5 py-0.5 rounded">
+                                                                    {obl.provider}
+                                                                </span>
+                                                            )}
+                                                            <span className="text-slate-300 text-[12px]">{obl.name}</span>
+                                                        </div>
+                                                    </div>
+                                                    {months.map(m => {
+                                                        const data = oblMonthData[obl.id]?.[m.key];
+                                                        return (
+                                                            <div
+                                                                key={m.key}
+                                                                className={`px-3 py-2.5 flex items-center justify-end ${m.isSelected ? 'bg-blue-500/[0.02] border-x border-blue-500/10' : ''
+                                                                    }`}
+                                                            >
+                                                                <AmountCell obl={obl} data={data} month={m} />
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+
+                        {/* ── Grand Total ── */}
+                        <div className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] bg-slate-800/50 border-t-2 border-slate-600/30">
+                            <div className="px-5 py-4">
+                                <span className="text-white text-[12px] font-bold uppercase tracking-wider">Total</span>
+                            </div>
+                            {months.map(m => (
+                                <div
+                                    key={m.key}
+                                    className={`px-3 py-4 text-right ${m.isSelected ? 'bg-blue-500/[0.05] border-x border-blue-500/15' : ''
+                                        }`}
+                                >
+                                    <span className={`font-mono text-[13px] font-bold ${m.isSelected ? 'text-blue-300' : m.isPrev ? 'text-emerald-300' : 'text-white'
+                                        }`}>
+                                        {formatCurrency(columnTotals[m.key] || 0)}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </div>

@@ -480,6 +480,9 @@ const Obligations = () => {
                             obligations={filteredObligations}
                             payments={payments}
                             monthOffset={monthOffset}
+                            openPaymentModal={openPaymentModal}
+                            handleQuickPay={handleQuickPay}
+                            onRefresh={fetchData}
                         />
                     )}
                 </div>
