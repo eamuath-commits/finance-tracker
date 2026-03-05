@@ -2770,3 +2770,53 @@ def search_transactions(
         result.append(tx_dict)
     
     return result
+
+
+# ============================================================
+# SETTINGS ENDPOINTS
+# ============================================================
+
+@app.get("/settings")
+def get_all_settings(db: Session = Depends(get_db)):
+    """Return all settings as a dict of key -> {value, label}"""
+    rows = db.query(models.UserSettings).all()
+    return {r.key: {"value": r.value, "label": r.label} for r in rows}
+
+
+@app.put("/settings/{key}")
+def upsert_setting(key: str, body: dict = Body(...), db: Session = Depends(get_db)):
+    """Create or update a setting"""
+    value = str(body.get("value", ""))
+    label = body.get("label", None)
+
+    existing = db.query(models.UserSettings).filter(models.UserSettings.key == key).first()
+    if existing:
+        existing.value = value
+        if label is not None:
+            existing.label = label
+        existing.updated_at = datetime.utcnow()
+    else:
+        existing = models.UserSettings(key=key, value=value, label=label)
+        db.add(existing)
+
+    db.commit()
+    db.refresh(existing)
+    return {"key": existing.key, "value": existing.value, "label": existing.label}
+
+
+@app.on_event("startup")
+def seed_default_settings():
+    """Seed default settings if they don't exist"""
+    from database import SessionLocal
+    db = SessionLocal()
+    try:
+        existing = db.query(models.UserSettings).filter(models.UserSettings.key == "period_start_day").first()
+        if not existing:
+            db.add(models.UserSettings(key="period_start_day", value="1", label=""))
+            db.commit()
+            logger.info("Seeded default setting: period_start_day=1")
+    except Exception as e:
+        logger.error(f"Error seeding settings: {e}")
+        db.rollback()
+    finally:
+        db.close()

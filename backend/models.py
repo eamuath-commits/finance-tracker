@@ -385,3 +385,13 @@ class TransactionQueue(Base):
     account = relationship("Account")
     credit_card = relationship("CreditCard")
 
+
+class UserSettings(Base):
+    """App-wide settings stored as key-value pairs"""
+    __tablename__ = "user_settings"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    key = Column(String, nullable=False, unique=True, index=True)
+    value = Column(String, nullable=False, default="")
+    label = Column(String, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
