@@ -1052,7 +1052,8 @@ def get_suggested_transactions(payment_id: int, db: Session = Depends(get_db)):
                 "date": tx.timestamp.isoformat() if tx.timestamp else None,
                 "score": score,
                 "reasons": reasons,
-                "already_linked": tx.id == payment.transaction_id
+                "already_linked": tx.id == payment.transaction_id,
+                "raw_sms_content": tx.raw_sms_content
             })
     
     # Sort by score descending
@@ -2759,7 +2760,8 @@ def search_transactions(
             "type": str(tx.type.value) if hasattr(tx.type, 'value') else str(tx.type),
             "timestamp": tx.timestamp,
             "linked_to_payment_id": None,
-            "linked_to_distribution_id": None
+            "linked_to_distribution_id": None,
+            "raw_sms_content": tx.raw_sms_content
         }
         
         payment_link = db.query(models.PaymentTransaction).filter(

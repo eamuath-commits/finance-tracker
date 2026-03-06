@@ -3,7 +3,7 @@ import { formatCurrency, Modal } from './UI';
 import TransactionSelectorModal from './TransactionSelectorModal';
 import {
     TrendingUp, TrendingDown, Minus, CheckCircle,
-    Download, ChevronDown, ChevronRight, Box, Edit3, DollarSign, X, Link2, LinkIcon, List, Trash2
+    Download, ChevronDown, ChevronRight, Box, Edit3, DollarSign, X, Link2, LinkIcon, List, Trash2, MessageSquare
 } from 'lucide-react';
 import axios from 'axios';
 import { exportToCSV } from '../utils/csvExport';
@@ -157,6 +157,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
     const [linkingBillingDate, setLinkingBillingDate] = useState(null);
     const [suggestedTxs, setSuggestedTxs] = useState([]);
     const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+    const [expandedSms, setExpandedSms] = useState(null);
 
     // Helper: get period date range label based on periodStartDay
     const getPeriodRange = (offset) => {
@@ -428,7 +429,8 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                         date: tx.timestamp,
                         score,
                         reasons,
-                        already_linked: !!tx.linked_to_payment_id
+                        already_linked: !!tx.linked_to_payment_id,
+                        raw_sms_content: tx.raw_sms_content || null
                     };
                 });
 
@@ -851,37 +853,68 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                             {suggestedTxs.map(tx => (
                                 <div
                                     key={tx.transaction_id}
-                                    className={`p-3 rounded-lg border cursor-pointer transition ${tx.already_linked
+                                    className={`rounded-lg border transition ${tx.already_linked
                                         ? 'bg-emerald-500/10 border-emerald-500/30'
                                         : 'bg-slate-700/50 border-slate-600 hover:border-purple-500 hover:bg-purple-500/10'
                                         }`}
-                                    onClick={() => !tx.already_linked && handleLinkTransaction(tx.transaction_id)}
                                 >
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <div className="text-white font-semibold text-sm">{tx.merchant || 'Unknown'}</div>
-                                            <div className="text-slate-400 text-xs">
-                                                {tx.date ? new Date(tx.date).toLocaleDateString() : '-'}
+                                    <div
+                                        className="p-3 cursor-pointer"
+                                        onClick={() => !tx.already_linked && handleLinkTransaction(tx.transaction_id)}
+                                    >
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <div className="text-white font-semibold text-sm flex items-center gap-1.5">
+                                                    {tx.merchant || 'Unknown'}
+                                                    {tx.raw_sms_content && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setExpandedSms(prev => prev === tx.transaction_id ? null : tx.transaction_id);
+                                                            }}
+                                                            className="text-slate-500 hover:text-blue-400 transition p-0.5 rounded hover:bg-slate-600/50"
+                                                            title="View SMS"
+                                                        >
+                                                            <MessageSquare size={12} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <div className="text-slate-400 text-xs">
+                                                    {tx.date ? new Date(tx.date).toLocaleDateString() : '-'}
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-emerald-400 font-mono text-sm">{formatCurrency(tx.amount)}</div>
+                                                {tx.already_linked ? (
+                                                    <span className="text-emerald-400 text-[10px] flex items-center gap-1 justify-end">
+                                                        <CheckCircle size={10} /> Linked
+                                                    </span>
+                                                ) : tx.score > 0 ? (
+                                                    <div className="text-[10px] text-purple-400">Score: {tx.score}</div>
+                                                ) : null}
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <div className="text-emerald-400 font-mono text-sm">{formatCurrency(tx.amount)}</div>
-                                            {tx.already_linked ? (
-                                                <span className="text-emerald-400 text-[10px] flex items-center gap-1 justify-end">
-                                                    <CheckCircle size={10} /> Linked
-                                                </span>
-                                            ) : tx.score > 0 ? (
-                                                <div className="text-[10px] text-purple-400">Score: {tx.score}</div>
-                                            ) : null}
-                                        </div>
+                                        {tx.reasons && tx.reasons.length > 0 && (
+                                            <div className="flex gap-1 mt-2 flex-wrap">
+                                                {tx.reasons.map(r => (
+                                                    <span key={r} className="bg-slate-600/50 text-slate-400 text-[9px] px-1.5 py-0.5 rounded">
+                                                        {r.replace('_', ' ')}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
-                                    {tx.reasons && tx.reasons.length > 0 && (
-                                        <div className="flex gap-1 mt-2 flex-wrap">
-                                            {tx.reasons.map(r => (
-                                                <span key={r} className="bg-slate-600/50 text-slate-400 text-[9px] px-1.5 py-0.5 rounded">
-                                                    {r.replace('_', ' ')}
-                                                </span>
-                                            ))}
+                                    {/* Expandable SMS Content */}
+                                    {expandedSms === tx.transaction_id && tx.raw_sms_content && (
+                                        <div className="px-3 pb-3 border-t border-slate-600/50 mt-0">
+                                            <div className="bg-slate-900/80 rounded-lg p-2.5 mt-2">
+                                                <div className="text-[9px] uppercase text-slate-500 font-bold mb-1 flex items-center gap-1">
+                                                    <MessageSquare size={9} /> SMS Content
+                                                </div>
+                                                <p className="text-slate-300 text-[11px] font-mono leading-relaxed whitespace-pre-wrap">
+                                                    {tx.raw_sms_content}
+                                                </p>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
