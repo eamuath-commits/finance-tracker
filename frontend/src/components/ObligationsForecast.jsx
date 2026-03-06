@@ -210,19 +210,24 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
         });
     };
 
-    // Expand all categories by default when data loads
-    useEffect(() => {
-        if (sortedCategories.length > 0 && expandedCats.size === 0) {
-            setExpandedCats(new Set(sortedCategories));
-        }
-    }, [sortedCategories]);
+    // Expand all categories by default when obligations load
+    const oblCategories = useMemo(() => {
+        const cats = [...new Set(obligations.map(o => o.category || 'Other'))].sort();
+        return cats;
+    }, [obligations]);
 
-    const allExpanded = sortedCategories.length > 0 && expandedCats.size === sortedCategories.length;
+    useEffect(() => {
+        if (oblCategories.length > 0 && expandedCats.size === 0) {
+            setExpandedCats(new Set(oblCategories));
+        }
+    }, [oblCategories]);
+
+    const allExpanded = oblCategories.length > 0 && expandedCats.size >= oblCategories.length;
     const toggleAllCats = () => {
         if (allExpanded) {
             setExpandedCats(new Set());
         } else {
-            setExpandedCats(new Set(sortedCategories));
+            setExpandedCats(new Set(oblCategories));
         }
     };
 
