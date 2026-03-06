@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Input } from './UI';
-import { Search, X, Check, Link, Calendar, DollarSign, Filter } from 'lucide-react';
+import { Search, X, Check, Link, Calendar, DollarSign, Filter, MessageSquare } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
@@ -27,6 +27,7 @@ export default function TransactionSelectorModal({
     const [selected, setSelected] = useState(new Set(currentLinked));
     const [searchQuery, setSearchQuery] = useState('');
     const [showFilters, setShowFilters] = useState(false);
+    const [expandedSms, setExpandedSms] = useState(null);
     const [filters, setFilters] = useState({
         accountId: defaultFilters.accountId || '',
         minAmount: '',
@@ -121,10 +122,10 @@ export default function TransactionSelectorModal({
         <Modal isOpen={isOpen} onClose={onClose} title={title} size="xl">
             <div className="flex flex-col h-[70vh]">
                 {/* Search and Filters Header */}
-                <div className="space-y-3 pb-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="space-y-3 pb-4 border-b border-slate-700">
                     <div className="flex gap-2">
                         <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             <input
                                 type="text"
                                 placeholder="Search by merchant or notes..."
@@ -214,8 +215,8 @@ export default function TransactionSelectorModal({
 
                 {/* Selection Summary */}
                 {selected.size > 0 && (
-                    <div className="py-2 px-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg my-2 flex justify-between items-center">
-                        <span className="text-sm text-blue-700 dark:text-blue-300">
+                    <div className="py-2 px-3 bg-blue-900/20 rounded-lg my-2 flex justify-between items-center">
+                        <span className="text-sm text-blue-300">
                             {selected.size} transaction{selected.size > 1 ? 's' : ''} selected
                             {newSelections.length > 0 && ` (${newSelections.length} new)`}
                         </span>
@@ -236,7 +237,7 @@ export default function TransactionSelectorModal({
                             <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" />
                         </div>
                     ) : transactions.length === 0 ? (
-                        <div className="text-center py-8 text-gray-500">
+                        <div className="text-center py-8 text-slate-500">
                             No transactions found
                         </div>
                     ) : (
@@ -248,64 +249,94 @@ export default function TransactionSelectorModal({
                             return (
                                 <div
                                     key={tx.id}
-                                    onClick={() => toggleSelect(tx.id)}
                                     className={`
-                                        p-3 rounded-lg border cursor-pointer transition-all
+                                        rounded-lg border transition-all
                                         ${isSelected
-                                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                                            : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                                            ? 'border-blue-500 bg-blue-900/20'
+                                            : 'border-slate-700 hover:border-slate-500 bg-slate-800/50'
                                         }
                                     `}
                                 >
-                                    <div className="flex items-start gap-3">
-                                        {/* Checkbox */}
-                                        <div className={`
-                                            mt-1 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0
-                                            ${isSelected
-                                                ? 'bg-blue-500 border-blue-500'
-                                                : 'border-gray-300 dark:border-gray-600'
-                                            }
-                                        `}>
-                                            {isSelected && <Check className="w-3 h-3 text-white" />}
-                                        </div>
-
-                                        {/* Transaction Details */}
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <p className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                                                        {tx.merchant || 'Unknown'}
-                                                    </p>
-                                                    <p className="text-sm text-gray-500 truncate">
-                                                        {tx.category || 'Uncategorized'}
-                                                    </p>
-                                                </div>
-                                                <div className="text-right flex-shrink-0 ml-2">
-                                                    <p className={`font-semibold ${tx.type === 'credit' ? 'text-green-600' : 'text-red-600'}`}>
-                                                        {tx.type === 'credit' ? '+' : '-'}{formatAmount(tx.amount)}
-                                                    </p>
-                                                    <p className="text-xs text-gray-500">
-                                                        {formatDate(tx.timestamp)}
-                                                    </p>
-                                                </div>
+                                    <div
+                                        className="p-3 cursor-pointer"
+                                        onClick={() => toggleSelect(tx.id)}
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            {/* Checkbox */}
+                                            <div className={`
+                                                mt-1 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0
+                                                ${isSelected
+                                                    ? 'bg-blue-500 border-blue-500'
+                                                    : 'border-slate-600'
+                                                }
+                                            `}>
+                                                {isSelected && <Check className="w-3 h-3 text-white" />}
                                             </div>
 
-                                            {/* Link Status Badges */}
-                                            <div className="flex gap-2 mt-1">
-                                                {isAlreadyLinked && (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                                        <Link className="w-3 h-3 mr-1" /> Already linked
-                                                    </span>
-                                                )}
-                                                {hasOtherLink && !isAlreadyLinked && (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
-                                                        <Link className="w-3 h-3 mr-1" />
-                                                        Linked to {tx.linked_to_payment_id ? 'Payment' : 'Distribution'}
-                                                    </span>
-                                                )}
+                                            {/* Transaction Details */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <p className="font-medium text-white truncate flex items-center gap-1.5">
+                                                            {tx.merchant || 'Unknown'}
+                                                            {tx.raw_sms_content && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setExpandedSms(prev => prev === tx.id ? null : tx.id);
+                                                                    }}
+                                                                    className="text-slate-500 hover:text-blue-400 transition p-0.5 rounded hover:bg-slate-600/50"
+                                                                    title="View SMS"
+                                                                >
+                                                                    <MessageSquare size={13} />
+                                                                </button>
+                                                            )}
+                                                        </p>
+                                                        <p className="text-sm text-slate-500 truncate">
+                                                            {tx.category || 'Uncategorized'}
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-right flex-shrink-0 ml-2">
+                                                        <p className={`font-semibold font-mono ${tx.type === 'credit' ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                            {tx.type === 'credit' ? '+' : '-'}{formatAmount(tx.amount)}
+                                                        </p>
+                                                        <p className="text-xs text-slate-500">
+                                                            {formatDate(tx.timestamp)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Link Status Badges */}
+                                                <div className="flex gap-2 mt-1">
+                                                    {isAlreadyLinked && (
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-emerald-900/30 text-emerald-400">
+                                                            <Link className="w-3 h-3 mr-1" /> Already linked
+                                                        </span>
+                                                    )}
+                                                    {hasOtherLink && !isAlreadyLinked && (
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-yellow-900/30 text-yellow-400">
+                                                            <Link className="w-3 h-3 mr-1" />
+                                                            Linked to {tx.linked_to_payment_id ? 'Payment' : 'Distribution'}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* Expandable SMS Content */}
+                                    {expandedSms === tx.id && tx.raw_sms_content && (
+                                        <div className="px-3 pb-3 border-t border-slate-700/50">
+                                            <div className="bg-slate-900/80 rounded-lg p-2.5 mt-2">
+                                                <div className="text-[9px] uppercase text-slate-500 font-bold mb-1 flex items-center gap-1">
+                                                    <MessageSquare size={9} /> SMS Content
+                                                </div>
+                                                <p className="text-slate-300 text-[11px] font-mono leading-relaxed whitespace-pre-wrap">
+                                                    {tx.raw_sms_content}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })
@@ -313,7 +344,7 @@ export default function TransactionSelectorModal({
                 </div>
 
                 {/* Footer Actions */}
-                <div className="pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+                <div className="pt-4 border-t border-slate-700 flex justify-end gap-3">
                     <Button variant="secondary" onClick={onClose}>
                         Cancel
                     </Button>
