@@ -345,21 +345,74 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                 const res = await axios.get(`${API_URL}/payments/${existingPayment.id}/suggested-transactions`).catch(() => ({ data: [] }));
                 setSuggestedTxs(res.data);
             } else {
-                // No payment yet — search by obligation name/amount
+                // No payment yet — search by amount range around the obligation amount
+                const oblAmount = obl.amount || 0;
+                const minAmt = Math.max(0, oblAmount * 0.9);  // ±10% range
+                const maxAmt = oblAmount * 1.1;
+
                 const params = new URLSearchParams();
-                params.set('query', obl.provider || obl.name);
+                if (oblAmount > 0) {
+                    params.set('min_amount', minAmt.toFixed(2));
+                    params.set('max_amount', maxAmt.toFixed(2));
+                }
                 params.set('type', 'debit');
-                params.set('limit', '10');
+                params.set('limit', '20');
                 const res = await axios.get(`${API_URL}/transactions/search?${params}`).catch(() => ({ data: [] }));
-                setSuggestedTxs((res.data || []).map(tx => ({
-                    transaction_id: tx.id,
-                    merchant: tx.merchant,
-                    amount: tx.amount,
-                    date: tx.timestamp,
-                    score: 0,
-                    reasons: ['name_search'],
-                    already_linked: !!tx.linked_to_payment_id
-                })));
+
+                // Also try name search as a secondary source
+                const nameParams = new URLSearchParams();
+                nameParams.set('query', obl.provider || obl.name);
+                nameParams.set('type', 'debit');
+                nameParams.set('limit', '10');
+                const nameRes = await axios.get(`${API_URL}/transactions/search?${nameParams}`).catch(() => ({ data: [] }));
+
+                // Merge results, dedup by transaction ID
+                const allTxs = [...(res.data || []), ...(nameRes.data || [])];
+                const seen = new Set();
+                const uniqueTxs = allTxs.filter(tx => {
+                    if (seen.has(tx.id)) return false;
+                    seen.add(tx.id);
+                    return true;
+                });
+
+                // Score and sort: exact amount match + date proximity to billing month
+                const billingMonth = new Date(billingDate);
+                const scored = uniqueTxs.map(tx => {
+                    let score = 0;
+                    const reasons = [];
+                    const txAmount = Math.abs(tx.amount || 0);
+
+                    // Amount matching
+                    if (oblAmount > 0 && Math.abs(txAmount - oblAmount) < 0.01) {
+                        score += 50;
+                        reasons.push('exact_amount');
+                    } else if (oblAmount > 0 && Math.abs(txAmount - oblAmount) / oblAmount < 0.1) {
+                        score += 20;
+                        reasons.push('similar_amount');
+                    }
+
+                    // Date proximity to billing month
+                    const txDate = new Date(tx.timestamp);
+                    const daysDiff = Math.abs((txDate - billingMonth) / (1000 * 60 * 60 * 24));
+                    if (daysDiff <= 5) { score += 20; reasons.push('exact_date'); }
+                    else if (daysDiff <= 15) { score += 10; reasons.push('near_date'); }
+                    else if (daysDiff <= 35) { score += 5; reasons.push('same_period'); }
+
+                    if (reasons.length === 0) reasons.push('amount_range');
+
+                    return {
+                        transaction_id: tx.id,
+                        merchant: tx.merchant,
+                        amount: txAmount,
+                        date: tx.timestamp,
+                        score,
+                        reasons,
+                        already_linked: !!tx.linked_to_payment_id
+                    };
+                });
+
+                scored.sort((a, b) => b.score - a.score);
+                setSuggestedTxs(scored.slice(0, 10));
             }
         } catch (err) {
             console.error('Error fetching suggestions:', err);
