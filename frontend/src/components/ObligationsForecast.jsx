@@ -210,6 +210,22 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
         });
     };
 
+    // Expand all categories by default when data loads
+    useEffect(() => {
+        if (sortedCategories.length > 0 && expandedCats.size === 0) {
+            setExpandedCats(new Set(sortedCategories));
+        }
+    }, [sortedCategories]);
+
+    const allExpanded = sortedCategories.length > 0 && expandedCats.size === sortedCategories.length;
+    const toggleAllCats = () => {
+        if (allExpanded) {
+            setExpandedCats(new Set());
+        } else {
+            setExpandedCats(new Set(sortedCategories));
+        }
+    };
+
     const filteredObligations = useMemo(() => {
         if (!categoryFilter) return obligations;
         return obligations.filter(o => o.category === categoryFilter);
@@ -668,8 +684,15 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                 })}
             </div>
 
-            {/* ── Export Button ── */}
-            <div className="flex justify-end">
+            {/* ── Action Buttons ── */}
+            <div className="flex justify-end gap-2">
+                <button
+                    onClick={toggleAllCats}
+                    className="flex items-center gap-1.5 text-slate-400 hover:text-white text-[11px] py-1.5 px-3 rounded-lg border border-slate-700/40 hover:border-slate-500 hover:bg-slate-800/50 transition-all"
+                >
+                    {allExpanded ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                    {allExpanded ? 'Collapse All' : 'Expand All'}
+                </button>
                 <button
                     onClick={handleExport}
                     className="flex items-center gap-1.5 text-slate-400 hover:text-white text-[11px] py-1.5 px-3 rounded-lg border border-slate-700/40 hover:border-slate-500 hover:bg-slate-800/50 transition-all"
