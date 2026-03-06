@@ -431,7 +431,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
             const txDate = tx?.date ? new Date(tx.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
 
             // Create a PAID payment for this obligation+month
-            const payRes = await axios.post(`${API_URL}/obligations/${linkingObl.id}/payments`, {
+            const payRes = await axios.post(`${API_URL}/obligations/${linkingObl.id}/pay`, {
                 amount: amount,
                 billing_month: linkingBillingDate,
                 status: 'Paid',
@@ -465,7 +465,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
             const txDate = txData?.timestamp ? new Date(txData.timestamp).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
 
             // Create a PAID payment for this obligation+month
-            const payRes = await axios.post(`${API_URL}/obligations/${linkingObl.id}/payments`, {
+            const payRes = await axios.post(`${API_URL}/obligations/${linkingObl.id}/pay`, {
                 amount: amount,
                 billing_month: linkingBillingDate,
                 status: 'Paid',
