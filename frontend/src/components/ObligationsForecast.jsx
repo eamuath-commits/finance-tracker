@@ -47,13 +47,17 @@ const EditPopover = ({ obl, monthData, billingDate, onSave, onClose, onLink, onD
 
     const handleSave = () => {
         const val = parseFloat(amount);
-        // If amount is blank or zero and there's an existing payment, delete it
-        if ((!amount || amount === '' || (val === 0) || isNaN(val)) && monthData?.paymentId) {
-            onSave(obl.id, 0, billingDate, 'DELETE');
+        const isEmpty = !amount || amount === '' || isNaN(val) || val === 0;
+
+        // If amount is blank or zero: delete existing payment, or just close
+        if (isEmpty) {
+            if (monthData?.paymentId) {
+                onSave(obl.id, 0, billingDate, 'DELETE');
+            }
             onClose();
             return;
         }
-        if (isNaN(val) || val <= 0) return;
+
         onSave(obl.id, val, billingDate, status);
         onClose();
     };
