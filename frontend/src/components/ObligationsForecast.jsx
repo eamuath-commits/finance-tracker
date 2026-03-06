@@ -47,10 +47,10 @@ const EditPopover = ({ obl, monthData, billingDate, onSave, onClose, onLink, onD
 
     const handleSave = () => {
         const val = parseFloat(amount);
-        const isEmpty = !amount || amount === '' || isNaN(val) || val === 0;
+        const isBlank = amount === '' || amount === null || amount === undefined;
 
-        // If amount is blank or zero: delete existing payment, or just close
-        if (isEmpty) {
+        // If field is completely blank: delete existing payment, or just close
+        if (isBlank) {
             if (monthData?.paymentId) {
                 onSave(obl.id, 0, billingDate, 'DELETE');
             }
@@ -58,6 +58,7 @@ const EditPopover = ({ obl, monthData, billingDate, onSave, onClose, onLink, onD
             return;
         }
 
+        if (isNaN(val)) return;
         onSave(obl.id, val, billingDate, status);
         onClose();
     };
