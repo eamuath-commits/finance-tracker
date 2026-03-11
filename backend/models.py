@@ -246,7 +246,7 @@ class Payment(Base):
     billing_month = Column(String) # YYYY-MM to track monthly payments
     note = Column(String, nullable=True)
     status = Column(Enum(PaymentStatus), default=PaymentStatus.PAID)
-    transaction_id = Column(String, ForeignKey("transactions.id"), nullable=True) # Link to actual transaction
+    transaction_id = Column(String, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True) # Link to actual transaction
 
     obligation = relationship("MonthlyObligation") # Removed back_populates to avoid circular dependency conflict if needed, or add back
     transaction = relationship("Transaction", back_populates="payments")
