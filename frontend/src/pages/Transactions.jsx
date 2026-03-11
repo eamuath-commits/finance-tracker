@@ -129,8 +129,8 @@ function Transactions() {
     // Fetch periodStartDay from settings
     useEffect(() => {
         axios.get(`${API_URL}/settings`).then(res => {
-            const s = res.data?.find(s => s.key === 'period_start_day');
-            if (s) setPeriodStartDay(parseInt(s.value) || 1);
+            const val = res.data?.period_start_day?.value;
+            if (val) setPeriodStartDay(parseInt(val) || 1);
         }).catch(() => { });
     }, []);
 
