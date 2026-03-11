@@ -154,7 +154,7 @@ function Transactions() {
         }
 
         const label = targetMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-        const fmtDate = (d) => d.toISOString().split('T')[0];
+        const fmtDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         return { start: fmtDate(start), end: fmtDate(end), label };
     }, [monthOffset, periodStartDay]);
 
