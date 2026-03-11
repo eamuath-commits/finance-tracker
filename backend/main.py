@@ -551,15 +551,17 @@ def get_obligations_forecast(months_ahead: int = 1, db: Session = Depends(get_db
 
     obligations = db.query(models.MonthlyObligation).order_by(models.MonthlyObligation.display_order).all()
 
-    # Get last 6 months of payments in one query
+    # Get last 6 months of payments using LIKE to match both YYYY-MM and YYYY-MM-DD formats
     history_months = []
     for i in range(1, 7):  # 1 to 6 months back
         hy = now.year + ((now.month - 1 - i) // 12)
         hm = ((now.month - 1 - i) % 12) + 1
         history_months.append(f"{hy}-{str(hm).zfill(2)}")
 
+    from sqlalchemy import or_
+    month_filters = [models.Payment.billing_month.like(f"{m}%") for m in history_months]
     all_history = db.query(models.Payment).filter(
-        models.Payment.billing_month.in_(history_months),
+        or_(*month_filters),
         models.Payment.status.in_([models.PaymentStatus.PAID, "PAID"])
     ).all()
 
@@ -574,48 +576,46 @@ def get_obligations_forecast(months_ahead: int = 1, db: Session = Depends(get_db
 
     for obl in obligations:
         payments = history_by_obl.get(obl.id, [])
-        amounts = [p.amount for p in payments if p.amount]
+        # Sort by billing_month descending to get most recent first
+        sorted_payments = sorted(payments, key=lambda p: p.billing_month or "", reverse=True)
+        amounts = [p.amount for p in sorted_payments if p.amount]
 
-        if len(amounts) >= 3:
+        if len(amounts) >= 1:
+            last_paid = amounts[0]  # Most recent payment
             avg = sum(amounts) / len(amounts)
-            last_paid = amounts[0] if amounts else None  # Most recent
-            # Sort by billing_month to get trend
-            sorted_payments = sorted(payments, key=lambda p: p.billing_month or "")
-            sorted_amounts = [p.amount for p in sorted_payments if p.amount]
 
-            # Simple trend: compare first half avg vs second half avg
-            mid = len(sorted_amounts) // 2
-            first_half = sum(sorted_amounts[:mid]) / max(mid, 1)
-            second_half = sum(sorted_amounts[mid:]) / max(len(sorted_amounts) - mid, 1)
-            pct_change = ((second_half - first_half) / first_half * 100) if first_half > 0 else 0
+            # Forecast = last paid amount (user requirement)
+            forecast_amount = round(last_paid, 2)
 
-            if pct_change > 5:
-                trend = "increasing"
-            elif pct_change < -5:
-                trend = "decreasing"
+            if len(amounts) >= 3:
+                # Trend: compare first half avg vs second half avg (chronological order)
+                chrono_amounts = list(reversed(amounts))
+                mid = len(chrono_amounts) // 2
+                first_half = sum(chrono_amounts[:mid]) / max(mid, 1)
+                second_half = sum(chrono_amounts[mid:]) / max(len(chrono_amounts) - mid, 1)
+                pct_change = ((second_half - first_half) / first_half * 100) if first_half > 0 else 0
+
+                if pct_change > 5:
+                    trend = "increasing"
+                elif pct_change < -5:
+                    trend = "decreasing"
+                else:
+                    trend = "stable"
+
+                # Confidence based on variance
+                variance = sum((a - avg) ** 2 for a in amounts) / len(amounts)
+                std_dev = variance ** 0.5
+                cv = (std_dev / avg * 100) if avg > 0 else 100
+
+                if cv <= 5:
+                    confidence = "high"
+                elif cv <= 20:
+                    confidence = "medium"
+                else:
+                    confidence = "low"
             else:
                 trend = "stable"
-
-            # Confidence based on variance
-            variance = sum((a - avg) ** 2 for a in amounts) / len(amounts)
-            std_dev = variance ** 0.5
-            cv = (std_dev / avg * 100) if avg > 0 else 100  # Coefficient of variation
-
-            if cv <= 5:
-                confidence = "high"
-            elif cv <= 20:
-                confidence = "medium"
-            else:
                 confidence = "low"
-
-            forecast_amount = round(avg, 2)
-
-        elif len(amounts) > 0:
-            avg = sum(amounts) / len(amounts)
-            forecast_amount = round(avg, 2)
-            last_paid = amounts[0]
-            trend = "stable"
-            confidence = "low"
         else:
             # No history — use obligation.amount as fallback
             forecast_amount = round(obl.amount or 0, 2)
