@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { useSearchParams } from 'react-router-dom';
 import { format } from "date-fns";
-import { Search, Edit3, Trash2, Plus, User, Calendar, Filter, X, MessageSquare, Upload } from "lucide-react";
+import { Search, Edit3, Trash2, Plus, User, Calendar, Filter, X, MessageSquare, Upload, ChevronLeft, ChevronRight } from "lucide-react";
 import { Modal, formatCurrency, inputClass, selectClass } from "../components/UI";
 import SMSIngestTab from "../components/SMSIngestTab";
 
@@ -28,6 +28,8 @@ function Transactions() {
     const [creditCards, setCreditCards] = useState([]); // NEW: For credit card transactions
     const [inboxMessages, setInboxMessages] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [periodStartDay, setPeriodStartDay] = useState(1);
+    const [monthOffset, setMonthOffset] = useState(null); // null = no month filter active
 
     // Confirm modal state (replaces window.confirm for Chrome compatibility)
     const [confirmModal, setConfirmModal] = useState({ open: false, message: '', onConfirm: null });
@@ -123,6 +125,45 @@ function Transactions() {
             }
         }
     }, [searchParams]);
+
+    // Fetch periodStartDay from settings
+    useEffect(() => {
+        axios.get(`${API_URL}/settings`).then(res => {
+            const s = res.data?.find(s => s.key === 'period_start_day');
+            if (s) setPeriodStartDay(parseInt(s.value) || 1);
+        }).catch(() => { });
+    }, []);
+
+    // Compute month period date range from monthOffset + periodStartDay
+    const monthPeriod = useMemo(() => {
+        if (monthOffset === null) return null;
+        const now = new Date();
+        const targetMonth = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
+        const y = targetMonth.getFullYear();
+        const m = targetMonth.getMonth(); // 0-indexed
+
+        let start, end;
+        if (periodStartDay === 1) {
+            // Standard: 1st to last day of month
+            start = new Date(y, m, 1);
+            end = new Date(y, m + 1, 0); // last day
+        } else {
+            // Custom cycle: e.g. 25th of prev month to 24th of this month
+            start = new Date(y, m - 1, periodStartDay);
+            end = new Date(y, m, periodStartDay - 1);
+        }
+
+        const label = targetMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        const fmtDate = (d) => d.toISOString().split('T')[0];
+        return { start: fmtDate(start), end: fmtDate(end), label };
+    }, [monthOffset, periodStartDay]);
+
+    // When monthPeriod changes, update dateRange
+    useEffect(() => {
+        if (monthPeriod) {
+            setDateRange({ start: monthPeriod.start, end: monthPeriod.end });
+        }
+    }, [monthPeriod]);
 
     useEffect(() => {
         fetchData();
@@ -461,6 +502,7 @@ function Transactions() {
         setCategoryFilterRaw('');
         setDateRangeRaw({ start: '', end: '' });
         setCountLimitRaw('');
+        setMonthOffset(null);
     };
 
     const completePendingTransfer = async (txId, sourceAccountId) => {
@@ -473,7 +515,7 @@ function Transactions() {
         }
     };
 
-    const hasActiveFilters = searchTerm || accountFilter || typeFilter || categoryFilter || dateRange.start || dateRange.end;
+    const hasActiveFilters = searchTerm || accountFilter || typeFilter || categoryFilter || dateRange.start || dateRange.end || monthOffset !== null;
 
     // Export state
     const [showExportMenu, setShowExportMenu] = useState(false);
@@ -683,6 +725,47 @@ function Transactions() {
                         </div>
                     </div>
 
+                    {/* Month Navigation */}
+                    <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700 mb-4 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setMonthOffset(prev => (prev ?? 0) - 1)}
+                                className="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white transition"
+                            >
+                                <ChevronLeft size={16} />
+                            </button>
+                            <span className="text-white font-semibold text-sm min-w-[140px] text-center">
+                                {monthPeriod ? monthPeriod.label : 'All Time'}
+                            </span>
+                            <button
+                                onClick={() => setMonthOffset(prev => (prev ?? 0) + 1)}
+                                className="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white transition"
+                            >
+                                <ChevronRight size={16} />
+                            </button>
+                            <button
+                                onClick={() => setMonthOffset(0)}
+                                className={`ml-2 px-3 py-1 rounded-lg text-xs font-medium transition ${monthOffset === 0 ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400 hover:text-white hover:bg-slate-600'
+                                    }`}
+                            >
+                                Today
+                            </button>
+                            {monthOffset !== null && (
+                                <button
+                                    onClick={() => { setMonthOffset(null); setDateRange({ start: '', end: '' }); }}
+                                    className="ml-1 px-3 py-1 rounded-lg text-xs font-medium bg-slate-700 text-slate-400 hover:text-white hover:bg-slate-600 transition"
+                                >
+                                    All Time
+                                </button>
+                            )}
+                        </div>
+                        {monthPeriod && periodStartDay !== 1 && (
+                            <span className="text-slate-500 text-xs">
+                                {new Date(monthPeriod.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} → {new Date(monthPeriod.end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </span>
+                        )}
+                    </div>
+
                     {/* Filters Bar */}
                     <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg mb-6 space-y-4">
                         {/* Search Row */}
@@ -766,7 +849,7 @@ function Transactions() {
                                 type="date"
                                 className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
                                 value={dateRange.start}
-                                onChange={e => setDateRange({ ...dateRange, start: e.target.value })}
+                                onChange={e => { setMonthOffset(null); setDateRange({ ...dateRange, start: e.target.value }); }}
                             />
 
                             {/* End Date */}
@@ -774,7 +857,7 @@ function Transactions() {
                                 type="date"
                                 className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
                                 value={dateRange.end}
-                                onChange={e => setDateRange({ ...dateRange, end: e.target.value })}
+                                onChange={e => { setMonthOffset(null); setDateRange({ ...dateRange, end: e.target.value }); }}
                             />
                         </div>
 
