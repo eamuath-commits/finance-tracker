@@ -258,6 +258,7 @@ class ObligationBase(BaseModel):
     provider: Optional[str] = None
     notes: Optional[str] = None
     status: str = "ACTIVE"
+    target_account_id: Optional[str] = None  # Envelope account for salary distribution
 
 class ObligationCreate(ObligationBase):
     pass
@@ -271,10 +272,12 @@ class ObligationUpdate(BaseModel):
     notes: Optional[str] = None
     status: Optional[str] = None
     display_order: Optional[int] = None
+    target_account_id: Optional[str] = None  # Envelope account for salary distribution
 
 class Obligation(ObligationBase):
     id: str
     display_order: int
+    target_account_name: Optional[str] = None  # Resolved account name for display
     payments: List[Payment] = []
     
     class Config:
@@ -438,27 +441,31 @@ class AllocationHistory(AllocationHistoryBase):
         
 # --- Allocation Preview Schemas ---
 class AllocationItem(BaseModel):
-    identifier: str  # Category name or Loan name
-    name: str  # Display name
-    rule_type: str  # 'CATEGORY' or 'LOAN'
+    obligation_id: str  # The obligation this allocation is for
+    obligation_name: str  # Display name
+    category: Optional[str] = None  # Obligation category
+    provider: Optional[str] = None  # Obligation provider
     target_account_id: str
     target_account_name: str
-    amount: float  # Calculated amount based on obligations
-    required_amount: Optional[float] = None  # Full required if source is short
-    status: str = "pending"  # 'pending', 'allocated', 'no_history'
+    amount: float  # Required amount for this obligation
+    already_transferred: float = 0.0  # Amount already distributed this month
+    pending_amount: float = 0.0  # Remaining to distribute
+    status: str = "pending"  # 'pending', 'transferred', 'partial'
+    due_day: Optional[int] = None
 
 class AllocationPreviewResponse(BaseModel):
+    billing_month: str  # "2026-03"
     total_required: float
-    total_amount: float  # What can actually be transferred (min of required, source)
+    total_transferred: float  # Already distributed this month
+    total_pending: float  # Still needs distribution
     allocations: List[AllocationItem]
-    fulfilled_items: List[str] = []  # Items already covered by existing balance
-    skipped_items: List[str] = []  # Items with no rule matched
+    unassigned_items: List[str] = []  # Obligation names with no target account
 
 class AllocationExecuteRequest(BaseModel):
     source_account_id: str
     month_offset: int = 0
-    target_account_id: Optional[str] = None  # Specific target, or all if None
-    override_amount: Optional[float] = None  # Override transfer amount
+    obligation_ids: Optional[List[str]] = None  # Specific obligations, or all if None
+    override_amounts: Optional[dict] = None  # {obligation_id: amount} overrides
 
 
 # --- Audit Schemas ---
@@ -499,6 +506,7 @@ class Audit(AuditBase):
 class DistributionBase(BaseModel):
     source_account_id: str
     target_account_id: str
+    obligation_id: Optional[str] = None  # Which obligation this transfer is for
     amount: float
     billing_month: str
     note: Optional[str] = None
@@ -517,6 +525,7 @@ class Distribution(DistributionBase):
     created_at: datetime
     source_account_name: Optional[str] = None
     target_account_name: Optional[str] = None
+    obligation_name: Optional[str] = None  # Display name of the obligation
     linked_transaction: Optional[Transaction] = None
     linked_transactions: List[Transaction] = []
     linked_transactions_count: int = 0

@@ -227,6 +227,9 @@ class MonthlyObligation(Base):
     provider = Column(String, nullable=True) # New optional field
     notes = Column(Text, nullable=True)
     display_order = Column(Integer, default=0) # For UI ordering
+    target_account_id = Column(String, ForeignKey("accounts.id"), nullable=True)  # Envelope account for salary distribution
+
+    target_account = relationship("Account", foreign_keys=[target_account_id])
 
 
 class PaymentStatus(enum.Enum):
@@ -321,6 +324,7 @@ class Distribution(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     source_account_id = Column(String, ForeignKey("accounts.id"), nullable=False)
     target_account_id = Column(String, ForeignKey("accounts.id"), nullable=False)
+    obligation_id = Column(String, ForeignKey("obligations.id"), nullable=True)  # Which obligation this transfer is for
     amount = Column(Float, nullable=False)
     billing_month = Column(String, nullable=False)  # "2026-01"
     note = Column(String, nullable=True)
@@ -330,6 +334,7 @@ class Distribution(Base):
     # Relationships
     source_account = relationship("Account", foreign_keys=[source_account_id])
     target_account = relationship("Account", foreign_keys=[target_account_id])
+    obligation = relationship("MonthlyObligation", foreign_keys=[obligation_id])
     linked_transaction = relationship("Transaction", foreign_keys=[transaction_id])
 
 

@@ -2239,7 +2239,16 @@ def delete_allocation_rule(rule_id: str, db: Session = Depends(get_db)):
 
 @app.get("/obligations/", response_model=List[schemas.Obligation])
 def get_obligations(db: Session = Depends(get_db)):
-    return crud.get_obligations(db)
+    obligations = crud.get_obligations(db)
+    # Resolve target_account_name for each obligation
+    accounts_cache = {}
+    for obl in obligations:
+        if obl.target_account_id:
+            if obl.target_account_id not in accounts_cache:
+                acc = crud.get_account(db, obl.target_account_id)
+                accounts_cache[obl.target_account_id] = acc.name if acc else None
+            obl.target_account_name = accounts_cache[obl.target_account_id]
+    return obligations
 
 @app.post("/obligations/", response_model=schemas.Obligation)
 def create_obligation(obligation: schemas.ObligationCreate, db: Session = Depends(get_db)):
@@ -2293,62 +2302,43 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
     if not source_acc:
         raise HTTPException(status_code=404, detail="Source account not found")
 
-    # Calculate billing month for payroll transfer records
+    # Calculate billing month
     from dateutil.relativedelta import relativedelta
     target_date = datetime.now() + relativedelta(months=req.month_offset)
     billing_month = target_date.strftime('%Y-%m')
 
-    # Group allocations by target_account_id to avoid duplicate transfers
-    # Only include pending items (not transferred/allocated)
-    by_target = {}
-    for item in preview.allocations:
-        if item.amount <= 0 or item.status != 'pending':
-            continue
-            
-        # Filter if specific target requested
-        if req.target_account_id and item.target_account_id != req.target_account_id:
-            continue
-        
-        if item.target_account_id not in by_target:
-            by_target[item.target_account_id] = {
-                'target_account_name': item.target_account_name,
-                'items': [],
-                'total_amount': 0
-            }
-        by_target[item.target_account_id]['items'].append(item.name)
-        by_target[item.target_account_id]['total_amount'] += item.amount
-
     executed_transfers = []
     
-    for target_account_id, data in by_target.items():
-        # Use override amount if provided for this specific target
-        requested_amount = data['total_amount']
-        if req.override_amount is not None and req.target_account_id == target_account_id:
-            requested_amount = req.override_amount
-
-        transfer_amount = requested_amount
+    for item in preview.allocations:
+        # Only process pending items with positive pending amounts
+        if item.pending_amount <= 0 or item.status == 'transferred':
+            continue
         
-        # Create Distribution record only (NO transaction creation)
-        # Distributions are tracking records - balances only change via SMS/manual transactions
-        items_summary = ", ".join(data['items'][:3])
-        if len(data['items']) > 3:
-            items_summary += f" +{len(data['items']) - 3} more"
-            
+        # Filter by specific obligations if provided
+        if req.obligation_ids and item.obligation_id not in req.obligation_ids:
+            continue
+        
+        # Use override amount if provided for this obligation
+        transfer_amount = item.pending_amount
+        if req.override_amounts and item.obligation_id in req.override_amounts:
+            transfer_amount = req.override_amounts[item.obligation_id]
+        
+        # Create per-obligation Distribution record
         distribution = schemas.DistributionCreate(
             source_account_id=source_acc.id,
-            target_account_id=target_account_id,
+            target_account_id=item.target_account_id,
+            obligation_id=item.obligation_id,
             amount=transfer_amount,
             billing_month=billing_month,
-            note=f"Payday Distributor: {items_summary}"
+            note=f"Payday: {item.obligation_name}"
         )
         crud.create_distribution(db, distribution)
         
-        # Track execution details
         executed_transfers.append({
-            "target": data['target_account_name'],
-            "requested": requested_amount,
-            "transferred": transfer_amount,
-            "shortage": 0.0  # No shortage check since we're not moving money
+            "obligation_id": item.obligation_id,
+            "obligation_name": item.obligation_name,
+            "target": item.target_account_name,
+            "amount": transfer_amount
         })
         
     return {
@@ -2469,14 +2459,23 @@ def get_distributions(
     """Get distributions, optionally filtered by month or source account."""
     distributions = crud.get_distributions(db, billing_month, source_account_id)
     
-    # Enrich with account names and linked transactions
+    # Enrich with account names, obligation names, and linked transactions
     result = []
+    obl_cache = {}
     for d in distributions:
         source = crud.get_account(db, d.source_account_id)
         target = crud.get_account(db, d.target_account_id)
         linked_tx = None
         if d.transaction_id:
             linked_tx = crud.get_transaction(db, d.transaction_id)
+        
+        # Resolve obligation name
+        obl_name = None
+        if d.obligation_id:
+            if d.obligation_id not in obl_cache:
+                obl = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == d.obligation_id).first()
+                obl_cache[d.obligation_id] = obl.name if obl else None
+            obl_name = obl_cache[d.obligation_id]
         
         # Get linked transactions from junction table
         linked_txs = []
@@ -2498,6 +2497,7 @@ def get_distributions(
             **d.__dict__,
             "source_account_name": source.name if source else None,
             "target_account_name": target.name if target else None,
+            "obligation_name": obl_name,
             "linked_transaction": linked_tx,
             "linked_transactions": linked_txs,
             "linked_transactions_count": len(linked_txs)

@@ -1675,11 +1675,11 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     """
     Calculate allocation preview for salary distribution.
     
-    1. Get all allocation rules (category→account mapping)
-    2. Get all obligations and their expected amounts for the target month
-    3. Aggregate obligation amounts by category
-    4. Match categories to target accounts via rules
-    5. Return preview of transfers
+    Per-obligation approach:
+    1. Get all obligations with target_account_id assigned
+    2. Get each obligation's expected amount for the target month
+    3. Check existing distributions per-obligation to determine status
+    4. Return per-obligation preview of transfers
     """
     from dateutil.relativedelta import relativedelta
     
@@ -1689,49 +1689,40 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     prev_month = target_date - relativedelta(months=1)
     prev_month_str = prev_month.strftime('%Y-%m')
     
-    # Get source account balance
-    source_account = get_account(db, source_account_id)
-    source_balance = source_account.current_balance if source_account else 0.0
-    
-    # Get all allocation rules
-    rules = db.query(models.AllocationRule).all()
-    rules_by_identifier = {}
-    for r in rules:
-        key = (r.rule_type, r.identifier)
-        rules_by_identifier[key] = r
-    
     # Get all accounts for name lookup
     accounts = db.query(models.Account).all()
     accounts_by_id = {a.id: a for a in accounts}
     
-    # Get existing Distributions for this month to prevent duplicates
-    existing_transfers = db.query(models.Distribution).filter(
+    # Get all obligations
+    obligations = db.query(models.MonthlyObligation).order_by(
+        models.MonthlyObligation.display_order.asc(),
+        models.MonthlyObligation.due_day.asc()
+    ).all()
+    
+    # Get existing Distributions for this month per-obligation
+    existing_distributions = db.query(models.Distribution).filter(
         models.Distribution.billing_month == target_month_str,
         models.Distribution.source_account_id == source_account_id
     ).all()
-    # Build set of (target_account_id) that already have transfers this month
-    transferred_targets = {t.target_account_id: t for t in existing_transfers}
+    # Build lookup: obligation_id -> total transferred amount
+    transferred_by_obl = {}
+    for d in existing_distributions:
+        if d.obligation_id:
+            transferred_by_obl[d.obligation_id] = transferred_by_obl.get(d.obligation_id, 0) + d.amount
     
-    # Get all obligations
-    obligations = db.query(models.MonthlyObligation).all()
-    
-    # Get all payments for target month to check what's already paid
+    # Get all payments for target month
     target_payments = db.query(models.Payment).filter(
         models.Payment.billing_month.like(f"{target_month_str}%")
     ).all()
-    paid_obligations = {p.obligation_id for p in target_payments if p.status == models.PaymentStatus.PAID}
-    
-    # Get this month's payment amounts for already-paid obligations
     target_payment_amounts = {}
-    # Also track BUDGET entries for this month
     target_budget_amounts = {}
     for p in target_payments:
         if p.status == models.PaymentStatus.PAID:
-            target_payment_amounts[p.obligation_id] = p.amount
+            target_payment_amounts[p.obligation_id] = target_payment_amounts.get(p.obligation_id, 0) + p.amount
         elif p.status == models.PaymentStatus.BUDGET:
-            target_budget_amounts[p.obligation_id] = p.amount
+            target_budget_amounts[p.obligation_id] = target_budget_amounts.get(p.obligation_id, 0) + p.amount
     
-    # Get previous month payments for Smart Default amounts (for pending obligations)
+    # Get previous month payments for Smart Default amounts
     prev_payments = db.query(models.Payment).filter(
         models.Payment.billing_month.like(f"{prev_month_str}%")
     ).all()
@@ -1739,169 +1730,71 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     for p in prev_payments:
         prev_amounts_by_obl[p.obligation_id] = p.amount
     
-    # Aggregate obligations by category with status tracking
-    # Structure: { category: { 'pending': amount, 'allocated': amount } }
-    category_data = {}  # category -> { 'pending': float, 'allocated': float }
-    loan_data = {}  # loan_name -> { 'pending': float, 'allocated': float }
-    
-    skipped_items = []
-    fulfilled_items = []
+    # Build per-obligation allocation items
+    allocations = []
+    unassigned_items = []
+    total_required = 0.0
+    total_transferred = 0.0
+    total_pending = 0.0
     
     for obl in obligations:
-        is_paid = obl.id in paid_obligations
-        
-        # Get expected amount - priority:
-        # 1. If PAID this month, use payment amount
-        # 2. If BUDGET entry exists for this month, use that
-        # 3. Otherwise, use previous month's payment as estimate
-        if is_paid:
-            expected_amount = target_payment_amounts.get(obl.id, 0)
+        # Determine expected amount: PAID > BUDGET > previous month > obligation.amount
+        if obl.id in target_payment_amounts:
+            expected_amount = target_payment_amounts[obl.id]
         elif obl.id in target_budget_amounts:
             expected_amount = target_budget_amounts[obl.id]
+        elif obl.id in prev_amounts_by_obl:
+            expected_amount = prev_amounts_by_obl[obl.id]
+        elif obl.amount and obl.amount > 0:
+            expected_amount = obl.amount
         else:
-            expected_amount = prev_amounts_by_obl.get(obl.id, 0)
+            expected_amount = 0
         
         if expected_amount <= 0:
-            skipped_items.append(f"{obl.name} (no payment history)")
+            continue  # Skip obligations with no known amount
+        
+        # Check if obligation has a target account assigned
+        if not obl.target_account_id:
+            unassigned_items.append(obl.name)
             continue
         
-        category = obl.category or "Other"
-        status = 'allocated' if is_paid else 'pending'
+        target_acc = accounts_by_id.get(obl.target_account_id)
+        already_transferred = transferred_by_obl.get(obl.id, 0)
+        pending_amount = max(0, expected_amount - already_transferred)
         
-        # Check if this is a Loan category (special handling)
-        if category.lower() == "loan":
-            # Use obligation name as loan identifier
-            if obl.name not in loan_data:
-                loan_data[obl.name] = {'pending': 0, 'allocated': 0}
-            loan_data[obl.name][status] += expected_amount
+        # Determine status
+        if already_transferred >= expected_amount:
+            status = 'transferred'
+        elif already_transferred > 0:
+            status = 'partial'
         else:
-            # Regular category
-            if category not in category_data:
-                category_data[category] = {'pending': 0, 'allocated': 0}
-            category_data[category][status] += expected_amount
-    
-    # Build allocation items
-    allocations = []
-    total_required = 0.0
-    
-    # Process categories
-    for category, amounts in category_data.items():
-        rule = rules_by_identifier.get(('CATEGORY', category))
-        if rule:
-            target_acc = accounts_by_id.get(rule.target_account_id)
-            pending_amount = amounts['pending']
-            allocated_amount = amounts['allocated']
-            
-            # Check if transfer already exists for this target account
-            existing_transfer = transferred_targets.get(rule.target_account_id)
-            
-            # Add pending allocation if any
-            if pending_amount > 0:
-                if existing_transfer:
-                    # Already transferred this month - show as transferred
-                    allocations.append(schemas.AllocationItem(
-                        identifier=category,
-                        name=category,
-                        rule_type='CATEGORY',
-                        target_account_id=rule.target_account_id,
-                        target_account_name=target_acc.name if target_acc else "Unknown",
-                        amount=existing_transfer.amount,
-                        required_amount=pending_amount,
-                        status='transferred'
-                    ))
-                else:
-                    # Transfer full required amount
-                    allocations.append(schemas.AllocationItem(
-                        identifier=category,
-                        name=category,
-                        rule_type='CATEGORY',
-                        target_account_id=rule.target_account_id,
-                        target_account_name=target_acc.name if target_acc else "Unknown",
-                        amount=pending_amount,
-                        required_amount=pending_amount,
-                        status='pending'
-                    ))
-                    total_required += pending_amount
-            
-            # Add allocated items if any
-            if allocated_amount > 0:
-                allocations.append(schemas.AllocationItem(
-                    identifier=f"{category}_allocated",
-                    name=category,
-                    rule_type='CATEGORY',
-                    target_account_id=rule.target_account_id,
-                    target_account_name=target_acc.name if target_acc else "Unknown",
-                    amount=allocated_amount,
-                    required_amount=allocated_amount,
-                    status='allocated'
-                ))
-        else:
-            skipped_items.append(f"{category} category (no rule)")
-    
-    # Process loans
-    for loan_name, amounts in loan_data.items():
-        rule = rules_by_identifier.get(('LOAN', loan_name))
-        if rule:
-            target_acc = accounts_by_id.get(rule.target_account_id)
-            pending_amount = amounts['pending']
-            allocated_amount = amounts['allocated']
-            
-            # Check if transfer already exists for this target account
-            existing_transfer = transferred_targets.get(rule.target_account_id)
-            
-            # Add pending allocation if any
-            if pending_amount > 0:
-                if existing_transfer:
-                    # Already transferred this month - show as transferred
-                    allocations.append(schemas.AllocationItem(
-                        identifier=loan_name,
-                        name=loan_name,
-                        rule_type='LOAN',
-                        target_account_id=rule.target_account_id,
-                        target_account_name=target_acc.name if target_acc else "Unknown",
-                        amount=existing_transfer.amount,
-                        required_amount=pending_amount,
-                        status='transferred'
-                    ))
-                else:
-                    # Transfer full required amount
-                    allocations.append(schemas.AllocationItem(
-                        identifier=loan_name,
-                        name=loan_name,
-                        rule_type='LOAN',
-                        target_account_id=rule.target_account_id,
-                        target_account_name=target_acc.name if target_acc else "Unknown",
-                        amount=pending_amount,
-                        required_amount=pending_amount,
-                        status='pending'
-                    ))
-                    total_required += pending_amount
-            
-            # Add allocated items if any
-            if allocated_amount > 0:
-                allocations.append(schemas.AllocationItem(
-                    identifier=f"{loan_name}_allocated",
-                    name=loan_name,
-                    rule_type='LOAN',
-                    target_account_id=rule.target_account_id,
-                    target_account_name=target_acc.name if target_acc else "Unknown",
-                    amount=allocated_amount,
-                    required_amount=allocated_amount,
-                    status='allocated'
-                ))
-        else:
-            skipped_items.append(f"{loan_name} loan (no rule)")
-    
-    # Calculate totals - show full required amounts without pro-rata reduction
-    # Shortage handling happens at execution time, not preview time
-    total_amount = total_required
+            status = 'pending'
+        
+        total_required += expected_amount
+        total_transferred += already_transferred
+        total_pending += pending_amount
+        
+        allocations.append(schemas.AllocationItem(
+            obligation_id=obl.id,
+            obligation_name=obl.name,
+            category=obl.category,
+            provider=obl.provider,
+            target_account_id=obl.target_account_id,
+            target_account_name=target_acc.name if target_acc else "Unknown",
+            amount=expected_amount,
+            already_transferred=already_transferred,
+            pending_amount=pending_amount,
+            status=status,
+            due_day=obl.due_day
+        ))
     
     return schemas.AllocationPreviewResponse(
+        billing_month=target_month_str,
         total_required=total_required,
-        total_amount=total_amount,
+        total_transferred=total_transferred,
+        total_pending=total_pending,
         allocations=allocations,
-        fulfilled_items=fulfilled_items,
-        skipped_items=skipped_items
+        unassigned_items=unassigned_items
     )
 
 
@@ -2001,6 +1894,7 @@ def create_distribution(db: Session, distribution: schemas.DistributionCreate):
     db_distribution = models.Distribution(
         source_account_id=distribution.source_account_id,
         target_account_id=distribution.target_account_id,
+        obligation_id=distribution.obligation_id,
         amount=distribution.amount,
         billing_month=distribution.billing_month,
         note=distribution.note,

@@ -358,6 +358,9 @@ const Distributions = ({ accounts }) => {
                                 <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('billing_month')}>
                                     <div className="flex items-center gap-1">Month {getSortIcon('billing_month')}</div>
                                 </th>
+                                <th className="px-4 py-4 border-b border-slate-700">
+                                    <div className="flex items-center gap-1">Obligation</div>
+                                </th>
                                 <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('target_account_name')}>
                                     <div className="flex items-center gap-1">Target Account {getSortIcon('target_account_name')}</div>
                                 </th>
@@ -374,6 +377,13 @@ const Distributions = ({ accounts }) => {
                                 <tr key={`${item.id}-${idx}`} className="hover:bg-slate-700/30 transition text-slate-300">
                                     <td className="px-4 py-3 text-purple-300 font-mono text-xs">
                                         {formatMonthDisplay(item.billing_month)}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        {item.obligation_name ? (
+                                            <span className="text-blue-300 text-xs font-medium">{item.obligation_name}</span>
+                                        ) : (
+                                            <span className="text-slate-600 text-xs italic">—</span>
+                                        )}
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="font-semibold text-white">{item.target_account_name}</div>
@@ -470,7 +480,7 @@ const Distributions = ({ accounts }) => {
                                 </tr>
                             )) : (
                                 <tr>
-                                    <td colSpan="6" className="px-6 py-12 text-center text-slate-500">
+                                    <td colSpan="7" className="px-6 py-12 text-center text-slate-500">
                                         <div className="flex flex-col items-center gap-2">
                                             <Filter className="opacity-20" size={48} />
                                             <span>No distributions found matching your filters.</span>
