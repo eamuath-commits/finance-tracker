@@ -924,6 +924,39 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
                     tx.balance_after_transaction = running_balance
                     db.add(tx)
 
+        # --- RECALCULATE SNAPSHOTS FOR OLD ACCOUNT (when account changed) ---
+        if account_changed and old_account and old_account_id:
+            old_all_txs = db.query(models.Transaction).filter(
+                models.Transaction.account_id == old_account_id,
+                models.Transaction.status == "completed"
+            ).order_by(models.Transaction.timestamp.asc()).all()
+            
+            if old_all_txs:
+                # Backward pass: reverse each transaction to find starting balance
+                running_balance = old_account.current_balance
+                for tx in reversed(old_all_txs):
+                    tx_type = str(tx.type).lower() if tx.type else 'debit'
+                    if tx_type == 'credit':
+                        running_balance -= tx.amount
+                    else:
+                        running_balance += tx.amount
+                    if tx.fees:
+                        running_balance += tx.fees
+                
+                # Forward pass: apply transactions in order
+                starting_balance = running_balance
+                running_balance = starting_balance
+                for tx in old_all_txs:
+                    tx_type = str(tx.type).lower() if tx.type else 'debit'
+                    if tx_type == 'credit':
+                        running_balance += tx.amount
+                    else:
+                        running_balance -= tx.amount
+                    if tx.fees:
+                        running_balance -= tx.fees
+                    tx.balance_after_transaction = running_balance
+                    db.add(tx)
+
         # --- RECALCULATE CREDIT CARD SNAPSHOTS ---
         # Handle credit card transactions similarly
         if db_tx.credit_card_id and db_tx.status == "completed":
