@@ -219,6 +219,8 @@ const Allocation = () => {
             }
             groups[key].items.push(item);
         });
+        // Sort items within each group by due_day
+        Object.values(groups).forEach(g => g.items.sort((a, b) => (a.due_day || 0) - (b.due_day || 0)));
         return Object.values(groups).sort((a, b) => a.target_account_name.localeCompare(b.target_account_name));
     }, [previewData]);
 
