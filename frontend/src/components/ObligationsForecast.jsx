@@ -18,24 +18,28 @@ const TREND_ICONS = {
 
 const getMonthLabel = (offset) => {
     const d = new Date();
+    d.setDate(1);
     d.setMonth(d.getMonth() + offset);
     return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 };
 
 const getMonthShort = (offset) => {
     const d = new Date();
+    d.setDate(1);
     d.setMonth(d.getMonth() + offset);
     return d.toLocaleDateString('en-US', { month: 'short' });
 };
 
 const getMonthKey = (offset) => {
     const d = new Date();
+    d.setDate(1);
     d.setMonth(d.getMonth() + offset);
     return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
 };
 
 const getBillingDateStr = (offset) => {
     const d = new Date();
+    d.setDate(1);
     d.setMonth(d.getMonth() + offset);
     return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-01`;
 };
@@ -163,6 +167,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
     const getPeriodRange = (offset) => {
         if (periodStartDay === 1) return null;
         const d = new Date();
+        d.setDate(1);
         d.setMonth(d.getMonth() + offset);
         const prevMonth = new Date(d.getFullYear(), d.getMonth() - 1, periodStartDay);
         const endDay = periodStartDay - 1;
