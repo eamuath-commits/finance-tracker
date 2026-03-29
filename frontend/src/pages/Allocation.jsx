@@ -403,14 +403,36 @@ const Allocation = () => {
                                                     ({group.items.length} items)
                                                 </span>
                                             </div>
-                                            {(() => {
-                                                const acc = accounts.find(a => a.id === group.target_account_id);
-                                                return acc ? (
-                                                    <span className="text-[10px] text-slate-400 font-mono">
-                                                        Balance: {formatCurrency(acc.current_balance)}
-                                                    </span>
-                                                ) : null;
-                                            })()}
+                                            <div className="flex items-center gap-4">
+                                                {(() => {
+                                                    const groupRequired = group.items.reduce((s, i) => s + (i.amount || 0), 0);
+                                                    const groupTransferred = group.items.reduce((s, i) => s + (i.already_transferred || 0), 0);
+                                                    const groupPending = group.items.reduce((s, i) => s + (i.pending_amount || 0), 0);
+                                                    const acc = accounts.find(a => a.id === group.target_account_id);
+                                                    return (
+                                                        <>
+                                                            <span className="text-[10px] text-slate-400 font-mono">
+                                                                Required: <span className="text-blue-400">{formatCurrency(groupRequired)}</span>
+                                                            </span>
+                                                            {groupTransferred > 0 && (
+                                                                <span className="text-[10px] text-slate-400 font-mono">
+                                                                    Done: <span className="text-emerald-400">{formatCurrency(groupTransferred)}</span>
+                                                                </span>
+                                                            )}
+                                                            {groupPending > 0 && (
+                                                                <span className="text-[10px] text-slate-400 font-mono">
+                                                                    Pending: <span className="text-amber-400 font-semibold">{formatCurrency(groupPending)}</span>
+                                                                </span>
+                                                            )}
+                                                            {acc && (
+                                                                <span className="text-[10px] text-slate-500 font-mono">
+                                                                    Bal: {formatCurrency(acc.current_balance)}
+                                                                </span>
+                                                            )}
+                                                        </>
+                                                    );
+                                                })()}
+                                            </div>
                                         </div>
 
                                         {/* Items Table */}
