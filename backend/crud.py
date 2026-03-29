@@ -1966,30 +1966,32 @@ def get_distribution_matches(db: Session, distribution_id: str):
         return []
     
     # Look for transfer transactions in the same month
-    # Match by: amount (within tolerance), type='credit', to target account
-    tolerance = distribution.amount * 0.1  # 10% tolerance
+    tolerance = distribution.amount * 0.15  # 15% tolerance
     min_amount = distribution.amount - tolerance
     max_amount = distribution.amount + tolerance
     
-    # Parse billing month to get date range
+    # Parse billing month to get date range (with buffer)
     try:
-        year, month = distribution.billing_month.split('-')
+        year, month = distribution.billing_month.split('-')[:2]
         from dateutil.relativedelta import relativedelta
-        start_date = datetime(int(year), int(month), 1)
-        end_date = start_date + relativedelta(months=1)
+        start_date = datetime(int(year), int(month), 1) - relativedelta(days=5)
+        end_date = datetime(int(year), int(month), 1) + relativedelta(months=1, days=5)
     except:
         return []
     
-    # Find transactions: credits to target account, matching amount, in the month
+    from sqlalchemy import or_
+    
+    # Search both source and target account transactions
     matches = db.query(models.Transaction).filter(
-        models.Transaction.account_id == distribution.target_account_id,
-        models.Transaction.type == 'credit',
+        models.Transaction.account_id.in_([
+            distribution.source_account_id,
+            distribution.target_account_id
+        ]),
         models.Transaction.amount >= min_amount,
         models.Transaction.amount <= max_amount,
         models.Transaction.timestamp >= start_date,
         models.Transaction.timestamp < end_date,
-        models.Transaction.category.in_(['Transfer', 'Internal Transfer', None])
-    ).order_by(models.Transaction.timestamp.desc()).limit(5).all()
+    ).order_by(models.Transaction.timestamp.desc()).limit(10).all()
     
     return matches
 
