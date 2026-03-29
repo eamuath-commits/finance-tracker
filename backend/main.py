@@ -2348,6 +2348,39 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
         "note": "Distribution records created. Link to real transactions when they occur."
     }
 
+@app.post("/allocation/reverse")
+def reverse_allocation(req: schemas.AllocationReverseRequest, db: Session = Depends(get_db)):
+    """Reverse/undo a payday distribution for specific obligations."""
+    from dateutil.relativedelta import relativedelta
+    target_date = datetime.now() + relativedelta(months=req.month_offset)
+    billing_month = target_date.strftime('%Y-%m')
+    
+    reversed_items = []
+    for obl_id in req.obligation_ids:
+        # Find and delete matching distributions
+        dists = db.query(models.Distribution).filter(
+            models.Distribution.source_account_id == req.source_account_id,
+            models.Distribution.billing_month == billing_month,
+            models.Distribution.obligation_id == obl_id
+        ).all()
+        
+        for d in dists:
+            reversed_items.append({
+                "obligation_id": obl_id,
+                "amount": d.amount,
+                "distribution_id": d.id
+            })
+            db.delete(d)
+    
+    db.commit()
+    
+    return {
+        "status": "reversed",
+        "reversed_count": len(reversed_items),
+        "details": reversed_items,
+        "billing_month": billing_month
+    }
+
 # --- Category Endpoints ---
 
 @app.post("/categories", response_model=schemas.Category)

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowRight, CheckCircle, AlertCircle, RefreshCw, Receipt, Clock, ArrowUpRight } from 'lucide-react';
+import { ArrowRight, CheckCircle, AlertCircle, RefreshCw, Receipt, Clock, ArrowUpRight, RotateCcw } from 'lucide-react';
 import { SectionHeader, formatCurrency, Modal } from '../components/UI';
 import AllocationRules from '../components/AllocationRules';
 import Distributions from '../components/Distributions';
@@ -164,6 +164,36 @@ const Allocation = () => {
         } catch (error) {
             console.error("Execution failed:", error);
             alert("Transfer failed.");
+        } finally {
+            setDistributing(false);
+        }
+    };
+
+    const handleReverseOne = async (obligationId) => {
+        const item = previewData?.allocations.find(a => a.obligation_id === obligationId);
+        if (!item) return;
+        if (!confirm(`Reverse distribution for ${item.obligation_name}? This will delete the distribution record.`)) return;
+
+        setDistributing(true);
+        try {
+            await axios.post(`${API_URL}/allocation/reverse`, {
+                source_account_id: sourceAccountId,
+                month_offset: monthOffset,
+                obligation_ids: [obligationId]
+            });
+
+            const [previewRes, accRes] = await Promise.all([
+                axios.post(`${API_URL}/allocation/preview`, {
+                    source_account_id: sourceAccountId,
+                    month_offset: monthOffset
+                }),
+                axios.get(`${API_URL}/accounts/`)
+            ]);
+            setPreviewData(previewRes.data);
+            setAccounts(accRes.data);
+        } catch (error) {
+            console.error('Reverse failed:', error);
+            alert('Failed to reverse distribution.');
         } finally {
             setDistributing(false);
         }
@@ -534,9 +564,9 @@ const Allocation = () => {
                                                                     </span>
                                                                 )}
                                                             </td>
-                                                            {/* Individual Execute */}
+                                                            {/* Individual Execute / Reverse */}
                                                             <td className="px-3 py-2 text-center">
-                                                                {isPending && (
+                                                                {isPending ? (
                                                                     <button
                                                                         onClick={() => handleExecuteOne(item.obligation_id)}
                                                                         disabled={distributing}
@@ -544,6 +574,15 @@ const Allocation = () => {
                                                                         title={`Distribute ${formatCurrency(editedAmount)}`}
                                                                     >
                                                                         <ArrowRight size={14} />
+                                                                    </button>
+                                                                ) : (
+                                                                    <button
+                                                                        onClick={() => handleReverseOne(item.obligation_id)}
+                                                                        disabled={distributing}
+                                                                        className="text-amber-400 hover:text-red-400 disabled:opacity-30 transition"
+                                                                        title="Undo distribution"
+                                                                    >
+                                                                        <RotateCcw size={13} />
                                                                     </button>
                                                                 )}
                                                             </td>

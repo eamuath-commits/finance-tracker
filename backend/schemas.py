@@ -467,6 +467,11 @@ class AllocationExecuteRequest(BaseModel):
     obligation_ids: Optional[List[str]] = None  # Specific obligations, or all if None
     override_amounts: Optional[dict] = None  # {obligation_id: amount} overrides
 
+class AllocationReverseRequest(BaseModel):
+    source_account_id: str
+    month_offset: int = 0
+    obligation_ids: List[str]  # Which obligations to reverse
+
 
 # --- Audit Schemas ---
 class AuditCheckRequest(BaseModel):
