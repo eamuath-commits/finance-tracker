@@ -130,26 +130,22 @@ const Allocation = () => {
         }
     };
 
-    const handleExecuteOne = async (obligationId) => {
-        const item = previewData?.allocations.find(a => a.obligation_id === obligationId);
-        if (!item) return;
-
-        const amount = editableAmounts[obligationId] ?? item.pending_amount;
-        if (!confirm(`Distribute ${formatCurrency(amount)} for ${item.obligation_name}?`)) return;
+    // Distribute entire envelope (all pending obligations for that target account)
+    const handleDistributeEnvelope = async (group) => {
+        const pendingItems = group.items.filter(i => i.status === 'pending' || i.status === 'partial');
+        if (pendingItems.length === 0) return;
+        const totalPending = pendingItems.reduce((s, i) => s + (i.pending_amount || 0), 0);
+        if (!confirm(`Distribute ${formatCurrency(totalPending)} to ${group.target_account_name}?`)) return;
 
         setDistributing(true);
         try {
-            const overrides = editableAmounts[obligationId] !== undefined
-                ? { [obligationId]: editableAmounts[obligationId] }
-                : null;
+            const oblIds = pendingItems.map(i => i.obligation_id);
             await axios.post(`${API_URL}/allocation/execute`, {
                 source_account_id: sourceAccountId,
                 month_offset: monthOffset,
-                obligation_ids: [obligationId],
-                override_amounts: overrides
+                obligation_ids: oblIds
             });
 
-            // Refresh
             const [previewRes, accRes] = await Promise.all([
                 axios.post(`${API_URL}/allocation/preview`, {
                     source_account_id: sourceAccountId,
@@ -159,27 +155,25 @@ const Allocation = () => {
             ]);
             setPreviewData(previewRes.data);
             setAccounts(accRes.data);
-            selectedIds.delete(obligationId);
-            setSelectedIds(new Set(selectedIds));
         } catch (error) {
-            console.error("Execution failed:", error);
-            alert("Transfer failed.");
+            console.error('Execute failed:', error);
+            alert('Distribution failed.');
         } finally {
             setDistributing(false);
         }
     };
 
-    const handleReverseOne = async (obligationId) => {
-        const item = previewData?.allocations.find(a => a.obligation_id === obligationId);
-        if (!item) return;
-        if (!confirm(`Reverse distribution for ${item.obligation_name}? This will delete the distribution record.`)) return;
+    // Reverse entire envelope distribution
+    const handleReverseEnvelope = async (group) => {
+        if (!confirm(`Reverse distribution for ${group.target_account_name}?`)) return;
 
         setDistributing(true);
         try {
+            const oblIds = group.items.map(i => i.obligation_id);
             await axios.post(`${API_URL}/allocation/reverse`, {
                 source_account_id: sourceAccountId,
                 month_offset: monthOffset,
-                obligation_ids: [obligationId]
+                obligation_ids: oblIds
             });
 
             const [previewRes, accRes] = await Promise.all([
@@ -433,11 +427,12 @@ const Allocation = () => {
                                                     ({group.items.length} items)
                                                 </span>
                                             </div>
-                                            <div className="flex items-center gap-4">
+                                            <div className="flex items-center gap-3">
                                                 {(() => {
                                                     const groupRequired = group.items.reduce((s, i) => s + (i.amount || 0), 0);
                                                     const groupTransferred = group.items.reduce((s, i) => s + (i.already_transferred || 0), 0);
                                                     const groupPending = group.items.reduce((s, i) => s + (i.pending_amount || 0), 0);
+                                                    const allDone = groupPending <= 0;
                                                     const acc = accounts.find(a => a.id === group.target_account_id);
                                                     return (
                                                         <>
@@ -459,6 +454,24 @@ const Allocation = () => {
                                                                     Bal: {formatCurrency(acc.current_balance)}
                                                                 </span>
                                                             )}
+                                                            {/* Envelope-level Distribute / Reverse button */}
+                                                            {allDone ? (
+                                                                <button
+                                                                    onClick={() => handleReverseEnvelope(group)}
+                                                                    disabled={distributing}
+                                                                    className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-500/10 hover:bg-red-500/20 hover:text-red-400 px-2.5 py-1 rounded-lg border border-amber-500/30 transition disabled:opacity-30"
+                                                                >
+                                                                    <RotateCcw size={11} /> Undo
+                                                                </button>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={() => handleDistributeEnvelope(group)}
+                                                                    disabled={distributing}
+                                                                    className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 px-2.5 py-1 rounded-lg border border-emerald-500/30 transition disabled:opacity-30"
+                                                                >
+                                                                    <ArrowRight size={11} /> Distribute {formatCurrency(groupPending)}
+                                                                </button>
+                                                            )}
                                                         </>
                                                     );
                                                 })()}
@@ -469,126 +482,64 @@ const Allocation = () => {
                                         <table className="w-full text-left table-fixed">
                                             <thead className="bg-slate-800/50">
                                                 <tr className="text-[8px] uppercase font-bold text-slate-500">
-                                                    <th className="px-3 py-1.5 w-[4%]"></th>
-                                                    <th className="px-3 py-1.5 w-[28%]">Obligation</th>
-                                                    <th className="px-3 py-1.5 text-center w-[8%]">Due</th>
-                                                    <th className="px-3 py-1.5 text-right w-[15%]">Required</th>
-                                                    <th className="px-3 py-1.5 text-right w-[15%]">Transferred</th>
-                                                    <th className="px-3 py-1.5 text-right w-[15%]">Pending</th>
-                                                    <th className="px-3 py-1.5 text-center w-[8%]">Status</th>
-                                                    <th className="px-3 py-1.5 text-center w-[7%]"></th>
+                                                    <th className="px-3 py-1.5 w-[35%]">Obligation</th>
+                                                    <th className="px-3 py-1.5 text-center w-[10%]">Due</th>
+                                                    <th className="px-3 py-1.5 text-right w-[20%]">Required</th>
+                                                    <th className="px-3 py-1.5 text-right w-[20%]">Transferred</th>
+                                                    <th className="px-3 py-1.5 text-center w-[15%]">Status</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {group.items.map(item => {
-                                                    const isPending = item.status === 'pending' || item.status === 'partial';
-                                                    const isSelected = selectedIds.has(item.obligation_id);
-                                                    const editedAmount = getItemAmount(item);
-
-                                                    return (
-                                                        <tr
-                                                            key={item.obligation_id}
-                                                            className={`border-b border-slate-700/20 transition-colors ${
-                                                                item.status === 'transferred' ? 'bg-emerald-900/10 opacity-70' :
-                                                                isSelected ? 'bg-blue-900/10' : 'hover:bg-slate-700/30'
-                                                            }`}
-                                                        >
-                                                            {/* Checkbox */}
-                                                            <td className="px-3 py-2 text-center">
-                                                                {isPending && (
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={isSelected}
-                                                                        onChange={() => toggleSelect(item.obligation_id)}
-                                                                        className="w-3.5 h-3.5 rounded bg-slate-700 border-slate-600 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
-                                                                    />
+                                                {group.items.map(item => (
+                                                    <tr
+                                                        key={item.obligation_id}
+                                                        className={`border-b border-slate-700/20 transition-colors ${
+                                                            item.status === 'transferred' ? 'bg-emerald-900/10 opacity-60' : 'hover:bg-slate-700/30'
+                                                        }`}
+                                                    >
+                                                        {/* Obligation Name */}
+                                                        <td className="px-3 py-2">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="font-medium text-white text-[12px] truncate">{item.obligation_name}</span>
+                                                                {item.category && (
+                                                                    <span className="text-[8px] text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">{item.category}</span>
                                                                 )}
-                                                            </td>
-                                                            {/* Obligation Name */}
-                                                            <td className="px-3 py-2">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <span className="font-medium text-white text-[12px] truncate">{item.obligation_name}</span>
-                                                                    {item.category && (
-                                                                        <span className="text-[8px] text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">{item.category}</span>
-                                                                    )}
-                                                                </div>
-                                                            </td>
-                                                            {/* Due Day */}
-                                                            <td className="px-3 py-2 text-center">
-                                                                <span className="text-[11px] font-mono text-slate-400">{item.due_day}</span>
-                                                            </td>
-                                                            {/* Required Amount */}
-                                                            <td className="px-3 py-2 text-right">
-                                                                <span className="text-[12px] font-mono text-slate-300">{formatCurrency(item.amount)}</span>
-                                                            </td>
-                                                            {/* Already Transferred */}
-                                                            <td className="px-3 py-2 text-right">
-                                                                {item.already_transferred > 0 ? (
-                                                                    <span className="text-[12px] font-mono text-emerald-400">{formatCurrency(item.already_transferred)}</span>
-                                                                ) : (
-                                                                    <span className="text-[12px] font-mono text-slate-600">—</span>
-                                                                )}
-                                                            </td>
-                                                            {/* Pending Amount (editable) */}
-                                                            <td className="px-3 py-2 text-right">
-                                                                {isPending ? (
-                                                                    <input
-                                                                        type="number"
-                                                                        value={editedAmount}
-                                                                        onChange={(e) => {
-                                                                            const val = parseFloat(e.target.value) || 0;
-                                                                            setEditableAmounts(prev => ({
-                                                                                ...prev,
-                                                                                [item.obligation_id]: val
-                                                                            }));
-                                                                        }}
-                                                                        className="w-20 bg-slate-700/60 text-right font-mono text-[12px] py-1 px-2 rounded border border-slate-600 focus:border-emerald-500 outline-none text-white"
-                                                                    />
-                                                                ) : (
-                                                                    <span className="text-[12px] font-mono text-slate-600">—</span>
-                                                                )}
-                                                            </td>
-                                                            {/* Status Badge */}
-                                                            <td className="px-3 py-2 text-center">
-                                                                {item.status === 'transferred' ? (
-                                                                    <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded border border-emerald-500/30 uppercase">
-                                                                        <CheckCircle size={8} /> Done
-                                                                    </span>
-                                                                ) : item.status === 'partial' ? (
-                                                                    <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-amber-400 bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30 uppercase">
-                                                                        <Clock size={8} /> Partial
-                                                                    </span>
-                                                                ) : (
-                                                                    <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-blue-400 bg-blue-500/20 px-1.5 py-0.5 rounded border border-blue-500/30 uppercase">
-                                                                        <Clock size={8} /> Pending
-                                                                    </span>
-                                                                )}
-                                                            </td>
-                                                            {/* Individual Execute / Reverse */}
-                                                            <td className="px-3 py-2 text-center">
-                                                                {isPending ? (
-                                                                    <button
-                                                                        onClick={() => handleExecuteOne(item.obligation_id)}
-                                                                        disabled={distributing}
-                                                                        className="text-emerald-400 hover:text-emerald-300 disabled:opacity-30 transition"
-                                                                        title={`Distribute ${formatCurrency(editedAmount)}`}
-                                                                    >
-                                                                        <ArrowRight size={14} />
-                                                                    </button>
-                                                                ) : (
-                                                                    <button
-                                                                        onClick={() => handleReverseOne(item.obligation_id)}
-                                                                        disabled={distributing}
-                                                                        className="text-amber-400 hover:text-red-400 disabled:opacity-30 transition"
-                                                                        title="Undo distribution"
-                                                                    >
-                                                                        <RotateCcw size={13} />
-                                                                    </button>
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
+                                                            </div>
+                                                        </td>
+                                                        {/* Due Day */}
+                                                        <td className="px-3 py-2 text-center">
+                                                            <span className="text-[11px] font-mono text-slate-400">{item.due_day}</span>
+                                                        </td>
+                                                        {/* Required Amount */}
+                                                        <td className="px-3 py-2 text-right">
+                                                            <span className="text-[12px] font-mono text-slate-300">{formatCurrency(item.amount)}</span>
+                                                        </td>
+                                                        {/* Already Transferred */}
+                                                        <td className="px-3 py-2 text-right">
+                                                            {item.already_transferred > 0 ? (
+                                                                <span className="text-[12px] font-mono text-emerald-400">{formatCurrency(item.already_transferred)}</span>
+                                                            ) : (
+                                                                <span className="text-[12px] font-mono text-slate-600">—</span>
+                                                            )}
+                                                        </td>
+                                                        {/* Status Badge */}
+                                                        <td className="px-3 py-2 text-center">
+                                                            {item.status === 'transferred' ? (
+                                                                <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded border border-emerald-500/30 uppercase">
+                                                                    <CheckCircle size={8} /> Done
+                                                                </span>
+                                                            ) : item.status === 'partial' ? (
+                                                                <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-amber-400 bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30 uppercase">
+                                                                    <Clock size={8} /> Partial
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-blue-400 bg-blue-500/20 px-1.5 py-0.5 rounded border border-blue-500/30 uppercase">
+                                                                    <Clock size={8} /> Pending
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))}
                                             </tbody>
                                         </table>
                                     </div>
