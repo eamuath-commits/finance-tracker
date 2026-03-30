@@ -1766,6 +1766,25 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
         db.commit()
         return {"status": "ignored", "reason": f"Masked account number ({masked_account_match.group()}) — cannot match registered accounts"}
     
+    # 0c. Early filter: Skip credit card statement/reminder notifications
+    statement_keywords = [
+        'statement', 'total amount due', 'minimum amount due',
+        'sadad number', 'pay your card dues', 'due date',
+        'كشف حساب', 'مبلغ الحد الأدنى', 'تاريخ الاستحقاق'
+    ]
+    if sum(1 for kw in statement_keywords if kw in body_lower) >= 2:
+        logger.info(f"[SMS-INGEST] Skipping credit card statement notification")
+        raw_msg = models.RawMessage(
+            sender=payload.sender or "Unknown",
+            body=payload.body.strip(),
+            source="webui",
+            status=models.MessageStatus.IGNORED
+        )
+        raw_msg.error_log = "Skipped: credit card statement/reminder notification"
+        db.add(raw_msg)
+        db.commit()
+        return {"status": "ignored", "reason": "Credit card statement notification — not a transaction"}
+    
     # 0b. QUEUE CHECK: Log pending transactions but don't block processing
     queue_status = queue_processor.get_queue_status(db)
     if queue_status["blocked"] > 0:
