@@ -734,12 +734,29 @@ const Accounts = () => {
                                             )}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
-                                            <button
-                                                onClick={() => openAccountModal(acc)}
-                                                className="text-blue-400 hover:text-blue-300 transition-colors p-2 bg-slate-700/50 rounded-lg hover:bg-slate-700"
-                                            >
-                                                <Edit3 size={16} />
-                                            </button>
+                                            <div className="flex items-center justify-center gap-1">
+                                                <button
+                                                    onClick={async () => {
+                                                        if (!confirm(`Recalculate ${acc.name} balance from transactions?`)) return;
+                                                        try {
+                                                            const res = await axios.post(`${API_URL}/accounts/${acc.id}/recalculate-balance`);
+                                                            const d = res.data;
+                                                            alert(`${acc.name}\nOld: ${formatCurrency(d.old_balance)}\nNew: ${formatCurrency(d.new_balance)}\nDiff: ${formatCurrency(d.new_balance - d.old_balance)}\n(${d.transaction_count} transactions)`);
+                                                            fetchData();
+                                                        } catch (e) { alert('Recalculate failed'); }
+                                                    }}
+                                                    className="text-amber-400 hover:text-amber-300 transition-colors p-2 bg-slate-700/50 rounded-lg hover:bg-slate-700"
+                                                    title="Recalculate balance from transactions"
+                                                >
+                                                    <RefreshCw size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => openAccountModal(acc)}
+                                                    className="text-blue-400 hover:text-blue-300 transition-colors p-2 bg-slate-700/50 rounded-lg hover:bg-slate-700"
+                                                >
+                                                    <Edit3 size={16} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
