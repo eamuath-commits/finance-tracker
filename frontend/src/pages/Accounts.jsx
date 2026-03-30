@@ -743,7 +743,8 @@ const Accounts = () => {
                                                             const d = res.data;
                                                             const fmt = (v) => v.toLocaleString('en-SA', {style:'currency',currency:'SAR'});
                                                             const baseline = d.baseline != null ? `\nBaseline: ${fmt(d.baseline)} (${d.baseline_tx})` : '';
-                                                            alert(`${acc.name}${baseline}\nOld: ${fmt(d.old_balance)}\nNew: ${fmt(d.new_balance)}\nDiff: ${fmt(d.new_balance - d.old_balance)}\n(${d.transaction_count} transactions)`);
+                                                            const corrections = d.corrections > 0 ? `\n⚡ ${d.corrections} transaction(s) corrected` : '\n✅ All transactions OK';
+                                                            alert(`${acc.name}${baseline}\nOld: ${fmt(d.old_balance)}\nNew: ${fmt(d.new_balance)}\nDiff: ${fmt(d.new_balance - d.old_balance)}\n(${d.transaction_count} transactions)${corrections}`);
                                                             fetchData();
                                                         } catch (e) { alert('Recalculate failed'); }
                                                     }}

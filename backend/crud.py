@@ -1128,82 +1128,39 @@ def delete_transaction(db: Session, transaction_id: str):
 
     logger.info(f"[DELETE_TX] Found tx: type={db_tx.type}, amount={db_tx.amount}, account_id={db_tx.account_id}, cc_id={db_tx.credit_card_id}, status={db_tx.status}")
     
-    # Skip balance reversal for pending_action transactions — their balance was never applied
+    # Capture IDs before deleting the transaction
+    account_id = db_tx.account_id
+    credit_card_id = db_tx.credit_card_id
     is_pending = str(db_tx.status).lower() in ('pending_action', 'pending_transfer')
     
-    # Revert Account balance change (only if balance was actually applied)
-    account = db_tx.account
-    if account and not is_pending:
-        old_balance = account.current_balance
-        # Compare type as string (db stores 'credit'/'debit', not enum)
-        tx_type = str(db_tx.type).lower() if db_tx.type else 'debit'
-        if tx_type == 'credit' or db_tx.type == models.TransactionType.CREDIT:
-            # Original was ADD, so removal is SUBTRACT
-            account.current_balance -= db_tx.amount
-        else:
-            # Original was SUBTRACT, so removal is ADD
-            account.current_balance += db_tx.amount
-        
-        # Revert fees (fees are always deducted, so add them back)
-        if db_tx.fees and db_tx.fees > 0:
-            account.current_balance += db_tx.fees
-        
-        logger.info(f"[DELETE_TX] Account {account.name}: {old_balance} -> {account.current_balance}")
-        
-        # Revert Wallet Balance
-        if db_tx.original_currency and db_tx.original_currency.upper() != "SAR":
-            curr = db_tx.original_currency.upper()
-            wallet = db.query(models.CurrencyWallet).filter(
-                models.CurrencyWallet.account_id == account.id,
-                models.CurrencyWallet.currency_code == curr
-            ).first()
-            if wallet:
-                if db_tx.type == models.TransactionType.CREDIT or str(db_tx.type).lower() == "credit":
-                    wallet.balance -= (db_tx.original_amount or 0.0)
-                else:
-                    wallet.balance += (db_tx.original_amount or 0.0)
-                db.add(wallet)
-
-        db.add(account)
-    else:
-        logger.info(f"[DELETE_TX] No account linked to transaction")
-    
-    # Revert Credit Card balance change (only if balance was actually applied)
-    credit_card = db_tx.credit_card
-    if credit_card and not is_pending:
-        old_cc_balance = credit_card.current_balance
-        # Compare type as string (db stores 'credit'/'debit', not enum)
-        cc_tx_type = str(db_tx.type).lower() if db_tx.type else 'debit'
-        if cc_tx_type == 'credit' or db_tx.type == models.TransactionType.CREDIT:
-            # Original credit ADDED to balance, so removal SUBTRACTS
-            credit_card.current_balance -= db_tx.amount
-        else:
-            # Original debit SUBTRACTED from balance, so removal ADDS back
-            credit_card.current_balance += db_tx.amount
-        
-        # Revert fees (fees always subtracted, so add them back)
-        if db_tx.fees and db_tx.fees > 0:
-            credit_card.current_balance += db_tx.fees
-        
-        logger.info(f"[DELETE_TX] Credit Card {credit_card.name}: {old_cc_balance} -> {credit_card.current_balance}")
-        db.add(credit_card)
-    else:
-        logger.info(f"[DELETE_TX] No credit card linked to transaction")
-    
-    # Capture IDs before deleting the transaction
-    cascade_account_id = db_tx.account_id if account and not is_pending else None
-    cascade_cc_id = db_tx.credit_card_id if credit_card and not is_pending else None
+    # Revert Wallet Balance for foreign currency transactions
+    if not is_pending and account_id and db_tx.original_currency and db_tx.original_currency.upper() != "SAR":
+        curr = db_tx.original_currency.upper()
+        wallet = db.query(models.CurrencyWallet).filter(
+            models.CurrencyWallet.account_id == account_id,
+            models.CurrencyWallet.currency_code == curr
+        ).first()
+        if wallet:
+            if db_tx.type == models.TransactionType.CREDIT or str(db_tx.type).lower() == "credit":
+                wallet.balance -= (db_tx.original_amount or 0.0)
+            else:
+                wallet.balance += (db_tx.original_amount or 0.0)
+            db.add(wallet)
     
     db.delete(db_tx)
     db.commit()
     
-    # Cascade: recalculate balance_after_transaction for remaining transactions
-    if cascade_account_id:
-        logger.info(f"[DELETE_TX] Cascading balance recalc for account {cascade_account_id}")
-        recalculate_account_balances(db, account_id=cascade_account_id)
-    if cascade_cc_id:
-        logger.info(f"[DELETE_TX] Cascading balance recalc for CC {cascade_cc_id}")
-        recalculate_account_balances(db, credit_card_id=cascade_cc_id)
+    # Recalculate account balance from first transaction baseline
+    # This replays all remaining transactions chronologically and fixes everything
+    if account_id and not is_pending:
+        logger.info(f"[DELETE_TX] Recalculating account {account_id} from baseline")
+        from main import _recalculate_account_balance
+        _recalculate_account_balance(db, account_id)
+    
+    # Recalculate credit card balance
+    if credit_card_id and not is_pending:
+        logger.info(f"[DELETE_TX] Cascading balance recalc for CC {credit_card_id}")
+        recalculate_account_balances(db, credit_card_id=credit_card_id)
     
     logger.info(f"[DELETE_TX] Transaction deleted and committed")
     return db_tx

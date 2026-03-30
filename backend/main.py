@@ -231,6 +231,7 @@ def delete_account(account_id: str, db: Session = Depends(get_db)):
 def _recalculate_account_balance(db: Session, account_id: str):
     """
     Internal helper: recalculate account balance from first transaction baseline.
+    Replays all transactions chronologically, fixing each balance_after_transaction.
     Returns dict with old/new balance info, or None if account not found.
     """
     account = db.query(models.Account).filter(models.Account.id == account_id).first()
@@ -244,10 +245,11 @@ def _recalculate_account_balance(db: Session, account_id: str):
     ).order_by(models.Transaction.timestamp.asc()).all()
     
     if not transactions:
-        return {"old_balance": old_balance, "new_balance": old_balance, "transaction_count": 0}
+        return {"old_balance": old_balance, "new_balance": old_balance, "transaction_count": 0, "corrections": 0}
     
     first_tx = transactions[0]
     baseline = first_tx.balance_after_transaction
+    corrections = 0
     
     if baseline is not None:
         if first_tx.type == "credit":
@@ -264,7 +266,10 @@ def _recalculate_account_balance(db: Session, account_id: str):
                 running -= tx.amount
             if tx.fees:
                 running -= tx.fees
-            tx.balance_after_transaction = round(running, 2)
+            expected = round(running, 2)
+            if tx.balance_after_transaction != expected:
+                corrections += 1
+            tx.balance_after_transaction = expected
     else:
         running = 0
         for tx in transactions:
@@ -274,7 +279,10 @@ def _recalculate_account_balance(db: Session, account_id: str):
                 running -= tx.amount
             if tx.fees:
                 running -= tx.fees
-            tx.balance_after_transaction = round(running, 2)
+            expected = round(running, 2)
+            if tx.balance_after_transaction != expected:
+                corrections += 1
+            tx.balance_after_transaction = expected
     
     account.current_balance = round(running, 2)
     db.commit()
@@ -285,7 +293,8 @@ def _recalculate_account_balance(db: Session, account_id: str):
         "baseline": baseline,
         "baseline_tx": first_tx.merchant or "Unknown",
         "baseline_date": first_tx.timestamp.isoformat(),
-        "transaction_count": len(transactions)
+        "transaction_count": len(transactions),
+        "corrections": corrections
     }
 
 
