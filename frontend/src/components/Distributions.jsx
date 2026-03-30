@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { formatCurrency, selectClass, Modal } from './UI';
+import { formatCurrency, selectClass } from './UI';
 import TransactionDetailModal from './TransactionDetailModal';
 import TransactionSelectorModal from './TransactionSelectorModal';
 import ConfirmDialog from './ConfirmDialog';
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Trash2, Eye, List } from 'lucide-react';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Trash2, Eye } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
@@ -23,10 +23,10 @@ const Distributions = ({ accounts }) => {
     const [selectedTarget, setSelectedTarget] = useState('All');
 
     // Link Modal State
-    const [showLinkModal, setShowLinkModal] = useState(false);
+
     const [showMultiLinkModal, setShowMultiLinkModal] = useState(false);
     const [linkingTransfer, setLinkingTransfer] = useState(null);
-    const [suggestedTransactions, setSuggestedTransactions] = useState([]);
+
     const [loadingSuggestions, setLoadingSuggestions] = useState(false);
     const [linkedTransactionIds, setLinkedTransactionIds] = useState([]);
 
@@ -151,26 +151,19 @@ const Distributions = ({ accounts }) => {
     // Link functions
     const openLinkModal = async (transfer) => {
         setLinkingTransfer(transfer);
-        setShowLinkModal(true);
         setLoadingSuggestions(true);
-        setSuggestedTransactions([]);
+        setLinkedTransactionIds([]);
 
         try {
-            const [suggestRes, linkedRes] = await Promise.all([
-                axios.get(`${API_URL}/distributions/${transfer.id}/matches`).catch(() => ({ data: [] })),
-                axios.get(`${API_URL}/distributions/${transfer.id}/transactions`).catch(() => ({ data: [] }))
-            ]);
-            setSuggestedTransactions(suggestRes.data);
+            const linkedRes = await axios.get(`${API_URL}/distributions/${transfer.id}/transactions`).catch(() => ({ data: [] }));
             setLinkedTransactionIds(linkedRes.data.map(tx => tx.id));
         } catch (err) {
-            console.error("Error fetching suggestions:", err);
+            console.error("Error fetching linked transactions:", err);
         } finally {
             setLoadingSuggestions(false);
         }
-    };
 
-    const openMultiLinkModal = () => {
-        setShowLinkModal(false);
+        // Go directly to the full TransactionSelectorModal
         setShowMultiLinkModal(true);
     };
 
@@ -494,73 +487,7 @@ const Distributions = ({ accounts }) => {
                 </div>
             </div>
 
-            {/* Link Transaction Modal */}
-            <Modal isOpen={showLinkModal} title="Link to Transaction" onClose={() => setShowLinkModal(false)}>
-                <div className="space-y-4">
-                    {linkingTransfer && (
-                        <div className="bg-slate-700/50 p-3 rounded-lg text-sm">
-                            <div className="text-slate-400 text-xs uppercase font-bold mb-1">Distribution</div>
-                            <div className="text-white font-semibold">{linkingTransfer.target_account_name}</div>
-                            <div className="text-emerald-400 font-mono">{formatCurrency(linkingTransfer.amount)}</div>
-                            <div className="text-slate-500 text-xs">{formatMonthDisplay(linkingTransfer.billing_month)}</div>
-                        </div>
-                    )}
-
-                    <div className="text-slate-400 text-xs uppercase font-bold">Suggested Transactions</div>
-
-                    {loadingSuggestions ? (
-                        <div className="text-center py-8 text-slate-500">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                            Finding matching transactions...
-                        </div>
-                    ) : suggestedTransactions.length > 0 ? (
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
-                            {suggestedTransactions.map(tx => (
-                                <div
-                                    key={tx.id}
-                                    className="p-3 rounded-lg border cursor-pointer transition bg-slate-700/50 border-slate-600 hover:border-purple-500 hover:bg-purple-500/10"
-                                    onClick={() => handleLinkTransaction(tx.id)}
-                                >
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <div className="text-white font-semibold text-sm">{tx.merchant || 'Transfer'}</div>
-                                            <div className="text-slate-400 text-xs">
-                                                {tx.timestamp ? new Date(tx.timestamp).toLocaleDateString() : '-'}
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="text-emerald-400 font-mono text-sm">{formatCurrency(tx.amount)}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center py-8 text-slate-500">
-                            <LinkIcon className="mx-auto mb-2 opacity-30" size={32} />
-                            <div>No matching transactions found.</div>
-                            <div className="text-xs mt-1">The transfer may have been auto-linked already.</div>
-                        </div>
-                    )}
-
-                    <div className="flex gap-2">
-                        <button
-                            onClick={openMultiLinkModal}
-                            className="flex-1 bg-purple-600 hover:bg-purple-500 text-white py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2"
-                        >
-                            <List size={14} /> Browse All Transactions
-                        </button>
-                        <button
-                            onClick={() => setShowLinkModal(false)}
-                            className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm font-medium transition"
-                        >
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-            </Modal>
-
-            {/* Multi-Select Transaction Linking Modal */}
+            {/* Transaction Linking Modal (with SMS viewing & multi-select) */}
             <TransactionSelectorModal
                 isOpen={showMultiLinkModal}
                 onClose={() => {
@@ -570,6 +497,7 @@ const Distributions = ({ accounts }) => {
                 onSelect={handleMultiLink}
                 currentLinked={linkedTransactionIds}
                 title={`Link Transactions to ${linkingTransfer?.target_account_name || 'Distribution'}`}
+                filters={{ accountId: linkingTransfer?.source_account_id || '' }}
             />
 
             {/* Transaction Detail Modal */}
