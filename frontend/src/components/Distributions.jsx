@@ -4,12 +4,13 @@ import { formatCurrency, selectClass } from './UI';
 import TransactionDetailModal from './TransactionDetailModal';
 import TransactionSelectorModal from './TransactionSelectorModal';
 import ConfirmDialog from './ConfirmDialog';
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Trash2, Eye, ArrowUpRight, Clock, LayoutGrid, List } from 'lucide-react';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Trash2, Eye, ArrowUpRight, Clock, LayoutGrid, List, PlusCircle } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
 const Distributions = ({ accounts }) => {
     const [transfers, setTransfers] = useState([]);
+    const [allocationPreview, setAllocationPreview] = useState(null);
     const [loading, setLoading] = useState(true);
 
     // Filters
@@ -45,14 +46,48 @@ const Distributions = ({ accounts }) => {
     const fetchTransfers = async () => {
         setLoading(true);
         try {
-            const res = await axios.get(`${API_URL}/distributions`);
-            setTransfers(res.data);
+            const [distRes, previewRes] = await Promise.all([
+                axios.get(`${API_URL}/distributions`),
+                fetchAllocationPreview()
+            ]);
+            setTransfers(distRes.data);
         } catch (error) {
             console.error("Failed to fetch payroll transfers:", error);
         } finally {
             setLoading(false);
         }
     };
+
+    const fetchAllocationPreview = async () => {
+        try {
+            // Find income/source account
+            const incomeAcc = accounts.find(a => a.is_income);
+            if (!incomeAcc) return;
+
+            // Calculate month_offset from selected year/month
+            const now = new Date();
+            let offset = 0;
+            if (selectedYear !== 'All' && selectedMonth !== 'All') {
+                const targetDate = new Date(parseInt(selectedYear), parseInt(selectedMonth) - 1, 1);
+                offset = (targetDate.getFullYear() - now.getFullYear()) * 12 + (targetDate.getMonth() - now.getMonth());
+            }
+
+            const res = await axios.post(`${API_URL}/allocation/preview`, {
+                source_account_id: incomeAcc.id,
+                month_offset: offset
+            });
+            setAllocationPreview(res.data);
+        } catch (error) {
+            console.error("Failed to fetch allocation preview:", error);
+        }
+    };
+
+    // Re-fetch preview when month/year filter changes
+    useEffect(() => {
+        if (accounts.length > 0 && selectedYear !== 'All' && selectedMonth !== 'All') {
+            fetchAllocationPreview();
+        }
+    }, [selectedYear, selectedMonth, accounts]);
 
     const formatMonthDisplay = (dateStr) => {
         if (!dateStr) return '-';
@@ -125,22 +160,49 @@ const Distributions = ({ accounts }) => {
     const linkedCount = sorted.filter(t => t.transaction_id).length;
     const pendingCount = sorted.filter(t => !t.transaction_id && (!t.linked_transactions || t.linked_transactions.length === 0)).length;
 
-    // Envelope grouping
+    // Envelope grouping - merge real distributions with planned allocations
     const groupedByEnvelope = useMemo(() => {
         const groups = {};
+
+        // Add real distribution records
         sorted.forEach(item => {
             const key = item.target_account_id || 'unknown';
             if (!groups[key]) {
                 groups[key] = {
                     target_account_id: key,
                     target_account_name: item.target_account_name || 'Unknown',
-                    items: []
+                    items: [],
+                    plannedItems: []
                 };
             }
             groups[key].items.push(item);
         });
-        return Object.values(groups).sort((a, b) => a.target_account_name.localeCompare(b.target_account_name));
-    }, [sorted]);
+
+        // Add planned items from allocation preview (only for current month filter)
+        if (allocationPreview && selectedYear !== 'All' && selectedMonth !== 'All') {
+            const filterMonth = `${selectedYear}-${selectedMonth}`;
+            if (allocationPreview.billing_month === filterMonth) {
+                allocationPreview.allocations.forEach(alloc => {
+                    if (alloc.status === 'pending') {
+                        const key = alloc.target_account_id;
+                        if (!groups[key]) {
+                            groups[key] = {
+                                target_account_id: key,
+                                target_account_name: alloc.target_account_name || 'Unknown',
+                                items: [],
+                                plannedItems: []
+                            };
+                        }
+                        groups[key].plannedItems.push(alloc);
+                    }
+                });
+            }
+        }
+
+        return Object.values(groups)
+            .filter(g => g.items.length > 0 || g.plannedItems.length > 0)
+            .sort((a, b) => a.target_account_name.localeCompare(b.target_account_name));
+    }, [sorted, allocationPreview, selectedYear, selectedMonth]);
 
     const requestSort = (key) => {
         let direction = 'asc';
@@ -183,6 +245,50 @@ const Distributions = ({ accounts }) => {
 
         // Go directly to the full TransactionSelectorModal
         setShowMultiLinkModal(true);
+    };
+
+    // Create distribution for a planned item, then open link modal
+    const handleCreateAndLink = async (plannedItem) => {
+        try {
+            const incomeAcc = accounts.find(a => a.is_income);
+            if (!incomeAcc) return alert('No source income account found');
+
+            const billingMonth = `${selectedYear}-${selectedMonth}`;
+
+            // Calculate correct month_offset
+            const now = new Date();
+            const targetDate = new Date(parseInt(selectedYear), parseInt(selectedMonth) - 1, 1);
+            const offset = (targetDate.getFullYear() - now.getFullYear()) * 12 + (targetDate.getMonth() - now.getMonth());
+
+            // Create distribution record via execute endpoint for this single obligation
+            await axios.post(`${API_URL}/allocation/execute`, {
+                source_account_id: incomeAcc.id,
+                month_offset: offset,
+                obligation_ids: [plannedItem.obligation_id]
+            });
+
+            // Re-fetch to get the new distribution
+            const distRes = await axios.get(`${API_URL}/distributions`);
+            setTransfers(distRes.data);
+
+            // Find the newly created distribution for this target account + month
+            const newDist = distRes.data.find(d =>
+                d.target_account_id === plannedItem.target_account_id &&
+                d.billing_month === billingMonth &&
+                !d.transaction_id &&
+                (!d.linked_transactions || d.linked_transactions.length === 0)
+            );
+
+            if (newDist) {
+                openLinkModal(newDist);
+            }
+
+            // Refresh preview
+            await fetchAllocationPreview();
+        } catch (err) {
+            console.error('Error creating distribution:', err);
+            alert('Failed to create distribution record');
+        }
     };
 
     const handleLinkTransaction = async (transactionId) => {
@@ -381,28 +487,37 @@ const Distributions = ({ accounts }) => {
                 <div className="space-y-4">
                     {groupedByEnvelope.length > 0 ? groupedByEnvelope.map(group => {
                         const groupTotal = group.items.reduce((s, i) => s + (i.amount || 0), 0);
+                        const plannedTotal = group.plannedItems.reduce((s, i) => s + (i.amount || 0), 0);
                         const groupLinked = group.items.filter(i => i.transaction_id || (i.linked_transactions && i.linked_transactions.length > 0)).length;
-                        const allLinked = groupLinked === group.items.length;
+                        const totalItems = group.items.length + group.plannedItems.length;
+                        const allDone = groupLinked === totalItems && group.plannedItems.length === 0;
 
                         return (
                             <div key={group.target_account_id} className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden shadow-lg">
                                 {/* Envelope Header */}
                                 <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900/60 border-b border-slate-700/30">
                                     <div className="flex items-center gap-2">
-                                        <ArrowUpRight size={14} className={allLinked ? "text-emerald-400" : "text-slate-500"} />
+                                        <ArrowUpRight size={14} className={allDone ? "text-emerald-400" : "text-slate-500"} />
                                         <span className="text-white font-semibold text-sm">{group.target_account_name}</span>
                                         <span className="text-[9px] text-slate-500 font-mono">
-                                            ({group.items.length} distribution{group.items.length > 1 ? 's' : ''})
+                                            ({totalItems} item{totalItems > 1 ? 's' : ''})
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-3">
                                         <span className="text-[10px] text-slate-400 font-mono">
-                                            Total: <span className="text-purple-400 font-semibold">{formatCurrency(groupTotal)}</span>
+                                            Total: <span className="text-purple-400 font-semibold">{formatCurrency(groupTotal + plannedTotal)}</span>
                                         </span>
-                                        <span className="text-[10px] text-slate-400 font-mono">
-                                            <span className="text-emerald-400">{groupLinked}</span>/{group.items.length} linked
-                                        </span>
-                                        {allLinked ? (
+                                        {group.items.length > 0 && (
+                                            <span className="text-[10px] text-slate-400 font-mono">
+                                                <span className="text-emerald-400">{groupLinked}</span>/{group.items.length} linked
+                                            </span>
+                                        )}
+                                        {group.plannedItems.length > 0 && (
+                                            <span className="text-[10px] text-amber-400 font-mono">
+                                                {group.plannedItems.length} planned
+                                            </span>
+                                        )}
+                                        {allDone ? (
                                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-lg border border-emerald-500/30 uppercase">
                                                 <CheckCircle size={10} /> Distributed
                                             </span>
@@ -414,8 +529,9 @@ const Distributions = ({ accounts }) => {
                                     </div>
                                 </div>
 
-                                {/* Distribution Items */}
+                                {/* Distribution Items + Planned Items */}
                                 <div className="divide-y divide-slate-700/30">
+                                    {/* Real distribution records */}
                                     {group.items.map(item => {
                                         const isLinked = item.transaction_id || (item.linked_transactions && item.linked_transactions.length > 0);
                                         return (
@@ -496,6 +612,30 @@ const Distributions = ({ accounts }) => {
                                             </div>
                                         );
                                     })}
+
+                                    {/* Planned items (from allocation preview, no distribution record yet) */}
+                                    {group.plannedItems.map(planned => (
+                                        <div key={`planned-${planned.obligation_id}`} className="px-4 py-3 flex items-center justify-between gap-4 border-l-2 border-l-amber-500/40 bg-amber-900/5 hover:bg-amber-900/10 transition">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-amber-400 font-mono font-medium text-sm">{formatCurrency(planned.amount)}</span>
+                                                    <span className="text-blue-300 text-xs">{planned.obligation_name}</span>
+                                                    {planned.category && (
+                                                        <span className="text-[8px] text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">{planned.category}</span>
+                                                    )}
+                                                    <span className="text-[8px] font-bold text-amber-400 bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30 uppercase">
+                                                        Planned
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => handleCreateAndLink(planned)}
+                                                className="bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 hover:text-amber-200 text-[10px] px-3 py-1.5 rounded border border-amber-500/30 hover:border-amber-400 font-bold uppercase tracking-wider transition flex items-center gap-1.5"
+                                            >
+                                                <PlusCircle size={11} /> Create & Link
+                                            </button>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         );
