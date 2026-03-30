@@ -247,8 +247,8 @@ const Distributions = ({ accounts }) => {
         setShowMultiLinkModal(true);
     };
 
-    // Create distribution for a planned item, then open link modal
-    const handleCreateAndLink = async (plannedItem) => {
+    // Create distribution for an entire envelope (all planned obligations for a target account), then open link modal
+    const handleCreateAndLink = async (plannedItems, targetAccountId) => {
         try {
             const incomeAcc = accounts.find(a => a.is_income);
             if (!incomeAcc) return alert('No source income account found');
@@ -260,11 +260,12 @@ const Distributions = ({ accounts }) => {
             const targetDate = new Date(parseInt(selectedYear), parseInt(selectedMonth) - 1, 1);
             const offset = (targetDate.getFullYear() - now.getFullYear()) * 12 + (targetDate.getMonth() - now.getMonth());
 
-            // Create distribution record via execute endpoint for this single obligation
+            // Create ONE distribution for all obligations in this envelope
+            const oblIds = plannedItems.map(p => p.obligation_id);
             await axios.post(`${API_URL}/allocation/execute`, {
                 source_account_id: incomeAcc.id,
                 month_offset: offset,
-                obligation_ids: [plannedItem.obligation_id]
+                obligation_ids: oblIds
             });
 
             // Re-fetch to get the new distribution
@@ -273,7 +274,7 @@ const Distributions = ({ accounts }) => {
 
             // Find the newly created distribution for this target account + month
             const newDist = distRes.data.find(d =>
-                d.target_account_id === plannedItem.target_account_id &&
+                d.target_account_id === targetAccountId &&
                 d.billing_month === billingMonth &&
                 !d.transaction_id &&
                 (!d.linked_transactions || d.linked_transactions.length === 0)
@@ -613,29 +614,37 @@ const Distributions = ({ accounts }) => {
                                         );
                                     })}
 
-                                    {/* Planned items (from allocation preview, no distribution record yet) */}
-                                    {group.plannedItems.map(planned => (
-                                        <div key={`planned-${planned.obligation_id}`} className="px-4 py-3 flex items-center justify-between gap-4 border-l-2 border-l-amber-500/40 bg-amber-900/5 hover:bg-amber-900/10 transition">
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-amber-400 font-mono font-medium text-sm">{formatCurrency(planned.amount)}</span>
-                                                    <span className="text-blue-300 text-xs">{planned.obligation_name}</span>
-                                                    {planned.category && (
-                                                        <span className="text-[8px] text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">{planned.category}</span>
-                                                    )}
-                                                    <span className="text-[8px] font-bold text-amber-400 bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30 uppercase">
-                                                        Planned
-                                                    </span>
+                                    {/* Planned envelope summary (no distribution record yet) */}
+                                    {group.plannedItems.length > 0 && (
+                                        <div className="px-4 py-3 border-l-2 border-l-amber-500/40 bg-amber-900/5">
+                                            <div className="flex items-center justify-between gap-4">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1.5">
+                                                        <span className="text-amber-400 font-mono font-semibold text-sm">{formatCurrency(plannedTotal)}</span>
+                                                        <span className="text-[8px] font-bold text-amber-400 bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30 uppercase">
+                                                            Planned
+                                                        </span>
+                                                        <span className="text-[9px] text-slate-500">
+                                                            {group.plannedItems.length} obligation{group.plannedItems.length > 1 ? 's' : ''}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {group.plannedItems.map(p => (
+                                                            <span key={p.obligation_id} className="text-[9px] bg-slate-700/60 text-slate-300 px-1.5 py-0.5 rounded">
+                                                                {p.obligation_name} ({formatCurrency(p.amount)})
+                                                            </span>
+                                                        ))}
+                                                    </div>
                                                 </div>
+                                                <button
+                                                    onClick={() => handleCreateAndLink(group.plannedItems, group.target_account_id)}
+                                                    className="bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 hover:text-amber-200 text-[10px] px-3 py-1.5 rounded border border-amber-500/30 hover:border-amber-400 font-bold uppercase tracking-wider transition flex items-center gap-1.5 flex-shrink-0"
+                                                >
+                                                    <PlusCircle size={11} /> Create & Link
+                                                </button>
                                             </div>
-                                            <button
-                                                onClick={() => handleCreateAndLink(planned)}
-                                                className="bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 hover:text-amber-200 text-[10px] px-3 py-1.5 rounded border border-amber-500/30 hover:border-amber-400 font-bold uppercase tracking-wider transition flex items-center gap-1.5"
-                                            >
-                                                <PlusCircle size={11} /> Create & Link
-                                            </button>
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
                             </div>
                         );
