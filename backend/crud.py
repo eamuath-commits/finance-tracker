@@ -1732,10 +1732,9 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
         models.MonthlyObligation.due_day.asc()
     ).all()
     
-    # Get existing Distributions for this month
+    # Get existing Distributions for this month (any source — we care about what was sent to targets)
     existing_distributions = db.query(models.Distribution).filter(
-        models.Distribution.billing_month == target_month_str,
-        models.Distribution.source_account_id == source_account_id
+        models.Distribution.billing_month == target_month_str
     ).all()
     # Build lookup: obligation_id -> total transferred amount (legacy per-obligation)
     transferred_by_obl = {}
