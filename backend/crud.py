@@ -1732,16 +1732,22 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
         models.MonthlyObligation.due_day.asc()
     ).all()
     
-    # Get existing Distributions for this month per-obligation
+    # Get existing Distributions for this month
     existing_distributions = db.query(models.Distribution).filter(
         models.Distribution.billing_month == target_month_str,
         models.Distribution.source_account_id == source_account_id
     ).all()
-    # Build lookup: obligation_id -> total transferred amount
+    # Build lookup: obligation_id -> total transferred amount (legacy per-obligation)
     transferred_by_obl = {}
+    # Build lookup: target_account_id -> total transferred amount (envelope-level)
+    transferred_by_envelope = {}
     for d in existing_distributions:
         if d.obligation_id:
             transferred_by_obl[d.obligation_id] = transferred_by_obl.get(d.obligation_id, 0) + d.amount
+        else:
+            # Envelope-level distribution (no obligation_id)
+            tid = d.target_account_id
+            transferred_by_envelope[tid] = transferred_by_envelope.get(tid, 0) + d.amount
     
     # Get all payments for target month
     target_payments = db.query(models.Payment).filter(
@@ -1770,6 +1776,9 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     total_transferred = 0.0
     total_pending = 0.0
     
+    # First pass: collect obligations per target account with their expected amounts
+    obls_by_target = {}  # target_account_id -> [(obl, expected_amount), ...]
+    
     for obl in obligations:
         # Determine expected amount: PAID > BUDGET > previous month > obligation.amount
         if obl.id in target_payment_amounts:
@@ -1784,42 +1793,68 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
             expected_amount = 0
         
         if expected_amount <= 0:
-            continue  # Skip obligations with no known amount
+            continue
         
-        # Check if obligation has a target account assigned
         if not obl.target_account_id:
             unassigned_items.append(obl.name)
             continue
         
-        target_acc = accounts_by_id.get(obl.target_account_id)
-        already_transferred = transferred_by_obl.get(obl.id, 0)
-        pending_amount = max(0, expected_amount - already_transferred)
+        if obl.target_account_id not in obls_by_target:
+            obls_by_target[obl.target_account_id] = []
+        obls_by_target[obl.target_account_id].append((obl, expected_amount))
+    
+    # Second pass: distribute envelope-level transfers proportionally
+    for target_id, obl_list in obls_by_target.items():
+        envelope_total = transferred_by_envelope.get(target_id, 0)
+        group_required = sum(ea for _, ea in obl_list)
         
-        # Determine status
-        if already_transferred >= expected_amount:
-            status = 'transferred'
-        elif already_transferred > 0:
-            status = 'partial'
-        else:
-            status = 'pending'
+        # Distribute envelope transfer proportionally across obligations
+        remaining_envelope = envelope_total
         
-        total_required += expected_amount
-        total_transferred += already_transferred
-        total_pending += pending_amount
-        
-        allocations.append(schemas.AllocationItem(
-            obligation_id=obl.id,
-            obligation_name=obl.name,
-            category=obl.category,
-            provider=obl.provider,
-            target_account_id=obl.target_account_id,
-            target_account_name=target_acc.name if target_acc else "Unknown",
-            amount=expected_amount,
-            already_transferred=already_transferred,
-            pending_amount=pending_amount,
-            status=status,
-            due_day=obl.due_day
-        ))
+        for i, (obl, expected_amount) in enumerate(obl_list):
+            # Per-obligation transfer (legacy)
+            obl_transferred = transferred_by_obl.get(obl.id, 0)
+            
+            # Add proportional share of envelope-level transfer
+            if remaining_envelope > 0 and group_required > 0:
+                if i == len(obl_list) - 1:
+                    # Last item gets remainder to avoid rounding errors
+                    share = remaining_envelope
+                else:
+                    share = round(envelope_total * (expected_amount / group_required), 2)
+                    share = min(share, remaining_envelope)
+                obl_transferred += share
+                remaining_envelope -= share
+            
+            already_transferred = obl_transferred
+            pending_amount = max(0, expected_amount - already_transferred)
+            
+            # Determine status
+            if already_transferred >= expected_amount:
+                status = 'transferred'
+            elif already_transferred > 0:
+                status = 'partial'
+            else:
+                status = 'pending'
+            
+            target_acc = accounts_by_id.get(obl.target_account_id)
+            total_required += expected_amount
+            total_transferred += already_transferred
+            total_pending += pending_amount
+            
+            allocations.append(schemas.AllocationItem(
+                obligation_id=obl.id,
+                obligation_name=obl.name,
+                category=obl.category,
+                provider=obl.provider,
+                target_account_id=obl.target_account_id,
+                target_account_name=target_acc.name if target_acc else "Unknown",
+                amount=expected_amount,
+                already_transferred=already_transferred,
+                pending_amount=pending_amount,
+                status=status,
+                due_day=obl.due_day
+            ))
     
     return schemas.AllocationPreviewResponse(
         billing_month=target_month_str,
