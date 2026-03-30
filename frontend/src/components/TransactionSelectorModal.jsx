@@ -214,21 +214,31 @@ export default function TransactionSelectorModal({
                 </div>
 
                 {/* Selection Summary */}
-                {selected.size > 0 && (
-                    <div className="py-2 px-3 bg-blue-900/20 rounded-lg my-2 flex justify-between items-center">
-                        <span className="text-sm text-blue-300">
-                            {selected.size} transaction{selected.size > 1 ? 's' : ''} selected
-                            {newSelections.length > 0 && ` (${newSelections.length} new)`}
-                        </span>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setSelected(new Set(currentLinked))}
-                        >
-                            Reset
-                        </Button>
-                    </div>
-                )}
+                {selected.size > 0 && (() => {
+                    const selectedTotal = transactions
+                        .filter(tx => selected.has(tx.id))
+                        .reduce((sum, tx) => sum + (tx.amount || 0), 0);
+                    return (
+                        <div className="py-2 px-3 bg-blue-900/20 rounded-lg my-2 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <span className="text-sm text-blue-300">
+                                    {selected.size} transaction{selected.size > 1 ? 's' : ''} selected
+                                    {newSelections.length > 0 && ` (${newSelections.length} new)`}
+                                </span>
+                                <span className="text-sm font-mono font-semibold text-emerald-400">
+                                    {formatAmount(selectedTotal)}
+                                </span>
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSelected(new Set(currentLinked))}
+                            >
+                                Reset
+                            </Button>
+                        </div>
+                    );
+                })()}
 
                 {/* Transaction List */}
                 <div className="flex-1 overflow-y-auto mt-2 space-y-2">
