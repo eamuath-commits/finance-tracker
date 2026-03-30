@@ -228,36 +228,28 @@ def delete_account(account_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Account not found")
     return {"message": "Account deleted successfully"}
 
-@app.post("/accounts/{account_id}/recalculate-balance")
-def recalculate_account_balance(account_id: str, db: Session = Depends(get_db)):
-    """Recalculate account balance using the first transaction as baseline, then replaying forward."""
+def _recalculate_account_balance(db: Session, account_id: str):
+    """
+    Internal helper: recalculate account balance from first transaction baseline.
+    Returns dict with old/new balance info, or None if account not found.
+    """
     account = db.query(models.Account).filter(models.Account.id == account_id).first()
     if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
+        return None
     
     old_balance = account.current_balance
     
-    # Get all transactions ordered by timestamp
     transactions = db.query(models.Transaction).filter(
         models.Transaction.account_id == account_id
     ).order_by(models.Transaction.timestamp.asc()).all()
     
     if not transactions:
-        return {
-            "message": "No transactions found",
-            "account_id": account_id,
-            "old_balance": round(old_balance, 2),
-            "new_balance": round(old_balance, 2),
-            "baseline": None,
-            "transaction_count": 0
-        }
+        return {"old_balance": old_balance, "new_balance": old_balance, "transaction_count": 0}
     
-    # Find baseline: first transaction's balance_after_transaction
     first_tx = transactions[0]
     baseline = first_tx.balance_after_transaction
     
     if baseline is not None:
-        # Derive the balance BEFORE the first transaction
         if first_tx.type == "credit":
             running = baseline - first_tx.amount
         else:
@@ -265,7 +257,6 @@ def recalculate_account_balance(account_id: str, db: Session = Depends(get_db)):
         if first_tx.fees:
             running += first_tx.fees
         
-        # Replay all transactions forward from the pre-first-tx balance
         for tx in transactions:
             if tx.type == "credit":
                 running += tx.amount
@@ -273,10 +264,8 @@ def recalculate_account_balance(account_id: str, db: Session = Depends(get_db)):
                 running -= tx.amount
             if tx.fees:
                 running -= tx.fees
-            # Also fix each transaction's snapshot
             tx.balance_after_transaction = round(running, 2)
     else:
-        # No baseline available — fall back to sum(credits) - sum(debits)
         running = 0
         for tx in transactions:
             if tx.type == "credit":
@@ -289,11 +278,8 @@ def recalculate_account_balance(account_id: str, db: Session = Depends(get_db)):
     
     account.current_balance = round(running, 2)
     db.commit()
-    db.refresh(account)
     
     return {
-        "message": "Balance recalculated from first transaction baseline",
-        "account_id": account_id,
         "old_balance": round(old_balance, 2),
         "new_balance": account.current_balance,
         "baseline": baseline,
@@ -301,6 +287,17 @@ def recalculate_account_balance(account_id: str, db: Session = Depends(get_db)):
         "baseline_date": first_tx.timestamp.isoformat(),
         "transaction_count": len(transactions)
     }
+
+
+@app.post("/accounts/{account_id}/recalculate-balance")
+def recalculate_account_balance(account_id: str, db: Session = Depends(get_db)):
+    """Recalculate account balance using the first transaction as baseline, then replaying forward."""
+    result = _recalculate_account_balance(db, account_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+    result["message"] = "Balance recalculated from first transaction baseline"
+    result["account_id"] = account_id
+    return result
 
 @app.post("/accounts/recalculate-all-balances")
 def recalculate_all_account_balances(db: Session = Depends(get_db)):
@@ -1425,9 +1422,6 @@ def complete_pending_transfer(transaction_id: str, source_account_id: str, db: S
         pending_tx.status = "completed"
         pending_tx.merchant = pending_tx.merchant or "External Transfer"
         
-        # Apply balance update for the credit
-        queue_processor.apply_balance_update(db, pending_tx)
-        
         # Update TransactionQueue entry to processed
         queue_entry = db.query(models.TransactionQueue).filter(
             models.TransactionQueue.transaction_id == transaction_id
@@ -1437,6 +1431,10 @@ def complete_pending_transfer(transaction_id: str, source_account_id: str, db: S
             queue_entry.processed_at = func.now()
         
         db.commit()
+        
+        # Recalculate account balance chronologically
+        _recalculate_account_balance(db, pending_tx.account_id)
+        
         return {
             "status": "completed",
             "message": "Transfer marked as from external source",
@@ -1479,14 +1477,7 @@ def complete_pending_transfer(transaction_id: str, source_account_id: str, db: S
     pending_tx.status = "completed"
     pending_tx.merchant = f"Transfer from {source_account.name}"
     
-    # 3. Apply balance updates via queue processor
-    # Source account: debit (subtract)
-    queue_processor.apply_balance_update(db, debit_tx)
-    
-    # Destination account: credit (add)
-    queue_processor.apply_balance_update(db, pending_tx)
-    
-    # 4. Add queue entries to track these transactions
+    # 3. Add queue entries to track these transactions
     debit_queue = models.TransactionQueue(
         transaction_id=debit_tx.id,
         account_id=source_account_id,
@@ -1495,8 +1486,7 @@ def complete_pending_transfer(transaction_id: str, source_account_id: str, db: S
     )
     db.add(debit_queue)
     
-    # 5. Mark the credit transaction's queue entry as processed (NOT queued!)
-    # The balance was already applied above, so we must NOT allow try_process to apply it again
+    # 4. Mark the credit transaction's queue entry as processed
     credit_queue = db.query(models.TransactionQueue).filter(
         models.TransactionQueue.transaction_id == pending_tx.id
     ).first()
@@ -1505,8 +1495,11 @@ def complete_pending_transfer(transaction_id: str, source_account_id: str, db: S
         credit_queue.blocked_reason = None
         credit_queue.processed_at = datetime.utcnow()
     
-    # Process any remaining queued items for source account
-    queue_processor.try_process(db, account_id=source_account_id)
+    db.commit()
+    
+    # 5. Recalculate both accounts chronologically so balance_after_transaction is correct
+    _recalculate_account_balance(db, source_account_id)
+    _recalculate_account_balance(db, pending_tx.account_id)
     
     db.commit()
     db.refresh(pending_tx)
