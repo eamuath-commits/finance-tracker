@@ -612,6 +612,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                 onSelect={handleMultiLink}
                 currentLinked={linkedTransactionIds}
                 title={`Link Transactions to ${linkingPayment?.oblName || 'Payment'}`}
+                expectedAmount={linkingPayment?.amount || null}
             />
 
             {/* Transaction Detail Modal */}

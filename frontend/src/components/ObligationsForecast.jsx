@@ -957,6 +957,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                 onSelect={handleBrowseLink}
                 currentLinked={[]}
                 title={`Link Transaction to ${linkingObl?.name || 'Obligation'}`}
+                expectedAmount={linkingObl?.amount || null}
             />
         </div>
     );

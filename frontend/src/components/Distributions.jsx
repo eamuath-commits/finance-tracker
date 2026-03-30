@@ -498,6 +498,7 @@ const Distributions = ({ accounts }) => {
                 currentLinked={linkedTransactionIds}
                 title={`Link Transactions to ${linkingTransfer?.target_account_name || 'Distribution'}`}
                 filters={{ accountId: linkingTransfer?.source_account_id || '' }}
+                expectedAmount={linkingTransfer?.amount || null}
             />
 
             {/* Transaction Detail Modal */}

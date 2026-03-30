@@ -20,7 +20,8 @@ export default function TransactionSelectorModal({
     onSelect,
     currentLinked = [],
     title = "Link Transactions",
-    filters: defaultFilters = {}
+    filters: defaultFilters = {},
+    expectedAmount = null
 }) {
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -218,6 +219,7 @@ export default function TransactionSelectorModal({
                     const selectedTotal = transactions
                         .filter(tx => selected.has(tx.id))
                         .reduce((sum, tx) => sum + (tx.amount || 0), 0);
+                    const diff = expectedAmount != null ? selectedTotal - expectedAmount : null;
                     return (
                         <div className="py-2 px-3 bg-blue-900/20 rounded-lg my-2 flex justify-between items-center">
                             <div className="flex items-center gap-3">
@@ -228,6 +230,19 @@ export default function TransactionSelectorModal({
                                 <span className="text-sm font-mono font-semibold text-emerald-400">
                                     {formatAmount(selectedTotal)}
                                 </span>
+                                {expectedAmount != null && (
+                                    <span className="text-xs text-slate-400">
+                                        / {formatAmount(expectedAmount)}
+                                        {diff != null && Math.abs(diff) > 0.01 && (
+                                            <span className={`ml-1 font-mono font-semibold ${diff > 0 ? 'text-red-400' : 'text-amber-400'}`}>
+                                                ({diff > 0 ? '+' : ''}{formatAmount(diff)})
+                                            </span>
+                                        )}
+                                        {diff != null && Math.abs(diff) <= 0.01 && (
+                                            <span className="ml-1 text-emerald-400 font-semibold">✓</span>
+                                        )}
+                                    </span>
+                                )}
                             </div>
                             <Button
                                 variant="ghost"
