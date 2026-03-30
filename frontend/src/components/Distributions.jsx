@@ -179,12 +179,16 @@ const Distributions = ({ accounts }) => {
         });
 
         // Add planned items from allocation preview (only for current month filter)
+        // Skip envelopes that already have real distribution records
         if (allocationPreview && selectedYear !== 'All' && selectedMonth !== 'All') {
             const filterMonth = `${selectedYear}-${selectedMonth}`;
             if (allocationPreview.billing_month === filterMonth) {
                 allocationPreview.allocations.forEach(alloc => {
                     if (alloc.status === 'pending') {
                         const key = alloc.target_account_id;
+                        // Only show as planned if NO distribution record exists for this envelope
+                        if (groups[key] && groups[key].items.length > 0) return;
+
                         if (!groups[key]) {
                             groups[key] = {
                                 target_account_id: key,
@@ -395,7 +399,7 @@ const Distributions = ({ accounts }) => {
                         <div className="flex flex-col gap-0.5 mt-1">
                             <span className="text-white font-semibold">{sorted.length} Records</span>
                             <span className="flex items-center gap-1 text-[10px] opacity-80">
-                                <span className="text-emerald-400">{linkedCount} Linked</span>
+                                <span className="text-emerald-400">{linkedCount} Distributed</span>
                                 <span>·</span>
                                 <span className="text-amber-400">{pendingCount} Pending</span>
                             </span>
@@ -466,7 +470,7 @@ const Distributions = ({ accounts }) => {
                             onChange={(e) => setSelectedStatus(e.target.value)}
                         >
                             <option value="All">All Status</option>
-                            <option value="Linked">Linked</option>
+                            <option value="Linked">Distributed</option>
                             <option value="Pending">Pending</option>
                         </select>
 
@@ -510,7 +514,7 @@ const Distributions = ({ accounts }) => {
                                         </span>
                                         {group.items.length > 0 && (
                                             <span className="text-[10px] text-slate-400 font-mono">
-                                                <span className="text-emerald-400">{groupLinked}</span>/{group.items.length} linked
+                                                <span className="text-emerald-400">{groupLinked}</span>/{group.items.length} distributed
                                             </span>
                                         )}
                                         {group.plannedItems.length > 0 && (
@@ -599,7 +603,7 @@ const Distributions = ({ accounts }) => {
                                                         onClick={() => openLinkModal(item)}
                                                         className="bg-slate-700/50 hover:bg-purple-600/50 text-slate-400 hover:text-purple-300 text-[10px] px-2 py-1 rounded border border-slate-600 hover:border-purple-500 font-bold uppercase tracking-wider transition flex items-center gap-1"
                                                     >
-                                                        <LinkIcon size={10} /> {isLinked ? '+ Add' : 'Link'}
+                                                        <LinkIcon size={10} /> Distribute
                                                     </button>
 
                                                     <button
@@ -677,7 +681,7 @@ const Distributions = ({ accounts }) => {
                                 <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('amount')}>
                                     <div className="flex items-center gap-1">Amount {getSortIcon('amount')}</div>
                                 </th>
-                                <th className="px-4 py-4 border-b border-slate-700">Linked Transaction</th>
+                                <th className="px-4 py-4 border-b border-slate-700">Transaction</th>
                                 <th className="px-4 py-4 border-b border-slate-700 text-right">Actions</th>
                             </tr>
                         </thead>
@@ -701,7 +705,7 @@ const Distributions = ({ accounts }) => {
 
                                     <td className="px-4 py-3">
                                         {(item.linked_transactions && item.linked_transactions.length > 0) || item.transaction_id ? (
-                                            <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded border border-emerald-500/30 font-bold uppercase tracking-wider">Linked</span>
+                                            <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded border border-emerald-500/30 font-bold uppercase tracking-wider">Distributed</span>
                                         ) : (
                                             <span className="bg-amber-500/20 text-amber-400 text-[10px] px-2 py-1 rounded border border-amber-500/30 font-bold uppercase tracking-wider">Pending</span>
                                         )}
@@ -739,7 +743,7 @@ const Distributions = ({ accounts }) => {
                                                     onClick={() => openLinkModal(item)}
                                                     className="text-slate-500 hover:text-purple-400 text-[10px] px-1 py-1 transition"
                                                 >
-                                                    + Add
+                                                    + Distribute
                                                 </button>
                                             </div>
                                         ) : item.transaction_id ? (
@@ -766,7 +770,7 @@ const Distributions = ({ accounts }) => {
                                                 onClick={() => openLinkModal(item)}
                                                 className="bg-slate-700/50 hover:bg-purple-600/50 text-slate-400 hover:text-purple-300 text-[10px] px-2 py-1 rounded border border-slate-600 hover:border-purple-500 font-bold uppercase tracking-wider transition flex items-center gap-1"
                                             >
-                                                <LinkIcon size={10} /> Link
+                                                <LinkIcon size={10} /> Distribute
                                             </button>
                                         )}
                                     </td>
