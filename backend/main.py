@@ -1777,7 +1777,6 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
         raw_msg = models.RawMessage(
             sender=payload.sender or "Unknown",
             body=payload.body.strip(),
-            source="webui",
             status=models.MessageStatus.IGNORED
         )
         raw_msg.error_log = "Skipped: credit card statement/reminder notification"
