@@ -230,34 +230,75 @@ def delete_account(account_id: str, db: Session = Depends(get_db)):
 
 @app.post("/accounts/{account_id}/recalculate-balance")
 def recalculate_account_balance(account_id: str, db: Session = Depends(get_db)):
-    """Recalculate account balance purely from transaction history (credits - debits - fees)"""
+    """Recalculate account balance using the first transaction as baseline, then replaying forward."""
     account = db.query(models.Account).filter(models.Account.id == account_id).first()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
     
     old_balance = account.current_balance
     
-    # Always calculate from scratch: sum(credits) - sum(debits) - sum(fees)
+    # Get all transactions ordered by timestamp
     transactions = db.query(models.Transaction).filter(
         models.Transaction.account_id == account_id
-    ).all()
+    ).order_by(models.Transaction.timestamp.asc()).all()
     
-    total_credits = sum(t.amount for t in transactions if t.type == "credit")
-    total_debits = sum(t.amount for t in transactions if t.type == "debit")
-    total_fees = sum(t.fees or 0 for t in transactions)
+    if not transactions:
+        return {
+            "message": "No transactions found",
+            "account_id": account_id,
+            "old_balance": round(old_balance, 2),
+            "new_balance": round(old_balance, 2),
+            "baseline": None,
+            "transaction_count": 0
+        }
     
-    account.current_balance = round(total_credits - total_debits - total_fees, 2)
+    # Find baseline: first transaction's balance_after_transaction
+    first_tx = transactions[0]
+    baseline = first_tx.balance_after_transaction
+    
+    if baseline is not None:
+        # Derive the balance BEFORE the first transaction
+        if first_tx.type == "credit":
+            running = baseline - first_tx.amount
+        else:
+            running = baseline + first_tx.amount
+        if first_tx.fees:
+            running += first_tx.fees
+        
+        # Replay all transactions forward from the pre-first-tx balance
+        for tx in transactions:
+            if tx.type == "credit":
+                running += tx.amount
+            else:
+                running -= tx.amount
+            if tx.fees:
+                running -= tx.fees
+            # Also fix each transaction's snapshot
+            tx.balance_after_transaction = round(running, 2)
+    else:
+        # No baseline available — fall back to sum(credits) - sum(debits)
+        running = 0
+        for tx in transactions:
+            if tx.type == "credit":
+                running += tx.amount
+            else:
+                running -= tx.amount
+            if tx.fees:
+                running -= tx.fees
+            tx.balance_after_transaction = round(running, 2)
+    
+    account.current_balance = round(running, 2)
     db.commit()
     db.refresh(account)
     
     return {
-        "message": "Balance recalculated from transactions",
+        "message": "Balance recalculated from first transaction baseline",
         "account_id": account_id,
         "old_balance": round(old_balance, 2),
         "new_balance": account.current_balance,
-        "total_credits": round(total_credits, 2),
-        "total_debits": round(total_debits, 2),
-        "total_fees": round(total_fees, 2),
+        "baseline": baseline,
+        "baseline_tx": first_tx.merchant or "Unknown",
+        "baseline_date": first_tx.timestamp.isoformat(),
         "transaction_count": len(transactions)
     }
 
