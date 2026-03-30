@@ -1768,6 +1768,15 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     for p in prev_payments:
         prev_amounts_by_obl[p.obligation_id] = p.amount
     
+    # Get previous month distributions for fallback amounts
+    prev_distributions = db.query(models.Distribution).filter(
+        models.Distribution.billing_month == prev_month_str
+    ).all()
+    prev_dist_by_obl = {}
+    for d in prev_distributions:
+        if d.obligation_id:
+            prev_dist_by_obl[d.obligation_id] = prev_dist_by_obl.get(d.obligation_id, 0) + d.amount
+    
     # Build per-obligation allocation items
     allocations = []
     unassigned_items = []
@@ -1779,13 +1788,15 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     obls_by_target = {}  # target_account_id -> [(obl, expected_amount), ...]
     
     for obl in obligations:
-        # Determine expected amount: PAID > BUDGET > previous month > obligation.amount
+        # Determine expected amount: PAID > BUDGET > prev payment > prev distribution > obligation.amount
         if obl.id in target_payment_amounts:
             expected_amount = target_payment_amounts[obl.id]
         elif obl.id in target_budget_amounts:
             expected_amount = target_budget_amounts[obl.id]
         elif obl.id in prev_amounts_by_obl:
             expected_amount = prev_amounts_by_obl[obl.id]
+        elif obl.id in prev_dist_by_obl:
+            expected_amount = prev_dist_by_obl[obl.id]
         elif obl.amount and obl.amount > 0:
             expected_amount = obl.amount
         else:
