@@ -1663,13 +1663,13 @@ def get_random_training_examples(db: Session, limit: int = 3):
 
 def calculate_allocation_preview(db: Session, source_account_id: str, month_offset: int = 0):
     """
-    Calculate allocation preview for salary distribution.
+    Calculate allocation preview for salary distribution planning.
     
     Per-obligation approach:
     1. Get all obligations with target_account_id assigned
     2. Get each obligation's expected amount for the target month
-    3. Check existing distributions per-obligation to determine status
-    4. Return per-obligation preview of transfers
+    3. Check if distributions exist AND have linked transactions
+    4. Status: 'transferred' = linked tx exists, 'pending' = everything else
     """
     from dateutil.relativedelta import relativedelta
     
@@ -1689,19 +1689,30 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
         models.MonthlyObligation.due_day.asc()
     ).all()
     
-    # Get existing Distributions for this month (any source — we care about what was sent to targets)
+    # Get existing Distributions for this month
     existing_distributions = db.query(models.Distribution).filter(
         models.Distribution.billing_month == target_month_str
     ).all()
-    # Build lookup: obligation_id -> total transferred amount (legacy per-obligation)
-    transferred_by_obl = {}
-    # Build lookup: target_account_id -> total transferred amount (envelope-level)
+    
+    # Check which distributions have linked transactions
+    dist_ids = [d.id for d in existing_distributions]
+    linked_dist_ids = set()
+    if dist_ids:
+        # Check junction table (multi-link)
+        linked_junctions = db.query(models.DistributionTransaction.distribution_id).filter(
+            models.DistributionTransaction.distribution_id.in_(dist_ids)
+        ).distinct().all()
+        linked_dist_ids = {row[0] for row in linked_junctions}
+    
+    # Also check legacy single-link (transaction_id on distribution)
+    for d in existing_distributions:
+        if d.transaction_id:
+            linked_dist_ids.add(d.id)
+    
+    # Build lookup: target_account_id -> total amount from distributions WITH linked transactions
     transferred_by_envelope = {}
     for d in existing_distributions:
-        if d.obligation_id:
-            transferred_by_obl[d.obligation_id] = transferred_by_obl.get(d.obligation_id, 0) + d.amount
-        else:
-            # Envelope-level distribution (no obligation_id)
+        if d.id in linked_dist_ids:
             tid = d.target_account_id
             transferred_by_envelope[tid] = transferred_by_envelope.get(tid, 0) + d.amount
     
@@ -1770,37 +1781,31 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
             obls_by_target[obl.target_account_id] = []
         obls_by_target[obl.target_account_id].append((obl, expected_amount))
     
-    # Second pass: distribute envelope-level transfers proportionally
+    # Second pass: determine status from linked transactions
     for target_id, obl_list in obls_by_target.items():
-        envelope_total = transferred_by_envelope.get(target_id, 0)
+        envelope_transferred = transferred_by_envelope.get(target_id, 0)
         group_required = sum(ea for _, ea in obl_list)
         
-        # Distribute envelope transfer proportionally across obligations
-        remaining_envelope = envelope_total
+        # Distribute linked amount proportionally across obligations
+        remaining = envelope_transferred
         
         for i, (obl, expected_amount) in enumerate(obl_list):
-            # Per-obligation transfer (legacy)
-            obl_transferred = transferred_by_obl.get(obl.id, 0)
-            
-            # Add proportional share of envelope-level transfer
-            if remaining_envelope > 0 and group_required > 0:
+            if remaining > 0 and group_required > 0:
                 if i == len(obl_list) - 1:
-                    # Last item gets remainder to avoid rounding errors
-                    share = remaining_envelope
+                    share = remaining
                 else:
-                    share = round(envelope_total * (expected_amount / group_required), 2)
-                    share = min(share, remaining_envelope)
-                obl_transferred += share
-                remaining_envelope -= share
+                    share = round(envelope_transferred * (expected_amount / group_required), 2)
+                    share = min(share, remaining)
+                already_transferred = share
+                remaining -= share
+            else:
+                already_transferred = 0
             
-            already_transferred = obl_transferred
             pending_amount = max(0, expected_amount - already_transferred)
             
-            # Determine status
+            # Only 2 states: transferred (has linked tx) or pending
             if already_transferred >= expected_amount:
                 status = 'transferred'
-            elif already_transferred > 0:
-                status = 'partial'
             else:
                 status = 'pending'
             
