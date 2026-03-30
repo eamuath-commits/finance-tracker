@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowRight, CheckCircle, AlertCircle, RefreshCw, Receipt, Clock, ArrowUpRight, RotateCcw } from 'lucide-react';
-import { SectionHeader, formatCurrency, Modal } from '../components/UI';
+import { ArrowUpRight, CheckCircle, Clock, Receipt } from 'lucide-react';
+import { SectionHeader, formatCurrency } from '../components/UI';
 import AllocationRules from '../components/AllocationRules';
 import Distributions from '../components/Distributions';
 
@@ -22,13 +22,7 @@ const Allocation = () => {
     const [sourceAccountId, setSourceAccountId] = useState('');
     const [monthOffset, setMonthOffset] = useState(0);
     const [previewData, setPreviewData] = useState(null);
-    const [distributing, setDistributing] = useState(false);
-
-    // Editable override amounts per obligation
-    const [editableAmounts, setEditableAmounts] = useState({});
-    // Selected obligations for batch execute
-    const [selectedIds, setSelectedIds] = useState(new Set());
-    const [surplusTargetId, setSurplusTargetId] = useState('');
+    const [loadingPreview, setLoadingPreview] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -62,170 +56,20 @@ const Allocation = () => {
     }, [activeTab, sourceAccountId, monthOffset]);
 
     const handleRunPreview = async () => {
-        setEditableAmounts({});
         if (!sourceAccountId) return;
 
-        setDistributing(true);
+        setLoadingPreview(true);
         try {
             const res = await axios.post(`${API_URL}/allocation/preview`, {
                 source_account_id: sourceAccountId,
                 month_offset: monthOffset
             });
             setPreviewData(res.data);
-            // Auto-select all pending items
-            const pendingIds = new Set();
-            res.data.allocations?.forEach(item => {
-                if (item.status === 'pending' || item.status === 'partial') {
-                    pendingIds.add(item.obligation_id);
-                }
-            });
-            setSelectedIds(pendingIds);
         } catch (error) {
             console.error("Preview failed:", error);
         } finally {
-            setDistributing(false);
+            setLoadingPreview(false);
         }
-    };
-
-    const handleExecuteSelected = async () => {
-        if (selectedIds.size === 0) return;
-
-        // Build override amounts for edited items
-        const overrides = {};
-        selectedIds.forEach(id => {
-            if (editableAmounts[id] !== undefined) {
-                overrides[id] = editableAmounts[id];
-            }
-        });
-
-        const totalAmount = getSelectedTotal();
-        if (!confirm(`Execute ${selectedIds.size} transfers totaling ${formatCurrency(totalAmount)}?`)) return;
-
-        setDistributing(true);
-        try {
-            await axios.post(`${API_URL}/allocation/execute`, {
-                source_account_id: sourceAccountId,
-                month_offset: monthOffset,
-                obligation_ids: [...selectedIds],
-                override_amounts: Object.keys(overrides).length > 0 ? overrides : null
-            });
-
-            // Re-fetch preview and accounts
-            const [previewRes, accRes] = await Promise.all([
-                axios.post(`${API_URL}/allocation/preview`, {
-                    source_account_id: sourceAccountId,
-                    month_offset: monthOffset
-                }),
-                axios.get(`${API_URL}/accounts/`)
-            ]);
-            setPreviewData(previewRes.data);
-            setAccounts(accRes.data);
-            setSelectedIds(new Set());
-            setEditableAmounts({});
-        } catch (error) {
-            console.error("Execution failed:", error);
-            alert("Transfer execution failed.");
-        } finally {
-            setDistributing(false);
-        }
-    };
-
-    // Distribute entire envelope (all pending obligations for that target account)
-    const handleDistributeEnvelope = async (group) => {
-        const pendingItems = group.items.filter(i => i.status === 'pending' || i.status === 'partial');
-        if (pendingItems.length === 0) return;
-        const totalPending = pendingItems.reduce((s, i) => s + (i.pending_amount || 0), 0);
-        if (!confirm(`Distribute ${formatCurrency(totalPending)} to ${group.target_account_name}?`)) return;
-
-        setDistributing(true);
-        try {
-            const oblIds = pendingItems.map(i => i.obligation_id);
-            await axios.post(`${API_URL}/allocation/execute`, {
-                source_account_id: sourceAccountId,
-                month_offset: monthOffset,
-                obligation_ids: oblIds
-            });
-
-            const [previewRes, accRes] = await Promise.all([
-                axios.post(`${API_URL}/allocation/preview`, {
-                    source_account_id: sourceAccountId,
-                    month_offset: monthOffset
-                }),
-                axios.get(`${API_URL}/accounts/`)
-            ]);
-            setPreviewData(previewRes.data);
-            setAccounts(accRes.data);
-        } catch (error) {
-            console.error('Execute failed:', error);
-            alert('Distribution failed.');
-        } finally {
-            setDistributing(false);
-        }
-    };
-
-    // Reverse entire envelope distribution
-    const handleReverseEnvelope = async (group) => {
-        if (!confirm(`Reverse distribution for ${group.target_account_name}?`)) return;
-
-        setDistributing(true);
-        try {
-            const oblIds = group.items.map(i => i.obligation_id);
-            await axios.post(`${API_URL}/allocation/reverse`, {
-                source_account_id: sourceAccountId,
-                month_offset: monthOffset,
-                obligation_ids: oblIds
-            });
-
-            const [previewRes, accRes] = await Promise.all([
-                axios.post(`${API_URL}/allocation/preview`, {
-                    source_account_id: sourceAccountId,
-                    month_offset: monthOffset
-                }),
-                axios.get(`${API_URL}/accounts/`)
-            ]);
-            setPreviewData(previewRes.data);
-            setAccounts(accRes.data);
-        } catch (error) {
-            console.error('Reverse failed:', error);
-            alert('Failed to reverse distribution.');
-        } finally {
-            setDistributing(false);
-        }
-    };
-
-    const toggleSelect = (id) => {
-        setSelectedIds(prev => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-        });
-    };
-
-    const toggleSelectAll = () => {
-        if (!previewData) return;
-        const pendingIds = previewData.allocations
-            .filter(a => a.status === 'pending' || a.status === 'partial')
-            .map(a => a.obligation_id);
-        if (selectedIds.size === pendingIds.length) {
-            setSelectedIds(new Set());
-        } else {
-            setSelectedIds(new Set(pendingIds));
-        }
-    };
-
-    const getItemAmount = (item) => {
-        if (editableAmounts[item.obligation_id] !== undefined) {
-            return editableAmounts[item.obligation_id];
-        }
-        return item.pending_amount;
-    };
-
-    const getSelectedTotal = () => {
-        if (!previewData) return 0;
-        return previewData.allocations
-            .filter(a => selectedIds.has(a.obligation_id))
-            .reduce((sum, a) => sum + getItemAmount(a), 0);
     };
 
     // Group allocations by target account for visual grouping
@@ -261,16 +105,6 @@ const Allocation = () => {
         </select>
     );
 
-    // Date display
-    const getMonthLabel = () => {
-        const d = new Date();
-        d.setMonth(d.getMonth() + monthOffset);
-        return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    };
-
-    const selectedTotal = getSelectedTotal();
-    const sourceBalance = accounts.find(a => a.id === sourceAccountId)?.current_balance || 0;
-
     return (
         <>
             <div className="space-y-8 animate-fade-in pb-20">
@@ -294,7 +128,7 @@ const Allocation = () => {
                                 : 'text-gray-400 hover:text-white'
                                 }`}
                         >
-                            Payday Distributor
+                            Payday Planner
                         </button>
                         <button
                             onClick={() => setActiveTab('transfers')}
@@ -309,7 +143,7 @@ const Allocation = () => {
                     </div>
                 </div>
 
-                {/* --- TAB 1: RULES MANAGER (now "Envelopes") --- */}
+                {/* --- TAB 1: RULES MANAGER (Envelopes) --- */}
                 {activeTab === 'manager' && (
                     <AllocationRules accounts={accounts} />
                 )}
@@ -319,7 +153,7 @@ const Allocation = () => {
                     <Distributions accounts={accounts} />
                 )}
 
-                {/* --- TAB 2: DISTRIBUTOR --- */}
+                {/* --- TAB 2: PAYDAY PLANNER (Read-Only) --- */}
                 {activeTab === 'distributor' && (
                     <div className="w-full space-y-5 animate-fade-in">
 
@@ -394,15 +228,11 @@ const Allocation = () => {
                             {sourceAccountId && previewData && (
                                 <div className="flex items-center gap-6">
                                     <div className="text-right">
-                                        <div className="text-[9px] text-gray-500 uppercase font-bold">Available</div>
-                                        <div className="text-sm font-mono text-white">{formatCurrency(sourceBalance)}</div>
-                                    </div>
-                                    <div className="text-right">
                                         <div className="text-[9px] text-gray-500 uppercase font-bold">Total Required</div>
                                         <div className="text-sm font-mono text-blue-400">{formatCurrency(previewData.total_required)}</div>
                                     </div>
                                     <div className="text-right">
-                                        <div className="text-[9px] text-emerald-400 uppercase font-bold">Transferred</div>
+                                        <div className="text-[9px] text-emerald-400 uppercase font-bold">Distributed</div>
                                         <div className="text-sm font-mono text-emerald-400">{formatCurrency(previewData.total_transferred)}</div>
                                     </div>
                                     <div className="text-right">
@@ -413,137 +243,122 @@ const Allocation = () => {
                             )}
                         </div>
 
-                        {/* Allocation Table */}
-                        {previewData && (
+                        {/* Allocation Table - Read Only */}
+                        {loadingPreview ? (
+                            <div className="text-center py-16 text-gray-500">
+                                <div className="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full mx-auto mb-3" />
+                                Loading preview...
+                            </div>
+                        ) : previewData && (
                             <>
-                                {groupedByTarget.map(group => (
-                                    <div key={group.target_account_id} className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden shadow-lg">
-                                        {/* Group Header */}
-                                        <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900/60 border-b border-slate-700/30">
-                                            <div className="flex items-center gap-2">
-                                                <ArrowUpRight size={14} className="text-emerald-400" />
-                                                <span className="text-white font-semibold text-sm">{group.target_account_name}</span>
-                                                <span className="text-[9px] text-slate-500 font-mono">
-                                                    ({group.items.length} items)
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                {(() => {
-                                                    const groupRequired = group.items.reduce((s, i) => s + (i.amount || 0), 0);
-                                                    const groupTransferred = group.items.reduce((s, i) => s + (i.already_transferred || 0), 0);
-                                                    const groupPending = group.items.reduce((s, i) => s + (i.pending_amount || 0), 0);
-                                                    const allDone = groupPending <= 0;
-                                                    const acc = accounts.find(a => a.id === group.target_account_id);
-                                                    return (
-                                                        <>
-                                                            <span className="text-[10px] text-slate-400 font-mono">
-                                                                Required: <span className="text-blue-400">{formatCurrency(groupRequired)}</span>
-                                                            </span>
-                                                            {groupTransferred > 0 && (
-                                                                <span className="text-[10px] text-slate-400 font-mono">
-                                                                    Done: <span className="text-emerald-400">{formatCurrency(groupTransferred)}</span>
-                                                                </span>
-                                                            )}
-                                                            {groupPending > 0 && (
-                                                                <span className="text-[10px] text-slate-400 font-mono">
-                                                                    Pending: <span className="text-amber-400 font-semibold">{formatCurrency(groupPending)}</span>
-                                                                </span>
-                                                            )}
-                                                            {acc && (
-                                                                <span className="text-[10px] text-slate-500 font-mono">
-                                                                    Bal: {formatCurrency(acc.current_balance)}
-                                                                </span>
-                                                            )}
-                                                            {/* Envelope-level Distribute / Reverse button */}
-                                                            {allDone ? (
-                                                                <button
-                                                                    onClick={() => handleReverseEnvelope(group)}
-                                                                    disabled={distributing}
-                                                                    className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-500/10 hover:bg-red-500/20 hover:text-red-400 px-2.5 py-1 rounded-lg border border-amber-500/30 transition disabled:opacity-30"
-                                                                >
-                                                                    <RotateCcw size={11} /> Undo
-                                                                </button>
-                                                            ) : (
-                                                                <button
-                                                                    onClick={() => handleDistributeEnvelope(group)}
-                                                                    disabled={distributing}
-                                                                    className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 px-2.5 py-1 rounded-lg border border-emerald-500/30 transition disabled:opacity-30"
-                                                                >
-                                                                    <ArrowRight size={11} /> Distribute {formatCurrency(groupPending)}
-                                                                </button>
-                                                            )}
-                                                        </>
-                                                    );
-                                                })()}
-                                            </div>
-                                        </div>
+                                {groupedByTarget.map(group => {
+                                    const groupRequired = group.items.reduce((s, i) => s + (i.amount || 0), 0);
+                                    const groupTransferred = group.items.reduce((s, i) => s + (i.already_transferred || 0), 0);
+                                    const groupPending = group.items.reduce((s, i) => s + (i.pending_amount || 0), 0);
+                                    const allDone = groupPending <= 0;
+                                    const acc = accounts.find(a => a.id === group.target_account_id);
 
-                                        {/* Items Table */}
-                                        <table className="w-full text-left table-fixed">
-                                            <thead className="bg-slate-800/50">
-                                                <tr className="text-[8px] uppercase font-bold text-slate-500">
-                                                    <th className="px-3 py-1.5 w-[35%]">Obligation</th>
-                                                    <th className="px-3 py-1.5 text-center w-[10%]">Due</th>
-                                                    <th className="px-3 py-1.5 text-right w-[20%]">Required</th>
-                                                    <th className="px-3 py-1.5 text-right w-[20%]">Transferred</th>
-                                                    <th className="px-3 py-1.5 text-center w-[15%]">Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {group.items.map(item => (
-                                                    <tr
-                                                        key={item.obligation_id}
-                                                        className={`border-b border-slate-700/20 transition-colors ${
-                                                            item.status === 'transferred' ? 'bg-emerald-900/10 opacity-60' : 'hover:bg-slate-700/30'
-                                                        }`}
-                                                    >
-                                                        {/* Obligation Name */}
-                                                        <td className="px-3 py-2">
-                                                            <div className="flex items-center gap-1.5">
-                                                                <span className="font-medium text-white text-[12px] truncate">{item.obligation_name}</span>
-                                                                {item.category && (
-                                                                    <span className="text-[8px] text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">{item.category}</span>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                        {/* Due Day */}
-                                                        <td className="px-3 py-2 text-center">
-                                                            <span className="text-[11px] font-mono text-slate-400">{item.due_day}</span>
-                                                        </td>
-                                                        {/* Required Amount */}
-                                                        <td className="px-3 py-2 text-right">
-                                                            <span className="text-[12px] font-mono text-slate-300">{formatCurrency(item.amount)}</span>
-                                                        </td>
-                                                        {/* Already Transferred */}
-                                                        <td className="px-3 py-2 text-right">
-                                                            {item.already_transferred > 0 ? (
-                                                                <span className="text-[12px] font-mono text-emerald-400">{formatCurrency(item.already_transferred)}</span>
-                                                            ) : (
-                                                                <span className="text-[12px] font-mono text-slate-600">—</span>
-                                                            )}
-                                                        </td>
-                                                        {/* Status Badge */}
-                                                        <td className="px-3 py-2 text-center">
-                                                            {item.status === 'transferred' ? (
-                                                                <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded border border-emerald-500/30 uppercase">
-                                                                    <CheckCircle size={8} /> Done
-                                                                </span>
-                                                            ) : item.status === 'partial' ? (
-                                                                <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-amber-400 bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30 uppercase">
-                                                                    <Clock size={8} /> Partial
-                                                                </span>
-                                                            ) : (
-                                                                <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-blue-400 bg-blue-500/20 px-1.5 py-0.5 rounded border border-blue-500/30 uppercase">
-                                                                    <Clock size={8} /> Pending
-                                                                </span>
-                                                            )}
-                                                        </td>
+                                    return (
+                                        <div key={group.target_account_id} className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden shadow-lg">
+                                            {/* Group Header */}
+                                            <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900/60 border-b border-slate-700/30">
+                                                <div className="flex items-center gap-2">
+                                                    <ArrowUpRight size={14} className={allDone ? "text-emerald-400" : "text-slate-500"} />
+                                                    <span className="text-white font-semibold text-sm">{group.target_account_name}</span>
+                                                    <span className="text-[9px] text-slate-500 font-mono">
+                                                        ({group.items.length} items)
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-[10px] text-slate-400 font-mono">
+                                                        Required: <span className="text-blue-400">{formatCurrency(groupRequired)}</span>
+                                                    </span>
+                                                    {groupTransferred > 0 && (
+                                                        <span className="text-[10px] text-slate-400 font-mono">
+                                                            Done: <span className="text-emerald-400">{formatCurrency(groupTransferred)}</span>
+                                                        </span>
+                                                    )}
+                                                    {groupPending > 0 && (
+                                                        <span className="text-[10px] text-slate-400 font-mono">
+                                                            Pending: <span className="text-amber-400 font-semibold">{formatCurrency(groupPending)}</span>
+                                                        </span>
+                                                    )}
+                                                    {acc && (
+                                                        <span className="text-[10px] text-slate-500 font-mono">
+                                                            Bal: {formatCurrency(acc.current_balance)}
+                                                        </span>
+                                                    )}
+                                                    {/* Status badge for envelope */}
+                                                    {allDone ? (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/20 px-2.5 py-1 rounded-lg border border-emerald-500/30 uppercase">
+                                                            <CheckCircle size={11} /> Distributed
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-400 bg-blue-500/20 px-2.5 py-1 rounded-lg border border-blue-500/30 uppercase">
+                                                            <Clock size={11} /> Pending
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Items Table */}
+                                            <table className="w-full text-left table-fixed">
+                                                <thead className="bg-slate-800/50">
+                                                    <tr className="text-[8px] uppercase font-bold text-slate-500">
+                                                        <th className="px-3 py-1.5 w-[35%]">Obligation</th>
+                                                        <th className="px-3 py-1.5 text-center w-[10%]">Due</th>
+                                                        <th className="px-3 py-1.5 text-right w-[20%]">Required</th>
+                                                        <th className="px-3 py-1.5 text-right w-[20%]">Distributed</th>
+                                                        <th className="px-3 py-1.5 text-center w-[15%]">Status</th>
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                ))}
+                                                </thead>
+                                                <tbody>
+                                                    {group.items.map(item => (
+                                                        <tr
+                                                            key={item.obligation_id}
+                                                            className={`border-b border-slate-700/20 transition-colors ${
+                                                                item.status === 'transferred' ? 'bg-emerald-900/10 opacity-60' : 'hover:bg-slate-700/30'
+                                                            }`}
+                                                        >
+                                                            <td className="px-3 py-2">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="font-medium text-white text-[12px] truncate">{item.obligation_name}</span>
+                                                                    {item.category && (
+                                                                        <span className="text-[8px] text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">{item.category}</span>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-3 py-2 text-center">
+                                                                <span className="text-[11px] font-mono text-slate-400">{item.due_day}</span>
+                                                            </td>
+                                                            <td className="px-3 py-2 text-right">
+                                                                <span className="text-[12px] font-mono text-slate-300">{formatCurrency(item.amount)}</span>
+                                                            </td>
+                                                            <td className="px-3 py-2 text-right">
+                                                                {item.already_transferred > 0 ? (
+                                                                    <span className="text-[12px] font-mono text-emerald-400">{formatCurrency(item.already_transferred)}</span>
+                                                                ) : (
+                                                                    <span className="text-[12px] font-mono text-slate-600">—</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-3 py-2 text-center">
+                                                                {item.status === 'transferred' ? (
+                                                                    <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded border border-emerald-500/30 uppercase">
+                                                                        <CheckCircle size={8} /> Done
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-blue-400 bg-blue-500/20 px-1.5 py-0.5 rounded border border-blue-500/30 uppercase">
+                                                                        <Clock size={8} /> Pending
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    );
+                                })}
 
                                 {/* No items */}
                                 {groupedByTarget.length === 0 && previewData.unassigned_items?.length === 0 && (
@@ -557,7 +372,7 @@ const Allocation = () => {
                                 {previewData.unassigned_items?.length > 0 && (
                                     <div className="bg-amber-900/15 border border-amber-500/25 rounded-xl p-4">
                                         <h3 className="text-amber-400 font-bold mb-2 text-xs uppercase tracking-wider flex items-center gap-2">
-                                            <AlertCircle size={14} /> Unassigned Obligations ({previewData.unassigned_items.length})
+                                            Unassigned Obligations ({previewData.unassigned_items.length})
                                         </h3>
                                         <p className="text-xs text-amber-300/70 mb-2">These obligations have no target envelope account. Assign them in the Envelopes tab.</p>
                                         <div className="flex flex-wrap gap-1.5">
@@ -567,89 +382,6 @@ const Allocation = () => {
                                         </div>
                                     </div>
                                 )}
-
-                                {/* Batch Execute Bar (sticky bottom) */}
-                                {selectedIds.size > 0 && (
-                                    <div className="sticky bottom-4 bg-slate-900/95 backdrop-blur-xl border border-emerald-500/30 rounded-2xl p-4 shadow-2xl flex items-center justify-between">
-                                        <div className="flex items-center gap-4">
-                                            <button
-                                                onClick={toggleSelectAll}
-                                                className="text-[10px] text-blue-400 hover:text-blue-300 uppercase font-bold transition"
-                                            >
-                                                {selectedIds.size === previewData.allocations.filter(a => a.status !== 'transferred').length ? 'Deselect All' : 'Select All'}
-                                            </button>
-                                            <span className="text-sm text-white">
-                                                <span className="font-bold text-emerald-400">{selectedIds.size}</span> items selected
-                                            </span>
-                                            <span className="text-lg font-mono font-bold text-white">{formatCurrency(selectedTotal)}</span>
-                                        </div>
-                                        <button
-                                            onClick={handleExecuteSelected}
-                                            disabled={distributing}
-                                            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-2.5 rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
-                                        >
-                                            {distributing ? (
-                                                <RefreshCw className="animate-spin w-4 h-4" />
-                                            ) : (
-                                                <>
-                                                    <span>Distribute Selected</span>
-                                                    <ArrowRight size={16} />
-                                                </>
-                                            )}
-                                        </button>
-                                    </div>
-                                )}
-
-                                {/* Surplus Card */}
-                                {(() => {
-                                    const currentSurplus = Math.max(0, sourceBalance - (previewData.total_pending + previewData.total_transferred));
-                                    if (currentSurplus < 0.01) return null;
-
-                                    return (
-                                        <div className="bg-emerald-900/10 border border-emerald-500/25 rounded-xl p-5 space-y-3">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <h3 className="font-bold text-lg text-white">Zero-Based Surplus</h3>
-                                                    <span className="text-[10px] text-emerald-400 bg-emerald-900/50 px-2 py-0.5 rounded border border-emerald-500/30 uppercase tracking-wider font-bold">
-                                                        Savings Opportunity
-                                                    </span>
-                                                </div>
-                                                <span className="text-2xl font-mono font-bold text-emerald-400">{formatCurrency(currentSurplus)}</span>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <div className="flex-1">
-                                                    {renderAccountSelect(
-                                                        surplusTargetId,
-                                                        setSurplusTargetId,
-                                                        "Select Savings Account",
-                                                        acc => acc.account_type === 'Savings' || acc.account_type === 'Investment'
-                                                    )}
-                                                </div>
-                                                <button
-                                                    onClick={async () => {
-                                                        if (!surplusTargetId || !confirm(`Transfer ${formatCurrency(currentSurplus)} to savings?`)) return;
-                                                        try {
-                                                            await axios.post(`${API_URL}/distributions`, {
-                                                                source_account_id: sourceAccountId,
-                                                                target_account_id: surplusTargetId,
-                                                                amount: currentSurplus,
-                                                                billing_month: previewData.billing_month,
-                                                                note: "Surplus savings transfer"
-                                                            });
-                                                            handleRunPreview();
-                                                        } catch (e) {
-                                                            alert("Failed to create surplus transfer");
-                                                        }
-                                                    }}
-                                                    disabled={!surplusTargetId || distributing}
-                                                    className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-gray-400 text-white font-bold px-5 py-2 rounded-xl transition"
-                                                >
-                                                    Transfer
-                                                </button>
-                                            </div>
-                                        </div>
-                                    );
-                                })()}
                             </>
                         )}
                     </div>

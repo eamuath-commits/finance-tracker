@@ -4,7 +4,7 @@ import { formatCurrency, selectClass } from './UI';
 import TransactionDetailModal from './TransactionDetailModal';
 import TransactionSelectorModal from './TransactionSelectorModal';
 import ConfirmDialog from './ConfirmDialog';
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Trash2, Eye } from 'lucide-react';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Trash2, Eye, ArrowUpRight, Clock, LayoutGrid, List } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
@@ -21,6 +21,7 @@ const Distributions = ({ accounts }) => {
     const [selectedMonth, setSelectedMonth] = useState((currentDate.getMonth() + 1).toString().padStart(2, '0'));
     const [selectedStatus, setSelectedStatus] = useState('All');
     const [selectedTarget, setSelectedTarget] = useState('All');
+    const [viewMode, setViewMode] = useState('envelope'); // 'envelope' or 'table'
 
     // Link Modal State
 
@@ -122,7 +123,24 @@ const Distributions = ({ accounts }) => {
     // Calculate totals
     const totalAmount = sorted.reduce((sum, item) => sum + (item.amount || 0), 0);
     const linkedCount = sorted.filter(t => t.transaction_id).length;
-    const pendingCount = sorted.filter(t => !t.transaction_id).length;
+    const pendingCount = sorted.filter(t => !t.transaction_id && (!t.linked_transactions || t.linked_transactions.length === 0)).length;
+
+    // Envelope grouping
+    const groupedByEnvelope = useMemo(() => {
+        const groups = {};
+        sorted.forEach(item => {
+            const key = item.target_account_id || 'unknown';
+            if (!groups[key]) {
+                groups[key] = {
+                    target_account_id: key,
+                    target_account_name: item.target_account_name || 'Unknown',
+                    items: []
+                };
+            }
+            groups[key].items.push(item);
+        });
+        return Object.values(groups).sort((a, b) => a.target_account_name.localeCompare(b.target_account_name));
+    }, [sorted]);
 
     const requestSort = (key) => {
         let direction = 'asc';
@@ -284,6 +302,22 @@ const Distributions = ({ accounts }) => {
                         <div className="flex items-center gap-2 text-slate-400 text-xs uppercase font-bold">
                             <Filter size={14} /> Filter Transfers
                         </div>
+                        <div className="flex items-center gap-1 bg-slate-900/50 p-0.5 rounded-lg">
+                            <button
+                                onClick={() => setViewMode('envelope')}
+                                className={`p-1.5 rounded transition ${viewMode === 'envelope' ? 'bg-purple-600 text-white' : 'text-slate-500 hover:text-white'}`}
+                                title="Envelope View"
+                            >
+                                <LayoutGrid size={14} />
+                            </button>
+                            <button
+                                onClick={() => setViewMode('table')}
+                                className={`p-1.5 rounded transition ${viewMode === 'table' ? 'bg-purple-600 text-white' : 'text-slate-500 hover:text-white'}`}
+                                title="Table View"
+                            >
+                                <List size={14} />
+                            </button>
+                        </div>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                         {/* Search */}
@@ -342,7 +376,140 @@ const Distributions = ({ accounts }) => {
                 </div>
             </div>
 
-            {/* Table */}
+            {/* Envelope View */}
+            {viewMode === 'envelope' && (
+                <div className="space-y-4">
+                    {groupedByEnvelope.length > 0 ? groupedByEnvelope.map(group => {
+                        const groupTotal = group.items.reduce((s, i) => s + (i.amount || 0), 0);
+                        const groupLinked = group.items.filter(i => i.transaction_id || (i.linked_transactions && i.linked_transactions.length > 0)).length;
+                        const allLinked = groupLinked === group.items.length;
+
+                        return (
+                            <div key={group.target_account_id} className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden shadow-lg">
+                                {/* Envelope Header */}
+                                <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900/60 border-b border-slate-700/30">
+                                    <div className="flex items-center gap-2">
+                                        <ArrowUpRight size={14} className={allLinked ? "text-emerald-400" : "text-slate-500"} />
+                                        <span className="text-white font-semibold text-sm">{group.target_account_name}</span>
+                                        <span className="text-[9px] text-slate-500 font-mono">
+                                            ({group.items.length} distribution{group.items.length > 1 ? 's' : ''})
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-[10px] text-slate-400 font-mono">
+                                            Total: <span className="text-purple-400 font-semibold">{formatCurrency(groupTotal)}</span>
+                                        </span>
+                                        <span className="text-[10px] text-slate-400 font-mono">
+                                            <span className="text-emerald-400">{groupLinked}</span>/{group.items.length} linked
+                                        </span>
+                                        {allLinked ? (
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-lg border border-emerald-500/30 uppercase">
+                                                <CheckCircle size={10} /> Distributed
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-400 bg-blue-500/20 px-2 py-0.5 rounded-lg border border-blue-500/30 uppercase">
+                                                <Clock size={10} /> Pending
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Distribution Items */}
+                                <div className="divide-y divide-slate-700/30">
+                                    {group.items.map(item => {
+                                        const isLinked = item.transaction_id || (item.linked_transactions && item.linked_transactions.length > 0);
+                                        return (
+                                            <div key={item.id} className={`px-4 py-3 flex items-center justify-between gap-4 ${isLinked ? 'bg-emerald-900/5' : 'hover:bg-slate-700/20'} transition`}>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-emerald-400 font-mono font-medium text-sm">{formatCurrency(item.amount)}</span>
+                                                        {item.obligation_name && (
+                                                            <span className="text-blue-300 text-xs">{item.obligation_name}</span>
+                                                        )}
+                                                        {item.note && (
+                                                            <span className="text-slate-500 text-[10px] italic truncate max-w-[200px]">{item.note}</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Linked transactions */}
+                                                <div className="flex items-center gap-2 flex-shrink-0">
+                                                    {item.linked_transactions && item.linked_transactions.length > 0 ? (
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {item.linked_transactions.map(tx => (
+                                                                <div key={tx.id} className="flex items-center gap-1 bg-purple-500/20 text-purple-400 text-[10px] px-2 py-0.5 rounded border border-purple-500/30">
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setSelectedTransaction(tx);
+                                                                            setShowTransactionDetail(true);
+                                                                        }}
+                                                                        className="font-mono hover:text-purple-200 flex items-center gap-1"
+                                                                    >
+                                                                        <Eye size={9} />
+                                                                        {tx.merchant?.substring(0, 10) || tx.id.substring(0, 6)}
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleUnlinkSingleTransaction(item.id, tx.id)}
+                                                                        className="text-purple-500 hover:text-red-400 transition"
+                                                                    >
+                                                                        <Unlink size={9} />
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : item.transaction_id ? (
+                                                        <div className="flex items-center gap-1">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedTransaction(item.linked_transaction);
+                                                                    setShowTransactionDetail(true);
+                                                                }}
+                                                                className="bg-purple-500/20 text-purple-400 text-[10px] px-2 py-0.5 rounded border border-purple-500/30 font-mono flex items-center gap-1 hover:bg-purple-500/30 transition"
+                                                            >
+                                                                <Eye size={9} />
+                                                                {item.transaction_id.substring(0, 8)}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleUnlinkTransaction(item.id)}
+                                                                className="text-slate-500 hover:text-red-400 transition"
+                                                            >
+                                                                <Unlink size={12} />
+                                                            </button>
+                                                        </div>
+                                                    ) : null}
+
+                                                    <button
+                                                        onClick={() => openLinkModal(item)}
+                                                        className="bg-slate-700/50 hover:bg-purple-600/50 text-slate-400 hover:text-purple-300 text-[10px] px-2 py-1 rounded border border-slate-600 hover:border-purple-500 font-bold uppercase tracking-wider transition flex items-center gap-1"
+                                                    >
+                                                        <LinkIcon size={10} /> {isLinked ? '+ Add' : 'Link'}
+                                                    </button>
+
+                                                    <button
+                                                        onClick={() => handleDelete(item.id)}
+                                                        className="bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white p-1 rounded transition-all"
+                                                        title="Delete"
+                                                    >
+                                                        <Trash2 size={13} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                    }) : (
+                        <div className="text-center py-16 text-slate-500">
+                            <Filter className="opacity-20 mx-auto mb-3" size={48} />
+                            <p>No distributions found matching your filters.</p>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Table View */}
+            {viewMode === 'table' && (
             <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden shadow-xl">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
@@ -397,7 +564,6 @@ const Distributions = ({ accounts }) => {
 
                                     {/* Linked Transaction Column */}
                                     <td className="px-4 py-3">
-                                        {/* Check for new multi-link first, fallback to legacy single-link */}
                                         {item.linked_transactions && item.linked_transactions.length > 0 ? (
                                             <div className="flex flex-wrap gap-1">
                                                 {item.linked_transactions.map(tx => (
@@ -408,7 +574,6 @@ const Distributions = ({ accounts }) => {
                                                                 setShowTransactionDetail(true);
                                                             }}
                                                             className="font-mono hover:text-purple-200 flex items-center gap-1"
-                                                            title="View transaction details"
                                                         >
                                                             <Eye size={10} />
                                                             {tx.merchant?.substring(0, 12) || tx.id.substring(0, 8)}...
@@ -416,7 +581,6 @@ const Distributions = ({ accounts }) => {
                                                         <button
                                                             onClick={() => handleUnlinkSingleTransaction(item.id, tx.id)}
                                                             className="text-purple-500 hover:text-red-400 transition ml-1"
-                                                            title="Unlink this transaction"
                                                         >
                                                             <Unlink size={10} />
                                                         </button>
@@ -425,7 +589,6 @@ const Distributions = ({ accounts }) => {
                                                 <button
                                                     onClick={() => openLinkModal(item)}
                                                     className="text-slate-500 hover:text-purple-400 text-[10px] px-1 py-1 transition"
-                                                    title="Link more transactions"
                                                 >
                                                     + Add
                                                 </button>
@@ -438,7 +601,6 @@ const Distributions = ({ accounts }) => {
                                                         setShowTransactionDetail(true);
                                                     }}
                                                     className="bg-purple-500/20 text-purple-400 text-[10px] px-2 py-1 rounded border border-purple-500/30 font-mono flex items-center gap-1 hover:bg-purple-500/30 hover:border-purple-400 transition cursor-pointer"
-                                                    title="View transaction details"
                                                 >
                                                     <Eye size={10} />
                                                     {item.transaction_id.substring(0, 8)}...
@@ -446,7 +608,6 @@ const Distributions = ({ accounts }) => {
                                                 <button
                                                     onClick={() => handleUnlinkTransaction(item.id)}
                                                     className="text-slate-500 hover:text-red-400 transition"
-                                                    title="Unlink transaction"
                                                 >
                                                     <Unlink size={14} />
                                                 </button>
@@ -477,7 +638,6 @@ const Distributions = ({ accounts }) => {
                                         <div className="flex flex-col items-center gap-2">
                                             <Filter className="opacity-20" size={48} />
                                             <span>No distributions found matching your filters.</span>
-                                            <span className="text-xs">Use the Payday Distributor to execute transfers.</span>
                                         </div>
                                     </td>
                                 </tr>
@@ -486,6 +646,7 @@ const Distributions = ({ accounts }) => {
                     </table>
                 </div>
             </div>
+            )}
 
             {/* Transaction Linking Modal (with SMS viewing & multi-select) */}
             <TransactionSelectorModal
