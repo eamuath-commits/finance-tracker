@@ -741,7 +741,8 @@ const Accounts = () => {
                                                         try {
                                                             const res = await axios.post(`${API_URL}/accounts/${acc.id}/recalculate-balance`);
                                                             const d = res.data;
-                                                            alert(`${acc.name}\nOld: ${formatCurrency(d.old_balance)}\nNew: ${formatCurrency(d.new_balance)}\nDiff: ${formatCurrency(d.new_balance - d.old_balance)}\n(${d.transaction_count} transactions)`);
+                                                            const fmt = (v) => v.toLocaleString('en-SA', {style:'currency',currency:'SAR'});
+                                                            alert(`${acc.name}\nOld: ${fmt(d.old_balance)}\nNew: ${fmt(d.new_balance)}\nDiff: ${fmt(d.new_balance - d.old_balance)}\n(${d.transaction_count} transactions)`);
                                                             fetchData();
                                                         } catch (e) { alert('Recalculate failed'); }
                                                     }}
