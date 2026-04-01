@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { formatCurrency, Modal } from './UI';
-import TransactionSelectorModal from './TransactionSelectorModal';
+import { formatCurrency } from './UI';
 import {
     TrendingUp, TrendingDown, Minus, CheckCircle,
-    Download, ChevronDown, ChevronRight, Box, Edit3, DollarSign, X, Link2, LinkIcon, List, Trash2, MessageSquare
+    Download, ChevronDown, ChevronRight, Box, Edit3, DollarSign, X, Trash2
 } from 'lucide-react';
 import axios from 'axios';
 import { exportToCSV } from '../utils/csvExport';
@@ -45,9 +44,8 @@ const getBillingDateStr = (offset) => {
 };
 
 // --- Inline Edit Popover ---
-const EditPopover = ({ obl, monthData, billingDate, onSave, onClose, onLink, onDelete }) => {
+const EditPopover = ({ obl, monthData, billingDate, onSave, onClose, onDelete }) => {
     const [amount, setAmount] = useState(monthData?.amount || '');
-    const [status, setStatus] = useState(monthData?.isPaid ? 'PAID' : 'BUDGET');
 
     const handleSave = () => {
         const val = parseFloat(amount);
@@ -63,7 +61,8 @@ const EditPopover = ({ obl, monthData, billingDate, onSave, onClose, onLink, onD
         }
 
         if (isNaN(val)) return;
-        onSave(obl.id, val, billingDate, status);
+        // Always save as BUDGET — payment completion happens via transaction linking in Payments tab
+        onSave(obl.id, val, billingDate, 'BUDGET');
         onClose();
     };
 
@@ -85,9 +84,9 @@ const EditPopover = ({ obl, monthData, billingDate, onSave, onClose, onLink, onD
                 </button>
             </div>
 
-            {/* Amount */}
+            {/* Budget Amount */}
             <div>
-                <label className="text-[9px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Amount</label>
+                <label className="text-[9px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Budget Amount</label>
                 <div className="relative">
                     <DollarSign size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
                     <input
@@ -103,65 +102,33 @@ const EditPopover = ({ obl, monthData, billingDate, onSave, onClose, onLink, onD
                 </div>
             </div>
 
-            {/* Status */}
-            <div>
-                <label className="text-[9px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Status</label>
-                <div className="flex gap-1.5">
-                    <button
-                        onClick={() => setStatus('PAID')}
-                        className={`flex-1 text-xs font-semibold py-1.5 rounded-lg transition ${status === 'PAID'
-                            ? 'bg-emerald-600 text-white shadow-sm'
-                            : 'bg-slate-700/60 text-slate-400 hover:text-white hover:bg-slate-700'
-                            }`}
-                    >
-                        ✓ Paid
-                    </button>
-                    <button
-                        onClick={() => setStatus('BUDGET')}
-                        className={`flex-1 text-xs font-semibold py-1.5 rounded-lg transition ${status === 'BUDGET'
-                            ? 'bg-blue-600 text-white shadow-sm'
-                            : 'bg-slate-700/60 text-slate-400 hover:text-white hover:bg-slate-700'
-                            }`}
-                    >
-                        Budget
-                    </button>
-                </div>
-            </div>
-
             {/* Actions */}
             <div className="flex gap-2">
                 <button
                     onClick={handleSave}
                     className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2 rounded-lg transition shadow-sm"
                 >
-                    Save
+                    Save Budget
                 </button>
-                <button
-                    onClick={() => { onClose(); onLink(obl, billingDate); }}
-                    className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold py-2 px-2.5 rounded-lg transition shadow-sm flex items-center gap-1"
-                    title="Link to Transaction"
-                >
-                    <Link2 size={12} /> Link
-                </button>
+                {monthData?.paymentId && (
+                    <button
+                        onClick={() => { onDelete(monthData.paymentId); onClose(); }}
+                        className="bg-red-900/60 hover:bg-red-600 text-red-300 hover:text-white text-xs font-bold py-2 px-2.5 rounded-lg transition shadow-sm flex items-center gap-1"
+                        title="Delete entry"
+                    >
+                        <Trash2 size={12} />
+                    </button>
+                )}
             </div>
         </div>
     );
 };
 
-const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, monthOffset = 0, periodStartDay = 1, openPaymentModal, handleQuickPay, onRefresh }) => {
+const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, monthOffset = 0, periodStartDay = 1, handleQuickPay, onRefresh }) => {
     const [forecast, setForecast] = useState(null);
     const [loading, setLoading] = useState(true);
     const [expandedCats, setExpandedCats] = useState(new Set());
     const [editingCell, setEditingCell] = useState(null); // { oblId, monthKey }
-
-    // --- Link Transaction State ---
-    const [showLinkModal, setShowLinkModal] = useState(false);
-    const [showBrowseModal, setShowBrowseModal] = useState(false);
-    const [linkingObl, setLinkingObl] = useState(null);
-    const [linkingBillingDate, setLinkingBillingDate] = useState(null);
-    const [suggestedTxs, setSuggestedTxs] = useState([]);
-    const [loadingSuggestions, setLoadingSuggestions] = useState(false);
-    const [expandedSms, setExpandedSms] = useState(null);
 
     // Helper: get period date range label based on periodStartDay
     const getPeriodRange = (offset) => {
@@ -252,7 +219,13 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                     const bm = p.billing_month || '';
                     return bm.startsWith(m.key) && p.status !== 'BUDGET';
                 });
-                const isPaid = monthPayments.length > 0;
+
+                // Paid = has linked transaction(s) OR legacy status=PAID
+                const hasLinkedTx = monthPayments.some(p =>
+                    p.transaction_id ||
+                    (p.linked_transactions && p.linked_transactions.length > 0)
+                );
+                const isPaid = hasLinkedTx || monthPayments.length > 0;
                 const paidAmount = monthPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
 
                 // Also check for BUDGET entries
@@ -353,167 +326,6 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
         }
     };
 
-    // --- Link Transaction Functions ---
-    const openLinkFlow = async (obl, billingDate) => {
-        setLinkingObl(obl);
-        setLinkingBillingDate(billingDate);
-        setShowLinkModal(true);
-        setLoadingSuggestions(true);
-        setSuggestedTxs([]);
-
-        try {
-            // Find existing payment for this obl+month to get suggestions,
-            // or search transactions by obligation amount/name
-            const oblPayments = payments[obl.id] || [];
-            const monthKey = billingDate.substring(0, 7);
-            const existingPayment = oblPayments.find(p => (p.billing_month || '').startsWith(monthKey));
-
-            if (existingPayment) {
-                const res = await axios.get(`${API_URL}/payments/${existingPayment.id}/suggested-transactions`).catch(() => ({ data: [] }));
-                setSuggestedTxs(res.data);
-            } else {
-                // No payment yet — search by amount range around the obligation amount
-                const oblAmount = obl.amount || 0;
-                const minAmt = Math.max(0, oblAmount * 0.9);  // ±10% range
-                const maxAmt = oblAmount * 1.1;
-
-                const params = new URLSearchParams();
-                if (oblAmount > 0) {
-                    params.set('min_amount', minAmt.toFixed(2));
-                    params.set('max_amount', maxAmt.toFixed(2));
-                }
-                params.set('type', 'debit');
-                params.set('limit', '20');
-                const res = await axios.get(`${API_URL}/transactions/search?${params}`).catch(() => ({ data: [] }));
-
-                // Also try name search as a secondary source
-                const nameParams = new URLSearchParams();
-                nameParams.set('query', obl.provider || obl.name);
-                nameParams.set('type', 'debit');
-                nameParams.set('limit', '10');
-                const nameRes = await axios.get(`${API_URL}/transactions/search?${nameParams}`).catch(() => ({ data: [] }));
-
-                // Merge results, dedup by transaction ID
-                const allTxs = [...(res.data || []), ...(nameRes.data || [])];
-                const seen = new Set();
-                const uniqueTxs = allTxs.filter(tx => {
-                    if (seen.has(tx.id)) return false;
-                    seen.add(tx.id);
-                    return true;
-                });
-
-                // Score and sort: exact amount match + date proximity to billing month
-                const billingMonth = new Date(billingDate);
-                const scored = uniqueTxs.map(tx => {
-                    let score = 0;
-                    const reasons = [];
-                    const txAmount = Math.abs(tx.amount || 0);
-
-                    // Amount matching
-                    if (oblAmount > 0 && Math.abs(txAmount - oblAmount) < 0.01) {
-                        score += 50;
-                        reasons.push('exact_amount');
-                    } else if (oblAmount > 0 && Math.abs(txAmount - oblAmount) / oblAmount < 0.1) {
-                        score += 20;
-                        reasons.push('similar_amount');
-                    }
-
-                    // Date proximity to billing month
-                    const txDate = new Date(tx.timestamp);
-                    const daysDiff = Math.abs((txDate - billingMonth) / (1000 * 60 * 60 * 24));
-                    if (daysDiff <= 5) { score += 20; reasons.push('exact_date'); }
-                    else if (daysDiff <= 15) { score += 10; reasons.push('near_date'); }
-                    else if (daysDiff <= 35) { score += 5; reasons.push('same_period'); }
-
-                    if (reasons.length === 0) reasons.push('amount_range');
-
-                    return {
-                        transaction_id: tx.id,
-                        merchant: tx.merchant,
-                        amount: txAmount,
-                        date: tx.timestamp,
-                        score,
-                        reasons,
-                        already_linked: !!tx.linked_to_payment_id,
-                        raw_sms_content: tx.raw_sms_content || null
-                    };
-                });
-
-                scored.sort((a, b) => b.score - a.score);
-                setSuggestedTxs(scored.slice(0, 10));
-            }
-        } catch (err) {
-            console.error('Error fetching suggestions:', err);
-        } finally {
-            setLoadingSuggestions(false);
-        }
-    };
-
-    const handleLinkTransaction = async (transactionId) => {
-        if (!linkingObl) return;
-        try {
-            const tx = suggestedTxs.find(t => t.transaction_id === transactionId);
-            const amount = tx?.amount || 0;
-
-            // Use the transaction date as payment date
-            const txDate = tx?.date ? new Date(tx.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
-
-            // Create a PAID payment for this obligation+month
-            const payRes = await axios.post(`${API_URL}/obligations/${linkingObl.id}/pay`, {
-                amount: amount,
-                billing_month: linkingBillingDate,
-                status: 'Paid',
-                payment_date: txDate
-            });
-
-            // Link the transaction to the newly created payment
-            const paymentId = payRes.data?.id;
-            if (paymentId) {
-                await axios.post(`${API_URL}/payments/${paymentId}/link-transaction?transaction_id=${transactionId}`);
-            }
-
-            setShowLinkModal(false);
-            setLinkingObl(null);
-            if (onRefresh) onRefresh();
-        } catch (err) {
-            console.error('Error linking transaction:', err);
-            alert('Failed to link transaction');
-        }
-    };
-
-    const handleBrowseLink = async (transactionIds) => {
-        if (!linkingObl || !transactionIds.length) return;
-        try {
-            const txId = transactionIds[0];
-
-            // Fetch transaction details to get amount and date
-            const searchRes = await axios.get(`${API_URL}/transactions/search?limit=50`).catch(() => ({ data: [] }));
-            const txData = (searchRes.data || []).find(t => t.id === txId);
-            const amount = txData?.amount || 0;
-            const txDate = txData?.timestamp ? new Date(txData.timestamp).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
-
-            // Create a PAID payment for this obligation+month
-            const payRes = await axios.post(`${API_URL}/obligations/${linkingObl.id}/pay`, {
-                amount: amount,
-                billing_month: linkingBillingDate,
-                status: 'Paid',
-                payment_date: txDate
-            });
-
-            // Link the transaction to the newly created payment
-            const paymentId = payRes.data?.id;
-            if (paymentId) {
-                await axios.post(`${API_URL}/payments/${paymentId}/link-transaction?transaction_id=${txId}`);
-            }
-
-            setShowBrowseModal(false);
-            setLinkingObl(null);
-            if (onRefresh) onRefresh();
-        } catch (err) {
-            console.error('Error linking from browse:', err);
-            alert('Failed to link transaction');
-        }
-    };
 
     const handleExport = () => {
         const rows = filteredObligations.map(obl => {
@@ -551,7 +363,6 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                             billingDate={month.billingDate}
                             onSave={handleInlineSave}
                             onClose={() => setEditingCell(null)}
-                            onLink={openLinkFlow}
                             onDelete={handleDeletePayment}
                         />
                     )}
@@ -577,7 +388,6 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                             billingDate={month.billingDate}
                             onSave={handleInlineSave}
                             onClose={() => setEditingCell(null)}
-                            onLink={openLinkFlow}
                             onDelete={handleDeletePayment}
                         />
                     )}
@@ -603,7 +413,6 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                             billingDate={month.billingDate}
                             onSave={handleInlineSave}
                             onClose={() => setEditingCell(null)}
-                            onLink={openLinkFlow}
                             onDelete={handleDeletePayment}
                         />
                     )}
@@ -628,7 +437,6 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                         billingDate={month.billingDate}
                         onSave={handleInlineSave}
                         onClose={() => setEditingCell(null)}
-                        onLink={openLinkFlow}
                         onDelete={handleDeletePayment}
                     />
                 )}
@@ -834,131 +642,6 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                 </div>
             )}
 
-            {/* Link Transaction Modal */}
-            <Modal isOpen={showLinkModal} title="Link to Transaction" onClose={() => setShowLinkModal(false)}>
-                <div className="space-y-4">
-                    {linkingObl && (
-                        <div className="bg-slate-700/50 p-3 rounded-lg text-sm">
-                            <div className="text-slate-400 text-xs uppercase font-bold mb-1">Obligation</div>
-                            <div className="text-white font-semibold">{linkingObl.name}</div>
-                            {linkingObl.provider && <div className="text-slate-500 text-xs">{linkingObl.provider}</div>}
-                            <div className="text-slate-500 text-xs mt-1">{linkingBillingDate}</div>
-                        </div>
-                    )}
-
-                    <div className="text-slate-400 text-xs uppercase font-bold">Suggested Transactions</div>
-
-                    {loadingSuggestions ? (
-                        <div className="text-center py-8 text-slate-500">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                            Finding matching transactions...
-                        </div>
-                    ) : suggestedTxs.length > 0 ? (
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
-                            {suggestedTxs.map(tx => (
-                                <div
-                                    key={tx.transaction_id}
-                                    className={`rounded-lg border transition ${tx.already_linked
-                                        ? 'bg-emerald-500/10 border-emerald-500/30'
-                                        : 'bg-slate-700/50 border-slate-600 hover:border-purple-500 hover:bg-purple-500/10'
-                                        }`}
-                                >
-                                    <div
-                                        className="p-3 cursor-pointer"
-                                        onClick={() => !tx.already_linked && handleLinkTransaction(tx.transaction_id)}
-                                    >
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <div className="text-white font-semibold text-sm flex items-center gap-1.5">
-                                                    {tx.merchant || 'Unknown'}
-                                                    {tx.raw_sms_content && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setExpandedSms(prev => prev === tx.transaction_id ? null : tx.transaction_id);
-                                                            }}
-                                                            className="text-slate-500 hover:text-blue-400 transition p-0.5 rounded hover:bg-slate-600/50"
-                                                            title="View SMS"
-                                                        >
-                                                            <MessageSquare size={12} />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                <div className="text-slate-400 text-xs">
-                                                    {tx.date ? new Date(tx.date).toLocaleDateString() : '-'}
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="text-emerald-400 font-mono text-sm">{formatCurrency(tx.amount)}</div>
-                                                {tx.already_linked ? (
-                                                    <span className="text-emerald-400 text-[10px] flex items-center gap-1 justify-end">
-                                                        <CheckCircle size={10} /> Linked
-                                                    </span>
-                                                ) : tx.score > 0 ? (
-                                                    <div className="text-[10px] text-purple-400">Score: {tx.score}</div>
-                                                ) : null}
-                                            </div>
-                                        </div>
-                                        {tx.reasons && tx.reasons.length > 0 && (
-                                            <div className="flex gap-1 mt-2 flex-wrap">
-                                                {tx.reasons.map(r => (
-                                                    <span key={r} className="bg-slate-600/50 text-slate-400 text-[9px] px-1.5 py-0.5 rounded">
-                                                        {r.replace('_', ' ')}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                    {/* Expandable SMS Content */}
-                                    {expandedSms === tx.transaction_id && tx.raw_sms_content && (
-                                        <div className="px-3 pb-3 border-t border-slate-600/50 mt-0">
-                                            <div className="bg-slate-900/80 rounded-lg p-2.5 mt-2">
-                                                <div className="text-[9px] uppercase text-slate-500 font-bold mb-1 flex items-center gap-1">
-                                                    <MessageSquare size={9} /> SMS Content
-                                                </div>
-                                                <p className="text-slate-300 text-[11px] font-mono leading-relaxed whitespace-pre-wrap">
-                                                    {tx.raw_sms_content}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center py-8 text-slate-500">
-                            <LinkIcon className="mx-auto mb-2 opacity-30" size={32} />
-                            <div>No matching transactions found.</div>
-                            <div className="text-xs mt-1">Try Browse All to find manually.</div>
-                        </div>
-                    )}
-
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => { setShowLinkModal(false); setShowBrowseModal(true); }}
-                            className="flex-1 bg-purple-600 hover:bg-purple-500 text-white py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2"
-                        >
-                            <List size={14} /> Browse All Transactions
-                        </button>
-                        <button
-                            onClick={() => setShowLinkModal(false)}
-                            className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm font-medium transition"
-                        >
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-            </Modal>
-
-            {/* Browse All Transactions Modal */}
-            <TransactionSelectorModal
-                isOpen={showBrowseModal}
-                onClose={() => { setShowBrowseModal(false); setLinkingObl(null); }}
-                onSelect={handleBrowseLink}
-                currentLinked={[]}
-                title={`Link Transaction to ${linkingObl?.name || 'Obligation'}`}
-                expectedAmount={linkingObl?.amount || null}
-            />
         </div>
     );
 };

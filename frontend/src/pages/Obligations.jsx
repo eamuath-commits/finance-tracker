@@ -494,7 +494,6 @@ const Obligations = () => {
                             payments={payments}
                             monthOffset={monthOffset}
                             periodStartDay={periodStartDay}
-                            openPaymentModal={openPaymentModal}
                             handleQuickPay={handleQuickPay}
                             onRefresh={fetchData}
                         />
