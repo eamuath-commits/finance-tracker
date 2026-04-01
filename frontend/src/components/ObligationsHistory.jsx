@@ -458,81 +458,134 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                 </div>
             </div>
 
-            {/* Envelope View */}
+            {/* Obligations List View */}
             {viewMode === 'envelope' && (
-                <div className="space-y-4">
-                    {groupedByCategory.length > 0 ? groupedByCategory.map(group => {
-                        const groupTotal = group.items.reduce((s, i) => s + (i.amount || 0), 0);
-                        const groupPaid = group.items.filter(i =>
-                            i.transaction_id ||
-                            (i.linked_transactions && i.linked_transactions.length > 0)
-                        ).length;
-                        const totalItems = group.items.length + group.plannedItems.length;
-                        const allDone = groupPaid === totalItems && group.plannedItems.length === 0;
+                <div className="space-y-2">
+                    {(() => {
+                        // Build a unified list: all obligations with their payment status for the selected month
+                        if (selectedYear === 'All' || selectedMonth === 'All') {
+                            return (
+                                <div className="text-center py-20 text-slate-500">
+                                    <Filter className="mx-auto mb-3 opacity-20" size={36} />
+                                    <p className="text-sm">Select a specific month to see all obligations</p>
+                                </div>
+                            );
+                        }
+
+                        const billingMonth = `${selectedYear}-${selectedMonth}`;
+                        const oblsWithPayments = new Set(sorted.map(s => s.obligation_id));
+                        
+                        // Combine: paid items + planned (no payment yet)
+                        const allItems = [];
+
+                        // Add paid/budgeted items from sorted
+                        sorted.forEach(item => {
+                            allItems.push({ type: 'payment', ...item });
+                        });
+
+                        // Add planned obligations (no payment record yet)
+                        obligations.forEach(obl => {
+                            if (oblsWithPayments.has(obl.id)) return;
+                            if (selectedCategory !== 'All' && obl.category !== selectedCategory) return;
+                            allItems.push({
+                                type: 'planned',
+                                id: `planned-${obl.id}`,
+                                obligation_id: obl.id,
+                                oblName: obl.name,
+                                oblCategory: obl.category,
+                                amount: obl.amount || 0,
+                                billing_month: billingMonth + '-01',
+                                status: 'Budget',
+                                obl: obl
+                            });
+                        });
+
+                        // Sort: budgets first, then by category, then by name
+                        allItems.sort((a, b) => {
+                            const aPaid = a.type === 'payment' && (a.transaction_id || (a.linked_transactions && a.linked_transactions.length > 0));
+                            const bPaid = b.type === 'payment' && (b.transaction_id || (b.linked_transactions && b.linked_transactions.length > 0));
+                            if (aPaid !== bPaid) return aPaid ? 1 : -1; // Unpaid first
+                            const catA = (a.oblCategory || 'Other');
+                            const catB = (b.oblCategory || 'Other');
+                            if (catA !== catB) return catA.localeCompare(catB);
+                            return (a.oblName || '').localeCompare(b.oblName || '');
+                        });
+
+                        if (allItems.length === 0) {
+                            return (
+                                <div className="text-center py-20 text-slate-500">
+                                    <Filter className="mx-auto mb-3 opacity-20" size={36} />
+                                    <p className="text-sm">No obligations found for this month</p>
+                                </div>
+                            );
+                        }
+
+                        // Summary stats
+                        const totalPaid = allItems.filter(i => i.type === 'payment' && (i.transaction_id || (i.linked_transactions && i.linked_transactions.length > 0))).length;
+                        const totalBudget = allItems.length - totalPaid;
 
                         return (
-                            <div key={group.category} className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden shadow-lg">
-                                {/* Category Header */}
-                                <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900/60 border-b border-slate-700/30">
-                                    <div className="flex items-center gap-2">
-                                        <ArrowUpRight size={14} className={allDone ? "text-emerald-400" : "text-slate-500"} />
-                                        <span className="text-white font-semibold text-sm">{group.category}</span>
-                                        <span className="text-[9px] text-slate-500 font-mono">
-                                            ({totalItems} item{totalItems > 1 ? 's' : ''})
+                            <>
+                                {/* Quick summary bar */}
+                                <div className="flex items-center justify-between px-4 py-2 bg-slate-800/50 rounded-lg border border-slate-700/30 mb-2">
+                                    <span className="text-slate-400 text-xs">
+                                        {allItems.length} obligation{allItems.length > 1 ? 's' : ''}
+                                    </span>
+                                    <div className="flex items-center gap-3 text-[10px] font-mono">
+                                        <span className="text-emerald-400">
+                                            <CheckCircle size={10} className="inline mr-0.5" />{totalPaid} paid
                                         </span>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-[10px] text-slate-400 font-mono">
-                                            Total: <span className="text-purple-400 font-semibold">{formatCurrency(groupTotal)}</span>
+                                        <span className="text-amber-400">
+                                            <Clock size={10} className="inline mr-0.5" />{totalBudget} budget
                                         </span>
-                                        {group.items.length > 0 && (
-                                            <span className="text-[10px] text-slate-400 font-mono">
-                                                <span className="text-emerald-400">{groupPaid}</span>/{group.items.length} paid
-                                            </span>
-                                        )}
-                                        {group.plannedItems.length > 0 && (
-                                            <span className="text-[10px] text-amber-400 font-mono">
-                                                {group.plannedItems.length} planned
-                                            </span>
-                                        )}
-                                        {allDone ? (
-                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-lg border border-emerald-500/30 uppercase">
-                                                <CheckCircle size={10} /> Paid
-                                            </span>
-                                        ) : (
-                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-400 bg-blue-500/20 px-2 py-0.5 rounded-lg border border-blue-500/30 uppercase">
-                                                <Clock size={10} /> Budget
-                                            </span>
-                                        )}
                                     </div>
                                 </div>
 
-                                {/* Payment Items */}
-                                <div className="divide-y divide-slate-700/30">
-                                    {group.items.map(item => {
-                                        const isLinked = item.transaction_id || (item.linked_transactions && item.linked_transactions.length > 0);
+                                {/* Obligations list */}
+                                <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden shadow-lg divide-y divide-slate-700/30">
+                                    {allItems.map(item => {
+                                        const isLinked = item.type === 'payment' && (item.transaction_id || (item.linked_transactions && item.linked_transactions.length > 0));
+                                        const isPlanned = item.type === 'planned';
+
                                         return (
-                                            <div key={item.id} className={`px-4 py-3 flex items-center justify-between gap-4 ${isLinked ? 'bg-emerald-900/5' : 'hover:bg-slate-700/20'} transition`}>
+                                            <div key={item.id} className={`px-4 py-3 flex items-center justify-between gap-4 transition ${isLinked ? 'bg-emerald-900/5' : isPlanned ? 'bg-amber-900/5 border-l-2 border-l-amber-500/40' : 'hover:bg-slate-700/20'}`}>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-emerald-400 font-mono font-medium text-sm">{formatCurrency(item.amount)}</span>
-                                                        <span className="text-blue-300 text-xs">{item.oblName}</span>
-                                                        <span className="text-[9px] text-slate-500 font-mono">{formatMonthDisplay(item.billing_month)}</span>
-                                                        {isLinked && (
-                                                            <span className="text-[8px] font-bold text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded border border-emerald-500/30 uppercase">Paid</span>
+                                                        {/* Status badge */}
+                                                        {isLinked ? (
+                                                            <span className="text-[8px] font-bold text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded border border-emerald-500/30 uppercase whitespace-nowrap">
+                                                                <CheckCircle size={8} className="inline mr-0.5" />Paid
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[8px] font-bold text-amber-400 bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30 uppercase whitespace-nowrap">
+                                                                <Clock size={8} className="inline mr-0.5" />Budget
+                                                            </span>
                                                         )}
+
+                                                        {/* Obligation name */}
+                                                        <span className="text-white font-semibold text-sm truncate">{item.oblName}</span>
+
+                                                        {/* Category badge */}
+                                                        {item.oblCategory && (
+                                                            <span className="text-[8px] text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">{item.oblCategory}</span>
+                                                        )}
+
+                                                        {/* Amount */}
+                                                        <span className="text-emerald-400 font-mono font-medium text-sm ml-auto mr-2">
+                                                            {item.amount > 0 ? formatCurrency(item.amount) : '—'}
+                                                        </span>
                                                     </div>
 
-                                                    {/* Linked transactions */}
+                                                    {/* Linked transactions (if any) */}
                                                     {item.linked_transactions && item.linked_transactions.length > 0 && (
-                                                        <div className="flex flex-wrap gap-1 mt-1">
+                                                        <div className="flex flex-wrap gap-1 mt-1.5 ml-14">
                                                             {item.linked_transactions.map(tx => (
                                                                 <div key={tx.id} className="flex items-center gap-1 bg-purple-500/10 text-purple-400 text-[9px] px-1.5 py-0.5 rounded">
                                                                     <button
                                                                         onClick={() => { setSelectedTransaction(tx); setShowTransactionDetail(true); }}
                                                                         className="font-mono hover:text-purple-200 flex items-center gap-0.5"
                                                                     >
-                                                                        <Eye size={8} /> {tx.merchant?.substring(0, 12) || tx.id.substring(0, 8)}
+                                                                        <Eye size={8} /> {tx.merchant?.substring(0, 15) || tx.id.substring(0, 8)}
                                                                     </button>
                                                                     <button
                                                                         onClick={() => handleUnlinkSingleTransaction(item.id, tx.id)}
@@ -546,58 +599,40 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                     )}
                                                 </div>
 
-                                                <div className="flex items-center gap-1.5">
-                                                    <button
-                                                        onClick={() => openLinkModal(item)}
-                                                        className="bg-slate-700/50 hover:bg-purple-600/50 text-slate-400 hover:text-purple-300 text-[10px] px-2 py-1 rounded border border-slate-600 hover:border-purple-500 font-bold uppercase tracking-wider transition flex items-center gap-1"
-                                                    >
-                                                        <DollarSign size={10} /> Pay
-                                                    </button>
-                                                    <button
-                                                        onClick={() => onDelete(item)}
-                                                        className="bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white p-1 rounded transition-all"
-                                                        title="Delete"
-                                                    >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                                                    </button>
+                                                {/* Actions */}
+                                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                    {isPlanned ? (
+                                                        <button
+                                                            onClick={() => handlePayAndLink(item.obl, item.billing_month)}
+                                                            className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] px-2.5 py-1.5 rounded-lg font-bold uppercase tracking-wider transition flex items-center gap-1 shadow-sm"
+                                                        >
+                                                            <DollarSign size={10} /> Pay
+                                                        </button>
+                                                    ) : (
+                                                        <>
+                                                            <button
+                                                                onClick={() => openLinkModal(item)}
+                                                                className="bg-slate-700/50 hover:bg-purple-600/50 text-slate-400 hover:text-purple-300 text-[10px] px-2 py-1 rounded border border-slate-600 hover:border-purple-500 font-bold uppercase tracking-wider transition flex items-center gap-1"
+                                                            >
+                                                                <DollarSign size={10} /> Pay
+                                                            </button>
+                                                            <button
+                                                                onClick={() => onDelete(item)}
+                                                                className="bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white p-1 rounded transition-all"
+                                                                title="Delete"
+                                                            >
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                                            </button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
                                         );
                                     })}
-
-                                    {/* Planned obligations (no payment record yet) */}
-                                    {group.plannedItems.length > 0 && (
-                                        <div className="px-4 py-3 border-l-2 border-l-amber-500/40 bg-amber-900/5">
-                                            <div className="flex items-center justify-between gap-4">
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2 mb-1.5">
-                                                        <span className="text-[8px] font-bold text-amber-400 bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30 uppercase">
-                                                            Budget
-                                                        </span>
-                                                        <span className="text-[9px] text-slate-500">
-                                                            {group.plannedItems.length} obligation{group.plannedItems.length > 1 ? 's' : ''} not yet paid
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {group.plannedItems.map(obl => (
-                                                            <span key={obl.id} className="text-[9px] bg-slate-700/60 text-slate-300 px-1.5 py-0.5 rounded">
-                                                                {obl.name}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
-                            </div>
+                            </>
                         );
-                    }) : (
-                        <div className="text-center py-20 text-slate-500">
-                            <Filter className="mx-auto mb-3 opacity-20" size={36} />
-                            <p className="text-sm">Select a specific month to see the envelope view</p>
-                        </div>
-                    )}
+                    })()}
                 </div>
             )}
 
