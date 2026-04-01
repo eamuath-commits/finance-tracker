@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { formatCurrency, selectClass, Modal } from '../components/UI';
 import TransactionDetailModal from '../components/TransactionDetailModal';
 import TransactionSelectorModal from '../components/TransactionSelectorModal';
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Eye, List } from 'lucide-react';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Eye, List, LayoutGrid, PlusCircle, ArrowUpRight, Clock, DollarSign } from 'lucide-react';
 import { exportToCSV } from '../utils/csvExport';
 import axios from 'axios';
 
@@ -11,6 +11,7 @@ const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.host
 const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDelete, onRefresh }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: 'billing_month', direction: 'desc' });
+    const [viewMode, setViewMode] = useState('envelope'); // 'envelope' or 'table'
 
     // Link Modal State
     const [showLinkModal, setShowLinkModal] = useState(false);
@@ -284,6 +285,81 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
         }
     };
 
+    // --- Pay & Link: Create payment + open link modal ---
+    const handlePayAndLink = async (obl, billingMonth) => {
+        try {
+            // Create a PAID payment for this obligation+month
+            const payRes = await axios.post(`${API_URL}/obligations/${obl.id}/pay`, {
+                amount: 0, // Will be set by linked transaction
+                billing_month: billingMonth,
+                status: 'Paid',
+                payment_date: new Date().toISOString()
+            });
+
+            const newPayment = payRes.data;
+            if (newPayment?.id) {
+                // Refresh data then open link modal for the new payment
+                if (onRefresh) await onRefresh();
+                // Build a payment-like object to open the modal
+                const paymentObj = {
+                    id: newPayment.id,
+                    oblName: obl.name,
+                    amount: obl.amount || 0,
+                    billing_month: billingMonth
+                };
+                openLinkModal(paymentObj);
+            }
+        } catch (err) {
+            console.error('Error creating payment:', err);
+            alert('Failed to create payment record');
+        }
+    };
+
+    // --- Envelope grouping by category ---
+    const groupedByCategory = useMemo(() => {
+        if (selectedYear === 'All' || selectedMonth === 'All') return [];
+
+        const billingMonth = `${selectedYear}-${selectedMonth}`;
+        const oblMap = {};
+        obligations.forEach(o => oblMap[o.id] = o);
+
+        const groups = {};
+
+        // Group existing payment records by category
+        sorted.forEach(item => {
+            const cat = item.oblCategory || 'Other';
+            if (!groups[cat]) {
+                groups[cat] = {
+                    category: cat,
+                    items: [],
+                    plannedItems: []
+                };
+            }
+            groups[cat].items.push(item);
+        });
+
+        // Add planned obligations (those without payment records for this month)
+        const oblsWithPayments = new Set(sorted.map(s => s.obligation_id));
+        obligations.forEach(obl => {
+            if (oblsWithPayments.has(obl.id)) return;
+            if (selectedCategory !== 'All' && obl.category !== selectedCategory) return;
+
+            const cat = obl.category || 'Other';
+            if (!groups[cat]) {
+                groups[cat] = {
+                    category: cat,
+                    items: [],
+                    plannedItems: []
+                };
+            }
+            groups[cat].plannedItems.push(obl);
+        });
+
+        return Object.values(groups)
+            .filter(g => g.items.length > 0 || g.plannedItems.length > 0)
+            .sort((a, b) => a.category.localeCompare(b.category));
+    }, [sorted, obligations, selectedYear, selectedMonth, selectedCategory]);
+
     return (
         <div className="animate-fade-in-up space-y-4">
             {/* Top Stats & Filters Row */}
@@ -302,18 +378,26 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                             <Filter size={14} /> Filter Payments
                         </div>
                         <div className="flex gap-2">
+                            <div className="flex bg-slate-900 rounded-lg border border-slate-700 overflow-hidden">
+                                <button
+                                    onClick={() => setViewMode('envelope')}
+                                    className={`text-xs px-2.5 py-1.5 flex items-center gap-1 transition ${viewMode === 'envelope' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    <LayoutGrid size={12} /> Envelope
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('table')}
+                                    className={`text-xs px-2.5 py-1.5 flex items-center gap-1 transition ${viewMode === 'table' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    <List size={12} /> Table
+                                </button>
+                            </div>
                             <button
                                 onClick={handleExport}
                                 className="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm flex items-center gap-1 transition"
                                 title="Export to CSV"
                             >
                                 <Download size={14} /> Export
-                            </button>
-                            <button
-                                onClick={() => onEdit(null)}
-                                className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm flex items-center gap-1 transition"
-                            >
-                                + New Payment
                             </button>
                         </div>
                     </div>
@@ -374,7 +458,151 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                 </div>
             </div>
 
-            {/* Table */}
+            {/* Envelope View */}
+            {viewMode === 'envelope' && (
+                <div className="space-y-4">
+                    {groupedByCategory.length > 0 ? groupedByCategory.map(group => {
+                        const groupTotal = group.items.reduce((s, i) => s + (i.amount || 0), 0);
+                        const groupPaid = group.items.filter(i =>
+                            i.transaction_id ||
+                            (i.linked_transactions && i.linked_transactions.length > 0)
+                        ).length;
+                        const totalItems = group.items.length + group.plannedItems.length;
+                        const allDone = groupPaid === totalItems && group.plannedItems.length === 0;
+
+                        return (
+                            <div key={group.category} className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden shadow-lg">
+                                {/* Category Header */}
+                                <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900/60 border-b border-slate-700/30">
+                                    <div className="flex items-center gap-2">
+                                        <ArrowUpRight size={14} className={allDone ? "text-emerald-400" : "text-slate-500"} />
+                                        <span className="text-white font-semibold text-sm">{group.category}</span>
+                                        <span className="text-[9px] text-slate-500 font-mono">
+                                            ({totalItems} item{totalItems > 1 ? 's' : ''})
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-[10px] text-slate-400 font-mono">
+                                            Total: <span className="text-purple-400 font-semibold">{formatCurrency(groupTotal)}</span>
+                                        </span>
+                                        {group.items.length > 0 && (
+                                            <span className="text-[10px] text-slate-400 font-mono">
+                                                <span className="text-emerald-400">{groupPaid}</span>/{group.items.length} paid
+                                            </span>
+                                        )}
+                                        {group.plannedItems.length > 0 && (
+                                            <span className="text-[10px] text-amber-400 font-mono">
+                                                {group.plannedItems.length} planned
+                                            </span>
+                                        )}
+                                        {allDone ? (
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-lg border border-emerald-500/30 uppercase">
+                                                <CheckCircle size={10} /> Paid
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-400 bg-blue-500/20 px-2 py-0.5 rounded-lg border border-blue-500/30 uppercase">
+                                                <Clock size={10} /> Budget
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Payment Items */}
+                                <div className="divide-y divide-slate-700/30">
+                                    {group.items.map(item => {
+                                        const isLinked = item.transaction_id || (item.linked_transactions && item.linked_transactions.length > 0);
+                                        return (
+                                            <div key={item.id} className={`px-4 py-3 flex items-center justify-between gap-4 ${isLinked ? 'bg-emerald-900/5' : 'hover:bg-slate-700/20'} transition`}>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-emerald-400 font-mono font-medium text-sm">{formatCurrency(item.amount)}</span>
+                                                        <span className="text-blue-300 text-xs">{item.oblName}</span>
+                                                        <span className="text-[9px] text-slate-500 font-mono">{formatMonthDisplay(item.billing_month)}</span>
+                                                        {isLinked && (
+                                                            <span className="text-[8px] font-bold text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded border border-emerald-500/30 uppercase">Paid</span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Linked transactions */}
+                                                    {item.linked_transactions && item.linked_transactions.length > 0 && (
+                                                        <div className="flex flex-wrap gap-1 mt-1">
+                                                            {item.linked_transactions.map(tx => (
+                                                                <div key={tx.id} className="flex items-center gap-1 bg-purple-500/10 text-purple-400 text-[9px] px-1.5 py-0.5 rounded">
+                                                                    <button
+                                                                        onClick={() => { setSelectedTransaction(tx); setShowTransactionDetail(true); }}
+                                                                        className="font-mono hover:text-purple-200 flex items-center gap-0.5"
+                                                                    >
+                                                                        <Eye size={8} /> {tx.merchant?.substring(0, 12) || tx.id.substring(0, 8)}
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleUnlinkSingleTransaction(item.id, tx.id)}
+                                                                        className="text-purple-500 hover:text-red-400 transition"
+                                                                    >
+                                                                        <Unlink size={8} />
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex items-center gap-1.5">
+                                                    <button
+                                                        onClick={() => openLinkModal(item)}
+                                                        className="bg-slate-700/50 hover:bg-purple-600/50 text-slate-400 hover:text-purple-300 text-[10px] px-2 py-1 rounded border border-slate-600 hover:border-purple-500 font-bold uppercase tracking-wider transition flex items-center gap-1"
+                                                    >
+                                                        <DollarSign size={10} /> Pay
+                                                    </button>
+                                                    <button
+                                                        onClick={() => onDelete(item)}
+                                                        className="bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white p-1 rounded transition-all"
+                                                        title="Delete"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+
+                                    {/* Planned obligations (no payment record yet) */}
+                                    {group.plannedItems.length > 0 && (
+                                        <div className="px-4 py-3 border-l-2 border-l-amber-500/40 bg-amber-900/5">
+                                            <div className="flex items-center justify-between gap-4">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1.5">
+                                                        <span className="text-[8px] font-bold text-amber-400 bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30 uppercase">
+                                                            Budget
+                                                        </span>
+                                                        <span className="text-[9px] text-slate-500">
+                                                            {group.plannedItems.length} obligation{group.plannedItems.length > 1 ? 's' : ''} not yet paid
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {group.plannedItems.map(obl => (
+                                                            <span key={obl.id} className="text-[9px] bg-slate-700/60 text-slate-300 px-1.5 py-0.5 rounded">
+                                                                {obl.name}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    }) : (
+                        <div className="text-center py-20 text-slate-500">
+                            <Filter className="mx-auto mb-3 opacity-20" size={36} />
+                            <p className="text-sm">Select a specific month to see the envelope view</p>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Table View */}
+            {viewMode === 'table' && (
             <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden shadow-xl">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
@@ -392,7 +620,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                 <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('amount')}>
                                     <div className="flex items-center gap-1">Amount {getSortIcon('amount')}</div>
                                 </th>
-                                <th className="px-4 py-4 border-b border-slate-700">Linked Transaction</th>
+                                <th className="px-4 py-4 border-b border-slate-700">Transaction</th>
                                 <th className="px-4 py-4 border-b border-slate-700 text-right">Actions</th>
                             </tr>
                         </thead>
@@ -449,9 +677,9 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                 <button
                                                     onClick={() => openLinkModal(item)}
                                                     className="text-slate-500 hover:text-purple-400 text-[10px] px-1 py-1 transition"
-                                                    title="Link more transactions"
+                                                    title="Pay more"
                                                 >
-                                                    + Add
+                                                    + Pay
                                                 </button>
                                             </div>
                                         ) : item.transaction_id ? (
@@ -480,7 +708,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                 onClick={() => openLinkModal(item)}
                                                 className="bg-slate-700/50 hover:bg-purple-600/50 text-slate-400 hover:text-purple-300 text-[10px] px-2 py-1 rounded border border-slate-600 hover:border-purple-500 font-bold uppercase tracking-wider transition flex items-center gap-1"
                                             >
-                                                <LinkIcon size={10} /> Link
+                                                <DollarSign size={10} /> Pay
                                             </button>
                                         )}
                                     </td>
@@ -514,6 +742,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                     </table>
                 </div>
             </div>
+            )}
 
             {/* Link Transaction Modal */}
             <Modal isOpen={showLinkModal} title="Link to Transaction" onClose={() => setShowLinkModal(false)}>
