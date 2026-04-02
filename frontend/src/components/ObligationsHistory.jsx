@@ -487,13 +487,22 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                         obligations.forEach(obl => {
                             if (oblsWithPayments.has(obl.id)) return;
                             if (selectedCategory !== 'All' && obl.category !== selectedCategory) return;
+
+                            // Look up the BUDGET entry from history for this obligation+month
+                            // This is the amount set in the Forecast (planning) tab
+                            const oblHistory = history[obl.id] || [];
+                            const budgetEntry = oblHistory.find(r =>
+                                r.status === 'BUDGET' && (r.billing_month || '').startsWith(billingMonth)
+                            );
+                            const plannedAmount = budgetEntry ? budgetEntry.amount : (obl.amount || 0);
+
                             allItems.push({
                                 type: 'planned',
                                 id: `planned-${obl.id}`,
                                 obligation_id: obl.id,
                                 oblName: obl.name,
                                 oblCategory: obl.category,
-                                amount: obl.amount || 0,
+                                amount: plannedAmount,
                                 billing_month: billingMonth + '-01',
                                 status: 'Budget',
                                 obl: obl
