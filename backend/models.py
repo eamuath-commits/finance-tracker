@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Date, Enum, Text, Boolean, JSON
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 import enum
@@ -349,7 +349,7 @@ class PaymentTransaction(Base):
     created_at = Column(DateTime, default=datetime.now)
     
     # Relationships
-    payment = relationship("Payment", backref="linked_transactions")
+    payment = relationship("Payment", backref=backref("linked_transactions", cascade="all, delete-orphan"))
     transaction = relationship("Transaction", backref="payment_links")
 
 
