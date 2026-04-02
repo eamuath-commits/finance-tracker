@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { formatCurrency, selectClass, Modal } from '../components/UI';
 import TransactionDetailModal from '../components/TransactionDetailModal';
 import TransactionSelectorModal from '../components/TransactionSelectorModal';
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Eye, List, LayoutGrid, PlusCircle, ArrowUpRight, Clock, DollarSign } from 'lucide-react';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Eye, List, LayoutGrid, PlusCircle, ArrowUpRight, Clock, DollarSign, MessageSquare } from 'lucide-react';
 import { exportToCSV } from '../utils/csvExport';
 import axios from 'axios';
 
@@ -24,6 +24,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
     // Transaction Detail Modal State
     const [showTransactionDetail, setShowTransactionDetail] = useState(false);
     const [selectedTransaction, setSelectedTransaction] = useState(null);
+    const [expandedSms, setExpandedSms] = useState(null);
 
     const formatMonthDisplay = (dateStr) => {
         if (!dateStr) return '-';
@@ -833,15 +834,24 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                 >
                                     <div className="flex justify-between items-start">
                                         <div className="flex-1 min-w-0 mr-3">
-                                            <div className="text-white font-semibold text-sm">{tx.merchant || 'Unknown'}</div>
+                                            <div className="text-white font-semibold text-sm flex items-center gap-1.5">
+                                                {tx.merchant || 'Unknown'}
+                                                {tx.raw_sms_content && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setExpandedSms(prev => prev === tx.transaction_id ? null : tx.transaction_id);
+                                                        }}
+                                                        className={`p-0.5 rounded transition ${expandedSms === tx.transaction_id ? 'text-blue-400 bg-blue-500/20' : 'text-slate-500 hover:text-blue-400 hover:bg-slate-600/50'}`}
+                                                        title="View SMS"
+                                                    >
+                                                        <MessageSquare size={13} />
+                                                    </button>
+                                                )}
+                                            </div>
                                             <div className="text-slate-400 text-xs">
                                                 {tx.date ? new Date(tx.date).toLocaleDateString() : '-'}
                                             </div>
-                                            {tx.raw_sms_content && (
-                                                <div className="mt-1.5 bg-slate-800/80 border border-slate-600/30 rounded px-2 py-1.5 text-[10px] font-mono text-slate-400 whitespace-pre-wrap leading-relaxed max-h-20 overflow-y-auto">
-                                                    {tx.raw_sms_content}
-                                                </div>
-                                            )}
                                         </div>
                                         <div className="text-right">
                                             <div className="text-emerald-400 font-mono text-sm">{formatCurrency(tx.amount)}</div>
@@ -863,6 +873,19 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                     {r.replace('_', ' ')}
                                                 </span>
                                             ))}
+                                        </div>
+                                    )}
+                                    {/* Expandable SMS Content */}
+                                    {expandedSms === tx.transaction_id && tx.raw_sms_content && (
+                                        <div className="mt-2 border-t border-slate-600/30 pt-2">
+                                            <div className="bg-slate-900/80 rounded-lg p-2.5">
+                                                <div className="text-[9px] uppercase text-slate-500 font-bold mb-1 flex items-center gap-1">
+                                                    <MessageSquare size={9} /> SMS Content
+                                                </div>
+                                                <p className="text-slate-300 text-[11px] font-mono leading-relaxed whitespace-pre-wrap">
+                                                    {tx.raw_sms_content}
+                                                </p>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
