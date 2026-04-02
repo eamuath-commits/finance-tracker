@@ -600,26 +600,40 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                     </div>
 
                                                     {/* Linked transactions (if any) */}
-                                                    {item.linked_transactions && item.linked_transactions.length > 0 && (
-                                                        <div className="flex flex-wrap gap-1 mt-1.5 ml-14">
-                                                            {item.linked_transactions.map(tx => (
-                                                                <div key={tx.id} className="flex items-center gap-1 bg-purple-500/10 text-purple-400 text-[9px] px-1.5 py-0.5 rounded">
-                                                                    <button
-                                                                        onClick={() => { setSelectedTransaction(tx); setShowTransactionDetail(true); }}
-                                                                        className="font-mono hover:text-purple-200 flex items-center gap-0.5"
-                                                                    >
-                                                                        <Eye size={8} /> {tx.merchant?.substring(0, 15) || tx.id.substring(0, 8)}
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleUnlinkSingleTransaction(item.id, tx.id)}
-                                                                        className="text-purple-500 hover:text-red-400 transition"
-                                                                    >
-                                                                        <Unlink size={8} />
-                                                                    </button>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
+                                                    {(() => {
+                                                        // Combine old-style (linked_transaction singular) and new-style (linked_transactions array)
+                                                        const txList = [];
+                                                        if (item.linked_transaction) {
+                                                            txList.push(item.linked_transaction);
+                                                        }
+                                                        if (item.linked_transactions && item.linked_transactions.length > 0) {
+                                                            item.linked_transactions.forEach(tx => {
+                                                                // Avoid duplicates if transaction_id matches
+                                                                if (!txList.find(t => t.id === tx.id)) txList.push(tx);
+                                                            });
+                                                        }
+                                                        if (txList.length === 0) return null;
+                                                        return (
+                                                            <div className="flex flex-wrap gap-1 mt-1.5 ml-14">
+                                                                {txList.map(tx => (
+                                                                    <div key={tx.id} className="flex items-center gap-1 bg-purple-500/10 text-purple-400 text-[9px] px-1.5 py-0.5 rounded">
+                                                                        <button
+                                                                            onClick={() => { setSelectedTransaction(tx); setShowTransactionDetail(true); }}
+                                                                            className="font-mono hover:text-purple-200 flex items-center gap-0.5"
+                                                                        >
+                                                                            <Eye size={8} /> {tx.merchant?.substring(0, 15) || tx.id.substring(0, 8)}
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleUnlinkSingleTransaction(item.id, tx.id)}
+                                                                            className="text-purple-500 hover:text-red-400 transition"
+                                                                        >
+                                                                            <Unlink size={8} />
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </div>
 
                                                 {/* Actions */}
