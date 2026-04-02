@@ -144,9 +144,9 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
     };
 
     const months = useMemo(() => [
+        { offset: monthOffset - 2, label: getMonthLabel(monthOffset - 2), short: getMonthShort(monthOffset - 2), key: getMonthKey(monthOffset - 2), billingDate: getBillingDateStr(monthOffset - 2), periodRange: getPeriodRange(monthOffset - 2), isPrev: true, isSelected: false, isNext: false },
         { offset: monthOffset - 1, label: getMonthLabel(monthOffset - 1), short: getMonthShort(monthOffset - 1), key: getMonthKey(monthOffset - 1), billingDate: getBillingDateStr(monthOffset - 1), periodRange: getPeriodRange(monthOffset - 1), isPrev: true, isSelected: false, isNext: false },
         { offset: monthOffset, label: getMonthLabel(monthOffset), short: getMonthShort(monthOffset), key: getMonthKey(monthOffset), billingDate: getBillingDateStr(monthOffset), periodRange: getPeriodRange(monthOffset), isPrev: false, isSelected: true, isNext: false },
-        { offset: monthOffset + 1, label: getMonthLabel(monthOffset + 1), short: getMonthShort(monthOffset + 1), key: getMonthKey(monthOffset + 1), billingDate: getBillingDateStr(monthOffset + 1), periodRange: getPeriodRange(monthOffset + 1), isPrev: false, isSelected: false, isNext: true },
     ], [monthOffset, periodStartDay]);
 
     useEffect(() => {
