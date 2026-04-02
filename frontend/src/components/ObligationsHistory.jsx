@@ -523,8 +523,8 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
 
                         // Sort: budgets first, then by category, then by name
                         allItems.sort((a, b) => {
-                            const aPaid = a.type === 'payment' && (a.transaction_id || (a.linked_transactions && a.linked_transactions.length > 0));
-                            const bPaid = b.type === 'payment' && (b.transaction_id || (b.linked_transactions && b.linked_transactions.length > 0));
+                            const aPaid = a.type === 'payment';
+                            const bPaid = b.type === 'payment';
                             if (aPaid !== bPaid) return aPaid ? 1 : -1; // Unpaid first
                             const catA = (a.oblCategory || 'Other');
                             const catB = (b.oblCategory || 'Other');
@@ -542,7 +542,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                         }
 
                         // Summary stats
-                        const totalPaid = allItems.filter(i => i.type === 'payment' && (i.transaction_id || (i.linked_transactions && i.linked_transactions.length > 0))).length;
+                        const totalPaid = allItems.filter(i => i.type === 'payment').length;
                         const totalBudget = allItems.length - totalPaid;
 
                         return (
@@ -565,15 +565,16 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                 {/* Obligations list */}
                                 <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden shadow-lg divide-y divide-slate-700/30">
                                     {allItems.map(item => {
-                                        const isLinked = item.type === 'payment' && (item.transaction_id || (item.linked_transactions && item.linked_transactions.length > 0));
+                                        const isPaid = item.type === 'payment';
                                         const isPlanned = item.type === 'planned';
+                                        const hasLinkedTx = item.transaction_id || (item.linked_transactions && item.linked_transactions.length > 0);
 
                                         return (
-                                            <div key={item.id} className={`px-4 py-3 flex items-center justify-between gap-4 transition ${isLinked ? 'bg-emerald-900/5' : isPlanned ? 'bg-amber-900/5 border-l-2 border-l-amber-500/40' : 'hover:bg-slate-700/20'}`}>
+                                            <div key={item.id} className={`px-4 py-3 flex items-center justify-between gap-4 transition ${isPaid ? 'bg-emerald-900/5' : isPlanned ? 'bg-amber-900/5 border-l-2 border-l-amber-500/40' : 'hover:bg-slate-700/20'}`}>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2">
                                                         {/* Status badge */}
-                                                        {isLinked ? (
+                                                        {isPaid ? (
                                                             <span className="text-[8px] font-bold text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded border border-emerald-500/30 uppercase whitespace-nowrap">
                                                                 <CheckCircle size={8} className="inline mr-0.5" />Paid
                                                             </span>
