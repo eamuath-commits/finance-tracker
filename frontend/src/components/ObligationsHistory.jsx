@@ -488,13 +488,25 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                             if (oblsWithPayments.has(obl.id)) return;
                             if (selectedCategory !== 'All' && obl.category !== selectedCategory) return;
 
-                            // Look up the BUDGET entry from history for this obligation+month
-                            // This is the amount set in the Forecast (planning) tab
+                            // Look up the planned amount for this obligation:
+                            // 1. First check for a BUDGET entry for this month (set in Forecast tab)
+                            // 2. Fall back to most recent PAID amount (matches Forecast API logic)
+                            // 3. Fall back to obligation base amount
                             const oblHistory = history[obl.id] || [];
                             const budgetEntry = oblHistory.find(r =>
                                 r.status === 'BUDGET' && (r.billing_month || '').startsWith(billingMonth)
                             );
-                            const plannedAmount = budgetEntry ? budgetEntry.amount : (obl.amount || 0);
+
+                            let plannedAmount;
+                            if (budgetEntry) {
+                                plannedAmount = budgetEntry.amount;
+                            } else {
+                                // Use the most recent PAID amount (same as Forecast API)
+                                const paidEntries = oblHistory
+                                    .filter(r => r.status === 'Paid' || r.status === 'PAID')
+                                    .sort((a, b) => (b.billing_month || '').localeCompare(a.billing_month || ''));
+                                plannedAmount = paidEntries.length > 0 ? paidEntries[0].amount : (obl.amount || 0);
+                            }
 
                             allItems.push({
                                 type: 'planned',
