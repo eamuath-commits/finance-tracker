@@ -832,11 +832,16 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                     onClick={() => !tx.already_linked && handleLinkTransaction(tx.transaction_id)}
                                 >
                                     <div className="flex justify-between items-start">
-                                        <div>
+                                        <div className="flex-1 min-w-0 mr-3">
                                             <div className="text-white font-semibold text-sm">{tx.merchant || 'Unknown'}</div>
                                             <div className="text-slate-400 text-xs">
                                                 {tx.date ? new Date(tx.date).toLocaleDateString() : '-'}
                                             </div>
+                                            {tx.raw_sms_content && (
+                                                <div className="mt-1.5 bg-slate-800/80 border border-slate-600/30 rounded px-2 py-1.5 text-[10px] font-mono text-slate-400 whitespace-pre-wrap leading-relaxed max-h-20 overflow-y-auto">
+                                                    {tx.raw_sms_content}
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="text-right">
                                             <div className="text-emerald-400 font-mono text-sm">{formatCurrency(tx.amount)}</div>
