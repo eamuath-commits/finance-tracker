@@ -288,9 +288,9 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
     // --- Pay & Link: Create payment + open link modal ---
     const handlePayAndLink = async (obl, billingMonth) => {
         try {
-            // Create a PAID payment for this obligation+month
+            // Create a payment record for this obligation+month
             const payRes = await axios.post(`${API_URL}/obligations/${obl.id}/pay`, {
-                amount: 0, // Will be set by linked transaction
+                amount: obl.amount || 0,
                 billing_month: billingMonth,
                 status: 'Paid',
                 payment_date: new Date().toISOString()
@@ -298,13 +298,13 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
 
             const newPayment = payRes.data;
             if (newPayment?.id) {
-                // Refresh data then open link modal for the new payment
-                if (onRefresh) await onRefresh();
-                // Build a payment-like object to open the modal
+                // Build a payment-like object and open the link modal immediately
+                // Do NOT call onRefresh() here — it re-renders and loses modal state
                 const paymentObj = {
                     id: newPayment.id,
+                    obligation_id: obl.id,
                     oblName: obl.name,
-                    amount: obl.amount || 0,
+                    amount: newPayment.amount || obl.amount || 0,
                     billing_month: billingMonth
                 };
                 openLinkModal(paymentObj);
