@@ -287,11 +287,12 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
     };
 
     // --- Pay & Link: Create payment + open link modal ---
-    const handlePayAndLink = async (obl, billingMonth) => {
+    const handlePayAndLink = async (obl, billingMonth, plannedAmount) => {
         try {
             // Create a payment record for this obligation+month
+            const payAmount = plannedAmount || obl.amount || 0;
             const payRes = await axios.post(`${API_URL}/obligations/${obl.id}/pay`, {
-                amount: obl.amount || 0,
+                amount: payAmount,
                 billing_month: billingMonth,
                 status: 'Paid',
                 payment_date: new Date().toISOString()
@@ -640,7 +641,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                 <div className="flex items-center gap-1.5 flex-shrink-0">
                                                     {isPlanned ? (
                                                         <button
-                                                            onClick={() => handlePayAndLink(item.obl, item.billing_month)}
+                                                            onClick={() => handlePayAndLink(item.obl, item.billing_month, item.amount)}
                                                             className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] px-2.5 py-1.5 rounded-lg font-bold uppercase tracking-wider transition flex items-center gap-1 shadow-sm"
                                                         >
                                                             <DollarSign size={10} /> Pay
