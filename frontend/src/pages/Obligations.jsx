@@ -418,11 +418,11 @@ const Obligations = () => {
                             <button onClick={() => setViewMode('manager')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${viewMode === 'manager' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-gray-400 hover:text-white hover:bg-slate-700/50'}`}>
                                 <LayoutGrid size={16} /> Manager
                             </button>
-                            <button onClick={() => setViewMode('payments')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${viewMode === 'payments' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-gray-400 hover:text-white hover:bg-slate-700/50'}`}>
-                                <Receipt size={16} /> Payments
-                            </button>
                             <button onClick={() => setViewMode('forecast')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${viewMode === 'forecast' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-gray-400 hover:text-white hover:bg-slate-700/50'}`}>
                                 <Calendar size={16} /> Forecast
+                            </button>
+                            <button onClick={() => setViewMode('payments')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${viewMode === 'payments' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-gray-400 hover:text-white hover:bg-slate-700/50'}`}>
+                                <Receipt size={16} /> Payments
                             </button>
                         </div>
 
