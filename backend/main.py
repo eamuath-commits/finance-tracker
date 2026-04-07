@@ -956,6 +956,7 @@ def read_obligation_payments(obligation_id: str, db: Session = Depends(get_db)):
             "note": p.note,
             "status": p.status,
             "transaction_id": p.transaction_id,
+            "source": getattr(p, 'source', None),
             "linked_transaction": None,
             "linked_transactions": linked_txs,
             "linked_transactions_count": len(linked_txs)
@@ -995,6 +996,168 @@ def update_payment(payment_id: int, payment_update: schemas.PaymentUpdate, db: S
     if not updated:
         raise HTTPException(status_code=404, detail="Payment entry not found")
     return updated
+
+# --- Auto-Match Obligations to Transactions ---
+@app.post("/obligations/auto-match")
+def auto_match_obligations(db: Session = Depends(get_db)):
+    """
+    Batch process: Scan unpaid obligations for the current and previous month.
+    For each, find a debit transaction with 100% amount match within ±5 days of due_day.
+    Creates a PAID payment with source='auto' and links the transaction.
+    Idempotent — safe to run repeatedly.
+    """
+    from datetime import datetime, timedelta
+    import calendar
+    import logging
+
+    logger = logging.getLogger("auto_match")
+    now = datetime.now()
+
+    # Target current month and previous month
+    target_months = []
+    for offset in [0, -1]:  # Current month and previous month
+        y = now.year + ((now.month - 1 + offset) // 12)
+        m = ((now.month - 1 + offset) % 12) + 1
+        target_months.append((y, m, f"{y}-{str(m).zfill(2)}"))
+
+    obligations = db.query(models.MonthlyObligation).all()
+
+    # Get ALL existing paid payments for the target months to check what's already done
+    from sqlalchemy import or_
+    month_filters = [models.Payment.billing_month.like(f"{bm}%") for _, _, bm in target_months]
+    existing_payments = db.query(models.Payment).filter(
+        or_(*month_filters),
+        models.Payment.status == models.PaymentStatus.PAID
+    ).all()
+    paid_set = {(p.obligation_id, p.billing_month[:7]) for p in existing_payments}
+
+    # Get ALL transactions already linked to any payment (via junction table or transaction_id)
+    linked_tx_ids = set()
+    # Junction table links
+    junction_links = db.query(models.PaymentTransaction.transaction_id).all()
+    linked_tx_ids.update(j[0] for j in junction_links)
+    # Legacy direct links
+    legacy_links = db.query(models.Payment.transaction_id).filter(
+        models.Payment.transaction_id.isnot(None)
+    ).all()
+    linked_tx_ids.update(l[0] for l in legacy_links)
+
+    # Get expected amounts per obligation (from BUDGET entries or most recent PAID)
+    def get_expected_amount(obl, billing_month_prefix):
+        # 1. Check for BUDGET entry
+        budget = db.query(models.Payment).filter(
+            models.Payment.obligation_id == obl.id,
+            models.Payment.billing_month.like(f"{billing_month_prefix}%"),
+            models.Payment.status == models.PaymentStatus.BUDGET
+        ).first()
+        if budget and budget.amount:
+            return budget.amount
+
+        # 2. Most recent PAID amount
+        recent_paid = db.query(models.Payment).filter(
+            models.Payment.obligation_id == obl.id,
+            models.Payment.status == models.PaymentStatus.PAID
+        ).order_by(models.Payment.billing_month.desc()).first()
+        if recent_paid and recent_paid.amount:
+            return recent_paid.amount
+
+        # 3. Base obligation amount
+        return obl.amount
+
+    matched = []
+    skipped = []
+
+    for year, month, bm_prefix in target_months:
+        for obl in obligations:
+            # Skip if already paid for this month
+            if (obl.id, bm_prefix) in paid_set:
+                continue
+
+            expected_amount = get_expected_amount(obl, bm_prefix)
+            if not expected_amount or expected_amount <= 0:
+                skipped.append({"name": obl.name, "month": bm_prefix, "reason": "no_expected_amount"})
+                continue
+
+            # Calculate due date and search window (±5 days)
+            due_day = obl.due_day or 1
+            last_day = calendar.monthrange(year, month)[1]
+            actual_due_day = min(due_day, last_day)
+            try:
+                due_date = datetime(year, month, actual_due_day)
+            except ValueError:
+                skipped.append({"name": obl.name, "month": bm_prefix, "reason": "invalid_date"})
+                continue
+
+            start_date = due_date - timedelta(days=5)
+            end_date = due_date + timedelta(days=5)
+
+            # Find exact-match debit transactions in the window
+            candidates = db.query(models.Transaction).filter(
+                models.Transaction.timestamp >= start_date,
+                models.Transaction.timestamp <= end_date,
+                models.Transaction.type == "debit",
+                models.Transaction.amount == expected_amount
+            ).order_by(
+                # Prefer transactions closest to due date
+                models.Transaction.timestamp
+            ).all()
+
+            # Find the first candidate not already linked
+            matched_tx = None
+            for tx in candidates:
+                if tx.id not in linked_tx_ids:
+                    matched_tx = tx
+                    break
+
+            if not matched_tx:
+                skipped.append({"name": obl.name, "month": bm_prefix, "reason": "no_matching_transaction"})
+                continue
+
+            # Create payment record
+            billing_month_str = f"{bm_prefix}-01"
+            new_payment = models.Payment(
+                obligation_id=obl.id,
+                amount=expected_amount,
+                payment_date=matched_tx.timestamp.date() if matched_tx.timestamp else now.date(),
+                billing_month=billing_month_str,
+                status=models.PaymentStatus.PAID,
+                source="auto",
+                note=f"Auto-matched to {matched_tx.merchant or matched_tx.id[:8]}"
+            )
+            db.add(new_payment)
+            db.flush()  # Get the payment ID
+
+            # Link via junction table
+            link = models.PaymentTransaction(
+                payment_id=new_payment.id,
+                transaction_id=matched_tx.id
+            )
+            db.add(link)
+
+            # Mark this transaction as linked so we don't double-link
+            linked_tx_ids.add(matched_tx.id)
+            # Mark this obligation+month as paid so we don't duplicate
+            paid_set.add((obl.id, bm_prefix))
+
+            matched.append({
+                "obligation": obl.name,
+                "month": bm_prefix,
+                "amount": expected_amount,
+                "transaction_merchant": matched_tx.merchant,
+                "transaction_date": matched_tx.timestamp.isoformat() if matched_tx.timestamp else None,
+                "payment_id": new_payment.id
+            })
+
+            logger.info(f"Auto-matched: {obl.name} ({bm_prefix}) -> {matched_tx.merchant} ({expected_amount})")
+
+    db.commit()
+
+    return {
+        "total_matched": len(matched),
+        "total_skipped": len(skipped),
+        "matched": matched,
+        "skipped": skipped
+    }
 
 # --- Payment-Transaction Linking Endpoints ---
 @app.get("/payments/{payment_id}/suggested-transactions")

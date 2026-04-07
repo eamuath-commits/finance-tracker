@@ -250,6 +250,7 @@ class Payment(Base):
     note = Column(String, nullable=True)
     status = Column(Enum(PaymentStatus), default=PaymentStatus.PAID)
     transaction_id = Column(String, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True) # Link to actual transaction
+    source = Column(String, nullable=True, default=None)  # None=manual, 'auto'=auto-matched
 
     obligation = relationship("MonthlyObligation") # Removed back_populates to avoid circular dependency conflict if needed, or add back
     transaction = relationship("Transaction", back_populates="payments")

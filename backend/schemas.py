@@ -230,6 +230,7 @@ class PaymentBase(BaseModel):
     note: Optional[str] = None
     planned_amount: Optional[float] = None
     transaction_id: Optional[str] = None
+    source: Optional[str] = None  # None=manual, 'auto'=auto-matched
 
 class PaymentCreate(PaymentBase):
     pass

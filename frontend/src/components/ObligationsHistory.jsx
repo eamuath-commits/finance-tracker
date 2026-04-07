@@ -577,9 +577,16 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                     <div className="flex items-center gap-2">
                                                         {/* Status badge */}
                                                         {isPaid ? (
-                                                            <span className="text-[8px] font-bold text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded border border-emerald-500/30 uppercase whitespace-nowrap">
-                                                                <CheckCircle size={8} className="inline mr-0.5" />Paid
-                                                            </span>
+                                                            <>
+                                                                <span className="text-[8px] font-bold text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded border border-emerald-500/30 uppercase whitespace-nowrap">
+                                                                    <CheckCircle size={8} className="inline mr-0.5" />Paid
+                                                                </span>
+                                                                {item.source === 'auto' && (
+                                                                    <span className="text-[8px] font-bold text-cyan-400 bg-cyan-500/20 px-1.5 py-0.5 rounded border border-cyan-500/30 uppercase whitespace-nowrap">
+                                                                        ⚡Auto
+                                                                    </span>
+                                                                )}
+                                                            </>
                                                         ) : (
                                                             <span className="text-[8px] font-bold text-amber-400 bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30 uppercase whitespace-nowrap">
                                                                 <Clock size={8} className="inline mr-0.5" />Budget
