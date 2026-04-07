@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Modal, formatCurrency } from './UI';
-import { Calendar, CreditCard, Tag, FileText, ArrowUpRight, ArrowDownLeft, ExternalLink } from 'lucide-react';
+import { Calendar, CreditCard, Tag, FileText, ArrowUpRight, ArrowDownLeft, ExternalLink, MessageSquare } from 'lucide-react';
 
 /**
  * TransactionDetailModal - A reusable modal to display transaction details
  * Can be used from Distributions, Payments, or any component that needs to show transaction info
  */
 const TransactionDetailModal = ({ isOpen, onClose, transaction }) => {
+    const [showSms, setShowSms] = useState(false);
+
     if (!transaction) return null;
 
     const isCredit = transaction.type === 'credit';
@@ -87,6 +89,27 @@ const TransactionDetailModal = ({ isOpen, onClose, transaction }) => {
                                 <div className="text-xs text-slate-500 uppercase font-bold">Notes</div>
                                 <div className="text-white font-medium">{transaction.notes}</div>
                             </div>
+                        </div>
+                    )}
+
+                    {/* Raw SMS Content */}
+                    {transaction.raw_sms_content && (
+                        <div className="p-3 bg-slate-700/30 rounded-lg">
+                            <button
+                                onClick={() => setShowSms(!showSms)}
+                                className={`flex items-center gap-2 text-xs font-bold uppercase tracking-wider transition ${showSms ? 'text-blue-400' : 'text-slate-500 hover:text-blue-400'}`}
+                            >
+                                <MessageSquare size={14} />
+                                Raw SMS Message
+                                <span className="text-[10px] normal-case font-normal">
+                                    {showSms ? '▲ hide' : '▼ show'}
+                                </span>
+                            </button>
+                            {showSms && (
+                                <pre className="mt-2 p-3 bg-slate-900/60 border border-slate-700 rounded-lg text-slate-300 text-xs font-mono whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
+                                    {transaction.raw_sms_content}
+                                </pre>
+                            )}
                         </div>
                     )}
 

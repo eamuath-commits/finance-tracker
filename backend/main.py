@@ -945,6 +945,8 @@ def read_obligation_payments(obligation_id: str, db: Session = Depends(get_db)):
                         "category": tx.category,
                         "timestamp": tx.timestamp.isoformat() if tx.timestamp else None,
                         "account_id": tx.account_id,
+                        "raw_sms_content": tx.raw_sms_content,
+                        "notes": tx.notes,
                     })
         
         payment_dict = {
