@@ -1720,9 +1720,194 @@ def process_queue(
 def get_allocation_analysis(db: Session = Depends(get_db)):
     return analysis.calculate_allocation(db)
 
+# --- Background SMS Processing ---
+async def _process_sms_background(raw_msg_id: str, sender: str, body: str, source: str = "webhook"):
+    """
+    Process an SMS message in the background.
+    Creates its own DB session since the request session is closed by now.
+    Used for iPhone Shortcuts and Telegram webhooks to avoid timeout errors.
+    """
+    from database import SessionLocal
+    db = SessionLocal()
+    try:
+        raw_msg = db.query(models.RawMessage).filter(models.RawMessage.id == raw_msg_id).first()
+        if not raw_msg:
+            logger.error(f"[SMS-BG] Raw message {raw_msg_id} not found")
+            return
+        
+        logger.info(f"[SMS-BG] Processing message {raw_msg_id} from {sender}")
+        
+        if source == "webhook":
+            # Webhook path: use generic AI parser
+            try:
+                result = await sms_agent.parse_with_ai(db, body)
+                result = sms_agent.validate_parsed_digits(body, result)
+            except Exception as e:
+                raw_msg.status = models.MessageStatus.FAILED
+                raw_msg.error_log = f"AI Parse Error: {str(e)}"
+                db.commit()
+                logger.error(f"[SMS-BG] AI Parse Error for {raw_msg_id}: {e}")
+                return
+            
+            if not result or not result.get("is_financial_event"):
+                raw_msg.status = models.MessageStatus.FAILED
+                raw_msg.error_log = "Not a financial event"
+                db.commit()
+                return
+            
+            # Find Account
+            last_4 = result.get("destination_account_last4") or result.get("source_account_last4")
+            if not last_4 and result.get("card_info"):
+                card_match = re.search(r"(\d{4})", result["card_info"])
+                if card_match: last_4 = card_match.group(1)
+            
+            account = crud.get_account_by_last_4(db, last_4=last_4) if last_4 else None
+            
+            if not account:
+                raw_msg.status = models.MessageStatus.FAILED
+                raw_msg.error_log = f"Account {last_4} not found"
+                db.commit()
+                return
+            
+            try:
+                await sms_agent._create_transaction_logic(db, result, account, None, body, reply_target=None, source="telegram")
+                raw_msg.status = models.MessageStatus.PARSED
+                raw_msg.error_log = None
+                db.commit()
+                logger.info(f"[SMS-BG] Successfully processed webhook message {raw_msg_id}")
+            except Exception as e:
+                raw_msg.status = models.MessageStatus.FAILED
+                raw_msg.error_log = f"Storage Error: {str(e)}"
+                db.commit()
+                logger.error(f"[SMS-BG] Storage Error for {raw_msg_id}: {e}")
+        
+        else:
+            # Ingest path (iPhone Shortcuts): use bank-specific parser
+            effective_sender = sender
+            body_for_parsing = body
+            body_lines = body.strip().split('\n')
+            
+            # Extract sender from header if present
+            first_line = body_lines[0] if body_lines else ""
+            header_match = re.search(r'^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+from\s+(.+)$', first_line.strip(), re.IGNORECASE)
+            if header_match:
+                effective_sender = header_match.group(1).strip()
+                body_for_parsing = '\n'.join(body_lines[1:]).strip()
+            
+            raw_msg.sender = effective_sender
+            db.commit()
+            
+            # Use bank-specific parser
+            try:
+                from bank_parsers import get_parser
+                parser = get_parser(effective_sender)
+                result = await parser.parse(db, body_for_parsing)
+                result = sms_agent.validate_parsed_digits(body_for_parsing, result)
+                logger.info(f"[SMS-BG] AI Response for {raw_msg_id}: {result}")
+            except Exception as e:
+                logger.error(f"[SMS-BG] AI Error for {raw_msg_id}: {str(e)}")
+                raw_msg.status = models.MessageStatus.FAILED
+                raw_msg.error_log = f"AI Error: {str(e)}"
+                db.commit()
+                return
+            
+            # Check for errors
+            if isinstance(result, list):
+                result = result[0] if result else {}
+            
+            if result and isinstance(result, dict) and result.get("error"):
+                raw_msg.status = models.MessageStatus.FAILED
+                raw_msg.error_log = result.get("error")
+                db.commit()
+                return
+            
+            if not result or not isinstance(result, dict) or not result.get("is_financial_event"):
+                db.delete(raw_msg)
+                db.commit()
+                return
+            
+            # Extract source_bank from header if not parsed
+            if not result.get("source_bank"):
+                hdr_match = re.search(r'\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+from\s+(\S+)', body, re.IGNORECASE)
+                if hdr_match:
+                    result["source_bank"] = hdr_match.group(1)
+            
+            # Check for Declines
+            if result.get("status") == "failed" or result.get("sub_type") == "decline":
+                raw_msg.status = models.MessageStatus.PARSED
+                raw_msg.error_log = "Transaction Declined (not added to ledger)"
+                db.commit()
+                return
+            
+            # Bank validation
+            tx_type_for_bank = (result.get("transaction_type") or "debit").lower()
+            if tx_type_for_bank == "credit":
+                bank_to_check = result.get("destination_bank")
+            else:
+                bank_to_check = result.get("source_bank") or result.get("destination_bank")
+            
+            if bank_to_check:
+                bank_lower = bank_to_check.lower().strip()
+                user_accounts = db.query(models.Account).all()
+                user_credit_cards = db.query(models.CreditCard).all()
+                user_bank_names = set()
+                for acc in user_accounts:
+                    if acc.bank_name:
+                        user_bank_names.add(acc.bank_name.lower().strip())
+                for card in user_credit_cards:
+                    if card.bank_name:
+                        user_bank_names.add(card.bank_name.lower().strip())
+                has_account_at_bank = any(
+                    user_bank in bank_lower or bank_lower in user_bank
+                    for user_bank in user_bank_names
+                )
+                if not has_account_at_bank and user_bank_names:
+                    raw_msg.status = models.MessageStatus.FAILED
+                    raw_msg.error_log = f"No account at bank: {bank_to_check}"
+                    db.commit()
+                    return
+            
+            # Find account
+            account, credit_card, any_last4 = sms_agent.resolve_account(db, result, body)
+            
+            if not account and not credit_card:
+                # For background processing, mark as FAILED so user can retry from SMS inbox
+                raw_msg.status = models.MessageStatus.FAILED
+                raw_msg.error_log = f"Account not found (last4: {any_last4 or 'none'}) — retry from SMS inbox"
+                db.commit()
+                logger.warning(f"[SMS-BG] No account found for {raw_msg_id}, last4={any_last4}")
+                return
+            
+            # Create transaction
+            try:
+                await sms_agent._create_transaction_logic(db, result, account, credit_card, body, reply_target=None, source="shortcut")
+                raw_msg.status = models.MessageStatus.PARSED
+                raw_msg.error_log = None
+                db.commit()
+                logger.info(f"[SMS-BG] Successfully processed ingest message {raw_msg_id}")
+            except Exception as e:
+                raw_msg.status = models.MessageStatus.FAILED
+                raw_msg.error_log = f"Transaction Error: {str(e)}"
+                db.commit()
+                logger.error(f"[SMS-BG] Transaction Error for {raw_msg_id}: {e}")
+    
+    except Exception as e:
+        logger.error(f"[SMS-BG] Unexpected error processing {raw_msg_id}: {e}")
+        try:
+            raw_msg = db.query(models.RawMessage).filter(models.RawMessage.id == raw_msg_id).first()
+            if raw_msg:
+                raw_msg.status = models.MessageStatus.FAILED
+                raw_msg.error_log = f"Background processing error: {str(e)}"
+                db.commit()
+        except:
+            pass
+    finally:
+        db.close()
+
+
 # --- Webhook Endpoint ---
 @app.post("/webhook/sms")
-async def receive_sms(request: Request, db: Session = Depends(get_db)):
+async def receive_sms(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     try:
         raw_body = await request.json()
     except Exception as e:
@@ -1736,65 +1921,22 @@ async def receive_sms(request: Request, db: Session = Depends(get_db)):
          # Try full dump if body key doesn't exist
          body = str(raw_body)
 
-    # 1. Save Raw Message
+    # 1. Save Raw Message immediately
     raw_msg = models.RawMessage(
         sender=sender,
         body=body,
         status=models.MessageStatus.PENDING
     )
     db.add(raw_msg)
-    db.commit() # Commit to get ID and ensure persistence even if crash
+    db.commit()
     db.refresh(raw_msg)
     
     print(f"Extract SMS Body: {body}")
 
-    # 2. Unified AI Parse
-    try:
-        result = await sms_agent.parse_with_ai(db, body)
-        result = sms_agent.validate_parsed_digits(body, result)  # Validate account numbers
-    except Exception as e:
-        raw_msg.status = models.MessageStatus.FAILED
-        raw_msg.error_log = f"AI Parse Error: {str(e)}"
-        db.commit()
-        return {"status": "failed", "reason": f"AI Parse Error: {str(e)}"}
-
-    if not result or not result.get("is_financial_event"):
-        raw_msg.status = models.MessageStatus.FAILED
-        raw_msg.error_log = "Not a financial event"
-        db.commit()
-        return {"status": "ignored", "reason": "Not a financial event"}
-
-    # 3. Find Account
-    last_4 = result.get("destination_account_last4") or result.get("source_account_last4")
-    if not last_4 and result.get("card_info"):
-        # Heuristic for cards
-        card_match = re.search(r"(\d{4})", result["card_info"])
-        if card_match: last_4 = card_match.group(1)
-
-    account = crud.get_account_by_last_4(db, last_4=last_4) if last_4 else None
+    # 2. Process in background — return immediately so callers don't timeout
+    background_tasks.add_task(_process_sms_background, str(raw_msg.id), sender, body, "webhook")
     
-    if not account:
-        raw_msg.status = models.MessageStatus.FAILED
-        raw_msg.error_log = f"Account {last_4} not found"
-        db.commit()
-        return {
-            "status": "warning", 
-            "reason": f"Account with last 4 digits {last_4} not found",
-            "parsed": result
-        }
-
-    # 4. Create Transaction Logic (Handles Conversion, Credit/Debit, etc.)
-    try:
-        await sms_agent._create_transaction_logic(db, result, account, None, body, reply_target=None, source="telegram")
-        raw_msg.status = models.MessageStatus.PARSED
-        raw_msg.error_log = None
-        db.commit()
-        return {"status": "success", "message": "Logged successfully via AI"}
-    except Exception as e:
-        raw_msg.status = models.MessageStatus.FAILED
-        raw_msg.error_log = f"Storage Error: {str(e)}"
-        db.commit()
-        return {"status": "failed", "reason": str(e)}
+    return {"status": "received", "message_id": str(raw_msg.id)}
 
 # --- SMS Inbox Endpoints ---
 @app.get("/messages/", response_model=List[schemas.RawMessage])
@@ -1897,13 +2039,20 @@ def bulk_delete_messages(payload: schemas.BulkDeleteRequest, db: Session = Depen
 
 # --- Direct SMS Ingest (for iPhone Shortcuts and Web UI) ---
 @app.post("/api/sms/ingest")
-async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
+async def ingest_sms(payload: schemas.SMSIngest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """
     Direct SMS ingest endpoint for iPhone Shortcuts and Web UI.
     Accepts separate 'sender' and 'body' fields.
     
+    For iPhone Shortcuts (non-WebUI senders):
+    - Saves raw message and returns immediately with {"status": "received"}
+    - Processes the SMS in the background to avoid iPhone timeout (-1001) errors
+    
+    For Web UI (sender="WebUI"):
+    - Processes synchronously and returns full result with parsed data
+    
     Returns:
-    - status: "success" | "pending_action" | "ignored" | "failed"
+    - status: "received" (async) | "success" | "pending_action" | "ignored" | "failed"
     - transaction: Created transaction details (if any)
     - accounts: List of accounts for selection (if pending_action)
     - parsed: AI parsing result
@@ -1958,6 +2107,27 @@ async def ingest_sms(payload: schemas.SMSIngest, db: Session = Depends(get_db)):
         db.commit()
         return {"status": "ignored", "reason": "Credit card statement notification — not a transaction"}
     
+    # --- ASYNC PATH: For iPhone Shortcuts (non-WebUI senders) ---
+    # Save raw message immediately and process in background to avoid -1001 timeout
+    is_webui = (payload.sender or "").strip().lower() == "webui"
+    
+    if not is_webui:
+        raw_msg = models.RawMessage(
+            sender=payload.sender,
+            body=payload.body,
+            status=models.MessageStatus.PENDING,
+            timestamp=datetime.now()
+        )
+        db.add(raw_msg)
+        db.commit()
+        db.refresh(raw_msg)
+        
+        logger.info(f"[SMS-INGEST] iPhone/Shortcut sender detected — processing in background (msg_id={raw_msg.id})")
+        background_tasks.add_task(_process_sms_background, str(raw_msg.id), payload.sender, payload.body, "ingest")
+        
+        return {"status": "received", "message_id": str(raw_msg.id), "message": "SMS received, processing in background"}
+    
+    # --- SYNC PATH: WebUI only (below this point) ---
     # 0b. QUEUE CHECK: Log pending transactions but don't block processing
     queue_status = queue_processor.get_queue_status(db)
     if queue_status["blocked"] > 0:
