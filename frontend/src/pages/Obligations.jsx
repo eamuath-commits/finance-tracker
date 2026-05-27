@@ -24,6 +24,7 @@ const Obligations = () => {
     // --- Obligations Data State ---
     const [obligations, setObligations] = useState([]);
     const [payments, setPayments] = useState({});
+    const [forecast, setForecast] = useState(null);
 
     // --- Categories Data State ---
     const [categoriesList, setCategoriesList] = useState([]);
@@ -94,12 +95,14 @@ const Obligations = () => {
         console.log("🚀 Starting fetchData...");
         setLoading(true);
         try {
-            const [oblRes, catRes] = await Promise.all([
+            const [oblRes, catRes, forecastRes] = await Promise.all([
                 axios.get(`${API_URL}/obligations/`),
-                axios.get(`${API_URL}/categories`)
+                axios.get(`${API_URL}/categories`),
+                axios.get(`${API_URL}/obligations/forecast?months_ahead=0`).catch(() => ({ data: null }))
             ]);
 
             setObligations(oblRes.data);
+            setForecast(forecastRes.data);
 
             // Auto-Migration: If no categories in DB, populate from existing obligations
             let finalCategories = catRes.data;
@@ -474,10 +477,17 @@ const Obligations = () => {
                             history={payments}
                             monthOffset={monthOffset}
                             periodStartDay={periodStartDay}
+                            forecast={forecast}
                             onEdit={(item) => {
                                 if (item) {
                                     const o = obligations.find(x => x.id === item.obligation_id);
-                                    if (o) openPaymentModal(o, null, null, item);
+                                    if (o) {
+                                        if (item.type === 'planned') {
+                                            openPaymentModal(o, item.billing_month, item.amount, null);
+                                        } else {
+                                            openPaymentModal(o, null, null, item);
+                                        }
+                                    }
                                 } else {
                                     openPaymentModal(null);
                                 }
