@@ -134,7 +134,41 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
 
     // 4. Calculate Total
     const visiblePaid = sorted.reduce((sum, item) => item.status === 'Paid' ? sum + (item.amount || 0) : sum, 0);
-    const visibleBudget = sorted.filter(p => p.status === 'BUDGET').reduce((sum, p) => sum + (p.amount || 0), 0);
+
+    // Compute forecast budget total for obligations without PAID records this month
+    const plannedBudgetTotal = useMemo(() => {
+        if (selectedYear === 'All' || selectedMonth === 'All') return 0;
+
+        const billingMonth = `${selectedYear}-${selectedMonth}`;
+        const oblsWithPayments = new Set(sorted.map(s => s.obligation_id));
+
+        let total = 0;
+        obligations.forEach(obl => {
+            if (oblsWithPayments.has(obl.id)) return;
+            if (selectedCategory !== 'All' && obl.category !== selectedCategory) return;
+
+            const oblHistory = history[obl.id] || [];
+            const budgetEntry = oblHistory.find(r =>
+                r.status === 'BUDGET' && (r.billing_month || '').startsWith(billingMonth)
+            );
+
+            let plannedAmount;
+            if (budgetEntry && budgetEntry.amount > 0) {
+                // Use explicit budget entry amount
+                plannedAmount = budgetEntry.amount;
+            } else {
+                // Fall back to most recent PAID amount (same as Forecast API)
+                const paidEntries = oblHistory
+                    .filter(r => r.status === 'Paid' || r.status === 'PAID')
+                    .sort((a, b) => (b.billing_month || '').localeCompare(a.billing_month || ''));
+                plannedAmount = paidEntries.length > 0 ? paidEntries[0].amount : (obl.amount || 0);
+            }
+
+            total += plannedAmount || 0;
+        });
+
+        return total;
+    }, [obligations, history, sorted, selectedYear, selectedMonth, selectedCategory]);
 
     const requestSort = (key) => {
         let direction = 'asc';
@@ -160,15 +194,16 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
         { value: '11', label: 'November' }, { value: '12', label: 'December' }
     ];
 
+    const totalBudget = plannedBudgetTotal;
     let totalLabel = "Total Amount";
-    let totalDisplay = visiblePaid + visibleBudget;
+    let totalDisplay = visiblePaid + totalBudget;
     let totalSubtext = (
         <div className="flex flex-col gap-0.5 mt-1">
-            <span className="text-white font-semibold">{sorted.length} Records</span>
+            <span className="text-white font-semibold">{obligations.length} Obligations</span>
             <span className="flex items-center gap-1 text-[10px] opacity-80">
                 <span className="text-emerald-400">{formatCurrency(visiblePaid)} Paid</span>
                 <span>·</span>
-                <span className="text-blue-400">{formatCurrency(visibleBudget)} Budget</span>
+                <span className="text-blue-400">{formatCurrency(totalBudget)} Budget</span>
             </span>
         </div>
     );
@@ -179,8 +214,8 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
         totalSubtext = <span className="text-emerald-400 font-semibold">{sorted.length} Records</span>;
     } else if (selectedStatus === 'BUDGET') {
         totalLabel = "Total Budgeted";
-        totalDisplay = visibleBudget;
-        totalSubtext = <span className="text-blue-400 font-semibold">{sorted.length} Records</span>;
+        totalDisplay = totalBudget;
+        totalSubtext = <span className="text-blue-400 font-semibold">{obligations.length} Obligations</span>;
     }
 
     const handleExport = () => {
@@ -476,7 +511,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
 
                         const billingMonth = `${selectedYear}-${selectedMonth}`;
                         const oblsWithPayments = new Set(sorted.map(s => s.obligation_id));
-                        
+
                         // Combine: paid items + planned (no payment yet)
                         const allItems = [];
 
@@ -648,7 +683,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                 <div className="flex items-center gap-1.5 flex-shrink-0">
                                                     {isPlanned ? (
                                                         <button
-                                                            onClick={() => handlePayAndLink(item.obl, item.billing_month, item.amount)}
+                                                            onClick={() => onEdit(item)}
                                                             className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] px-2.5 py-1.5 rounded-lg font-bold uppercase tracking-wider transition flex items-center gap-1 shadow-sm"
                                                         >
                                                             <DollarSign size={10} /> Pay
@@ -666,7 +701,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                                 className="bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white p-1 rounded transition-all"
                                                                 title="Delete"
                                                             >
-                                                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>
                                                             </button>
                                                         </>
                                                     )}
@@ -683,145 +718,145 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
 
             {/* Table View */}
             {viewMode === 'table' && (
-            <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden shadow-xl">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-900/80 text-slate-400 text-xs uppercase font-bold backdrop-blur-sm">
-                            <tr>
-                                <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('billing_month_sort')}>
-                                    <div className="flex items-center gap-1">Month {getSortIcon('billing_month_sort')}</div>
-                                </th>
-                                <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('oblName')}>
-                                    <div className="flex items-center gap-1">Name {getSortIcon('oblName')}</div>
-                                </th>
-                                <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('status')}>
-                                    <div className="flex items-center gap-1">Status {getSortIcon('status')}</div>
-                                </th>
-                                <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('amount')}>
-                                    <div className="flex items-center gap-1">Amount {getSortIcon('amount')}</div>
-                                </th>
-                                <th className="px-4 py-4 border-b border-slate-700">Transaction</th>
-                                <th className="px-4 py-4 border-b border-slate-700 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-700/50">
-                            {sorted.length > 0 ? sorted.map((item, idx) => (
-                                <tr key={`${item.id}-${idx}`} className="hover:bg-slate-700/30 transition text-slate-300">
-                                    <td className="px-4 py-3 text-blue-300 font-mono text-xs">
-                                        {formatMonthDisplay(item.billing_month)}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <div className="font-semibold text-white">{item.oblName}</div>
-                                        {item.note && <div className="text-[10px] text-slate-500 italic truncate max-w-[150px]">{item.note}</div>}
-                                    </td>
+                <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden shadow-xl">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-slate-900/80 text-slate-400 text-xs uppercase font-bold backdrop-blur-sm">
+                                <tr>
+                                    <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('billing_month_sort')}>
+                                        <div className="flex items-center gap-1">Month {getSortIcon('billing_month_sort')}</div>
+                                    </th>
+                                    <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('oblName')}>
+                                        <div className="flex items-center gap-1">Name {getSortIcon('oblName')}</div>
+                                    </th>
+                                    <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('status')}>
+                                        <div className="flex items-center gap-1">Status {getSortIcon('status')}</div>
+                                    </th>
+                                    <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('amount')}>
+                                        <div className="flex items-center gap-1">Amount {getSortIcon('amount')}</div>
+                                    </th>
+                                    <th className="px-4 py-4 border-b border-slate-700">Transaction</th>
+                                    <th className="px-4 py-4 border-b border-slate-700 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-700/50">
+                                {sorted.length > 0 ? sorted.map((item, idx) => (
+                                    <tr key={`${item.id}-${idx}`} className="hover:bg-slate-700/30 transition text-slate-300">
+                                        <td className="px-4 py-3 text-blue-300 font-mono text-xs">
+                                            {formatMonthDisplay(item.billing_month)}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <div className="font-semibold text-white">{item.oblName}</div>
+                                            {item.note && <div className="text-[10px] text-slate-500 italic truncate max-w-[150px]">{item.note}</div>}
+                                        </td>
 
-                                    <td className="px-4 py-3">
-                                        {item.status === 'Paid' ? (
-                                            <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded border border-emerald-500/30 font-bold uppercase tracking-wider">Paid</span>
-                                        ) : (
-                                            <span className="bg-blue-500/20 text-blue-400 text-[10px] px-2 py-1 rounded border border-blue-500/30 font-bold uppercase tracking-wider">Budget</span>
-                                        )}
-                                    </td>
+                                        <td className="px-4 py-3">
+                                            {item.status === 'Paid' ? (
+                                                <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded border border-emerald-500/30 font-bold uppercase tracking-wider">Paid</span>
+                                            ) : (
+                                                <span className="bg-blue-500/20 text-blue-400 text-[10px] px-2 py-1 rounded border border-blue-500/30 font-bold uppercase tracking-wider">Budget</span>
+                                            )}
+                                        </td>
 
-                                    <td className="px-4 py-3 font-mono text-emerald-400 font-medium">
-                                        {formatCurrency(item.amount)}
-                                    </td>
+                                        <td className="px-4 py-3 font-mono text-emerald-400 font-medium">
+                                            {formatCurrency(item.amount)}
+                                        </td>
 
-                                    {/* Linked Transaction Column */}
-                                    <td className="px-4 py-3">
-                                        {/* Check for new multi-link first, fallback to legacy single-link */}
-                                        {item.linked_transactions && item.linked_transactions.length > 0 ? (
-                                            <div className="flex flex-wrap gap-1">
-                                                {item.linked_transactions.map(tx => (
-                                                    <div key={tx.id} className="flex items-center gap-1 bg-purple-500/20 text-purple-400 text-[10px] px-2 py-1 rounded border border-purple-500/30">
-                                                        <button
-                                                            onClick={() => {
-                                                                setSelectedTransaction(tx);
-                                                                setShowTransactionDetail(true);
-                                                            }}
-                                                            className="font-mono hover:text-purple-200 flex items-center gap-1"
-                                                            title="View transaction details"
-                                                        >
-                                                            <Eye size={10} />
-                                                            {tx.merchant?.substring(0, 12) || tx.id.substring(0, 8)}...
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleUnlinkSingleTransaction(item.id, tx.id)}
-                                                            className="text-purple-500 hover:text-red-400 transition ml-1"
-                                                            title="Unlink this transaction"
-                                                        >
-                                                            <Unlink size={10} />
-                                                        </button>
-                                                    </div>
-                                                ))}
+                                        {/* Linked Transaction Column */}
+                                        <td className="px-4 py-3">
+                                            {/* Check for new multi-link first, fallback to legacy single-link */}
+                                            {item.linked_transactions && item.linked_transactions.length > 0 ? (
+                                                <div className="flex flex-wrap gap-1">
+                                                    {item.linked_transactions.map(tx => (
+                                                        <div key={tx.id} className="flex items-center gap-1 bg-purple-500/20 text-purple-400 text-[10px] px-2 py-1 rounded border border-purple-500/30">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedTransaction(tx);
+                                                                    setShowTransactionDetail(true);
+                                                                }}
+                                                                className="font-mono hover:text-purple-200 flex items-center gap-1"
+                                                                title="View transaction details"
+                                                            >
+                                                                <Eye size={10} />
+                                                                {tx.merchant?.substring(0, 12) || tx.id.substring(0, 8)}...
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleUnlinkSingleTransaction(item.id, tx.id)}
+                                                                className="text-purple-500 hover:text-red-400 transition ml-1"
+                                                                title="Unlink this transaction"
+                                                            >
+                                                                <Unlink size={10} />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                    <button
+                                                        onClick={() => openLinkModal(item)}
+                                                        className="text-slate-500 hover:text-purple-400 text-[10px] px-1 py-1 transition"
+                                                        title="Pay more"
+                                                    >
+                                                        + Pay
+                                                    </button>
+                                                </div>
+                                            ) : item.transaction_id ? (
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedTransaction(item.linked_transaction);
+                                                            setShowTransactionDetail(true);
+                                                        }}
+                                                        className="bg-purple-500/20 text-purple-400 text-[10px] px-2 py-1 rounded border border-purple-500/30 font-mono flex items-center gap-1 hover:bg-purple-500/30 hover:border-purple-400 transition cursor-pointer"
+                                                        title="View transaction details"
+                                                    >
+                                                        <Eye size={10} />
+                                                        {item.transaction_id.substring(0, 8)}...
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleUnlinkTransaction(item.id)}
+                                                        className="text-slate-500 hover:text-red-400 transition"
+                                                        title="Unlink transaction"
+                                                    >
+                                                        <Unlink size={14} />
+                                                    </button>
+                                                </div>
+                                            ) : (
                                                 <button
                                                     onClick={() => openLinkModal(item)}
-                                                    className="text-slate-500 hover:text-purple-400 text-[10px] px-1 py-1 transition"
-                                                    title="Pay more"
+                                                    className="bg-slate-700/50 hover:bg-purple-600/50 text-slate-400 hover:text-purple-300 text-[10px] px-2 py-1 rounded border border-slate-600 hover:border-purple-500 font-bold uppercase tracking-wider transition flex items-center gap-1"
                                                 >
-                                                    + Pay
+                                                    <DollarSign size={10} /> Pay
                                                 </button>
-                                            </div>
-                                        ) : item.transaction_id ? (
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedTransaction(item.linked_transaction);
-                                                        setShowTransactionDetail(true);
-                                                    }}
-                                                    className="bg-purple-500/20 text-purple-400 text-[10px] px-2 py-1 rounded border border-purple-500/30 font-mono flex items-center gap-1 hover:bg-purple-500/30 hover:border-purple-400 transition cursor-pointer"
-                                                    title="View transaction details"
-                                                >
-                                                    <Eye size={10} />
-                                                    {item.transaction_id.substring(0, 8)}...
-                                                </button>
-                                                <button
-                                                    onClick={() => handleUnlinkTransaction(item.id)}
-                                                    className="text-slate-500 hover:text-red-400 transition"
-                                                    title="Unlink transaction"
-                                                >
-                                                    <Unlink size={14} />
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <button
-                                                onClick={() => openLinkModal(item)}
-                                                className="bg-slate-700/50 hover:bg-purple-600/50 text-slate-400 hover:text-purple-300 text-[10px] px-2 py-1 rounded border border-slate-600 hover:border-purple-500 font-bold uppercase tracking-wider transition flex items-center gap-1"
-                                            >
-                                                <DollarSign size={10} /> Pay
-                                            </button>
-                                        )}
-                                    </td>
+                                            )}
+                                        </td>
 
-                                    <td className="px-4 py-3 text-right flex justify-end gap-2">
-                                        <button
-                                            onClick={() => onEdit(item)}
-                                            className="bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white p-1.5 rounded transition-all duration-200"
-                                            title={item.status === 'Paid' ? "Edit Payment" : "Make Payment"}
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
-                                        </button>
-                                        <button
-                                            onClick={() => onDelete(item)}
-                                            className="bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white p-1.5 rounded transition-all duration-200"
-                                            title="Delete Payment"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
-                                        </button>
-                                    </td>
-                                </tr>
-                            )) : (
-                                <tr>
-                                    <td colSpan="6" className="px-6 py-12 text-center text-slate-500 flex flex-col items-center gap-2">
-                                        <Filter className="opacity-20" size={48} />
-                                        <span>No payments found matching your filters.</span>
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+                                        <td className="px-4 py-3 text-right flex justify-end gap-2">
+                                            <button
+                                                onClick={() => onEdit(item)}
+                                                className="bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white p-1.5 rounded transition-all duration-200"
+                                                title={item.status === 'Paid' ? "Edit Payment" : "Make Payment"}
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
+                                            </button>
+                                            <button
+                                                onClick={() => onDelete(item)}
+                                                className="bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white p-1.5 rounded transition-all duration-200"
+                                                title="Delete Payment"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                )) : (
+                                    <tr>
+                                        <td colSpan="6" className="px-6 py-12 text-center text-slate-500 flex flex-col items-center gap-2">
+                                            <Filter className="opacity-20" size={48} />
+                                            <span>No payments found matching your filters.</span>
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
             )}
 
             {/* Link Transaction Modal */}
