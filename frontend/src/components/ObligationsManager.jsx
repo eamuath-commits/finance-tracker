@@ -1,102 +1,21 @@
 import React, { useState, useMemo } from 'react';
 import { formatCurrency } from './UI';
-import {
-    Box, Home, Zap, Car, Shield, Smartphone,
-    Landmark, CreditCard, Clock, Utensils, Banknote, Edit2,
-    ChevronRight, Download, Search, Plus
-} from 'lucide-react';
+import { CATEGORY_ICONS, CATEGORY_COLORS, CategoryHeader, CategorySectionWrapper } from './categoryStyles';
+import { Edit2, Download, Search, Plus, Box } from 'lucide-react';
 import { exportToCSV } from '../utils/csvExport';
-
-// --- Category Icons ---
-const CATEGORY_ICONS = {
-    "Salary": <Banknote size={16} className="text-emerald-400" />,
-    "House": <Home size={16} className="text-blue-400" />,
-    "Utilities": <Zap size={16} className="text-yellow-400" />,
-    "Auto Loan": <Car size={16} className="text-red-400" />,
-    "Food & Groceries": <Utensils size={16} className="text-orange-400" />,
-    "Telecom": <Smartphone size={16} className="text-cyan-400" />,
-    "Insurance": <Shield size={16} className="text-purple-400" />,
-    "Subscription": <Clock size={16} className="text-pink-400" />,
-    "Loan": <Landmark size={16} className="text-rose-400" />,
-    "Credit Card": <CreditCard size={16} className="text-pink-400" />,
-    "Pay Later": <Clock size={16} className="text-amber-400" />,
-    "Personal Expense": <Box size={16} className="text-slate-400" />,
-    "School": <Landmark size={16} className="text-indigo-400" />,
-    "Other": <Box size={16} className="text-gray-400" />
-};
-
-const CATEGORY_COLORS = {
-    "Salary": "border-emerald-500/40",
-    "House": "border-blue-500/40",
-    "Utilities": "border-yellow-500/40",
-    "Auto Loan": "border-red-500/40",
-    "Food & Groceries": "border-orange-500/40",
-    "Telecom": "border-cyan-500/40",
-    "Insurance": "border-purple-500/40",
-    "Subscription": "border-pink-500/40",
-    "Loan": "border-rose-500/40",
-    "Credit Card": "border-pink-500/40",
-    "Pay Later": "border-amber-500/40",
-    "Personal Expense": "border-slate-500/40",
-    "School": "border-indigo-500/40",
-    "Other": "border-gray-500/40"
-};
-
-// --- Obligation Row (CRUD only, compact) ---
-const ObligationRow = ({ obl, openObligationModal }) => {
-    return (
-        <tr className="border-b border-slate-700/20 hover:bg-slate-800/50 transition-colors group">
-            <td className="px-4 py-1.5">
-                <div className="flex items-center gap-1.5">
-                    {obl.provider && (
-                        <span className="text-[9px] text-slate-500 font-semibold uppercase">{obl.provider}</span>
-                    )}
-                    {obl.provider && <span className="text-slate-600 text-[8px]">·</span>}
-                    <span className="font-medium text-white text-[12px] truncate">{obl.name}</span>
-                </div>
-            </td>
-            <td className="px-3 py-1.5 text-center">
-                <span className="text-[11px] font-mono text-slate-400">{obl.due_day}</span>
-            </td>
-            <td className="px-3 py-1.5">
-                <span className="text-[11px] text-slate-500 truncate block max-w-[200px]">{obl.notes || '—'}</span>
-            </td>
-            <td className="px-3 py-1.5">
-                <div className="flex items-center justify-end">
-                    <button
-                        onClick={() => openObligationModal(obl)}
-                        className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-blue-400 p-1 rounded transition"
-                        title="Edit"
-                    >
-                        <Edit2 size={12} />
-                    </button>
-                </div>
-            </td>
-        </tr>
-    );
-};
 
 // --- Category Section (Collapsible) ---
 const CategorySection = ({ category, obligations, openObligationModal }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
-    const borderColor = CATEGORY_COLORS[category] || "border-gray-500/40";
 
     return (
-        <div className={`bg-slate-900/70 backdrop-blur-sm border border-slate-700/50 rounded-xl overflow-hidden shadow-lg border-l-2 ${borderColor} transition-all duration-300`}>
-            {/* Category Header */}
-            <button
-                onClick={() => setIsCollapsed(!isCollapsed)}
-                className="w-full flex items-center justify-between px-4 py-2 bg-slate-800/50 hover:bg-slate-800/80 transition-colors"
-            >
-                <div className="flex items-center gap-2">
-                    <div className="transition-transform duration-200" style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}>
-                        <ChevronRight size={12} className="text-slate-500" />
-                    </div>
-                    {CATEGORY_ICONS[category] || <Box size={14} />}
-                    <h3 className="text-white font-semibold text-[11px] uppercase tracking-wider">{category}</h3>
-                    <span className="px-1.5 py-0.5 bg-slate-700/80 text-slate-400 rounded-full text-[9px] font-mono">{obligations.length}</span>
-                </div>
-            </button>
+        <CategorySectionWrapper category={category}>
+            <CategoryHeader
+                category={category}
+                count={obligations.length}
+                isCollapsed={isCollapsed}
+                onToggle={() => setIsCollapsed(!isCollapsed)}
+            />
 
             {/* Table */}
             {!isCollapsed && (
@@ -122,7 +41,7 @@ const CategorySection = ({ category, obligations, openObligationModal }) => {
                     </table>
                 </div>
             )}
-        </div>
+        </CategorySectionWrapper>
     );
 };
 

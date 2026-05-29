@@ -2,7 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { formatCurrency, selectClass, Modal } from '../components/UI';
 import TransactionDetailModal from '../components/TransactionDetailModal';
 import TransactionSelectorModal from '../components/TransactionSelectorModal';
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Eye, List, LayoutGrid, PlusCircle, ArrowUpRight, Clock, DollarSign, MessageSquare } from 'lucide-react';
+import { CATEGORY_ICONS, CATEGORY_COLORS, CategoryHeader, CategorySectionWrapper } from './categoryStyles';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Eye, List, LayoutGrid, PlusCircle, ArrowUpRight, Clock, DollarSign, MessageSquare, Box } from 'lucide-react';
 import { exportToCSV } from '../utils/csvExport';
 import axios from 'axios';
 
@@ -448,471 +449,260 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
         return items;
     }, [sorted, obligations, forecast, selectedYear, selectedMonth, selectedCategory]);
 
+    // --- Group allItems by category for the category-section view ---
+    const groupedAllItems = useMemo(() => {
+        const groups = {};
+        allItems.forEach(item => {
+            const cat = item.oblCategory || 'Other';
+            if (!groups[cat]) groups[cat] = { paid: [], planned: [] };
+            if (item.type === 'payment') {
+                groups[cat].paid.push(item);
+            } else {
+                groups[cat].planned.push(item);
+            }
+        });
+        return Object.entries(groups)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([cat, items]) => ({
+                category: cat,
+                items: [...items.planned, ...items.paid], // Budget first, then paid
+                paidCount: items.paid.length,
+                plannedCount: items.planned.length,
+                totalAmount: [...items.paid, ...items.planned].reduce((s, i) => s + (i.amount || 0), 0)
+            }));
+    }, [allItems]);
+
+    const [collapsedCategories, setCollapsedCategories] = useState(new Set());
+    const toggleCategory = (cat) => {
+        setCollapsedCategories(prev => {
+            const next = new Set(prev);
+            if (next.has(cat)) next.delete(cat); else next.add(cat);
+            return next;
+        });
+    };
+
     return (
         <div className="animate-fade-in-up space-y-4">
-            {/* Top Stats & Filters Row */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {/* Total Summary Card */}
-                <div className="bg-gradient-to-br from-blue-900/50 to-slate-900 border border-blue-800/30 p-4 rounded-xl flex flex-col justify-center relative">
-                    <p className="text-blue-300 text-xs uppercase font-bold tracking-wider mb-1">{totalLabel}</p>
-                    <p className="text-2xl font-mono font-bold text-white">{formatCurrency(totalDisplay)}</p>
-                    <div className="text-xs text-slate-500 mt-1">{totalSubtext}</div>
+            {/* Summary Cards — matches Manager tab gradient style */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="bg-gradient-to-br from-blue-900/30 to-slate-900/90 backdrop-blur-sm border border-blue-500/20 rounded-xl p-4 shadow-lg">
+                    <p className="text-[10px] text-blue-400 uppercase tracking-wider font-semibold mb-1">{totalLabel}</p>
+                    <p className="text-2xl font-bold text-white font-mono">{formatCurrency(totalDisplay)}</p>
+                    <div className="text-[10px] text-blue-400/60 mt-1">{totalSubtext}</div>
                 </div>
 
-                {/* Filters Area */}
-                <div className="md:col-span-3 bg-slate-800/50 border border-slate-700/50 p-4 rounded-xl flex flex-col justify-between">
-                    <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2 text-slate-400 text-xs uppercase font-bold">
-                            <Filter size={14} /> Filter Payments
-                        </div>
-                        <div className="flex gap-2">
-                            <div className="flex bg-slate-900 rounded-lg border border-slate-700 overflow-hidden">
-                                <button
-                                    onClick={() => setViewMode('envelope')}
-                                    className={`text-xs px-2.5 py-1.5 flex items-center gap-1 transition ${viewMode === 'envelope' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                                >
-                                    <LayoutGrid size={12} /> Envelope
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('table')}
-                                    className={`text-xs px-2.5 py-1.5 flex items-center gap-1 transition ${viewMode === 'table' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                                >
-                                    <List size={12} /> Table
-                                </button>
-                            </div>
-                            <button
-                                onClick={handleExport}
-                                className="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm flex items-center gap-1 transition"
-                                title="Export to CSV"
-                            >
-                                <Download size={14} /> Export
-                            </button>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                        {/* Search */}
-                        <div className="relative md:col-span-1">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" size={14} />
-                            <input
-                                type="text"
-                                placeholder="Search..."
-                                className="w-full bg-slate-900 border border-slate-700 text-white pl-9 pr-3 py-2 rounded-lg text-xs focus:outline-none focus:border-blue-500 transition"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                        </div>
+                <div className="bg-gradient-to-br from-emerald-900/20 to-slate-900/90 backdrop-blur-sm border border-emerald-500/20 rounded-xl p-4 shadow-lg">
+                    <p className="text-[10px] text-emerald-400 uppercase tracking-wider font-semibold mb-1">Paid</p>
+                    <p className="text-2xl font-bold text-white font-mono">{formatCurrency(visiblePaid)}</p>
+                    <p className="text-[10px] text-emerald-400/60 mt-1">{sorted.length} payment records</p>
+                </div>
 
-                        {/* Year Filter */}
-                        <select
-                            className={`${selectClass} text-xs py-2`}
-                            value={selectedYear}
-                            onChange={(e) => setSelectedYear(e.target.value)}
-                        >
-                            <option value="All">All Years</option>
-                            {years.map(y => <option key={y} value={y}>{y}</option>)}
-                        </select>
-
-                        {/* Month Filter */}
-                        <select
-                            className={`${selectClass} text-xs py-2`}
-                            value={selectedMonth}
-                            onChange={(e) => setSelectedMonth(e.target.value)}
-                        >
-                            <option value="All">All Months</option>
-                            {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                        </select>
-
-                        {/* Status Filter */}
-                        <select
-                            className={`${selectClass} text-xs py-2`}
-                            value={selectedStatus}
-                            onChange={(e) => setSelectedStatus(e.target.value)}
-                        >
-                            <option value="All">All Status</option>
-                            <option value="Paid">Paid</option>
-                            <option value="BUDGET">Budget</option>
-                        </select>
-
-                        {/* Category Filter */}
-                        <select
-                            className={`${selectClass} text-xs py-2`}
-                            value={selectedCategory}
-                            onChange={(e) => setSelectedCategory(e.target.value)}
-                        >
-                            <option value="All">All Categories</option>
-                            {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                    </div>
+                <div className="bg-gradient-to-br from-amber-900/20 to-slate-900/90 backdrop-blur-sm border border-amber-500/20 rounded-xl p-4 shadow-lg">
+                    <p className="text-[10px] text-amber-400 uppercase tracking-wider font-semibold mb-1">Budget</p>
+                    <p className="text-2xl font-bold text-white font-mono">{formatCurrency(totalBudget)}</p>
+                    <p className="text-[10px] text-amber-400/60 mt-1">{allItems.filter(i => i.type === 'planned').length} pending obligations</p>
                 </div>
             </div>
 
-            {/* Obligations List View */}
-            {viewMode === 'envelope' && (
-                <div className="space-y-2">
-                    {(() => {
-                        // Build a unified list: all obligations with their payment status for the selected month
-                        if (selectedYear === 'All' || selectedMonth === 'All') {
-                            return (
-                                <div className="text-center py-20 text-slate-500">
-                                    <Filter className="mx-auto mb-3 opacity-20" size={36} />
-                                    <p className="text-sm">Select a specific month to see all obligations</p>
-                                </div>
-                            );
-                        }
+            {/* Toolbar — matches Manager tab */}
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                    <div className="relative">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                        <input
+                            type="text"
+                            placeholder="Search..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="bg-slate-800/80 border border-slate-700/50 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 outline-none focus:border-blue-500/50 transition w-48"
+                        />
+                    </div>
+                    <select className={`${selectClass} text-xs py-2`} value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)}>
+                        <option value="All">All Years</option>
+                        {years.map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                    <select className={`${selectClass} text-xs py-2`} value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
+                        <option value="All">All Months</option>
+                        {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    </select>
+                    <select className={`${selectClass} text-xs py-2`} value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
+                        <option value="All">All Status</option>
+                        <option value="Paid">Paid</option>
+                        <option value="BUDGET">Budget</option>
+                    </select>
+                    <select className={`${selectClass} text-xs py-2`} value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
+                        <option value="All">All Categories</option>
+                        {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                </div>
+                <button
+                    onClick={handleExport}
+                    className="flex items-center gap-1.5 text-slate-400 hover:text-white text-xs py-2 px-3 rounded-lg border border-slate-700/50 hover:border-slate-600 transition"
+                >
+                    <Download size={14} /> Export
+                </button>
+            </div>
 
-                        const billingMonth = `${selectedYear}-${selectedMonth}`;
-                        const oblsWithPayments = new Set(sorted.map(s => s.obligation_id));
-
-                        // Combine: paid items + planned (no payment yet)
-                        const allItems = [];
-
-                        // Add paid/budgeted items from sorted
-                        sorted.forEach(item => {
-                            allItems.push({ type: 'payment', ...item });
-                        });
-
-                        // Add planned obligations (no payment record yet)
-                        // Build forecast lookup
-                        const forecastLookup = {};
-                        if (forecast && forecast.obligations) {
-                            forecast.obligations.forEach(f => { forecastLookup[f.id] = f.forecast_amount || 0; });
-                        }
-
-                        obligations.forEach(obl => {
-                            if (oblsWithPayments.has(obl.id)) return;
-                            if (selectedCategory !== 'All' && obl.category !== selectedCategory) return;
-
-                            // Use forecast API amount as the single source of truth
-                            const plannedAmount = forecastLookup[obl.id] !== undefined
-                                ? forecastLookup[obl.id]
-                                : (obl.amount || 0);
-
-                            allItems.push({
-                                type: 'planned',
-                                id: `planned-${obl.id}`,
-                                obligation_id: obl.id,
-                                oblName: obl.name,
-                                oblCategory: obl.category,
-                                amount: plannedAmount,
-                                billing_month: billingMonth + '-01',
-                                status: 'Budget',
-                                obl: obl
-                            });
-                        });
-
-                        // Sort: budgets first, then by category, then by name
-                        allItems.sort((a, b) => {
-                            const aPaid = a.type === 'payment';
-                            const bPaid = b.type === 'payment';
-                            if (aPaid !== bPaid) return aPaid ? 1 : -1; // Unpaid first
-                            const catA = (a.oblCategory || 'Other');
-                            const catB = (b.oblCategory || 'Other');
-                            if (catA !== catB) return catA.localeCompare(catB);
-                            return (a.oblName || '').localeCompare(b.oblName || '');
-                        });
-
-                        if (allItems.length === 0) {
-                            return (
-                                <div className="text-center py-20 text-slate-500">
-                                    <Filter className="mx-auto mb-3 opacity-20" size={36} />
-                                    <p className="text-sm">No obligations found for this month</p>
-                                </div>
-                            );
-                        }
-
-                        // Summary stats
-                        const totalPaid = allItems.filter(i => i.type === 'payment').length;
-                        const totalBudget = allItems.length - totalPaid;
-
+            {/* Category-Grouped Obligations */}
+            {(selectedYear === 'All' || selectedMonth === 'All') ? (
+                <div className="text-center py-16 text-slate-500">
+                    <Filter className="mx-auto mb-3 opacity-20" size={36} />
+                    <p className="text-sm">Select a specific month to see all obligations</p>
+                </div>
+            ) : groupedAllItems.length === 0 ? (
+                <div className="text-center py-16 text-slate-500">
+                    <Box size={40} className="mx-auto mb-3 opacity-30" />
+                    <p className="text-sm">No obligations found for this period</p>
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    {groupedAllItems.map(group => {
+                        const isCollapsed = collapsedCategories.has(group.category);
                         return (
-                            <>
-                                {/* Quick summary bar */}
-                                <div className="flex items-center justify-between px-4 py-2 bg-slate-800/50 rounded-lg border border-slate-700/30 mb-2">
-                                    <span className="text-slate-400 text-xs">
-                                        {allItems.length} obligation{allItems.length > 1 ? 's' : ''}
-                                    </span>
-                                    <div className="flex items-center gap-3 text-[10px] font-mono">
-                                        <span className="text-emerald-400">
-                                            <CheckCircle size={10} className="inline mr-0.5" />{totalPaid} paid
+                            <CategorySectionWrapper key={group.category} category={group.category}>
+                                <CategoryHeader
+                                    category={group.category}
+                                    count={group.items.length}
+                                    isCollapsed={isCollapsed}
+                                    onToggle={() => toggleCategory(group.category)}
+                                    rightContent={
+                                        <span className="font-mono text-[11px] text-slate-400">
+                                            {formatCurrency(group.totalAmount)}
                                         </span>
-                                        <span className="text-amber-400">
-                                            <Clock size={10} className="inline mr-0.5" />{totalBudget} budget
-                                        </span>
-                                    </div>
-                                </div>
+                                    }
+                                />
 
-                                {/* Obligations list */}
-                                <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden shadow-lg divide-y divide-slate-700/30">
-                                    {allItems.map(item => {
-                                        const isPaid = item.type === 'payment';
-                                        const isPlanned = item.type === 'planned';
-                                        const hasLinkedTx = item.transaction_id || (item.linked_transactions && item.linked_transactions.length > 0);
+                                {!isCollapsed && (
+                                    <div className="animate-fade-in">
+                                        <table className="w-full text-left table-fixed">
+                                            <thead className="bg-slate-800/30">
+                                                <tr className="text-[8px] uppercase font-bold text-slate-500">
+                                                    <th className="px-4 py-1.5 w-[30%]">Name</th>
+                                                    <th className="px-3 py-1.5 text-center w-[10%]">Status</th>
+                                                    <th className="px-3 py-1.5 text-right w-[18%]">Amount</th>
+                                                    <th className="px-3 py-1.5 w-[25%]">Transaction</th>
+                                                    <th className="px-3 py-1.5 text-right w-[17%]">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {group.items.map((item, idx) => {
+                                                    const isPaid = item.type === 'payment';
+                                                    const isPlanned = item.type === 'planned';
 
-                                        return (
-                                            <div key={item.id} className={`px-4 py-3 flex items-center justify-between gap-4 transition ${isPaid ? 'bg-emerald-900/5' : isPlanned ? 'bg-amber-900/5 border-l-2 border-l-amber-500/40' : 'hover:bg-slate-700/20'}`}>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2">
-                                                        {/* Status badge */}
-                                                        {isPaid ? (
-                                                            <>
-                                                                <span className="text-[8px] font-bold text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded border border-emerald-500/30 uppercase whitespace-nowrap">
-                                                                    <CheckCircle size={8} className="inline mr-0.5" />Paid
-                                                                </span>
-                                                                {item.source === 'auto' && (
-                                                                    <span className="text-[8px] font-bold text-cyan-400 bg-cyan-500/20 px-1.5 py-0.5 rounded border border-cyan-500/30 uppercase whitespace-nowrap">
-                                                                        ⚡Auto
+                                                    return (
+                                                        <tr key={`${item.id}-${idx}`} className={`border-b border-slate-700/20 hover:bg-slate-800/50 transition-colors group ${isPlanned ? 'bg-amber-900/5' : ''}`}>
+                                                            {/* Name */}
+                                                            <td className="px-4 py-2">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="font-medium text-white text-[12px] truncate">{item.oblName}</span>
+                                                                </div>
+                                                                {item.note && <div className="text-[9px] text-slate-500 italic truncate max-w-[200px]">{item.note}</div>}
+                                                            </td>
+
+                                                            {/* Status */}
+                                                            <td className="px-3 py-2 text-center">
+                                                                {isPaid ? (
+                                                                    <span className="inline-flex items-center gap-1 bg-emerald-500/15 text-emerald-400 text-[9px] px-2 py-0.5 rounded-full border border-emerald-500/25 font-bold uppercase tracking-wider">
+                                                                        <CheckCircle size={9} /> Paid
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="inline-flex items-center gap-1 bg-amber-500/15 text-amber-400 text-[9px] px-2 py-0.5 rounded-full border border-amber-500/25 font-bold uppercase tracking-wider">
+                                                                        <Clock size={9} /> Budget
                                                                     </span>
                                                                 )}
-                                                            </>
-                                                        ) : (
-                                                            <span className="text-[8px] font-bold text-amber-400 bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30 uppercase whitespace-nowrap">
-                                                                <Clock size={8} className="inline mr-0.5" />Budget
-                                                            </span>
-                                                        )}
+                                                            </td>
 
-                                                        {/* Obligation name */}
-                                                        <span className="text-white font-semibold text-sm truncate">{item.oblName}</span>
+                                                            {/* Amount */}
+                                                            <td className={`px-3 py-2 text-right font-mono text-[12px] font-medium ${isPaid ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                                                {item.amount > 0 ? formatCurrency(item.amount) : '—'}
+                                                            </td>
 
-                                                        {/* Category badge */}
-                                                        {item.oblCategory && (
-                                                            <span className="text-[8px] text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">{item.oblCategory}</span>
-                                                        )}
-
-                                                        {/* Amount */}
-                                                        <span className="text-emerald-400 font-mono font-medium text-sm ml-auto mr-2">
-                                                            {item.amount > 0 ? formatCurrency(item.amount) : '—'}
-                                                        </span>
-                                                    </div>
-
-                                                    {/* Linked transactions (if any) */}
-                                                    {(() => {
-                                                        // Combine old-style (linked_transaction singular) and new-style (linked_transactions array)
-                                                        const txList = [];
-                                                        if (item.linked_transaction) {
-                                                            txList.push(item.linked_transaction);
-                                                        }
-                                                        if (item.linked_transactions && item.linked_transactions.length > 0) {
-                                                            item.linked_transactions.forEach(tx => {
-                                                                // Avoid duplicates if transaction_id matches
-                                                                if (!txList.find(t => t.id === tx.id)) txList.push(tx);
-                                                            });
-                                                        }
-                                                        if (txList.length === 0) return null;
-                                                        return (
-                                                            <div className="flex flex-wrap gap-1 mt-1.5 ml-14">
-                                                                {txList.map(tx => (
-                                                                    <div key={tx.id} className="flex items-center gap-1 bg-purple-500/10 text-purple-400 text-[9px] px-1.5 py-0.5 rounded">
+                                                            {/* Transaction */}
+                                                            <td className="px-3 py-2">
+                                                                {isPlanned ? (
+                                                                    <button
+                                                                        onClick={() => onEdit(item)}
+                                                                        className="bg-blue-600 hover:bg-blue-500 text-white text-[9px] px-2.5 py-1 rounded font-bold uppercase tracking-wider transition flex items-center gap-1"
+                                                                    >
+                                                                        <DollarSign size={10} /> Pay
+                                                                    </button>
+                                                                ) : item.linked_transactions && item.linked_transactions.length > 0 ? (
+                                                                    <div className="flex flex-wrap gap-1">
+                                                                        {item.linked_transactions.map(tx => (
+                                                                            <div key={tx.id} className="flex items-center gap-1 bg-purple-500/20 text-purple-400 text-[9px] px-1.5 py-0.5 rounded border border-purple-500/30">
+                                                                                <button
+                                                                                    onClick={() => { setSelectedTransaction(tx); setShowTransactionDetail(true); }}
+                                                                                    className="font-mono hover:text-purple-200 flex items-center gap-0.5"
+                                                                                    title="View transaction"
+                                                                                >
+                                                                                    <Eye size={9} />
+                                                                                    {tx.merchant?.substring(0, 10) || tx.id.substring(0, 8)}
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => handleUnlinkSingleTransaction(item.id, tx.id)}
+                                                                                    className="text-purple-500 hover:text-red-400 transition ml-0.5"
+                                                                                    title="Unlink"
+                                                                                >
+                                                                                    <Unlink size={9} />
+                                                                                </button>
+                                                                            </div>
+                                                                        ))}
+                                                                        <button onClick={() => openLinkModal(item)} className="text-slate-500 hover:text-purple-400 text-[9px] px-1 transition">+ Pay</button>
+                                                                    </div>
+                                                                ) : item.transaction_id ? (
+                                                                    <div className="flex items-center gap-1.5">
                                                                         <button
-                                                                            onClick={() => { setSelectedTransaction(tx); setShowTransactionDetail(true); }}
-                                                                            className="font-mono hover:text-purple-200 flex items-center gap-0.5"
+                                                                            onClick={() => { setSelectedTransaction(item.linked_transaction); setShowTransactionDetail(true); }}
+                                                                            className="bg-purple-500/20 text-purple-400 text-[9px] px-2 py-0.5 rounded border border-purple-500/30 font-mono flex items-center gap-1 hover:bg-purple-500/30 transition"
+                                                                            title="View transaction"
                                                                         >
-                                                                            <Eye size={8} /> {tx.merchant?.substring(0, 15) || tx.id.substring(0, 8)}
+                                                                            <Eye size={9} /> {item.transaction_id.substring(0, 8)}...
                                                                         </button>
-                                                                        <button
-                                                                            onClick={() => handleUnlinkSingleTransaction(item.id, tx.id)}
-                                                                            className="text-purple-500 hover:text-red-400 transition"
-                                                                        >
-                                                                            <Unlink size={8} />
+                                                                        <button onClick={() => handleUnlinkTransaction(item.id)} className="text-slate-500 hover:text-red-400 transition" title="Unlink">
+                                                                            <Unlink size={12} />
                                                                         </button>
                                                                     </div>
-                                                                ))}
-                                                            </div>
-                                                        );
-                                                    })()}
-                                                </div>
+                                                                ) : (
+                                                                    <button
+                                                                        onClick={() => openLinkModal(item)}
+                                                                        className="bg-slate-700/50 hover:bg-purple-600/50 text-slate-400 hover:text-purple-300 text-[9px] px-2 py-1 rounded border border-slate-600 hover:border-purple-500 font-bold uppercase tracking-wider transition flex items-center gap-1"
+                                                                    >
+                                                                        <DollarSign size={9} /> Pay
+                                                                    </button>
+                                                                )}
+                                                            </td>
 
-                                                {/* Actions */}
-                                                <div className="flex items-center gap-1.5 flex-shrink-0">
-                                                    {isPlanned ? (
-                                                        <button
-                                                            onClick={() => onEdit(item)}
-                                                            className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] px-2.5 py-1.5 rounded-lg font-bold uppercase tracking-wider transition flex items-center gap-1 shadow-sm"
-                                                        >
-                                                            <DollarSign size={10} /> Pay
-                                                        </button>
-                                                    ) : (
-                                                        <>
-                                                            <button
-                                                                onClick={() => openLinkModal(item)}
-                                                                className="bg-slate-700/50 hover:bg-purple-600/50 text-slate-400 hover:text-purple-300 text-[10px] px-2 py-1 rounded border border-slate-600 hover:border-purple-500 font-bold uppercase tracking-wider transition flex items-center gap-1"
-                                                            >
-                                                                <DollarSign size={10} /> Pay
-                                                            </button>
-                                                            <button
-                                                                onClick={() => onDelete(item)}
-                                                                className="bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white p-1 rounded transition-all"
-                                                                title="Delete"
-                                                            >
-                                                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>
-                                                            </button>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </>
-                        );
-                    })()}
-                </div>
-            )}
-
-            {/* Table View */}
-            {viewMode === 'table' && (
-                <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden shadow-xl">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-900/80 text-slate-400 text-xs uppercase font-bold backdrop-blur-sm">
-                                <tr>
-                                    <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('billing_month_sort')}>
-                                        <div className="flex items-center gap-1">Month {getSortIcon('billing_month_sort')}</div>
-                                    </th>
-                                    <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('oblName')}>
-                                        <div className="flex items-center gap-1">Name {getSortIcon('oblName')}</div>
-                                    </th>
-                                    <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('status')}>
-                                        <div className="flex items-center gap-1">Status {getSortIcon('status')}</div>
-                                    </th>
-                                    <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('amount')}>
-                                        <div className="flex items-center gap-1">Amount {getSortIcon('amount')}</div>
-                                    </th>
-                                    <th className="px-4 py-4 border-b border-slate-700">Transaction</th>
-                                    <th className="px-4 py-4 border-b border-slate-700 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-700/50">
-                                {allItems.length > 0 ? allItems.map((item, idx) => {
-                                    const isPaid = item.type === 'payment';
-                                    const isPlanned = item.type === 'planned';
-
-                                    return (
-                                    <tr key={`${item.id}-${idx}`} className={`hover:bg-slate-700/30 transition text-slate-300 ${isPlanned ? 'bg-amber-900/5' : ''}`}>
-                                        <td className="px-4 py-3 text-blue-300 font-mono text-xs">
-                                            {formatMonthDisplay(item.billing_month)}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="font-semibold text-white">{item.oblName}</div>
-                                            {item.note && <div className="text-[10px] text-slate-500 italic truncate max-w-[150px]">{item.note}</div>}
-                                        </td>
-
-                                        <td className="px-4 py-3">
-                                            {isPaid ? (
-                                                <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded border border-emerald-500/30 font-bold uppercase tracking-wider">Paid</span>
-                                            ) : (
-                                                <span className="bg-amber-500/20 text-amber-400 text-[10px] px-2 py-1 rounded border border-amber-500/30 font-bold uppercase tracking-wider">Budget</span>
-                                            )}
-                                        </td>
-
-                                        <td className={`px-4 py-3 font-mono font-medium ${isPaid ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                            {item.amount > 0 ? formatCurrency(item.amount) : '—'}
-                                        </td>
-
-                                        {/* Linked Transaction Column */}
-                                        <td className="px-4 py-3">
-                                            {isPlanned ? (
-                                                <button
-                                                    onClick={() => onEdit(item)}
-                                                    className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] px-2.5 py-1.5 rounded font-bold uppercase tracking-wider transition flex items-center gap-1"
-                                                >
-                                                    <DollarSign size={10} /> Pay
-                                                </button>
-                                            ) : item.linked_transactions && item.linked_transactions.length > 0 ? (
-                                                <div className="flex flex-wrap gap-1">
-                                                    {item.linked_transactions.map(tx => (
-                                                        <div key={tx.id} className="flex items-center gap-1 bg-purple-500/20 text-purple-400 text-[10px] px-2 py-1 rounded border border-purple-500/30">
-                                                            <button
-                                                                onClick={() => {
-                                                                    setSelectedTransaction(tx);
-                                                                    setShowTransactionDetail(true);
-                                                                }}
-                                                                className="font-mono hover:text-purple-200 flex items-center gap-1"
-                                                                title="View transaction details"
-                                                            >
-                                                                <Eye size={10} />
-                                                                {tx.merchant?.substring(0, 12) || tx.id.substring(0, 8)}...
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleUnlinkSingleTransaction(item.id, tx.id)}
-                                                                className="text-purple-500 hover:text-red-400 transition ml-1"
-                                                                title="Unlink this transaction"
-                                                            >
-                                                                <Unlink size={10} />
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                    <button
-                                                        onClick={() => openLinkModal(item)}
-                                                        className="text-slate-500 hover:text-purple-400 text-[10px] px-1 py-1 transition"
-                                                        title="Pay more"
-                                                    >
-                                                        + Pay
-                                                    </button>
-                                                </div>
-                                            ) : item.transaction_id ? (
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => {
-                                                            setSelectedTransaction(item.linked_transaction);
-                                                            setShowTransactionDetail(true);
-                                                        }}
-                                                        className="bg-purple-500/20 text-purple-400 text-[10px] px-2 py-1 rounded border border-purple-500/30 font-mono flex items-center gap-1 hover:bg-purple-500/30 hover:border-purple-400 transition cursor-pointer"
-                                                        title="View transaction details"
-                                                    >
-                                                        <Eye size={10} />
-                                                        {item.transaction_id.substring(0, 8)}...
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleUnlinkTransaction(item.id)}
-                                                        className="text-slate-500 hover:text-red-400 transition"
-                                                        title="Unlink transaction"
-                                                    >
-                                                        <Unlink size={14} />
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <button
-                                                    onClick={() => openLinkModal(item)}
-                                                    className="bg-slate-700/50 hover:bg-purple-600/50 text-slate-400 hover:text-purple-300 text-[10px] px-2 py-1 rounded border border-slate-600 hover:border-purple-500 font-bold uppercase tracking-wider transition flex items-center gap-1"
-                                                >
-                                                    <DollarSign size={10} /> Pay
-                                                </button>
-                                            )}
-                                        </td>
-
-                                        <td className="px-4 py-3 text-right flex justify-end gap-2">
-                                            {isPaid && (
-                                                <>
-                                                    <button
-                                                        onClick={() => onEdit(item)}
-                                                        className="bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white p-1.5 rounded transition-all duration-200"
-                                                        title="Edit Payment"
-                                                    >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => onDelete(item)}
-                                                        className="bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white p-1.5 rounded transition-all duration-200"
-                                                        title="Delete Payment"
-                                                    >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
-                                                    </button>
-                                                </>
-                                            )}
-                                        </td>
-                                    </tr>
-                                    );
-                                }) : (
-                                    <tr>
-                                        <td colSpan="6" className="px-6 py-12 text-center text-slate-500 flex flex-col items-center gap-2">
-                                            <Filter className="opacity-20" size={48} />
-                                            <span>No obligations found. Select a specific month.</span>
-                                        </td>
-                                    </tr>
+                                                            {/* Actions */}
+                                                            <td className="px-3 py-2 text-right">
+                                                                {isPaid && (
+                                                                    <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition">
+                                                                        <button
+                                                                            onClick={() => onEdit(item)}
+                                                                            className="text-slate-500 hover:text-blue-400 p-1 rounded transition"
+                                                                            title="Edit Payment"
+                                                                        >
+                                                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => onDelete(item)}
+                                                                            className="text-slate-500 hover:text-red-400 p-1 rounded transition"
+                                                                            title="Delete Payment"
+                                                                        >
+                                                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 )}
-                            </tbody>
-                        </table>
-                    </div>
+                            </CategorySectionWrapper>
+                        );
+                    })}
                 </div>
             )}
 

@@ -4,6 +4,7 @@ import {
     TrendingUp, TrendingDown, Minus, CheckCircle,
     Download, ChevronDown, ChevronRight, Box, Edit3, DollarSign, X, Trash2
 } from 'lucide-react';
+import { CATEGORY_ICONS, CATEGORY_COLORS } from './categoryStyles';
 import axios from 'axios';
 import { exportToCSV } from '../utils/csvExport';
 
@@ -522,67 +523,55 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
             </div>
 
             {/* ── Forecast Grid ── */}
-            <div className="rounded-2xl border border-slate-700/40 overflow-hidden bg-slate-900/50 shadow-xl">
-                <div className="overflow-x-auto">
-                    {/* Header */}
-                    <div className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] bg-slate-800/70 border-b border-slate-700/40">
-                        <div className="px-5 py-3 text-[10px] text-slate-500 uppercase tracking-widest font-bold">
-                            Category / Obligation
-                        </div>
-                        {months.map(m => (
-                            <div
-                                key={m.key}
-                                className={`px-3 py-3 text-center text-[10px] uppercase tracking-widest font-bold ${m.isSelected
-                                    ? 'text-blue-400 bg-blue-500/5 border-x border-blue-500/10'
-                                    : m.isPrev
-                                        ? 'text-emerald-400/70'
-                                        : 'text-slate-500'
-                                    }`}
+            <div className="space-y-3">
+                {sortedCategories.map((cat, catIdx) => {
+                    const items = grouped[cat];
+                    const isExpanded = expandedCats.has(cat);
+                    const borderColor = CATEGORY_COLORS[cat] || 'border-gray-500/40';
+                    const icon = CATEGORY_ICONS[cat] || <Box size={16} className="text-gray-400" />;
+
+                    return (
+                        <div key={cat} className={`bg-slate-900/70 backdrop-blur-sm border border-slate-700/50 rounded-xl overflow-hidden shadow-lg border-l-2 ${borderColor} transition-all duration-300`}>
+                            {/* Category Header */}
+                            <button
+                                onClick={() => toggleCat(cat)}
+                                className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-800/50 hover:bg-slate-800/80 transition-colors"
                             >
-                                {m.short}
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Body */}
-                    <div>
-                        {sortedCategories.map((cat, catIdx) => {
-                            const items = grouped[cat];
-                            const isExpanded = expandedCats.has(cat);
-                            const isLast = catIdx === sortedCategories.length - 1;
-
-                            return (
-                                <div key={cat} className={!isLast ? 'border-b border-slate-700/25' : ''}>
-                                    {/* Category Row */}
-                                    <div
-                                        className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] cursor-pointer hover:bg-slate-800/40 transition-colors"
-                                        onClick={() => toggleCat(cat)}
-                                    >
-                                        <div className="px-5 py-2.5 flex items-center gap-2.5">
-                                            <div className="transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
-                                                <ChevronDown size={13} className="text-slate-500" />
-                                            </div>
-                                            <span className="text-white text-[12px] font-semibold">{cat}</span>
-                                            <span className="text-[9px] text-slate-600 bg-slate-800 px-1.5 py-0.5 rounded font-mono">{items.length}</span>
-                                        </div>
-                                        {months.map(m => (
-                                            <div
-                                                key={m.key}
-                                                className={`px-3 py-2.5 ${m.isSelected ? 'bg-blue-500/[0.03] border-x border-blue-500/10' : ''}`}
-                                            />
-                                        ))}
+                                <div className="flex items-center gap-2.5">
+                                    <div className="transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+                                        <ChevronRight size={12} className="text-slate-500" />
                                     </div>
+                                    {icon}
+                                    <h3 className="text-white font-semibold text-[11px] uppercase tracking-wider">{cat}</h3>
+                                    <span className="px-1.5 py-0.5 bg-slate-700/80 text-slate-400 rounded-full text-[9px] font-mono">{items.length}</span>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    {months.map(m => (
+                                        <span key={m.key} className={`font-mono text-[10px] ${m.isSelected ? 'text-blue-400' : 'text-slate-500'}`}>
+                                            {formatCurrency(catMonthTotals[cat]?.[m.key] || 0)}
+                                        </span>
+                                    ))}
+                                </div>
+                            </button>
 
-                                    {/* Expanded Items */}
-                                    {isExpanded && (
-                                        <div className="bg-slate-900/30">
-                                            {items.map((obl, oblIdx) => (
-                                                <div
-                                                    key={obl.id}
-                                                    className={`grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] hover:bg-slate-800/25 transition-colors ${oblIdx < items.length - 1 ? 'border-b border-slate-800/40' : ''
-                                                        }`}
-                                                >
-                                                    <div className="px-5 py-2.5 pl-12">
+                            {/* Expanded Items */}
+                            {isExpanded && (
+                                <div className="animate-fade-in">
+                                    <table className="w-full text-left table-fixed">
+                                        <thead className="bg-slate-800/30">
+                                            <tr className="text-[8px] uppercase font-bold text-slate-500">
+                                                <th className="px-4 py-1.5 w-[40%]">Obligation</th>
+                                                {months.map(m => (
+                                                    <th key={m.key} className={`px-3 py-1.5 text-right ${m.isSelected ? 'text-blue-400' : ''}`} style={{ width: `${60 / months.length}%` }}>
+                                                        {m.short}
+                                                    </th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {items.map(obl => (
+                                                <tr key={obl.id} className="border-b border-slate-700/20 hover:bg-slate-800/50 transition-colors group">
+                                                    <td className="px-4 py-2">
                                                         <div className="flex items-center gap-1.5">
                                                             {obl.provider && (
                                                                 <span className="text-[9px] text-slate-500 uppercase font-medium bg-slate-800/80 px-1.5 py-0.5 rounded">
@@ -591,48 +580,42 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                                                             )}
                                                             <span className="text-slate-300 text-[12px]">{obl.name}</span>
                                                         </div>
-                                                    </div>
+                                                    </td>
                                                     {months.map(m => {
                                                         const data = oblMonthData[obl.id]?.[m.key];
                                                         return (
-                                                            <div
+                                                            <td
                                                                 key={m.key}
-                                                                className={`px-3 py-2.5 flex items-center justify-end ${m.isSelected ? 'bg-blue-500/[0.02] border-x border-blue-500/10' : ''
-                                                                    }`}
+                                                                className={`px-3 py-2 text-right ${m.isSelected ? 'bg-blue-500/[0.02]' : ''}`}
                                                             >
                                                                 <AmountCell obl={obl} data={data} month={m} />
-                                                            </div>
+                                                            </td>
                                                         );
                                                     })}
-                                                </div>
+                                                </tr>
                                             ))}
-                                        </div>
-                                    )}
+                                        </tbody>
+                                    </table>
                                 </div>
-                            );
-                        })}
+                            )}
+                        </div>
+                    );
+                })}
 
-                        {/* ── Grand Total ── */}
-                        <div className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] bg-slate-800/50 border-t-2 border-slate-600/30">
-                            <div className="px-5 py-4">
-                                <span className="text-white text-[12px] font-bold uppercase tracking-wider">Total</span>
-                            </div>
-                            {months.map(m => (
-                                <div
-                                    key={m.key}
-                                    className={`px-3 py-4 text-right ${m.isSelected ? 'bg-blue-500/[0.05] border-x border-blue-500/15' : ''
-                                        }`}
-                                >
-                                    <span className={`font-mono text-[13px] font-bold ${m.isSelected ? 'text-blue-300' : m.isPrev ? 'text-emerald-300' : 'text-white'
-                                        }`}>
+                    {/* ── Grand Total ── */}
+                    <div className="bg-slate-900/70 backdrop-blur-sm border border-slate-700/50 rounded-xl overflow-hidden shadow-lg border-l-2 border-white/20 transition-all duration-300">
+                        <div className="flex items-center justify-between px-4 py-3 bg-slate-800/50">
+                            <span className="text-white text-[12px] font-bold uppercase tracking-wider">Total</span>
+                            <div className="flex items-center gap-4">
+                                {months.map(m => (
+                                    <span key={m.key} className={`font-mono text-[12px] font-bold ${m.isSelected ? 'text-blue-300' : m.isPrev ? 'text-emerald-300' : 'text-white'}`}>
                                         {formatCurrency(columnTotals[m.key] || 0)}
                                     </span>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
             {/* Empty State */}
             {sortedCategories.length === 0 && (
