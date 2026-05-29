@@ -139,6 +139,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
     // Compute forecast budget total for obligations without PAID records this month
     const plannedBudgetTotal = useMemo(() => {
         if (selectedYear === 'All' || selectedMonth === 'All') return 0;
+        const billingMonth = `${selectedYear}-${selectedMonth}`;
 
         const oblsWithPayments = new Set(sorted.map(s => s.obligation_id));
 
@@ -148,23 +149,35 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
             forecast.obligations.forEach(f => { forecastLookup[f.id] = f.forecast_amount || 0; });
         }
 
+        // Build BUDGET entries lookup for this month
+        const budgetLookup = {};
+        Object.entries(history).forEach(([oblId, records]) => {
+            records.forEach(r => {
+                if (r.status !== 'BUDGET') return;
+                const bm = (r.billing_month || '').substring(0, 7);
+                if (bm === billingMonth) {
+                    budgetLookup[oblId] = r.amount || 0;
+                }
+            });
+        });
+
         let total = 0;
         obligations.forEach(obl => {
             if (oblsWithPayments.has(obl.id)) return;
             if (selectedCategory !== 'All' && obl.category !== selectedCategory) return;
 
-            // Use forecast API amount (same source as Forecast tab)
-            const forecastAmt = forecastLookup[obl.id];
-            if (forecastAmt !== undefined) {
-                total += forecastAmt;
+            // Priority: manual BUDGET entry > forecast API > obligation default
+            if (budgetLookup[obl.id] !== undefined) {
+                total += budgetLookup[obl.id];
+            } else if (forecastLookup[obl.id] !== undefined) {
+                total += forecastLookup[obl.id];
             } else {
-                // Fallback if forecast data not available
                 total += obl.amount || 0;
             }
         });
 
         return total;
-    }, [obligations, forecast, sorted, selectedYear, selectedMonth, selectedCategory]);
+    }, [obligations, history, forecast, sorted, selectedYear, selectedMonth, selectedCategory]);
 
     const requestSort = (key) => {
         let direction = 'asc';
@@ -413,13 +426,30 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
             forecast.obligations.forEach(f => { forecastLookup[f.id] = f.forecast_amount || 0; });
         }
 
+        // Build a lookup for BUDGET entries per obligation for this month
+        const budgetLookup = {};
+        const oblMap = {};
+        obligations.forEach(o => { oblMap[o.id] = o; });
+        Object.entries(history).forEach(([oblId, records]) => {
+            records.forEach(r => {
+                if (r.status !== 'BUDGET') return;
+                const bm = (r.billing_month || '').substring(0, 7);
+                if (bm === billingMonth) {
+                    budgetLookup[oblId] = r.amount || 0;
+                }
+            });
+        });
+
         obligations.forEach(obl => {
             if (oblsWithPayments.has(obl.id)) return;
             if (selectedCategory !== 'All' && obl.category !== selectedCategory) return;
 
-            const plannedAmount = forecastLookup[obl.id] !== undefined
-                ? forecastLookup[obl.id]
-                : (obl.amount || 0);
+            // Priority: manual BUDGET entry > forecast API > obligation default
+            const plannedAmount = budgetLookup[obl.id] !== undefined
+                ? budgetLookup[obl.id]
+                : (forecastLookup[obl.id] !== undefined
+                    ? forecastLookup[obl.id]
+                    : (obl.amount || 0));
 
             items.push({
                 type: 'planned',
