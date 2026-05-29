@@ -98,7 +98,7 @@ const Obligations = () => {
             const [oblRes, catRes, forecastRes] = await Promise.all([
                 axios.get(`${API_URL}/obligations/`),
                 axios.get(`${API_URL}/categories`),
-                axios.get(`${API_URL}/obligations/forecast?months_ahead=0`).catch(() => ({ data: null }))
+                axios.get(`${API_URL}/obligations/forecast?months_ahead=1`).catch(() => ({ data: null }))
             ]);
 
             setObligations(oblRes.data);
