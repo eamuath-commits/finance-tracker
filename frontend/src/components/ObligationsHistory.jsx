@@ -650,9 +650,13 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                                         <span className="inline-flex items-center gap-1 bg-emerald-500/15 text-emerald-400 text-[9px] px-2 py-0.5 rounded-full border border-emerald-500/25 font-bold uppercase tracking-wider">
                                                                             <CheckCircle size={9} /> Paid
                                                                         </span>
-                                                                        {item.source === 'auto' && (
+                                                                        {item.source === 'auto' ? (
                                                                             <span className="inline-flex items-center gap-0.5 bg-cyan-500/15 text-cyan-400 text-[8px] px-1.5 py-0.5 rounded-full border border-cyan-500/25 font-bold uppercase tracking-wider">
                                                                                 ⚡Auto
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="inline-flex items-center gap-0.5 bg-slate-500/10 text-slate-400 text-[8px] px-1.5 py-0.5 rounded-full border border-slate-500/20 font-bold uppercase tracking-wider">
+                                                                                ✋ Manual
                                                                             </span>
                                                                         )}
                                                                     </div>
