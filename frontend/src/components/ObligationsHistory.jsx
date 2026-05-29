@@ -632,9 +632,16 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                             {/* Status */}
                                                             <td className="px-3 py-2 text-center">
                                                                 {isPaid ? (
-                                                                    <span className="inline-flex items-center gap-1 bg-emerald-500/15 text-emerald-400 text-[9px] px-2 py-0.5 rounded-full border border-emerald-500/25 font-bold uppercase tracking-wider">
-                                                                        <CheckCircle size={9} /> Paid
-                                                                    </span>
+                                                                    <div className="flex flex-col items-center gap-1">
+                                                                        <span className="inline-flex items-center gap-1 bg-emerald-500/15 text-emerald-400 text-[9px] px-2 py-0.5 rounded-full border border-emerald-500/25 font-bold uppercase tracking-wider">
+                                                                            <CheckCircle size={9} /> Paid
+                                                                        </span>
+                                                                        {item.source === 'auto' && (
+                                                                            <span className="inline-flex items-center gap-0.5 bg-cyan-500/15 text-cyan-400 text-[8px] px-1.5 py-0.5 rounded-full border border-cyan-500/25 font-bold uppercase tracking-wider">
+                                                                                ⚡Auto
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
                                                                 ) : (
                                                                     <span className="inline-flex items-center gap-1 bg-amber-500/15 text-amber-400 text-[9px] px-2 py-0.5 rounded-full border border-amber-500/25 font-bold uppercase tracking-wider">
                                                                         <Clock size={9} /> Budget
@@ -659,37 +666,42 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                                 ) : item.linked_transactions && item.linked_transactions.length > 0 ? (
                                                                     <div className="flex flex-wrap gap-1">
                                                                         {item.linked_transactions.map(tx => (
-                                                                            <div key={tx.id} className="flex items-center gap-1 bg-purple-500/20 text-purple-400 text-[9px] px-1.5 py-0.5 rounded border border-purple-500/30">
+                                                                            <div key={tx.id} className="flex items-center gap-1.5 bg-purple-500/15 text-purple-400 text-[9px] px-2 py-1 rounded-lg border border-purple-500/25">
                                                                                 <button
                                                                                     onClick={() => { setSelectedTransaction(tx); setShowTransactionDetail(true); }}
-                                                                                    className="font-mono hover:text-purple-200 flex items-center gap-0.5"
-                                                                                    title="View transaction"
+                                                                                    className="hover:text-purple-200 flex items-center gap-1 text-left"
+                                                                                    title="View transaction details"
                                                                                 >
-                                                                                    <Eye size={9} />
-                                                                                    {tx.merchant?.substring(0, 10) || tx.id.substring(0, 8)}
+                                                                                    <Eye size={10} />
+                                                                                    <span className="font-medium">{tx.merchant?.substring(0, 25) || 'Unknown'}</span>
+                                                                                    <span className="text-purple-300/60 font-mono text-[8px]">{formatCurrency(tx.amount)}</span>
                                                                                 </button>
                                                                                 <button
                                                                                     onClick={() => handleUnlinkSingleTransaction(item.id, tx.id)}
-                                                                                    className="text-purple-500 hover:text-red-400 transition ml-0.5"
+                                                                                    className="text-purple-500/50 hover:text-red-400 transition ml-0.5"
                                                                                     title="Unlink"
                                                                                 >
                                                                                     <Unlink size={9} />
                                                                                 </button>
                                                                             </div>
                                                                         ))}
-                                                                        <button onClick={() => openLinkModal(item)} className="text-slate-500 hover:text-purple-400 text-[9px] px-1 transition">+ Pay</button>
+                                                                        <button onClick={() => openLinkModal(item)} className="text-slate-500 hover:text-purple-400 text-[9px] px-1 transition">+ Link</button>
                                                                     </div>
                                                                 ) : item.transaction_id ? (
                                                                     <div className="flex items-center gap-1.5">
                                                                         <button
                                                                             onClick={() => { setSelectedTransaction(item.linked_transaction); setShowTransactionDetail(true); }}
-                                                                            className="bg-purple-500/20 text-purple-400 text-[9px] px-2 py-0.5 rounded border border-purple-500/30 font-mono flex items-center gap-1 hover:bg-purple-500/30 transition"
-                                                                            title="View transaction"
+                                                                            className="bg-purple-500/15 text-purple-400 text-[9px] px-2 py-1 rounded-lg border border-purple-500/25 flex items-center gap-1.5 hover:bg-purple-500/25 transition text-left"
+                                                                            title="View transaction details"
                                                                         >
-                                                                            <Eye size={9} /> {item.transaction_id.substring(0, 8)}...
+                                                                            <Eye size={10} />
+                                                                            <span className="font-medium">{item.linked_transaction?.merchant?.substring(0, 25) || 'Linked'}</span>
+                                                                            {item.linked_transaction?.amount && (
+                                                                                <span className="text-purple-300/60 font-mono text-[8px]">{formatCurrency(item.linked_transaction.amount)}</span>
+                                                                            )}
                                                                         </button>
-                                                                        <button onClick={() => handleUnlinkTransaction(item.id)} className="text-slate-500 hover:text-red-400 transition" title="Unlink">
-                                                                            <Unlink size={12} />
+                                                                        <button onClick={() => handleUnlinkTransaction(item.id)} className="text-slate-500/50 hover:text-red-400 transition" title="Unlink">
+                                                                            <Unlink size={10} />
                                                                         </button>
                                                                     </div>
                                                                 ) : (
@@ -697,7 +709,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                                         onClick={() => openLinkModal(item)}
                                                                         className="bg-slate-700/50 hover:bg-purple-600/50 text-slate-400 hover:text-purple-300 text-[9px] px-2 py-1 rounded border border-slate-600 hover:border-purple-500 font-bold uppercase tracking-wider transition flex items-center gap-1"
                                                                     >
-                                                                        <DollarSign size={9} /> Pay
+                                                                        <DollarSign size={9} /> Link
                                                                     </button>
                                                                 )}
                                                             </td>
