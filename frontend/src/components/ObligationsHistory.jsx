@@ -392,6 +392,62 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
             .sort((a, b) => a.category.localeCompare(b.category));
     }, [sorted, obligations, selectedYear, selectedMonth, selectedCategory]);
 
+    // --- Unified allItems: paid + planned (used by both Envelope and Table views) ---
+    const allItems = useMemo(() => {
+        if (selectedYear === 'All' || selectedMonth === 'All') return [];
+
+        const billingMonth = `${selectedYear}-${selectedMonth}`;
+        const oblsWithPayments = new Set(sorted.map(s => s.obligation_id));
+
+        const items = [];
+
+        // Add paid items from sorted
+        sorted.forEach(item => {
+            items.push({ type: 'payment', ...item });
+        });
+
+        // Add planned obligations (no payment record yet)
+        const forecastLookup = {};
+        if (forecast && forecast.obligations) {
+            forecast.obligations.forEach(f => { forecastLookup[f.id] = f.forecast_amount || 0; });
+        }
+
+        obligations.forEach(obl => {
+            if (oblsWithPayments.has(obl.id)) return;
+            if (selectedCategory !== 'All' && obl.category !== selectedCategory) return;
+
+            const plannedAmount = forecastLookup[obl.id] !== undefined
+                ? forecastLookup[obl.id]
+                : (obl.amount || 0);
+
+            items.push({
+                type: 'planned',
+                id: `planned-${obl.id}`,
+                obligation_id: obl.id,
+                oblName: obl.name,
+                oblCategory: obl.category,
+                amount: plannedAmount,
+                billing_month: billingMonth + '-01',
+                billing_month_sort: billingMonth + '-01',
+                status: 'Budget',
+                obl: obl
+            });
+        });
+
+        // Sort: budgets first, then by category, then by name
+        items.sort((a, b) => {
+            const aPaid = a.type === 'payment';
+            const bPaid = b.type === 'payment';
+            if (aPaid !== bPaid) return aPaid ? 1 : -1;
+            const catA = (a.oblCategory || 'Other');
+            const catB = (b.oblCategory || 'Other');
+            if (catA !== catB) return catA.localeCompare(catB);
+            return (a.oblName || '').localeCompare(b.oblName || '');
+        });
+
+        return items;
+    }, [sorted, obligations, forecast, selectedYear, selectedMonth, selectedCategory]);
+
     return (
         <div className="animate-fade-in-up space-y-4">
             {/* Top Stats & Filters Row */}
@@ -726,8 +782,12 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-700/50">
-                                {sorted.length > 0 ? sorted.map((item, idx) => (
-                                    <tr key={`${item.id}-${idx}`} className="hover:bg-slate-700/30 transition text-slate-300">
+                                {allItems.length > 0 ? allItems.map((item, idx) => {
+                                    const isPaid = item.type === 'payment';
+                                    const isPlanned = item.type === 'planned';
+
+                                    return (
+                                    <tr key={`${item.id}-${idx}`} className={`hover:bg-slate-700/30 transition text-slate-300 ${isPlanned ? 'bg-amber-900/5' : ''}`}>
                                         <td className="px-4 py-3 text-blue-300 font-mono text-xs">
                                             {formatMonthDisplay(item.billing_month)}
                                         </td>
@@ -737,21 +797,27 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                         </td>
 
                                         <td className="px-4 py-3">
-                                            {item.status === 'Paid' ? (
+                                            {isPaid ? (
                                                 <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded border border-emerald-500/30 font-bold uppercase tracking-wider">Paid</span>
                                             ) : (
-                                                <span className="bg-blue-500/20 text-blue-400 text-[10px] px-2 py-1 rounded border border-blue-500/30 font-bold uppercase tracking-wider">Budget</span>
+                                                <span className="bg-amber-500/20 text-amber-400 text-[10px] px-2 py-1 rounded border border-amber-500/30 font-bold uppercase tracking-wider">Budget</span>
                                             )}
                                         </td>
 
-                                        <td className="px-4 py-3 font-mono text-emerald-400 font-medium">
-                                            {formatCurrency(item.amount)}
+                                        <td className={`px-4 py-3 font-mono font-medium ${isPaid ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                            {item.amount > 0 ? formatCurrency(item.amount) : '—'}
                                         </td>
 
                                         {/* Linked Transaction Column */}
                                         <td className="px-4 py-3">
-                                            {/* Check for new multi-link first, fallback to legacy single-link */}
-                                            {item.linked_transactions && item.linked_transactions.length > 0 ? (
+                                            {isPlanned ? (
+                                                <button
+                                                    onClick={() => onEdit(item)}
+                                                    className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] px-2.5 py-1.5 rounded font-bold uppercase tracking-wider transition flex items-center gap-1"
+                                                >
+                                                    <DollarSign size={10} /> Pay
+                                                </button>
+                                            ) : item.linked_transactions && item.linked_transactions.length > 0 ? (
                                                 <div className="flex flex-wrap gap-1">
                                                     {item.linked_transactions.map(tx => (
                                                         <div key={tx.id} className="flex items-center gap-1 bg-purple-500/20 text-purple-400 text-[10px] px-2 py-1 rounded border border-purple-500/30">
@@ -815,27 +881,32 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                         </td>
 
                                         <td className="px-4 py-3 text-right flex justify-end gap-2">
-                                            <button
-                                                onClick={() => onEdit(item)}
-                                                className="bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white p-1.5 rounded transition-all duration-200"
-                                                title={item.status === 'Paid' ? "Edit Payment" : "Make Payment"}
-                                            >
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
-                                            </button>
-                                            <button
-                                                onClick={() => onDelete(item)}
-                                                className="bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white p-1.5 rounded transition-all duration-200"
-                                                title="Delete Payment"
-                                            >
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
-                                            </button>
+                                            {isPaid && (
+                                                <>
+                                                    <button
+                                                        onClick={() => onEdit(item)}
+                                                        className="bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white p-1.5 rounded transition-all duration-200"
+                                                        title="Edit Payment"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => onDelete(item)}
+                                                        className="bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white p-1.5 rounded transition-all duration-200"
+                                                        title="Delete Payment"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
+                                                    </button>
+                                                </>
+                                            )}
                                         </td>
                                     </tr>
-                                )) : (
+                                    );
+                                }) : (
                                     <tr>
                                         <td colSpan="6" className="px-6 py-12 text-center text-slate-500 flex flex-col items-center gap-2">
                                             <Filter className="opacity-20" size={48} />
-                                            <span>No payments found matching your filters.</span>
+                                            <span>No obligations found. Select a specific month.</span>
                                         </td>
                                     </tr>
                                 )}
