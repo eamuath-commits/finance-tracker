@@ -330,7 +330,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
         }
     };
 
-    // --- Pay & Link: Create payment + open link modal ---
+    // --- Pay & Link: Create payment + auto-link best match + open modal for verification ---
     const handlePayAndLink = async (obl, billingMonth, plannedAmount) => {
         try {
             // Create a payment record for this obligation+month
@@ -344,8 +344,22 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
 
             const newPayment = payRes.data;
             if (newPayment?.id) {
-                // Build a payment-like object and open the link modal immediately
-                // Do NOT call onRefresh() here — it re-renders and loses modal state
+                // Try to auto-link the best matching transaction
+                try {
+                    const suggestRes = await axios.get(`${API_URL}/payments/${newPayment.id}/suggested-transactions`);
+                    const suggestions = suggestRes.data || [];
+                    // Auto-link if top suggestion has a high confidence score (>= 80)
+                    const bestMatch = suggestions.length > 0 ? suggestions[0] : null;
+                    if (bestMatch && bestMatch.score >= 80 && !bestMatch.already_linked) {
+                        await axios.post(`${API_URL}/payments/${newPayment.id}/transactions`, {
+                            transaction_ids: [bestMatch.transaction_id]
+                        });
+                    }
+                } catch (suggestErr) {
+                    console.warn('Could not auto-link transaction:', suggestErr);
+                }
+
+                // Build a payment-like object and open the link modal for verification
                 const paymentObj = {
                     id: newPayment.id,
                     obligation_id: obl.id,
