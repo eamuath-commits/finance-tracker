@@ -348,6 +348,7 @@ class PaymentTransaction(Base):
     payment_id = Column(Integer, ForeignKey("payments.id", ondelete="CASCADE"), primary_key=True)
     transaction_id = Column(String, ForeignKey("transactions.id", ondelete="CASCADE"), primary_key=True)
     created_at = Column(DateTime, default=datetime.now)
+    link_source = Column(String, nullable=True)  # 'auto' = auto-matched/auto-linked, None = manual
     
     # Relationships
     payment = relationship("Payment", backref=backref("linked_transactions", cascade="all, delete-orphan"))

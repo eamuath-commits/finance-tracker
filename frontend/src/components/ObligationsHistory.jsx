@@ -344,19 +344,32 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
 
             const newPayment = payRes.data;
             if (newPayment?.id) {
+                let didAutoLink = false;
+
                 // Try to auto-link the best matching transaction
                 try {
                     const suggestRes = await axios.get(`${API_URL}/payments/${newPayment.id}/suggested-transactions`);
                     const suggestions = suggestRes.data || [];
-                    // Auto-link if top suggestion has a high confidence score (>= 80)
                     const bestMatch = suggestions.length > 0 ? suggestions[0] : null;
                     if (bestMatch && bestMatch.score >= 80 && !bestMatch.already_linked) {
                         await axios.post(`${API_URL}/payments/${newPayment.id}/transactions`, {
-                            transaction_ids: [bestMatch.transaction_id]
+                            transaction_ids: [bestMatch.transaction_id],
+                            link_source: 'auto'
                         });
+                        didAutoLink = true;
                     }
                 } catch (suggestErr) {
                     console.warn('Could not auto-link transaction:', suggestErr);
+                }
+
+                // If auto-linked, update payment source to 'auto'
+                if (didAutoLink) {
+                    try {
+                        await axios.put(`${API_URL}/obligations/history/${newPayment.id}`, {
+                            source: 'auto',
+                            note: `Auto-linked to best match`
+                        });
+                    } catch (e) { /* non-critical */ }
                 }
 
                 // Build a payment-like object and open the link modal for verification

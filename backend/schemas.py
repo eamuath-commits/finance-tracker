@@ -243,6 +243,7 @@ class PaymentUpdate(BaseModel):
     note: Optional[str] = None
     planned_amount: Optional[float] = None
     transaction_id: Optional[str] = None
+    source: Optional[str] = None  # 'auto' = auto-matched, None = manual
 
 class Payment(PaymentBase):
     id: int
@@ -544,6 +545,7 @@ class Distribution(DistributionBase):
 class LinkTransactionsRequest(BaseModel):
     """Request to link multiple transactions to a payment or distribution"""
     transaction_ids: List[str]
+    link_source: Optional[str] = None  # 'auto' = auto-linked, None = manual
 
 
 class TransactionSearchParams(BaseModel):

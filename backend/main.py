@@ -947,6 +947,7 @@ def read_obligation_payments(obligation_id: str, db: Session = Depends(get_db)):
                         "account_id": tx.account_id,
                         "raw_sms_content": tx.raw_sms_content,
                         "notes": tx.notes,
+                        "link_source": getattr(link, 'link_source', None),
                     })
         
         payment_dict = {
@@ -1132,7 +1133,8 @@ def auto_match_obligations(db: Session = Depends(get_db)):
             # Link via junction table
             link = models.PaymentTransaction(
                 payment_id=new_payment.id,
-                transaction_id=matched_tx.id
+                transaction_id=matched_tx.id,
+                link_source='auto'
             )
             db.add(link)
 
@@ -3080,7 +3082,7 @@ def link_transactions_to_payment(
         ).first()
         
         if not existing:
-            link = models.PaymentTransaction(payment_id=payment_id, transaction_id=tx_id)
+            link = models.PaymentTransaction(payment_id=payment_id, transaction_id=tx_id, link_source=request.link_source)
             db.add(link)
             linked.append(tx_id)
     
