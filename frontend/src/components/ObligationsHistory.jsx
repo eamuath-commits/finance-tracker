@@ -621,7 +621,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                             <td className="px-3 py-2">
                                                                 {isPlanned ? (
                                                                     <button
-                                                                        onClick={() => onEdit(item)}
+                                                                        onClick={() => handlePayAndLink(item.obl, item.billing_month, item.amount)}
                                                                         className="bg-blue-600 hover:bg-blue-500 text-white text-[9px] px-2.5 py-1 rounded font-bold uppercase tracking-wider transition flex items-center gap-1"
                                                                     >
                                                                         <DollarSign size={10} /> Pay
