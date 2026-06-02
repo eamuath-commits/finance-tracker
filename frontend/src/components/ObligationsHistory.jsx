@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { formatCurrency, selectClass, Modal } from '../components/UI';
 import TransactionDetailModal from '../components/TransactionDetailModal';
 import TransactionSelectorModal from '../components/TransactionSelectorModal';
@@ -26,6 +26,19 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
     const [showTransactionDetail, setShowTransactionDetail] = useState(false);
     const [selectedTransaction, setSelectedTransaction] = useState(null);
     const [expandedSms, setExpandedSms] = useState(null);
+    const [payMenuId, setPayMenuId] = useState(null); // which item's pay menu is open
+    const payMenuRef = useRef(null);
+
+    // Close pay menu on click outside
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (payMenuRef.current && !payMenuRef.current.contains(e.target)) {
+                setPayMenuId(null);
+            }
+        };
+        if (payMenuId) document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [payMenuId]);
 
     const formatMonthDisplay = (dateStr) => {
         if (!dateStr) return '-';
@@ -705,21 +718,29 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                             {/* Transaction */}
                                                             <td className="px-3 py-2">
                                                                 {isPlanned ? (
-                                                                    <div className="flex items-center gap-1">
+                                                                    <div className="relative" ref={payMenuId === `${item.id}-${idx}` ? payMenuRef : null}>
                                                                         <button
-                                                                            onClick={() => handlePayAndLink(item.obl, item.billing_month, item.amount)}
-                                                                            className="bg-blue-600 hover:bg-blue-500 text-white text-[9px] px-2 py-1 rounded font-bold uppercase tracking-wider transition flex items-center gap-1"
-                                                                            title="Pay and link to a transaction"
+                                                                            onClick={() => setPayMenuId(payMenuId === `${item.id}-${idx}` ? null : `${item.id}-${idx}`)}
+                                                                            className="bg-blue-600 hover:bg-blue-500 text-white text-[9px] px-2.5 py-1 rounded font-bold uppercase tracking-wider transition flex items-center gap-1"
                                                                         >
-                                                                            <DollarSign size={9} /> Pay & Link
+                                                                            <DollarSign size={9} /> Pay
                                                                         </button>
-                                                                        <button
-                                                                            onClick={() => handleMarkPaid(item.obl, item.billing_month, item.amount)}
-                                                                            className="bg-emerald-700 hover:bg-emerald-600 text-white text-[9px] px-2 py-1 rounded font-bold uppercase tracking-wider transition flex items-center gap-1"
-                                                                            title="Mark as paid without linking"
-                                                                        >
-                                                                            <CheckCircle size={9} /> Paid
-                                                                        </button>
+                                                                        {payMenuId === `${item.id}-${idx}` && (
+                                                                            <div className="absolute left-0 top-full mt-1 z-50 bg-slate-800 border border-slate-600 rounded-lg shadow-xl overflow-hidden min-w-[180px]">
+                                                                                <button
+                                                                                    onClick={() => { setPayMenuId(null); handlePayAndLink(item.obl, item.billing_month, item.amount); }}
+                                                                                    className="w-full px-3 py-2 text-left text-[10px] text-white hover:bg-blue-600/30 transition flex items-center gap-2 border-b border-slate-700"
+                                                                                >
+                                                                                    <DollarSign size={11} className="text-blue-400" /> Pay & Link Transaction
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => { setPayMenuId(null); handleMarkPaid(item.obl, item.billing_month, item.amount); }}
+                                                                                    className="w-full px-3 py-2 text-left text-[10px] text-white hover:bg-emerald-600/30 transition flex items-center gap-2"
+                                                                                >
+                                                                                    <CheckCircle size={11} className="text-emerald-400" /> Mark as Paid
+                                                                                </button>
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                 ) : item.linked_transactions && item.linked_transactions.length > 0 ? (
                                                                     <div className="flex flex-wrap gap-1">
