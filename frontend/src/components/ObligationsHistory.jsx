@@ -388,6 +388,23 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
         }
     };
 
+    // --- Mark Paid: Create payment without linking ---
+    const handleMarkPaid = async (obl, billingMonth, plannedAmount) => {
+        try {
+            const payAmount = plannedAmount || obl.amount || 0;
+            await axios.post(`${API_URL}/obligations/${obl.id}/pay`, {
+                amount: payAmount,
+                billing_month: billingMonth,
+                status: 'Paid',
+                payment_date: new Date().toISOString()
+            });
+            if (onRefresh) onRefresh();
+        } catch (err) {
+            console.error('Error marking as paid:', err);
+            alert('Failed to mark as paid');
+        }
+    };
+
     // --- Envelope grouping by category ---
     const groupedByCategory = useMemo(() => {
         if (selectedYear === 'All' || selectedMonth === 'All') return [];
@@ -688,12 +705,22 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                             {/* Transaction */}
                                                             <td className="px-3 py-2">
                                                                 {isPlanned ? (
-                                                                    <button
-                                                                        onClick={() => handlePayAndLink(item.obl, item.billing_month, item.amount)}
-                                                                        className="bg-blue-600 hover:bg-blue-500 text-white text-[9px] px-2.5 py-1 rounded font-bold uppercase tracking-wider transition flex items-center gap-1"
-                                                                    >
-                                                                        <DollarSign size={10} /> Pay
-                                                                    </button>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <button
+                                                                            onClick={() => handlePayAndLink(item.obl, item.billing_month, item.amount)}
+                                                                            className="bg-blue-600 hover:bg-blue-500 text-white text-[9px] px-2 py-1 rounded font-bold uppercase tracking-wider transition flex items-center gap-1"
+                                                                            title="Pay and link to a transaction"
+                                                                        >
+                                                                            <DollarSign size={9} /> Pay & Link
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleMarkPaid(item.obl, item.billing_month, item.amount)}
+                                                                            className="bg-emerald-700 hover:bg-emerald-600 text-white text-[9px] px-2 py-1 rounded font-bold uppercase tracking-wider transition flex items-center gap-1"
+                                                                            title="Mark as paid without linking"
+                                                                        >
+                                                                            <CheckCircle size={9} /> Paid
+                                                                        </button>
+                                                                    </div>
                                                                 ) : item.linked_transactions && item.linked_transactions.length > 0 ? (
                                                                     <div className="flex flex-wrap gap-1">
                                                                         {item.linked_transactions.map(tx => (
