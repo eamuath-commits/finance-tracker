@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Wallet, CreditCard, Receipt, FileBarChart, Settings, TrendingDown, Layers, Tags, ClipboardCheck, Store } from 'lucide-react';
+import { LayoutDashboard, Wallet, CreditCard, Receipt, FileBarChart, Settings, TrendingDown, Layers, Tags, ClipboardCheck, Store, FileSearch } from 'lucide-react';
 
 const Sidebar = () => {
     const navItems = [
@@ -16,6 +16,7 @@ const Sidebar = () => {
         { path: '/reports', label: 'Reports', icon: FileBarChart },
         { path: '/planning', label: 'Planning', icon: TrendingDown },
         { path: '/audit', label: 'Audit', icon: ClipboardCheck },
+        { path: '/settlement', label: 'Settlement', icon: FileSearch },
     ];
 
     return (

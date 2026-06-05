@@ -22,6 +22,7 @@ import analysis_schema
 import queue_processor
 from rate_limiter import RateLimitMiddleware
 from webhook import router as webhook_router
+from settlement_service import router as settlement_router
 
 # --- Migration Logic ---
 def run_migrations(engine):
@@ -199,6 +200,9 @@ app.add_middleware(RateLimitMiddleware)
 
 # Include webhook router for Cloudflare Tunnel SMS integration
 app.include_router(webhook_router)
+
+# Include settlement router for bank statement reconciliation
+app.include_router(settlement_router)
 
 @app.get("/")
 def read_root():

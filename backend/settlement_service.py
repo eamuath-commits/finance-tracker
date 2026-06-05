@@ -1,0 +1,842 @@
+"""
+Bank Statement Settlement Service
+=================================
+Self-contained module for uploading bank statements, parsing transactions,
+comparing against system records, and logging missing transactions.
+
+Endpoints:
+  POST /settlement/upload         - Upload & reconcile a bank statement
+  POST /settlement/log-transaction - Log a single missing transaction
+  POST /settlement/log-batch       - Batch log selected missing transactions
+"""
+
+import csv
+import io
+import re
+import logging
+from datetime import datetime, timedelta
+from typing import List, Optional, Dict, Any
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from sqlalchemy.orm import Session
+from pydantic import BaseModel
+
+import models
+import schemas
+import crud
+from database import get_db
+
+logger = logging.getLogger("settlement")
+
+router = APIRouter(prefix="/settlement", tags=["Settlement"])
+
+
+# ============================================================
+# Pydantic Schemas (local to this service)
+# ============================================================
+
+class ParsedTransaction(BaseModel):
+    """A single transaction extracted from the uploaded bank statement."""
+    date: str  # ISO format string
+    amount: float
+    description: str
+    type: str  # "credit" or "debit"
+    raw_line: Optional[str] = None  # Original line for debugging
+
+
+class MatchedTransaction(BaseModel):
+    """A bank transaction that was matched to a system transaction."""
+    bank_date: str
+    bank_amount: float
+    bank_description: str
+    bank_type: str
+    system_transaction_id: str
+    system_merchant: Optional[str] = None
+    system_date: str
+    system_amount: float
+
+
+class MissingTransaction(BaseModel):
+    """A bank transaction that has no matching system transaction."""
+    index: int  # Position in the parsed list (for selection)
+    date: str
+    amount: float
+    description: str
+    type: str
+    raw_line: Optional[str] = None
+
+
+class ReconciliationReport(BaseModel):
+    """Full reconciliation report returned after upload & matching."""
+    account_id: str
+    account_name: str
+    file_name: str
+    total_bank_transactions: int
+    matched_count: int
+    missing_count: int
+    matched_transactions: List[MatchedTransaction]
+    missing_transactions: List[MissingTransaction]
+    date_range: Optional[Dict[str, str]] = None  # {start, end}
+    parsing_warnings: List[str] = []
+
+
+class LogTransactionRequest(BaseModel):
+    """Request to log a single missing transaction."""
+    account_id: str
+    date: str
+    amount: float
+    description: str
+    type: str  # "credit" or "debit"
+    category: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class LogBatchRequest(BaseModel):
+    """Request to batch-log multiple missing transactions."""
+    account_id: str
+    transactions: List[LogTransactionRequest]
+
+
+# ============================================================
+# File Parsing Logic
+# ============================================================
+
+def _detect_date(value: str) -> Optional[datetime]:
+    """Try to parse a date string using common bank statement formats."""
+    if not value or not value.strip():
+        return None
+
+    value = value.strip()
+
+    # Common date formats used by Saudi and international banks
+    formats = [
+        "%Y-%m-%d",
+        "%d/%m/%Y",
+        "%m/%d/%Y",
+        "%d-%m-%Y",
+        "%Y/%m/%d",
+        "%d %b %Y",
+        "%d %B %Y",
+        "%b %d, %Y",
+        "%B %d, %Y",
+        "%d-%b-%Y",
+        "%d-%b-%y",
+        "%d/%m/%y",
+        "%m/%d/%y",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+        "%d/%m/%Y %H:%M",
+        "%d/%m/%Y %H:%M:%S",
+    ]
+
+    for fmt in formats:
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+
+    return None
+
+
+def _detect_amount(value: str) -> Optional[float]:
+    """Parse an amount string, handling commas, currency symbols, and negative markers."""
+    if not value or not value.strip():
+        return None
+
+    value = value.strip()
+
+    # Remove common currency symbols and whitespace
+    value = re.sub(r'[SAR$€£¥₹\s]', '', value, flags=re.IGNORECASE)
+
+    # Handle parentheses as negative: (1,234.56) -> -1234.56
+    is_negative = False
+    if value.startswith('(') and value.endswith(')'):
+        value = value[1:-1]
+        is_negative = True
+
+    # Handle minus sign
+    if value.startswith('-'):
+        is_negative = True
+        value = value[1:]
+
+    # Remove thousands separators (commas)
+    value = value.replace(',', '')
+
+    try:
+        amount = float(value)
+        return -amount if is_negative else amount
+    except ValueError:
+        return None
+
+
+def _identify_columns(headers: List[str]) -> Dict[str, int]:
+    """
+    Heuristically identify which columns contain date, amount, and description.
+    Returns a mapping of {field_name: column_index}.
+    """
+    headers_lower = [h.lower().strip() for h in headers]
+    mapping = {}
+
+    # Date column detection
+    date_keywords = ['date', 'transaction date', 'posting date', 'value date',
+                     'txn date', 'trans date', 'booking date', 'تاريخ']
+    for i, h in enumerate(headers_lower):
+        if any(kw in h for kw in date_keywords):
+            mapping['date'] = i
+            break
+
+    # Amount column detection (look for single amount or debit/credit split)
+    amount_keywords = ['amount', 'transaction amount', 'txn amount', 'المبلغ']
+    debit_keywords = ['debit', 'withdrawal', 'dr', 'مدين', 'سحب']
+    credit_keywords = ['credit', 'deposit', 'cr', 'دائن', 'إيداع']
+
+    for i, h in enumerate(headers_lower):
+        if any(kw in h for kw in amount_keywords):
+            mapping['amount'] = i
+            break
+
+    # Check for split debit/credit columns
+    for i, h in enumerate(headers_lower):
+        if any(kw in h for kw in debit_keywords):
+            mapping['debit'] = i
+        if any(kw in h for kw in credit_keywords):
+            mapping['credit'] = i
+
+    # Description column detection
+    desc_keywords = ['description', 'details', 'narrative', 'particulars',
+                     'merchant', 'memo', 'reference', 'الوصف', 'البيان',
+                     'transaction description']
+    for i, h in enumerate(headers_lower):
+        if any(kw in h for kw in desc_keywords):
+            mapping['description'] = i
+            break
+
+    # Fallback: if description not found, use the widest text column
+    if 'description' not in mapping and len(headers) >= 3:
+        # Skip columns already assigned
+        used = set(mapping.values())
+        for i in range(len(headers)):
+            if i not in used:
+                mapping['description'] = i
+                break
+
+    return mapping
+
+
+def _rows_to_transactions(rows: List[List[str]], col_map: Dict[str, int]) -> tuple:
+    """
+    Convert parsed rows + column mapping into ParsedTransaction objects.
+    Returns (transactions, warnings).
+    """
+    transactions = []
+    warnings = []
+
+    for row_idx, row in enumerate(rows):
+        if not row or all(not cell.strip() for cell in row):
+            continue  # Skip empty rows
+
+        # Extract date
+        date_val = None
+        if 'date' in col_map and col_map['date'] < len(row):
+            date_val = _detect_date(row[col_map['date']])
+
+        if not date_val:
+            # Try to find a date in any column (fallback)
+            for cell in row:
+                date_val = _detect_date(cell)
+                if date_val:
+                    break
+
+        if not date_val:
+            warnings.append(f"Row {row_idx + 1}: Could not parse date, skipping")
+            continue
+
+        # Extract amount and determine type
+        amount = None
+        tx_type = "debit"
+
+        if 'amount' in col_map and col_map['amount'] < len(row):
+            amount = _detect_amount(row[col_map['amount']])
+            if amount is not None:
+                if amount > 0:
+                    tx_type = "credit"
+                else:
+                    tx_type = "debit"
+                amount = abs(amount)
+        elif 'debit' in col_map or 'credit' in col_map:
+            # Split column format
+            debit_val = None
+            credit_val = None
+            if 'debit' in col_map and col_map['debit'] < len(row):
+                debit_val = _detect_amount(row[col_map['debit']])
+            if 'credit' in col_map and col_map['credit'] < len(row):
+                credit_val = _detect_amount(row[col_map['credit']])
+
+            if debit_val and debit_val != 0:
+                amount = abs(debit_val)
+                tx_type = "debit"
+            elif credit_val and credit_val != 0:
+                amount = abs(credit_val)
+                tx_type = "credit"
+
+        if amount is None or amount == 0:
+            warnings.append(f"Row {row_idx + 1}: Could not parse amount, skipping")
+            continue
+
+        # Extract description
+        description = ""
+        if 'description' in col_map and col_map['description'] < len(row):
+            description = row[col_map['description']].strip()
+
+        if not description:
+            # Fallback: concatenate non-date, non-amount cells
+            used_indices = set(col_map.values())
+            desc_parts = [row[i].strip() for i in range(len(row))
+                          if i not in used_indices and row[i].strip()]
+            description = " | ".join(desc_parts) if desc_parts else "Unknown Transaction"
+
+        raw_line = " | ".join(cell.strip() for cell in row if cell.strip())
+
+        transactions.append(ParsedTransaction(
+            date=date_val.strftime("%Y-%m-%d"),
+            amount=round(amount, 2),
+            description=description,
+            type=tx_type,
+            raw_line=raw_line
+        ))
+
+    return transactions, warnings
+
+
+def parse_csv(file_content: bytes, filename: str) -> tuple:
+    """Parse a CSV bank statement. Returns (transactions, warnings)."""
+    warnings = []
+
+    # Decode content
+    try:
+        text = file_content.decode('utf-8')
+    except UnicodeDecodeError:
+        try:
+            text = file_content.decode('utf-8-sig')  # BOM-aware
+        except UnicodeDecodeError:
+            text = file_content.decode('latin-1')
+            warnings.append("File encoding detected as Latin-1 (non-UTF8)")
+
+    # Detect delimiter
+    sniffer = csv.Sniffer()
+    try:
+        dialect = sniffer.sniff(text[:4096])
+        delimiter = dialect.delimiter
+    except csv.Error:
+        delimiter = ','
+
+    reader = csv.reader(io.StringIO(text), delimiter=delimiter)
+    all_rows = list(reader)
+
+    if len(all_rows) < 2:
+        raise ValueError("CSV file appears to be empty or has only headers")
+
+    # First non-empty row is assumed to be headers
+    header_row = None
+    data_rows = []
+    for i, row in enumerate(all_rows):
+        if not row or all(not cell.strip() for cell in row):
+            continue
+        if header_row is None:
+            # Check if this row looks like headers (no parseable date in first few cells)
+            looks_like_header = True
+            for cell in row[:3]:
+                if _detect_date(cell.strip()):
+                    looks_like_header = False
+                    break
+            if looks_like_header:
+                header_row = row
+            else:
+                # No header row, use generic column names
+                header_row = [f"Column {j+1}" for j in range(len(row))]
+                data_rows.append(row)
+        else:
+            data_rows.append(row)
+
+    if not header_row:
+        raise ValueError("Could not detect headers in CSV file")
+
+    col_map = _identify_columns(header_row)
+
+    if 'date' not in col_map:
+        warnings.append("Could not identify a date column from headers — will attempt per-row detection")
+    if 'amount' not in col_map and 'debit' not in col_map and 'credit' not in col_map:
+        raise ValueError(
+            f"Could not identify amount columns in headers: {header_row}. "
+            "Expected column names like 'Amount', 'Debit', 'Credit', etc."
+        )
+
+    transactions, parse_warnings = _rows_to_transactions(data_rows, col_map)
+    warnings.extend(parse_warnings)
+
+    return transactions, warnings
+
+
+def parse_excel(file_content: bytes, filename: str) -> tuple:
+    """Parse an Excel bank statement. Returns (transactions, warnings)."""
+    import openpyxl
+
+    warnings = []
+
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(file_content), read_only=True, data_only=True)
+    except Exception as e:
+        raise ValueError(f"Could not read Excel file: {str(e)}")
+
+    ws = wb.active
+    if not ws:
+        raise ValueError("Excel workbook has no active sheet")
+
+    # Read all rows as string lists
+    all_rows = []
+    for row in ws.iter_rows(values_only=True):
+        str_row = [str(cell) if cell is not None else "" for cell in row]
+        all_rows.append(str_row)
+
+    wb.close()
+
+    if len(all_rows) < 2:
+        raise ValueError("Excel file appears to be empty or has only headers")
+
+    # Same logic as CSV: detect headers and columns
+    header_row = None
+    data_rows = []
+    for i, row in enumerate(all_rows):
+        if not row or all(not cell.strip() for cell in row):
+            continue
+        if header_row is None:
+            looks_like_header = True
+            for cell in row[:3]:
+                if _detect_date(cell.strip()):
+                    looks_like_header = False
+                    break
+            if looks_like_header:
+                header_row = row
+            else:
+                header_row = [f"Column {j+1}" for j in range(len(row))]
+                data_rows.append(row)
+        else:
+            data_rows.append(row)
+
+    if not header_row:
+        raise ValueError("Could not detect headers in Excel file")
+
+    col_map = _identify_columns(header_row)
+
+    if 'amount' not in col_map and 'debit' not in col_map and 'credit' not in col_map:
+        raise ValueError(
+            f"Could not identify amount columns in headers: {header_row}. "
+            "Expected column names like 'Amount', 'Debit', 'Credit', etc."
+        )
+
+    transactions, parse_warnings = _rows_to_transactions(data_rows, col_map)
+    warnings.extend(parse_warnings)
+
+    return transactions, warnings
+
+
+def parse_pdf(file_content: bytes, filename: str) -> tuple:
+    """Parse a PDF bank statement using pdfplumber. Returns (transactions, warnings)."""
+    import pdfplumber
+
+    warnings = []
+    warnings.append("PDF parsing is in beta — results may vary by bank format")
+
+    try:
+        pdf = pdfplumber.open(io.BytesIO(file_content))
+    except Exception as e:
+        raise ValueError(f"Could not read PDF file: {str(e)}")
+
+    all_rows = []
+    header_row = None
+
+    for page_num, page in enumerate(pdf.pages):
+        tables = page.extract_tables()
+
+        if not tables:
+            # Try extracting text lines as fallback
+            text = page.extract_text()
+            if text:
+                warnings.append(f"Page {page_num + 1}: No tables found, extracted text only")
+            continue
+
+        for table in tables:
+            for row_idx, row in enumerate(table):
+                if not row or all(cell is None or str(cell).strip() == '' for cell in row):
+                    continue
+                str_row = [str(cell).strip() if cell else "" for cell in row]
+
+                if header_row is None:
+                    # Check if this looks like a header
+                    looks_like_header = True
+                    for cell in str_row[:3]:
+                        if _detect_date(cell):
+                            looks_like_header = False
+                            break
+                    if looks_like_header:
+                        header_row = str_row
+                    else:
+                        header_row = [f"Column {j+1}" for j in range(len(str_row))]
+                        all_rows.append(str_row)
+                else:
+                    all_rows.append(str_row)
+
+    pdf.close()
+
+    if not header_row:
+        raise ValueError("Could not extract any tabular data from PDF")
+
+    if not all_rows:
+        raise ValueError("No data rows found in PDF tables")
+
+    col_map = _identify_columns(header_row)
+
+    if 'amount' not in col_map and 'debit' not in col_map and 'credit' not in col_map:
+        raise ValueError(
+            f"Could not identify amount columns in PDF headers: {header_row}. "
+            "Expected column names like 'Amount', 'Debit', 'Credit', etc."
+        )
+
+    transactions, parse_warnings = _rows_to_transactions(all_rows, col_map)
+    warnings.extend(parse_warnings)
+
+    return transactions, warnings
+
+
+def parse_file(file_content: bytes, filename: str) -> tuple:
+    """
+    Route to the appropriate parser based on file extension.
+    Returns (transactions: List[ParsedTransaction], warnings: List[str]).
+    """
+    ext = filename.lower().rsplit('.', 1)[-1] if '.' in filename else ''
+
+    if ext == 'csv':
+        return parse_csv(file_content, filename)
+    elif ext in ('xlsx', 'xls'):
+        return parse_excel(file_content, filename)
+    elif ext == 'pdf':
+        return parse_pdf(file_content, filename)
+    else:
+        raise ValueError(
+            f"Unsupported file format: .{ext}. "
+            "Please upload a CSV, Excel (.xlsx), or PDF file."
+        )
+
+
+# ============================================================
+# Transaction Matching Algorithm
+# ============================================================
+
+def match_transactions(
+    bank_transactions: List[ParsedTransaction],
+    system_transactions: list,
+    date_tolerance_days: int = 1
+) -> tuple:
+    """
+    Compare bank transactions against system transactions.
+
+    Matching criteria:
+    - Date must be within ±date_tolerance_days
+    - Amount must match exactly (after rounding to 2 decimal places)
+    - Description is used as a tiebreaker when multiple candidates match
+
+    Returns (matched: List[MatchedTransaction], missing: List[MissingTransaction])
+    """
+    matched = []
+    missing = []
+
+    # Build a lookup structure for system transactions indexed by amount
+    sys_by_amount: Dict[float, list] = {}
+    for tx in system_transactions:
+        key = round(tx.amount, 2)
+        sys_by_amount.setdefault(key, []).append(tx)
+
+    # Track which system transactions have been matched (by id)
+    used_system_ids = set()
+
+    for idx, bank_tx in enumerate(bank_transactions):
+        bank_date = datetime.strptime(bank_tx.date, "%Y-%m-%d")
+        bank_amount = round(bank_tx.amount, 2)
+
+        # Find candidates with matching amount
+        candidates = sys_by_amount.get(bank_amount, [])
+
+        best_match = None
+        best_score = -1
+
+        for sys_tx in candidates:
+            if sys_tx.id in used_system_ids:
+                continue
+
+            # Check type match
+            sys_type = sys_tx.type or "debit"
+            if sys_type != bank_tx.type:
+                continue
+
+            # Check date tolerance
+            sys_date = sys_tx.timestamp
+            if sys_date is None:
+                continue
+
+            # Handle timezone-aware vs naive
+            if sys_date.tzinfo:
+                sys_date = sys_date.replace(tzinfo=None)
+
+            date_diff = abs((sys_date.date() - bank_date.date()).days)
+            if date_diff > date_tolerance_days:
+                continue
+
+            # Calculate match score (lower date diff = better)
+            score = 100 - (date_diff * 30)
+
+            # Bonus for description similarity
+            sys_desc = (sys_tx.merchant or sys_tx.notes or "").lower()
+            bank_desc = bank_tx.description.lower()
+            if sys_desc and bank_desc:
+                # Check for substring match
+                if sys_desc in bank_desc or bank_desc in sys_desc:
+                    score += 20
+                else:
+                    # Check for word overlap
+                    sys_words = set(sys_desc.split())
+                    bank_words = set(bank_desc.split())
+                    overlap = len(sys_words & bank_words)
+                    if overlap > 0:
+                        score += min(overlap * 5, 15)
+
+            if score > best_score:
+                best_score = score
+                best_match = sys_tx
+
+        if best_match:
+            used_system_ids.add(best_match.id)
+            sys_date = best_match.timestamp
+            if sys_date and sys_date.tzinfo:
+                sys_date = sys_date.replace(tzinfo=None)
+
+            matched.append(MatchedTransaction(
+                bank_date=bank_tx.date,
+                bank_amount=bank_tx.amount,
+                bank_description=bank_tx.description,
+                bank_type=bank_tx.type,
+                system_transaction_id=best_match.id,
+                system_merchant=best_match.merchant,
+                system_date=sys_date.strftime("%Y-%m-%d") if sys_date else "",
+                system_amount=best_match.amount
+            ))
+        else:
+            missing.append(MissingTransaction(
+                index=idx,
+                date=bank_tx.date,
+                amount=bank_tx.amount,
+                description=bank_tx.description,
+                type=bank_tx.type,
+                raw_line=bank_tx.raw_line
+            ))
+
+    return matched, missing
+
+
+# ============================================================
+# API Endpoints
+# ============================================================
+
+@router.post("/upload", response_model=ReconciliationReport)
+async def upload_and_reconcile(
+    file: UploadFile = File(...),
+    account_id: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload a bank statement file and reconcile against system transactions.
+
+    Accepts CSV, Excel (.xlsx), or PDF files.
+    Returns a reconciliation report with matched and missing transactions.
+    """
+    # Validate account exists
+    account = db.query(models.Account).filter(models.Account.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    # Validate file
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file uploaded")
+
+    # Read file content
+    try:
+        file_content = await file.read()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read file: {str(e)}")
+
+    if len(file_content) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+    # Size limit: 10MB
+    if len(file_content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 10MB.")
+
+    # Parse file
+    try:
+        bank_transactions, warnings = parse_file(file_content, file.filename)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error parsing file: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error parsing file: {str(e)}"
+        )
+
+    if not bank_transactions:
+        raise HTTPException(
+            status_code=422,
+            detail="No transactions could be extracted from the file. "
+                   "Please check the file format and ensure it contains transaction data."
+        )
+
+    # Determine date range from parsed transactions
+    parsed_dates = [datetime.strptime(t.date, "%Y-%m-%d") for t in bank_transactions]
+    min_date = min(parsed_dates)
+    max_date = max(parsed_dates)
+
+    # Expand search window by tolerance
+    search_start = min_date - timedelta(days=7)
+    search_end = max_date + timedelta(days=7)
+
+    # Query system transactions for this account within the date range
+    system_transactions = db.query(models.Transaction).filter(
+        models.Transaction.account_id == account_id,
+        models.Transaction.timestamp >= search_start,
+        models.Transaction.timestamp <= search_end
+    ).order_by(models.Transaction.timestamp.asc()).all()
+
+    # Run matching algorithm
+    matched, missing = match_transactions(bank_transactions, system_transactions)
+
+    logger.info(
+        f"Settlement reconciliation for account {account.name}: "
+        f"{len(bank_transactions)} bank txs, {len(matched)} matched, {len(missing)} missing"
+    )
+
+    return ReconciliationReport(
+        account_id=account_id,
+        account_name=account.name,
+        file_name=file.filename,
+        total_bank_transactions=len(bank_transactions),
+        matched_count=len(matched),
+        missing_count=len(missing),
+        matched_transactions=matched,
+        missing_transactions=missing,
+        date_range={
+            "start": min_date.strftime("%Y-%m-%d"),
+            "end": max_date.strftime("%Y-%m-%d")
+        },
+        parsing_warnings=warnings
+    )
+
+
+@router.post("/log-transaction")
+def log_missing_transaction(
+    req: LogTransactionRequest,
+    db: Session = Depends(get_db)
+):
+    """Log a single missing transaction into the system."""
+    # Validate account
+    account = db.query(models.Account).filter(models.Account.id == req.account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    # Parse date
+    try:
+        timestamp = datetime.strptime(req.date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {req.date}")
+
+    # Create transaction using existing crud
+    tx_data = schemas.TransactionCreate(
+        account_id=req.account_id,
+        amount=req.amount,
+        merchant=req.description,
+        category=req.category,
+        type=req.type,
+        status="completed",
+        timestamp=timestamp,
+        source="settlement",
+        notes=req.notes or f"Logged from bank statement settlement"
+    )
+
+    try:
+        transaction = crud.create_transaction(db, tx_data)
+    except Exception as e:
+        logger.error(f"Failed to create transaction: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create transaction: {str(e)}")
+
+    return {
+        "message": "Transaction logged successfully",
+        "transaction_id": transaction.id,
+        "amount": transaction.amount,
+        "merchant": transaction.merchant,
+        "date": timestamp.strftime("%Y-%m-%d")
+    }
+
+
+@router.post("/log-batch")
+def log_batch_transactions(
+    req: LogBatchRequest,
+    db: Session = Depends(get_db)
+):
+    """Batch log multiple missing transactions into the system."""
+    # Validate account
+    account = db.query(models.Account).filter(models.Account.id == req.account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    if not req.transactions:
+        raise HTTPException(status_code=400, detail="No transactions provided")
+
+    results = []
+    errors = []
+
+    for i, tx_req in enumerate(req.transactions):
+        try:
+            timestamp = datetime.strptime(tx_req.date, "%Y-%m-%d")
+
+            tx_data = schemas.TransactionCreate(
+                account_id=req.account_id,
+                amount=tx_req.amount,
+                merchant=tx_req.description,
+                category=tx_req.category,
+                type=tx_req.type,
+                status="completed",
+                timestamp=timestamp,
+                source="settlement",
+                notes=tx_req.notes or "Logged from bank statement settlement"
+            )
+
+            transaction = crud.create_transaction(db, tx_data)
+            results.append({
+                "index": i,
+                "transaction_id": transaction.id,
+                "status": "success"
+            })
+        except Exception as e:
+            logger.error(f"Failed to create transaction {i}: {e}")
+            errors.append({
+                "index": i,
+                "description": tx_req.description,
+                "error": str(e)
+            })
+
+    return {
+        "message": f"Batch complete: {len(results)} logged, {len(errors)} failed",
+        "total_requested": len(req.transactions),
+        "successful": len(results),
+        "failed": len(errors),
+        "results": results,
+        "errors": errors
+    }

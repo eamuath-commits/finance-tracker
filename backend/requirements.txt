@@ -10,3 +10,6 @@ google-generativeai>=0.7.0
 nest_asyncio
 python-dateutil>=2.8.2
 beautifulsoup4
+python-multipart
+openpyxl
+pdfplumber
