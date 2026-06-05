@@ -871,6 +871,12 @@ def parse_text(file_content: bytes, filename: str) -> tuple:
         r'password\s*reset',
         r'login\s*code',
         r'رمز\s*التحقق',
+        r'new\s+login\s+to\s+your\s+account',
+        r'we\s+detected\s+a\s+new\s+login',
+        r'device\s+authentication',
+        r'credit\s+card.*statement',
+        r'mubasher\s+retail',
+        r'reset\s+your\s+password',
     ]
     skip_re = re.compile('|'.join(skip_patterns), re.IGNORECASE)
 
@@ -951,8 +957,8 @@ def parse_text(file_content: bytes, filename: str) -> tuple:
             to_acct = None
             from_acct = None
             merchant = None
+            card_info = None
             for line in body_lines:
-                line_lower = line.lower()
                 # "To:ARKAAN AL AAMAL" - name (not a number)
                 m = re.match(r'^To[:\s]+(.+)', line, re.IGNORECASE)
                 if m:
@@ -971,19 +977,21 @@ def parse_text(file_content: bytes, filename: str) -> tuple:
                     merchant = m.group(1).strip()
                 # "By:9365;mada-Apple Pay" — card info
                 m = re.match(r'^By[:\s]+(.+)', line, re.IGNORECASE)
-                if m and not from_acct:
-                    from_val = m.group(1).strip().split(';')[0]
-                    if re.match(r'^\d{3,}$', from_val):
-                        from_acct = from_val
+                if m:
+                    card_info = m.group(1).strip()
+                    if not from_acct:
+                        from_val = card_info.split(';')[0].strip()
+                        if re.match(r'^\d{3,}$', from_val):
+                            from_acct = from_val
 
-            # Build description
+            # Build description — include all available info
             if merchant:
                 desc_parts.append(f"at {merchant}")
             if to_name:
                 desc_parts.append(f"To: {to_name}")
             if to_acct:
                 desc_parts.append(f"Acct: {to_acct}")
-            if from_acct and not desc_parts:
+            if from_acct:
                 desc_parts.append(f"From: {from_acct}")
 
             description = ' — '.join(desc_parts) if desc_parts else tx_data["description"]
