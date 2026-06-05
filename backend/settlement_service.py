@@ -1232,3 +1232,144 @@ def log_batch_transactions(
         "results": results,
         "errors": errors
     }
+
+
+class ParseSmsRequest(BaseModel):
+    sms_text: str
+    account_id: Optional[str] = None  # Optional: if provided, will match to this account
+
+
+@router.post("/parse-sms")
+async def parse_sms_preview(
+    req: ParseSmsRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Parse a raw SMS text through the AI pipeline (same as Telegram ingest)
+    and return the parsed result as a preview — without saving to DB.
+    """
+    import sms_agent
+
+    if not req.sms_text or len(req.sms_text.strip()) < 5:
+        raise HTTPException(status_code=400, detail="SMS text is too short")
+
+    try:
+        # Run through AI parser (same as Telegram flow)
+        result = await sms_agent.parse_with_ai(db, req.sms_text.strip())
+
+        if "error" in result:
+            raise HTTPException(
+                status_code=500,
+                detail=f"AI parsing failed: {result['error']}"
+            )
+
+        # Validate parsed digits
+        result = sms_agent.validate_parsed_digits(req.sms_text, result)
+
+        # Resolve account
+        account, credit_card, any_last4 = sms_agent.resolve_account(db, result, req.sms_text)
+
+        # Build preview response
+        account_name = None
+        account_id = req.account_id
+        if account:
+            account_name = account.name
+            account_id = account.id
+        elif credit_card:
+            account_name = f"{credit_card.name} (Credit Card)"
+
+        preview = {
+            "is_transaction": result.get("is_transaction", False),
+            "is_financial_event": result.get("is_financial_event", False),
+            "transaction_type": result.get("transaction_type", "debit"),
+            "sub_type": result.get("sub_type"),
+            "amount": result.get("amount"),
+            "currency": result.get("currency", "SAR"),
+            "merchant": result.get("merchant"),
+            "brand_name": result.get("brand_name"),
+            "description": result.get("description"),
+            "category": result.get("category"),
+            "timestamp": result.get("timestamp"),
+            "source_account_last4": result.get("source_account_last4"),
+            "destination_account_last4": result.get("destination_account_last4"),
+            "source_bank": result.get("source_bank"),
+            "beneficiary": result.get("beneficiary"),
+            "resolved_account_name": account_name,
+            "resolved_account_id": account_id,
+            "available_balance": result.get("available_balance"),
+            "fees": result.get("fees"),
+        }
+
+        logger.info(f"SMS preview parsed: {preview.get('description')} - {preview.get('amount')} {preview.get('currency')}")
+
+        return preview
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"SMS parse preview error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to parse SMS: {str(e)}")
+
+
+class ConfirmSmsIngestRequest(BaseModel):
+    sms_text: str
+    account_id: str
+    amount: float
+    merchant: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    transaction_type: str = "debit"
+    timestamp: Optional[str] = None
+
+
+@router.post("/confirm-sms-ingest")
+def confirm_sms_ingest(
+    req: ConfirmSmsIngestRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Confirm and log a previewed SMS transaction into the system.
+    This saves the transaction after the user has reviewed the AI-parsed preview.
+    """
+    # Validate account
+    account = db.query(models.Account).filter(models.Account.id == req.account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    # Parse timestamp
+    tx_timestamp = datetime.now()
+    if req.timestamp:
+        try:
+            tx_timestamp = datetime.strptime(req.timestamp, "%Y-%m-%d %H:%M")
+        except ValueError:
+            try:
+                tx_timestamp = datetime.strptime(req.timestamp, "%Y-%m-%d")
+            except ValueError:
+                pass  # Use current time as fallback
+
+    tx_data = schemas.TransactionCreate(
+        account_id=req.account_id,
+        amount=req.amount,
+        merchant=req.merchant or req.description or "Unknown",
+        raw_sms_content=req.sms_text,
+        category=req.category or "Uncategorized",
+        type=req.transaction_type,
+        status="completed",
+        timestamp=tx_timestamp,
+        source="settlement_rerun",
+        notes=f"Re-ingested from settlement service"
+    )
+
+    try:
+        transaction = crud.create_transaction(db, tx_data)
+    except Exception as e:
+        logger.error(f"Failed to create re-ingested transaction: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create transaction: {str(e)}")
+
+    return {
+        "message": "Transaction logged successfully",
+        "transaction_id": transaction.id,
+        "amount": transaction.amount,
+        "merchant": transaction.merchant,
+        "date": tx_timestamp.strftime("%Y-%m-%d")
+    }
