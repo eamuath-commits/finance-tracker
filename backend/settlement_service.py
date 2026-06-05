@@ -818,7 +818,21 @@ def parse_pdf(file_content: bytes, filename: str) -> tuple:
 
     return transactions, warnings
 def parse_text(file_content: bytes, filename: str) -> tuple:
-    """Parse a plain text file containing SMS messages (one per line or blank-line separated)."""
+    """Parse a plain text file containing SMS messages.
+    
+    Supports two formats:
+    1. Dash-separated blocks (e.g. iPhone SMS export tools):
+       2026-05-23 11:56:53 from AlRajhiBank
+       
+       Debit Internal Transfer
+       From:3264
+       Amount:SR 1100
+       ...
+       
+       ----------------------------------------------------
+    
+    2. Simple line-by-line (one SMS per line)
+    """
     warnings = ["Detected plain text file — treating each line/block as an SMS message"]
     transactions = []
 
@@ -832,57 +846,160 @@ def parse_text(file_content: bytes, filename: str) -> tuple:
             text = file_content.decode('latin-1')
             warnings.append("File encoding detected as Latin-1 (non-UTF8)")
 
-    # Split by blank lines (paragraphs) or by single lines
-    # Try paragraph mode first (double newline separated)
-    paragraphs = re.split(r'\n\s*\n', text.strip())
-
-    # If only 1 paragraph, fall back to line-by-line
-    if len(paragraphs) <= 1:
-        lines = [line.strip() for line in text.strip().split('\n') if line.strip()]
-    else:
-        lines = [p.replace('\n', ' ').strip() for p in paragraphs if p.strip()]
+    # Detect dash-separated format (lines of 4+ dashes as separator)
+    has_dash_separator = bool(re.search(r'^-{4,}\s*$', text, re.MULTILINE))
 
     skipped = 0
     parsed = 0
-    today_str = datetime.now().strftime("%Y-%m-%d")
+    otp_skipped = 0
+    non_financial_skipped = 0
+    dates_found = 0
 
-    for idx, line in enumerate(lines):
-        if not line or len(line) < 10:
-            continue
+    # Header pattern: "2026-05-23 11:56:53 from AlRajhiBank"
+    header_pattern = re.compile(
+        r'^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\s+from\s+(.+)$',
+        re.IGNORECASE
+    )
 
-        tx_data = _extract_transaction_from_sms(line)
-        if not tx_data:
-            skipped += 1
-            continue
+    # OTP / non-transaction patterns to skip early
+    skip_patterns = [
+        r'otp\s*code',
+        r'verification\s*code',
+        r'beneficiary\s+(added|activated|deleted)',
+        r'security\s*code',
+        r'one.time\s*password',
+        r'password\s*reset',
+        r'login\s*code',
+        r'رمز\s*التحقق',
+    ]
+    skip_re = re.compile('|'.join(skip_patterns), re.IGNORECASE)
 
-        # Try to extract a date from the SMS text itself
-        date_val = None
-        # Look for inline dates in the text
-        date_patterns_in_text = [
-            r'(\d{2}/\d{2}/\d{4})', r'(\d{4}-\d{2}-\d{2})',
-            r'(\d{2}-\d{2}-\d{4})', r'(\d{2}/\d{2}/\d{2})',
-            r'(\d{2}-\d{2}-\d{2})',
-        ]
-        for dp in date_patterns_in_text:
-            m = re.search(dp, line)
-            if m:
-                date_val = _detect_date(m.group(1))
-                if date_val:
-                    break
+    if has_dash_separator:
+        # === Mode 1: Dash-separated blocks ===
+        blocks = re.split(r'^-{4,}\s*$', text, flags=re.MULTILINE)
+        warnings[0] = f"Detected dash-separated SMS export — {len(blocks)} blocks found"
 
-        parsed += 1
-        transactions.append(ParsedTransaction(
-            date=date_val.strftime("%Y-%m-%d") if date_val else today_str,
-            amount=tx_data["amount"],
-            description=tx_data["description"],
-            type=tx_data["type"],
-            raw_line=line[:120]
-        ))
+        for block in blocks:
+            block = block.strip()
+            if not block or len(block) < 10:
+                continue
 
-    if not date_val and parsed > 0:
-        warnings.append("No dates found in text — using today's date as fallback for all transactions")
+            # Try to extract header line
+            lines = block.split('\n')
+            header_match = header_pattern.match(lines[0].strip())
 
-    warnings.append(f"Processed {parsed + skipped} messages: {parsed} transactions found, {skipped} skipped")
+            block_date = None
+            sender = None
+            sms_body = block
+
+            if header_match:
+                date_str = header_match.group(1)  # "2026-05-23"
+                time_str = header_match.group(2)  # "11:56:53"
+                sender = header_match.group(3).strip()  # "AlRajhiBank"
+
+                try:
+                    block_date = datetime.strptime(date_str, "%Y-%m-%d")
+                    dates_found += 1
+                except ValueError:
+                    pass
+
+                # SMS body is everything after the header (skip blank lines after header)
+                body_lines = []
+                started = False
+                for line in lines[1:]:
+                    if not started and not line.strip():
+                        continue  # Skip blank lines between header and body
+                    started = True
+                    body_lines.append(line)
+                sms_body = '\n'.join(body_lines).strip()
+
+            if not sms_body or len(sms_body) < 5:
+                continue
+
+            # Skip OTP/non-financial messages early
+            if skip_re.search(sms_body):
+                otp_skipped += 1
+                continue
+
+            # Try to extract transaction
+            # Join multi-line body for regex matching
+            sms_oneline = sms_body.replace('\n', ' ').strip()
+            tx_data = _extract_transaction_from_sms(sms_oneline)
+
+            if not tx_data:
+                # Try with the raw multi-line body (some patterns need newlines)
+                tx_data = _extract_transaction_from_sms(sms_body)
+
+            if not tx_data:
+                skipped += 1
+                continue
+
+            # If no date from header, try inline dates in the body
+            if not block_date:
+                for dp in [r'(\d{2}/\d{1,2}/\d{2,4})', r'(\d{4}-\d{2}-\d{2})', r'(\d{2}-\d{2}-\d{4})']:
+                    m = re.search(dp, sms_body)
+                    if m:
+                        block_date = _detect_date(m.group(1))
+                        if block_date:
+                            dates_found += 1
+                            break
+
+            parsed += 1
+            transactions.append(ParsedTransaction(
+                date=block_date.strftime("%Y-%m-%d") if block_date else datetime.now().strftime("%Y-%m-%d"),
+                amount=tx_data["amount"],
+                description=tx_data["description"],
+                type=tx_data["type"],
+                raw_line=sms_body[:200]
+            ))
+
+    else:
+        # === Mode 2: Simple line-by-line or paragraph-separated ===
+        paragraphs = re.split(r'\n\s*\n', text.strip())
+        if len(paragraphs) <= 1:
+            items = [line.strip() for line in text.strip().split('\n') if line.strip()]
+        else:
+            items = [p.replace('\n', ' ').strip() for p in paragraphs if p.strip()]
+
+        for item in items:
+            if not item or len(item) < 10:
+                continue
+
+            if skip_re.search(item):
+                otp_skipped += 1
+                continue
+
+            tx_data = _extract_transaction_from_sms(item)
+            if not tx_data:
+                skipped += 1
+                continue
+
+            # Extract date from text
+            date_val = None
+            for dp in [r'(\d{2}/\d{1,2}/\d{2,4})', r'(\d{4}-\d{2}-\d{2})', r'(\d{2}-\d{2}-\d{4})']:
+                m = re.search(dp, item)
+                if m:
+                    date_val = _detect_date(m.group(1))
+                    if date_val:
+                        dates_found += 1
+                        break
+
+            parsed += 1
+            transactions.append(ParsedTransaction(
+                date=date_val.strftime("%Y-%m-%d") if date_val else datetime.now().strftime("%Y-%m-%d"),
+                amount=tx_data["amount"],
+                description=tx_data["description"],
+                type=tx_data["type"],
+                raw_line=item[:200]
+            ))
+
+    # Summary warnings
+    total = parsed + skipped + otp_skipped + non_financial_skipped
+    if otp_skipped > 0:
+        warnings.append(f"Auto-skipped {otp_skipped} OTP/verification/non-financial messages")
+    if dates_found == 0 and parsed > 0:
+        warnings.append("No dates found — using today's date as fallback for all transactions")
+    warnings.append(f"Processed {total} messages: {parsed} transactions found, {skipped + otp_skipped} skipped")
 
     return transactions, warnings
 
