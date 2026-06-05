@@ -423,8 +423,199 @@ def _rows_to_transactions(rows: List[List[str]], col_map: Dict[str, int]) -> tup
     return transactions, warnings
 
 
+def _is_sms_export_csv(headers: List[str]) -> bool:
+    """Check if a CSV is an iPhone/Android SMS export (has 'Text' and date-like columns)."""
+    headers_lower = [h.lower().strip() for h in headers]
+    has_text = any(h in ('text', 'message', 'body', 'sms text', 'sms body', 'content') for h in headers_lower)
+    has_date = any('date' in h for h in headers_lower)
+    has_sender = any(h in ('sender id', 'sender', 'sender name', 'address', 'from', 'number', 'phone') for h in headers_lower)
+    return has_text and has_date and (has_sender or len(headers) > 5)
+
+
+def _extract_transaction_from_sms(sms_text: str) -> Optional[Dict[str, Any]]:
+    """
+    Extract transaction data from a bank SMS message using regex patterns.
+    Returns None if the text is not a recognizable financial transaction.
+    """
+    if not sms_text or len(sms_text.strip()) < 10:
+        return None
+
+    text = sms_text.strip()
+
+    # Skip non-transaction messages (OTPs, promo, balance inquiries without amounts)
+    skip_patterns = [
+        r'\bOTP\b', r'\bverification\s+code\b', r'\bpassword\b', r'\bPIN\b',
+        r'\bرمز التحقق\b', r'\bactivat', r'\bunsubscribe\b', r'\bpromo\b'
+    ]
+    for sp in skip_patterns:
+        if re.search(sp, text, re.IGNORECASE):
+            return None
+
+    # --- Amount extraction ---
+    amount = None
+    # Pattern: SAR 1,234.56 or 1,234.56 SAR or Amount: 1234.56 or ر.س 1234.56
+    amount_patterns = [
+        r'(?:SAR|sar|S\.R|ر\.س|SR)\s*[:\s]?\s*([\d,]+\.?\d*)',
+        r'([\d,]+\.?\d*)\s*(?:SAR|sar|S\.R|ر\.س|SR)',
+        r'(?:Amount|المبلغ|Amt)[:\s]+\s*([\d,]+\.?\d*)',
+        r'(?:of|بمبلغ)\s+([\d,]+\.?\d*)',
+    ]
+
+    for pat in amount_patterns:
+        m = re.search(pat, text)
+        if m:
+            try:
+                amount = float(m.group(1).replace(',', ''))
+                if amount > 0:
+                    break
+            except ValueError:
+                continue
+
+    if not amount or amount <= 0:
+        return None
+
+    # --- Transaction type ---
+    tx_type = "debit"  # Default
+    credit_keywords = [
+        r'\b(?:credited|deposited?|received|incoming|salary|refund)\b',
+        r'\b(?:إيداع|تحويل وارد|استلام|راتب|استرداد)\b',
+        r'\btransfer(?:red)?\s+to\s+your\b',
+        r'\bcredit\b(?!\s*card)',
+    ]
+    debit_keywords = [
+        r'\b(?:purchase|purchas|debit|withdrawn|withdrawal|payment|paid|spent|PoS|P\.O\.S)\b',
+        r'\b(?:شراء|سحب|خصم|دفع|مشتريات)\b',
+        r'\b(?:mada|visa|mastercard)\b',
+        r'\btransfer(?:red)?\s+from\b',
+    ]
+
+    for ck in credit_keywords:
+        if re.search(ck, text, re.IGNORECASE):
+            tx_type = "credit"
+            break
+
+    # Debit overrides if credit wasn't matched
+    if tx_type != "credit":
+        for dk in debit_keywords:
+            if re.search(dk, text, re.IGNORECASE):
+                tx_type = "debit"
+                break
+
+    # --- Merchant / description extraction ---
+    description = ""
+    merchant_patterns = [
+        r'(?:At|at|AT|From|from|To|to|By|Store|Merchant)[:\s]+\s*([A-Za-z0-9\s\-\.\'&/]+?)(?:\s*(?:on|On|Amount|SAR|SR|Acc|Avl|Bal|\d{2}[/\-]))',
+        r'(?:عند|لدى|من|الى)\s+(.+?)(?:\s*(?:بمبلغ|مبلغ|SAR|SR|\d))',
+    ]
+    for mp in merchant_patterns:
+        m = re.search(mp, text)
+        if m:
+            description = m.group(1).strip().rstrip('.')
+            break
+
+    if not description:
+        # Fallback: use the first ~60 chars of the SMS text as description
+        description = text[:80].strip()
+        if len(text) > 80:
+            description += "..."
+
+    return {
+        "amount": round(amount, 2),
+        "type": tx_type,
+        "description": description,
+    }
+
+
+def _parse_sms_csv(headers: List[str], data_rows: List[List[str]]) -> tuple:
+    """
+    Parse an SMS export CSV by extracting transactions from the 'Text' column.
+    Returns (transactions, warnings).
+    """
+    warnings = ["Detected SMS export format — extracting transactions from message text"]
+    transactions = []
+
+    headers_lower = [h.lower().strip() for h in headers]
+
+    # Find the text column
+    text_col = None
+    for i, h in enumerate(headers_lower):
+        if h in ('text', 'message', 'body', 'sms text', 'sms body', 'content'):
+            text_col = i
+            break
+    if text_col is None:
+        raise ValueError("SMS export detected but could not find 'Text' column")
+
+    # Find the date column (prefer 'Message Date', then any date column)
+    date_col = None
+    for i, h in enumerate(headers_lower):
+        if h == 'message date':
+            date_col = i
+            break
+    if date_col is None:
+        for i, h in enumerate(headers_lower):
+            if 'date' in h and 'delete' not in h and 'edit' not in h and 'read' not in h:
+                date_col = i
+                break
+
+    skipped = 0
+    parsed = 0
+
+    for row_idx, row in enumerate(data_rows):
+        if not row or text_col >= len(row):
+            continue
+
+        sms_text = row[text_col].strip()
+        if not sms_text:
+            continue
+
+        # Extract transaction from SMS text
+        tx_data = _extract_transaction_from_sms(sms_text)
+        if not tx_data:
+            skipped += 1
+            continue
+
+        # Extract date
+        date_val = None
+        if date_col is not None and date_col < len(row):
+            date_val = _detect_date(row[date_col].strip())
+
+        if not date_val:
+            # Try parsing common SMS export date formats
+            if date_col is not None and date_col < len(row):
+                raw_date = row[date_col].strip()
+                # Handle "Jun 05, 2026 17:30:00" or similar
+                extra_formats = [
+                    "%b %d, %Y %H:%M:%S", "%b %d, %Y %H:%M",
+                    "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d %H:%M:%S%z",
+                    "%m/%d/%y, %H:%M", "%m/%d/%Y, %H:%M",
+                ]
+                for fmt in extra_formats:
+                    try:
+                        date_val = datetime.strptime(raw_date, fmt)
+                        break
+                    except ValueError:
+                        continue
+
+        if not date_val:
+            warnings.append(f"Row {row_idx + 1}: Could not parse date, skipping")
+            continue
+
+        parsed += 1
+        transactions.append(ParsedTransaction(
+            date=date_val.strftime("%Y-%m-%d"),
+            amount=tx_data["amount"],
+            description=tx_data["description"],
+            type=tx_data["type"],
+            raw_line=sms_text[:120]
+        ))
+
+    warnings.append(f"Processed {parsed + skipped} SMS messages: {parsed} transactions found, {skipped} non-transaction messages skipped")
+
+    return transactions, warnings
+
+
 def parse_csv(file_content: bytes, filename: str) -> tuple:
-    """Parse a CSV bank statement. Returns (transactions, warnings)."""
+    """Parse a CSV bank statement or SMS export. Returns (transactions, warnings)."""
     warnings = []
 
     # Decode content
@@ -476,6 +667,11 @@ def parse_csv(file_content: bytes, filename: str) -> tuple:
     if not header_row:
         raise ValueError("Could not detect headers in CSV file")
 
+    # --- Check if this is an SMS export CSV ---
+    if _is_sms_export_csv(header_row):
+        return _parse_sms_csv(header_row, data_rows)
+
+    # --- Standard bank statement CSV parsing ---
     col_map = _identify_columns(header_row, data_rows)
 
     if 'date' not in col_map:
