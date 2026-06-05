@@ -934,6 +934,60 @@ def parse_text(file_content: bytes, filename: str) -> tuple:
                 skipped += 1
                 continue
 
+            # Build a richer description from the structured SMS body
+            # Parse key:value pairs from lines like "From:3264", "To:ARKAAN AL AAMAL"
+            body_lines = [l.strip() for l in sms_body.split('\n') if l.strip()]
+            desc_parts = []
+
+            # First line is usually the transaction type (e.g. "Debit Internal Transfer", "PoS")
+            if body_lines:
+                first_line = body_lines[0]
+                # Only use first line if it's not a key:value pair
+                if ':' not in first_line or first_line.startswith(('PoS', 'Online', 'Bill', 'Credit', 'Debit', 'Refund')):
+                    desc_parts.append(first_line)
+
+            # Extract To name/beneficiary (most important for description)
+            to_name = None
+            to_acct = None
+            from_acct = None
+            merchant = None
+            for line in body_lines:
+                line_lower = line.lower()
+                # "To:ARKAAN AL AAMAL" - name (not a number)
+                m = re.match(r'^To[:\s]+(.+)', line, re.IGNORECASE)
+                if m:
+                    val = m.group(1).strip()
+                    if re.match(r'^\d{3,}$', val):
+                        to_acct = val
+                    elif not to_name:
+                        to_name = val
+                # "From:3264" - account
+                m = re.match(r'^From[:\s]+(\d{3,})', line, re.IGNORECASE)
+                if m:
+                    from_acct = m.group(1).strip()
+                # "At:GOT COOKI" - merchant
+                m = re.match(r'^(?:At|Merchant|Store)[:\s]+(.+)', line, re.IGNORECASE)
+                if m:
+                    merchant = m.group(1).strip()
+                # "By:9365;mada-Apple Pay" — card info
+                m = re.match(r'^By[:\s]+(.+)', line, re.IGNORECASE)
+                if m and not from_acct:
+                    from_val = m.group(1).strip().split(';')[0]
+                    if re.match(r'^\d{3,}$', from_val):
+                        from_acct = from_val
+
+            # Build description
+            if merchant:
+                desc_parts.append(f"at {merchant}")
+            if to_name:
+                desc_parts.append(f"To: {to_name}")
+            if to_acct:
+                desc_parts.append(f"Acct: {to_acct}")
+            if from_acct and not desc_parts:
+                desc_parts.append(f"From: {from_acct}")
+
+            description = ' — '.join(desc_parts) if desc_parts else tx_data["description"]
+
             # If no date from header, try inline dates in the body
             if not block_date:
                 for dp in [r'(\d{2}/\d{1,2}/\d{2,4})', r'(\d{4}-\d{2}-\d{2})', r'(\d{2}-\d{2}-\d{4})']:
@@ -948,9 +1002,9 @@ def parse_text(file_content: bytes, filename: str) -> tuple:
             transactions.append(ParsedTransaction(
                 date=block_date.strftime("%Y-%m-%d") if block_date else datetime.now().strftime("%Y-%m-%d"),
                 amount=tx_data["amount"],
-                description=tx_data["description"],
+                description=description,
                 type=tx_data["type"],
-                raw_line=sms_body[:200]
+                raw_line=sms_body[:300]
             ))
 
     else:
