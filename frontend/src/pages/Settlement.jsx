@@ -19,7 +19,8 @@ import {
     X,
     Info,
     ArrowLeft,
-    Loader2
+    Loader2,
+    Search
 } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || 'http://' + window.location.hostname + ':8000';
@@ -90,6 +91,9 @@ export default function Settlement() {
 
     // Logged transaction count for done screen
     const [loggedCount, setLoggedCount] = useState(0);
+
+    // Description filter
+    const [descFilter, setDescFilter] = useState('');
 
     // === Effects ===
     useEffect(() => {
@@ -235,10 +239,20 @@ export default function Settlement() {
         }
     };
 
-    // === Sorting ===
+    // === Sorting & Filtering ===
     const sortedMissing = useMemo(() => {
         if (!report?.missing_transactions) return [];
-        const items = [...report.missing_transactions];
+        let items = [...report.missing_transactions];
+
+        // Apply description filter
+        if (descFilter.trim()) {
+            const q = descFilter.trim().toLowerCase();
+            items = items.filter(tx =>
+                tx.description.toLowerCase().includes(q) ||
+                (tx.raw_line && tx.raw_line.toLowerCase().includes(q))
+            );
+        }
+
         items.sort((a, b) => {
             let cmp = 0;
             if (sortField === 'date') {
@@ -253,7 +267,7 @@ export default function Settlement() {
             return sortDir === 'asc' ? cmp : -cmp;
         });
         return items;
-    }, [report, sortField, sortDir]);
+    }, [report, sortField, sortDir, descFilter]);
 
     const toggleSort = (field) => {
         if (sortField === field) {
@@ -309,6 +323,7 @@ export default function Settlement() {
         setSelectedIndices(new Set());
         setLoggedIds(new Set());
         setError(null);
+        setDescFilter('');
         setLoggedCount(0);
         setReportTab('missing');
     };
@@ -606,8 +621,8 @@ export default function Settlement() {
                         </div>
                     )}
 
-                    {/* Report Tabs */}
-                    <div className="flex items-center justify-between">
+                    {/* Report Tabs + Filter */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                         <div className="flex space-x-1 bg-slate-800/50 p-1 rounded-lg border border-slate-700">
                             <button
                                 onClick={() => setReportTab('missing')}
@@ -633,9 +648,33 @@ export default function Settlement() {
                             </button>
                         </div>
 
-                        {/* Batch action bar */}
-                        {reportTab === 'missing' && unloggedCount > 0 && !isAllAccounts && (
-                            <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3">
+                            {/* Search filter */}
+                            {reportTab === 'missing' && report?.missing_count > 0 && (
+                                <div className="relative">
+                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                                    <input
+                                        id="settlement-desc-filter"
+                                        type="text"
+                                        value={descFilter}
+                                        onChange={(e) => setDescFilter(e.target.value)}
+                                        placeholder="Filter by description..."
+                                        className="pl-9 pr-8 py-2 w-56 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white placeholder-gray-500 focus:ring-2 focus:ring-cyan-500 outline-none transition-all"
+                                    />
+                                    {descFilter && (
+                                        <button
+                                            onClick={() => setDescFilter('')}
+                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Batch action bar */}
+                            {reportTab === 'missing' && unloggedCount > 0 && !isAllAccounts && (
+                                <div className="flex items-center gap-3">
                                 {selectedIndices.size > 0 && (
                                     <button
                                         id="settlement-log-selected-btn"
@@ -656,8 +695,9 @@ export default function Settlement() {
                                         )}
                                     </button>
                                 )}
-                            </div>
-                        )}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Missing Transactions Table */}
