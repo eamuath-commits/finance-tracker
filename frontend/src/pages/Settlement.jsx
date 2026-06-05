@@ -943,9 +943,7 @@ export default function Settlement() {
                                                 >
                                                     <span className="flex items-center gap-1">Description <SortIcon field="description" /></span>
                                                 </th>
-                                                {!isAllAccounts && (
                                                 <th className="text-right px-4 py-3 w-40">Action</th>
-                                                )}
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-700/50">
@@ -998,7 +996,6 @@ export default function Settlement() {
                                                         <td className="px-4 py-3 text-sm text-white max-w-[300px] truncate" title={tx.description}>
                                                             {tx.description}
                                                         </td>
-                                                        {!isAllAccounts && (
                                                         <td className="px-4 py-3 text-right">
                                                             {isLogged ? (
                                                                 <span className="text-xs text-emerald-400 font-medium">Logged ✓</span>
@@ -1023,6 +1020,7 @@ export default function Settlement() {
                                                                             <Zap size={12} />
                                                                         )}
                                                                     </button>
+                                                                    {!isAllAccounts && (
                                                                     <button
                                                                         onClick={() => handleLogSingle(tx)}
                                                                         disabled={isLogging}
@@ -1036,10 +1034,10 @@ export default function Settlement() {
                                                                         )}
                                                                         Log
                                                                     </button>
+                                                                    )}
                                                                 </div>
                                                             )}
                                                         </td>
-                                                        )}
                                                     </tr>
                                                 );
                                             })}
