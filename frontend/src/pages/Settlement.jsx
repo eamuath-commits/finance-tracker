@@ -105,7 +105,8 @@ export default function Settlement() {
         }
     };
 
-    const selectedAccount = accounts.find(a => a.id === selectedAccountId);
+    const isAllAccounts = selectedAccountId === 'all';
+    const selectedAccount = isAllAccounts ? null : accounts.find(a => a.id === selectedAccountId);
 
     // === File Handling ===
     const acceptedFormats = '.csv,.xlsx,.xls,.pdf';
@@ -348,6 +349,7 @@ export default function Settlement() {
                                 className="w-full px-4 py-3 bg-slate-800 border border-slate-600 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none text-white transition-all"
                             >
                                 <option value="">Choose an account...</option>
+                                <option value="all">⚡ All Accounts (multi-account matching)</option>
                                 {accounts.map(acc => (
                                     <option key={acc.id} value={acc.id}>
                                         {acc.name} {acc.last_4_digits ? `(****${acc.last_4_digits})` : ''}
@@ -355,6 +357,16 @@ export default function Settlement() {
                                 ))}
                             </select>
 
+                            {isAllAccounts && (
+                                <div className="mt-4 p-4 bg-cyan-500/10 rounded-xl border border-cyan-500/20">
+                                    <div className="flex items-start gap-2">
+                                        <Info size={16} className="text-cyan-400 shrink-0 mt-0.5" />
+                                        <div className="text-sm text-cyan-400/90">
+                                            Matching against <strong>{accounts.length} accounts</strong>. Ideal for SMS export files containing transactions from multiple banks.
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             {selectedAccount && (
                                 <div className="mt-4 p-4 bg-slate-900/50 rounded-xl border border-slate-700/50">
                                     <div className="flex justify-between items-center">
@@ -478,7 +490,7 @@ export default function Settlement() {
                             <div className="space-y-4 text-sm">
                                 <div className="flex gap-3">
                                     <span className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs font-bold shrink-0">1</span>
-                                    <p className="text-gray-400">Select the account this statement belongs to</p>
+                                    <p className="text-gray-400">Select an account, or "All Accounts" for multi-bank SMS files</p>
                                 </div>
                                 <div className="flex gap-3">
                                     <span className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs font-bold shrink-0">2</span>
@@ -622,7 +634,7 @@ export default function Settlement() {
                         </div>
 
                         {/* Batch action bar */}
-                        {reportTab === 'missing' && unloggedCount > 0 && (
+                        {reportTab === 'missing' && unloggedCount > 0 && !isAllAccounts && (
                             <div className="flex items-center gap-3">
                                 {selectedIndices.size > 0 && (
                                     <button
@@ -649,6 +661,14 @@ export default function Settlement() {
                     </div>
 
                     {/* Missing Transactions Table */}
+                    {reportTab === 'missing' && isAllAccounts && unloggedCount > 0 && (
+                        <div className="flex items-start gap-3 p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-xl">
+                            <Info size={18} className="text-cyan-400 shrink-0 mt-0.5" />
+                            <div className="text-sm text-cyan-400/90">
+                                <strong>View-only mode</strong> — To log missing transactions, re-run the analysis with a specific account selected so we know where to record them.
+                            </div>
+                        </div>
+                    )}
                     {reportTab === 'missing' && (
                         <div className="bg-slate-800/40 rounded-2xl border border-slate-700 overflow-hidden">
                             {report.missing_transactions.length === 0 ? (
@@ -672,6 +692,7 @@ export default function Settlement() {
                                     <table className="w-full">
                                         <thead className="bg-slate-900/50 sticky top-0">
                                             <tr className="text-xs text-gray-500 uppercase">
+                                                {!isAllAccounts && (
                                                 <th className="text-left px-4 py-3 w-10">
                                                     <input
                                                         type="checkbox"
@@ -680,6 +701,7 @@ export default function Settlement() {
                                                         className="rounded border-slate-600 bg-slate-700 text-cyan-500 focus:ring-cyan-500"
                                                     />
                                                 </th>
+                                                )}
                                                 <th
                                                     className="text-left px-4 py-3 cursor-pointer hover:text-gray-300 select-none"
                                                     onClick={() => toggleSort('date')}
@@ -699,7 +721,9 @@ export default function Settlement() {
                                                 >
                                                     <span className="flex items-center gap-1">Description <SortIcon field="description" /></span>
                                                 </th>
+                                                {!isAllAccounts && (
                                                 <th className="text-right px-4 py-3 w-28">Action</th>
+                                                )}
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-700/50">
@@ -718,6 +742,7 @@ export default function Settlement() {
                                                                     : 'hover:bg-slate-700/30'
                                                         }`}
                                                     >
+                                                        {!isAllAccounts && (
                                                         <td className="px-4 py-3">
                                                             {isLogged ? (
                                                                 <Check size={16} className="text-emerald-400" />
@@ -730,6 +755,7 @@ export default function Settlement() {
                                                                 />
                                                             )}
                                                         </td>
+                                                        )}
                                                         <td className="px-4 py-3 text-sm text-gray-300 font-mono whitespace-nowrap">
                                                             {formatDate(tx.date)}
                                                         </td>
@@ -750,6 +776,7 @@ export default function Settlement() {
                                                         <td className="px-4 py-3 text-sm text-white max-w-[300px] truncate" title={tx.description}>
                                                             {tx.description}
                                                         </td>
+                                                        {!isAllAccounts && (
                                                         <td className="px-4 py-3 text-right">
                                                             {isLogged ? (
                                                                 <span className="text-xs text-emerald-400 font-medium">Logged ✓</span>
@@ -768,6 +795,7 @@ export default function Settlement() {
                                                                 </button>
                                                             )}
                                                         </td>
+                                                        )}
                                                     </tr>
                                                 );
                                             })}

@@ -771,12 +771,19 @@ async def upload_and_reconcile(
     Upload a bank statement file and reconcile against system transactions.
 
     Accepts CSV, Excel (.xlsx), or PDF files.
+    Pass account_id="all" to match against all accounts.
     Returns a reconciliation report with matched and missing transactions.
     """
-    # Validate account exists
-    account = db.query(models.Account).filter(models.Account.id == account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
+    # Validate account exists (or "all" mode)
+    is_all_accounts = account_id.lower() == "all"
+
+    if is_all_accounts:
+        account_name = "All Accounts"
+    else:
+        account = db.query(models.Account).filter(models.Account.id == account_id).first()
+        if not account:
+            raise HTTPException(status_code=404, detail="Account not found")
+        account_name = account.name
 
     # Validate file
     if not file.filename:
@@ -823,24 +830,28 @@ async def upload_and_reconcile(
     search_start = min_date - timedelta(days=7)
     search_end = max_date + timedelta(days=7)
 
-    # Query system transactions for this account within the date range
-    system_transactions = db.query(models.Transaction).filter(
-        models.Transaction.account_id == account_id,
+    # Query system transactions within the date range
+    tx_query = db.query(models.Transaction).filter(
         models.Transaction.timestamp >= search_start,
         models.Transaction.timestamp <= search_end
-    ).order_by(models.Transaction.timestamp.asc()).all()
+    )
+
+    if not is_all_accounts:
+        tx_query = tx_query.filter(models.Transaction.account_id == account_id)
+
+    system_transactions = tx_query.order_by(models.Transaction.timestamp.asc()).all()
 
     # Run matching algorithm
     matched, missing = match_transactions(bank_transactions, system_transactions)
 
     logger.info(
-        f"Settlement reconciliation for account {account.name}: "
+        f"Settlement reconciliation for {account_name}: "
         f"{len(bank_transactions)} bank txs, {len(matched)} matched, {len(missing)} missing"
     )
 
     return ReconciliationReport(
         account_id=account_id,
-        account_name=account.name,
+        account_name=account_name,
         file_name=file.filename,
         total_bank_transactions=len(bank_transactions),
         matched_count=len(matched),
