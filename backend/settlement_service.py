@@ -817,6 +817,74 @@ def parse_pdf(file_content: bytes, filename: str) -> tuple:
     warnings.extend(parse_warnings)
 
     return transactions, warnings
+def parse_text(file_content: bytes, filename: str) -> tuple:
+    """Parse a plain text file containing SMS messages (one per line or blank-line separated)."""
+    warnings = ["Detected plain text file — treating each line/block as an SMS message"]
+    transactions = []
+
+    # Decode
+    try:
+        text = file_content.decode('utf-8')
+    except UnicodeDecodeError:
+        try:
+            text = file_content.decode('utf-8-sig')
+        except UnicodeDecodeError:
+            text = file_content.decode('latin-1')
+            warnings.append("File encoding detected as Latin-1 (non-UTF8)")
+
+    # Split by blank lines (paragraphs) or by single lines
+    # Try paragraph mode first (double newline separated)
+    paragraphs = re.split(r'\n\s*\n', text.strip())
+
+    # If only 1 paragraph, fall back to line-by-line
+    if len(paragraphs) <= 1:
+        lines = [line.strip() for line in text.strip().split('\n') if line.strip()]
+    else:
+        lines = [p.replace('\n', ' ').strip() for p in paragraphs if p.strip()]
+
+    skipped = 0
+    parsed = 0
+    today_str = datetime.now().strftime("%Y-%m-%d")
+
+    for idx, line in enumerate(lines):
+        if not line or len(line) < 10:
+            continue
+
+        tx_data = _extract_transaction_from_sms(line)
+        if not tx_data:
+            skipped += 1
+            continue
+
+        # Try to extract a date from the SMS text itself
+        date_val = None
+        # Look for inline dates in the text
+        date_patterns_in_text = [
+            r'(\d{2}/\d{2}/\d{4})', r'(\d{4}-\d{2}-\d{2})',
+            r'(\d{2}-\d{2}-\d{4})', r'(\d{2}/\d{2}/\d{2})',
+            r'(\d{2}-\d{2}-\d{2})',
+        ]
+        for dp in date_patterns_in_text:
+            m = re.search(dp, line)
+            if m:
+                date_val = _detect_date(m.group(1))
+                if date_val:
+                    break
+
+        parsed += 1
+        transactions.append(ParsedTransaction(
+            date=date_val.strftime("%Y-%m-%d") if date_val else today_str,
+            amount=tx_data["amount"],
+            description=tx_data["description"],
+            type=tx_data["type"],
+            raw_line=line[:120]
+        ))
+
+    if not date_val and parsed > 0:
+        warnings.append("No dates found in text — using today's date as fallback for all transactions")
+
+    warnings.append(f"Processed {parsed + skipped} messages: {parsed} transactions found, {skipped} skipped")
+
+    return transactions, warnings
 
 
 def parse_file(file_content: bytes, filename: str) -> tuple:
@@ -832,10 +900,12 @@ def parse_file(file_content: bytes, filename: str) -> tuple:
         return parse_excel(file_content, filename)
     elif ext == 'pdf':
         return parse_pdf(file_content, filename)
+    elif ext == 'txt':
+        return parse_text(file_content, filename)
     else:
         raise ValueError(
             f"Unsupported file format: .{ext}. "
-            "Please upload a CSV, Excel (.xlsx), or PDF file."
+            "Please upload a CSV, Excel (.xlsx), PDF, or Text (.txt) file."
         )
 
 

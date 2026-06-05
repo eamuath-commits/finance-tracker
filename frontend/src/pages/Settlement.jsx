@@ -50,7 +50,8 @@ const FormatBadge = ({ format, active }) => {
     const icons = {
         CSV: FileText,
         Excel: FileSpreadsheet,
-        PDF: File
+        PDF: File,
+        Text: FileText
     };
     const Icon = icons[format] || File;
 
@@ -95,6 +96,10 @@ export default function Settlement() {
     // Description filter
     const [descFilter, setDescFilter] = useState('');
 
+    // Previous report (for rerun comparison)
+    const [previousReport, setPreviousReport] = useState(null);
+    const [rerunning, setRerunning] = useState(false);
+
     // === Effects ===
     useEffect(() => {
         fetchAccounts();
@@ -113,13 +118,14 @@ export default function Settlement() {
     const selectedAccount = isAllAccounts ? null : accounts.find(a => a.id === selectedAccountId);
 
     // === File Handling ===
-    const acceptedFormats = '.csv,.xlsx,.xls,.pdf';
+    const acceptedFormats = '.csv,.xlsx,.xls,.pdf,.txt';
     const formatLabel = (filename) => {
         if (!filename) return '';
         const ext = filename.split('.').pop().toLowerCase();
         if (ext === 'csv') return 'CSV';
         if (ext === 'xlsx' || ext === 'xls') return 'Excel';
         if (ext === 'pdf') return 'PDF';
+        if (ext === 'txt') return 'Text';
         return ext.toUpperCase();
     };
 
@@ -172,6 +178,39 @@ export default function Settlement() {
             }
         } finally {
             setLoading(false);
+        }
+    };
+
+    // === Rerun (re-submit same file + account) ===
+    const handleRerun = async () => {
+        if (!selectedAccountId || !file) return;
+
+        setRerunning(true);
+        setError(null);
+        setPreviousReport(report); // Save current as "before"
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('account_id', selectedAccountId);
+
+        try {
+            const res = await axios.post(`${API}/settlement/upload`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                timeout: 60000
+            });
+            setReport(res.data);
+            setSelectedIndices(new Set());
+            setLoggedIds(new Set());
+            setDescFilter('');
+        } catch (err) {
+            const detail = err.response?.data?.detail;
+            if (typeof detail === 'string') {
+                setError(detail);
+            } else {
+                setError('Rerun failed. Please try again.');
+            }
+        } finally {
+            setRerunning(false);
         }
     };
 
@@ -320,6 +359,7 @@ export default function Settlement() {
         setStage('upload');
         setFile(null);
         setReport(null);
+        setPreviousReport(null);
         setSelectedIndices(new Set());
         setLoggedIds(new Set());
         setError(null);
@@ -409,6 +449,7 @@ export default function Settlement() {
                                 <FormatBadge format="CSV" active={file && formatLabel(file.name) === 'CSV'} />
                                 <FormatBadge format="Excel" active={file && formatLabel(file.name) === 'Excel'} />
                                 <FormatBadge format="PDF" active={file && formatLabel(file.name) === 'PDF'} />
+                                <FormatBadge format="Text" active={file && formatLabel(file.name) === 'Text'} />
                             </div>
 
                             {/* Drop zone */}
@@ -459,7 +500,7 @@ export default function Settlement() {
                                         </div>
                                         <div>
                                             <p className="text-white font-medium">Drop your file here or click to browse</p>
-                                            <p className="text-sm text-gray-500 mt-1">CSV, Excel (.xlsx), or PDF files up to 10MB</p>
+                                            <p className="text-sm text-gray-500 mt-1">CSV, Excel (.xlsx), PDF, or Text (.txt) files up to 10MB</p>
                                         </div>
                                     </div>
                                 )}
@@ -538,14 +579,79 @@ export default function Settlement() {
             {/* Stage: Report */}
             {stage === 'report' && report && (
                 <div className="space-y-6">
-                    {/* Back button */}
-                    <button
-                        onClick={handleReset}
-                        className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm"
-                    >
-                        <ArrowLeft size={16} />
-                        Upload another statement
-                    </button>
+                    {/* Back + Rerun buttons */}
+                    <div className="flex items-center justify-between">
+                        <button
+                            onClick={handleReset}
+                            className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm"
+                        >
+                            <ArrowLeft size={16} />
+                            Upload another statement
+                        </button>
+                        <button
+                            onClick={handleRerun}
+                            disabled={rerunning}
+                            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white text-sm font-medium rounded-lg transition-all disabled:opacity-50"
+                        >
+                            <RefreshCw size={14} className={rerunning ? 'animate-spin' : ''} />
+                            {rerunning ? 'Re-analyzing...' : 'Rerun Analysis'}
+                        </button>
+                    </div>
+
+                    {/* Before/After Comparison (shown after rerun) */}
+                    {previousReport && (
+                        <div className="bg-slate-800/40 rounded-2xl p-5 border border-slate-700">
+                            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Before → After Rerun</h3>
+                            <div className="grid grid-cols-3 gap-4 text-center">
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-1">Matched</p>
+                                    <div className="flex items-center justify-center gap-2">
+                                        <span className="text-lg font-bold text-gray-500">{previousReport.matched_count}</span>
+                                        <ArrowRight size={14} className="text-gray-600" />
+                                        <span className={`text-lg font-bold ${
+                                            report.matched_count > previousReport.matched_count ? 'text-emerald-400' : 'text-white'
+                                        }`}>{report.matched_count}</span>
+                                        {report.matched_count > previousReport.matched_count && (
+                                            <span className="text-xs text-emerald-400 font-medium">+{report.matched_count - previousReport.matched_count}</span>
+                                        )}
+                                    </div>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-1">Missing</p>
+                                    <div className="flex items-center justify-center gap-2">
+                                        <span className="text-lg font-bold text-gray-500">{previousReport.missing_count}</span>
+                                        <ArrowRight size={14} className="text-gray-600" />
+                                        <span className={`text-lg font-bold ${
+                                            report.missing_count < previousReport.missing_count ? 'text-emerald-400' : 'text-white'
+                                        }`}>{report.missing_count}</span>
+                                        {report.missing_count < previousReport.missing_count && (
+                                            <span className="text-xs text-emerald-400 font-medium">{report.missing_count - previousReport.missing_count}</span>
+                                        )}
+                                    </div>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-1">Reconciled</p>
+                                    <div className="flex items-center justify-center gap-2">
+                                        <span className="text-lg font-bold text-gray-500">
+                                            {previousReport.total_bank_transactions > 0 ? Math.round((previousReport.matched_count / previousReport.total_bank_transactions) * 100) : 0}%
+                                        </span>
+                                        <ArrowRight size={14} className="text-gray-600" />
+                                        <span className={`text-lg font-bold ${
+                                            report.matched_count > previousReport.matched_count ? 'text-emerald-400' : 'text-white'
+                                        }`}>
+                                            {report.total_bank_transactions > 0 ? Math.round((report.matched_count / report.total_bank_transactions) * 100) : 0}%
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setPreviousReport(null)}
+                                className="mt-3 text-xs text-gray-500 hover:text-gray-300 transition"
+                            >
+                                Dismiss comparison
+                            </button>
+                        </div>
+                    )}
 
                     {/* Summary Cards */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
