@@ -169,9 +169,11 @@ def _detect_amount(value: str) -> Optional[float]:
         return None
 
 
-def _identify_columns(headers: List[str]) -> Dict[str, int]:
+def _identify_columns(headers: List[str], data_rows: List[List[str]] = None) -> Dict[str, int]:
     """
     Heuristically identify which columns contain date, amount, and description.
+    If keyword-based detection fails and data_rows are provided, falls back to
+    sampling actual cell values to infer column types.
     Returns a mapping of {field_name: column_index}.
     """
     headers_lower = [h.lower().strip() for h in headers]
@@ -211,14 +213,127 @@ def _identify_columns(headers: List[str]) -> Dict[str, int]:
             mapping['description'] = i
             break
 
-    # Fallback: if description not found, use the widest text column
+    # --- Fallback: infer from data when keyword detection is incomplete ---
+    needs_amount = 'amount' not in mapping and 'debit' not in mapping and 'credit' not in mapping
+    needs_date = 'date' not in mapping
+
+    if (needs_amount or needs_date) and data_rows:
+        mapping = _infer_columns_from_data(data_rows, mapping)
+
+    # Fallback: if description not found, use the longest text column
     if 'description' not in mapping and len(headers) >= 3:
-        # Skip columns already assigned
         used = set(mapping.values())
-        for i in range(len(headers)):
-            if i not in used:
-                mapping['description'] = i
-                break
+        if data_rows:
+            # Pick the column with the longest average text (likely description)
+            best_col = None
+            best_avg_len = 0
+            for i in range(len(headers)):
+                if i in used:
+                    continue
+                total_len = 0
+                count = 0
+                for row in data_rows[:15]:
+                    if i < len(row) and row[i].strip():
+                        val = row[i].strip()
+                        # Skip if it looks like a date or number
+                        if _detect_date(val) or _detect_amount(val) is not None:
+                            continue
+                        total_len += len(val)
+                        count += 1
+                avg_len = total_len / max(count, 1)
+                if avg_len > best_avg_len:
+                    best_avg_len = avg_len
+                    best_col = i
+            if best_col is not None:
+                mapping['description'] = best_col
+        else:
+            for i in range(len(headers)):
+                if i not in used:
+                    mapping['description'] = i
+                    break
+
+    return mapping
+
+
+def _infer_columns_from_data(data_rows: List[List[str]], existing_map: Dict[str, int]) -> Dict[str, int]:
+    """
+    When header keywords fail (generic 'Column 1', 'Column 2'...), sample actual
+    data rows to infer which columns are dates, amounts, and descriptions.
+    """
+    mapping = dict(existing_map)
+    if not data_rows:
+        return mapping
+
+    sample = data_rows[:15]  # Sample up to 15 rows
+    num_cols = max(len(row) for row in sample) if sample else 0
+
+    # Score each column for date-ness and amount-ness
+    date_scores = [0] * num_cols
+    amount_scores = [0] * num_cols
+    text_scores = [0] * num_cols
+    row_count = len(sample)
+
+    for row in sample:
+        for col_idx in range(min(len(row), num_cols)):
+            val = row[col_idx].strip()
+            if not val:
+                continue
+
+            if _detect_date(val):
+                date_scores[col_idx] += 1
+            elif _detect_amount(val) is not None:
+                amount_scores[col_idx] += 1
+            else:
+                text_scores[col_idx] += 1
+
+    used = set(mapping.values())
+    threshold = max(row_count * 0.4, 2)  # At least 40% of rows or 2 matches
+
+    # Assign date column (highest date score above threshold)
+    if 'date' not in mapping:
+        best_date_col = None
+        best_date_score = 0
+        for i in range(num_cols):
+            if i in used:
+                continue
+            if date_scores[i] >= threshold and date_scores[i] > best_date_score:
+                best_date_score = date_scores[i]
+                best_date_col = i
+        if best_date_col is not None:
+            mapping['date'] = best_date_col
+            used.add(best_date_col)
+
+    # Assign amount column(s)
+    if 'amount' not in mapping and 'debit' not in mapping and 'credit' not in mapping:
+        # Collect all columns that look like amounts
+        amount_cols = []
+        for i in range(num_cols):
+            if i in used:
+                continue
+            if amount_scores[i] >= threshold:
+                amount_cols.append((i, amount_scores[i]))
+
+        amount_cols.sort(key=lambda x: x[1], reverse=True)
+
+        if len(amount_cols) == 1:
+            # Single amount column (signed: positive = credit, negative = debit)
+            mapping['amount'] = amount_cols[0][0]
+            used.add(amount_cols[0][0])
+        elif len(amount_cols) >= 2:
+            # Two amount columns — likely debit/credit split
+            # Check which one has more negative or which tends to be the first
+            col_a, col_b = amount_cols[0][0], amount_cols[1][0]
+
+            # Heuristic: in split format, one column has values and the other is empty
+            # The column that appears first is usually debit
+            if col_a < col_b:
+                mapping['debit'] = col_a
+                mapping['credit'] = col_b
+            else:
+                mapping['debit'] = col_b
+                mapping['credit'] = col_a
+            used.add(col_a)
+            used.add(col_b)
 
     return mapping
 
@@ -361,7 +476,7 @@ def parse_csv(file_content: bytes, filename: str) -> tuple:
     if not header_row:
         raise ValueError("Could not detect headers in CSV file")
 
-    col_map = _identify_columns(header_row)
+    col_map = _identify_columns(header_row, data_rows)
 
     if 'date' not in col_map:
         warnings.append("Could not identify a date column from headers — will attempt per-row detection")
@@ -426,7 +541,7 @@ def parse_excel(file_content: bytes, filename: str) -> tuple:
     if not header_row:
         raise ValueError("Could not detect headers in Excel file")
 
-    col_map = _identify_columns(header_row)
+    col_map = _identify_columns(header_row, data_rows)
 
     if 'amount' not in col_map and 'debit' not in col_map and 'credit' not in col_map:
         raise ValueError(
@@ -494,7 +609,7 @@ def parse_pdf(file_content: bytes, filename: str) -> tuple:
     if not all_rows:
         raise ValueError("No data rows found in PDF tables")
 
-    col_map = _identify_columns(header_row)
+    col_map = _identify_columns(header_row, all_rows)
 
     if 'amount' not in col_map and 'debit' not in col_map and 'credit' not in col_map:
         raise ValueError(
