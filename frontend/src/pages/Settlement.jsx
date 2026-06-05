@@ -855,9 +855,23 @@ export default function Settlement() {
                             )}
 
                             {/* Batch action bar */}
-                            {reportTab === 'missing' && unloggedCount > 0 && !isAllAccounts && (
-                                <div className="flex items-center gap-3">
-                                {selectedIndices.size > 0 && (
+                            {reportTab === 'missing' && unloggedCount > 0 && selectedIndices.size > 0 && (
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => {
+                                            setDismissedIds(prev => {
+                                                const next = new Set(prev);
+                                                selectedIndices.forEach(idx => next.add(idx));
+                                                return next;
+                                            });
+                                            setSelectedIndices(new Set());
+                                        }}
+                                        className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-red-600/80 text-gray-300 hover:text-white font-medium text-sm rounded-lg transition-all active:scale-95"
+                                    >
+                                        <Trash2 size={14} />
+                                        Dismiss ({selectedIndices.size})
+                                    </button>
+                                    {!isAllAccounts && (
                                     <button
                                         id="settlement-log-selected-btn"
                                         onClick={handleLogBatch}
@@ -876,7 +890,7 @@ export default function Settlement() {
                                             </>
                                         )}
                                     </button>
-                                )}
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -914,7 +928,6 @@ export default function Settlement() {
                                     <table className="w-full">
                                         <thead className="bg-slate-900/50 sticky top-0">
                                             <tr className="text-xs text-gray-500 uppercase">
-                                                {!isAllAccounts && (
                                                 <th className="text-left px-4 py-3 w-10">
                                                     <input
                                                         type="checkbox"
@@ -923,7 +936,6 @@ export default function Settlement() {
                                                         className="rounded border-slate-600 bg-slate-700 text-cyan-500 focus:ring-cyan-500"
                                                     />
                                                 </th>
-                                                )}
                                                 <th
                                                     className="text-left px-4 py-3 cursor-pointer hover:text-gray-300 select-none"
                                                     onClick={() => toggleSort('date')}
@@ -962,7 +974,6 @@ export default function Settlement() {
                                                                     : 'hover:bg-slate-700/30'
                                                         }`}
                                                     >
-                                                        {!isAllAccounts && (
                                                         <td className="px-4 py-3">
                                                             {isLogged ? (
                                                                 <Check size={16} className="text-emerald-400" />
@@ -975,7 +986,6 @@ export default function Settlement() {
                                                                 />
                                                             )}
                                                         </td>
-                                                        )}
                                                         <td className="px-4 py-3 text-sm text-gray-300 font-mono whitespace-nowrap">
                                                             {formatDate(tx.date)}
                                                         </td>
