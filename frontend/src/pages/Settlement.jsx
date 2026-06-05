@@ -337,14 +337,15 @@ export default function Settlement() {
 
     // === Selection ===
     const toggleSelectAll = () => {
-        const unloggedIndices = report.missing_transactions
+        // Only select items currently visible (after filter + dismiss)
+        const visibleUnlogged = sortedMissing
             .filter(tx => !loggedIds.has(tx.index))
             .map(tx => tx.index);
 
-        if (selectedIndices.size === unloggedIndices.length) {
+        if (selectedIndices.size === visibleUnlogged.length && visibleUnlogged.length > 0) {
             setSelectedIndices(new Set());
         } else {
-            setSelectedIndices(new Set(unloggedIndices));
+            setSelectedIndices(new Set(visibleUnlogged));
         }
     };
 
@@ -364,6 +365,9 @@ export default function Settlement() {
     const unloggedCount = report
         ? report.missing_transactions.filter(tx => !loggedIds.has(tx.index) && !dismissedIds.has(tx.index)).length
         : 0;
+
+    // Count of unlogged items currently visible (respects filter)
+    const visibleUnloggedCount = sortedMissing.filter(tx => !loggedIds.has(tx.index)).length;
 
     // === Dismiss ===
     const handleDismiss = (index) => {
@@ -931,7 +935,7 @@ export default function Settlement() {
                                                 <th className="text-left px-4 py-3 w-10">
                                                     <input
                                                         type="checkbox"
-                                                        checked={selectedIndices.size > 0 && selectedIndices.size === unloggedCount}
+                                                        checked={selectedIndices.size > 0 && selectedIndices.size === visibleUnloggedCount}
                                                         onChange={toggleSelectAll}
                                                         className="rounded border-slate-600 bg-slate-700 text-cyan-500 focus:ring-cyan-500"
                                                     />
