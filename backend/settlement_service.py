@@ -650,7 +650,7 @@ def parse_file(file_content: bytes, filename: str) -> tuple:
 def match_transactions(
     bank_transactions: List[ParsedTransaction],
     system_transactions: list,
-    date_tolerance_days: int = 1
+    date_tolerance_days: int = 3
 ) -> tuple:
     """
     Compare bank transactions against system transactions.
