@@ -790,7 +790,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except: pass
         if 'db' in locals(): db.close()
 
-async def _create_transaction_logic(db, result, source_account, source_credit_card, msg_text, reply_target=None, source="telegram"):
+async def _create_transaction_logic(db, result, source_account, source_credit_card, msg_text, reply_target=None, source="telegram", user_id=None):
     # --- DUPLICATE GUARD: Prevent the same SMS from creating multiple transactions ---
     # Check by raw_sms_content (normalized match) OR by account+amount+merchant
     from datetime import timedelta
@@ -1117,7 +1117,8 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
             type=tx_type_str,
             status="pending_action",
             fees=result.get('fees', 0.0),
-            source=source  # Track transaction source
+            source=source,  # Track transaction source
+            user_id=user_id,
         )
         
         tx = crud.create_transaction(db, transaction_data)
@@ -1273,6 +1274,7 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
         merchant_id=counterparty_merchant_id,
         beneficiary_id=counterparty_beneficiary_id,
         biller_id=counterparty_biller_id,
+        user_id=user_id,
     )
     
     tx = crud.create_transaction(db, transaction_data)
@@ -1305,7 +1307,8 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
                     type="debit",
                     status="completed",
                     fees=0.0,
-                    source=source
+                    source=source,
+                    user_id=user_id,
                 )
                 debit_tx = crud.create_transaction(db, debit_data)
                 logger.info(f"Auto-created debit transaction {debit_tx.id} on Expense account")

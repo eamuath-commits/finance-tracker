@@ -430,6 +430,7 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate):
         merchant_id=getattr(transaction, 'merchant_id', None),
         beneficiary_id=getattr(transaction, 'beneficiary_id', None),
         biller_id=getattr(transaction, 'biller_id', None),
+        user_id=getattr(transaction, 'user_id', None),
     )
     db.add(db_transaction)
 

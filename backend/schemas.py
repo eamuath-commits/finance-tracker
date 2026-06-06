@@ -211,6 +211,7 @@ class TransactionCreate(TransactionBase):
     merchant_id: Optional[str] = None
     beneficiary_id: Optional[str] = None
     biller_id: Optional[str] = None
+    user_id: Optional[str] = None  # Owner of the transaction
 
 class TransactionUpdate(BaseModel):
     account_id: Optional[str] = None

@@ -98,6 +98,10 @@ async def receive_sms(
         db.add(raw_msg)
         db.commit()
         db.refresh(raw_msg)
+
+        # Default user: admin (will be overridden when account is matched)
+        default_user = db.query(models.User).filter(models.User.username == "admin").first()
+        resolved_user_id = default_user.id if default_user else None
         
         # Use bank-specific parser based on sender
         from bank_parsers import get_parser
@@ -159,10 +163,21 @@ async def receive_sms(
                 if not source_credit_card:
                     source_account = crud.get_account_by_last_4(db, source_last4)
         
+        # Resolve user_id from matched account/card owner
+        if source_credit_card and hasattr(source_credit_card, 'user_id') and source_credit_card.user_id:
+            resolved_user_id = source_credit_card.user_id
+        elif source_account and hasattr(source_account, 'user_id') and source_account.user_id:
+            resolved_user_id = source_account.user_id
+        
+        # Tag the raw message with the resolved user
+        raw_msg.user_id = resolved_user_id
+        db.commit()
+        
         if not source_account and not source_credit_card:
-            # Account not found - create pending transaction
+            # Account not found - tag with default user and mark pending
             raw_msg.status = models.MessageStatus.PENDING
             raw_msg.error_log = "Account not found - needs manual assignment"
+            raw_msg.user_id = resolved_user_id
             db.commit()
             return SMSWebhookResponse(
                 status="pending",
@@ -173,7 +188,8 @@ async def receive_sms(
         # Create transaction using existing logic
         await sms_agent._create_transaction_logic(
             db, result, source_account, source_credit_card, 
-            request.message, reply_target=None, source="webhook"
+            request.message, reply_target=None, source="webhook",
+            user_id=resolved_user_id
         )
         
         raw_msg.status = models.MessageStatus.PARSED
