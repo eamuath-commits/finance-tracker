@@ -88,49 +88,38 @@ def upgrade() -> None:
             op.create_foreign_key(fk, tbl, 'users', ['user_id'], ['id'])
 
     # === 4. Fix unique constraints for multi-user ===
+    # Helper: drop index/constraint only if they exist (avoids PG transaction abort)
+    def _drop_index_if_exists(name, table):
+        if _exists(conn, "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = :n)", n=name):
+            op.drop_index(name, table_name=table)
+
+    def _drop_constraint_if_exists(name, table):
+        if _exists(conn, "SELECT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = :n AND table_name = :t)", n=name, t=table):
+            op.drop_constraint(name, table, type_='unique')
+
     # accounts.last_4_digits
-    for idx in ['ix_accounts_last_4_digits']:
-        try:
-            op.drop_index(idx, table_name='accounts')
-        except Exception:
-            pass
-    for con in ['accounts_last_4_digits_key']:
-        try:
-            op.drop_constraint(con, 'accounts', type_='unique')
-        except Exception:
-            pass
+    _drop_index_if_exists('ix_accounts_last_4_digits', 'accounts')
+    _drop_constraint_if_exists('accounts_last_4_digits_key', 'accounts')
     if not _exists(conn, "SELECT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = :n)", n='uq_account_user_last4'):
         op.create_unique_constraint('uq_account_user_last4', 'accounts', ['user_id', 'last_4_digits'])
     if not _exists(conn, "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = :n)", n='ix_accounts_last_4_digits'):
         op.create_index('ix_accounts_last_4_digits', 'accounts', ['last_4_digits'])
 
     # credit_cards.last_4_digits
-    for idx in ['ix_credit_cards_last_4_digits']:
-        try:
-            op.drop_index(idx, table_name='credit_cards')
-        except Exception:
-            pass
-    for con in ['credit_cards_last_4_digits_key']:
-        try:
-            op.drop_constraint(con, 'credit_cards', type_='unique')
-        except Exception:
-            pass
+    _drop_index_if_exists('ix_credit_cards_last_4_digits', 'credit_cards')
+    _drop_constraint_if_exists('credit_cards_last_4_digits_key', 'credit_cards')
     if not _exists(conn, "SELECT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = :n)", n='uq_cc_user_last4'):
         op.create_unique_constraint('uq_cc_user_last4', 'credit_cards', ['user_id', 'last_4_digits'])
     if not _exists(conn, "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = :n)", n='ix_credit_cards_last_4_digits'):
         op.create_index('ix_credit_cards_last_4_digits', 'credit_cards', ['last_4_digits'])
 
     # user_settings.key
-    for idx in ['ix_user_settings_key']:
-        try:
-            op.drop_index(idx, table_name='user_settings')
-        except Exception:
-            pass
-    for con in ['user_settings_key_key']:
-        try:
-            op.drop_constraint(con, 'user_settings', type_='unique')
-        except Exception:
-            pass
+    _drop_index_if_exists('ix_user_settings_key', 'user_settings')
+    _drop_constraint_if_exists('user_settings_key_key', 'user_settings')
+    if not _exists(conn, "SELECT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = :n)", n='uq_settings_user_key'):
+        op.create_unique_constraint('uq_settings_user_key', 'user_settings', ['user_id', 'key'])
+    if not _exists(conn, "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = :n)", n='ix_user_settings_key'):
+        op.create_index('ix_user_settings_key', 'user_settings', ['key'])
     if not _exists(conn, "SELECT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = :n)", n='uq_settings_user_key'):
         op.create_unique_constraint('uq_settings_user_key', 'user_settings', ['user_id', 'key'])
     if not _exists(conn, "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = :n)", n='ix_user_settings_key'):
