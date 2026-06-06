@@ -2150,57 +2150,8 @@ async def ingest_sms(payload: schemas.SMSIngest, background_tasks: BackgroundTas
     if queue_status["blocked"] > 0:
         logger.info(f"[SMS-INGEST] Note: {queue_status['blocked']} pending transactions exist, but continuing to process")
     
-    # 0c. DUPLICATE CHECK: Skip if same SMS body already processed
-    # Extract meaningful lines for matching (skip timestamp/sender headers)
-    body_lines = payload.body.strip().split('\n')
-    core_lines = []
-    amount_line = None
-    
-    for line in body_lines:
-        line_lower = line.lower().strip()
-        line_stripped = line.strip()
-        
-        # Skip header lines like "2026-01-25 17:05:01 from AlRajhiBank"
-        if ' from ' in line_lower and ('bank' in line_lower or 'alrajhi' in line_lower or 'stc' in line_lower):
-            continue
-        
-        # Capture amount line specifically (contains "amount" or numeric value with currency)
-        if 'amount' in line_lower and amount_line is None:
-            amount_line = line_stripped
-        
-        if line_stripped:
-            core_lines.append(line_stripped)
-    
-    # Use first line + amount line for duplicate check (unique combination)
-    if len(core_lines) >= 1:
-        search_line1 = core_lines[0][:50]  # First content line (e.g., "Credit Card:Payment")
-        
-        # Build query conditions
-        query = db.query(models.Transaction).filter(
-            models.Transaction.raw_sms_content.ilike(f"%{search_line1}%")
-        )
-        
-        # Add amount line if found (makes the check more specific)
-        if amount_line:
-            query = query.filter(
-                models.Transaction.raw_sms_content.ilike(f"%{amount_line[:40]}%")
-            )
-        
-        existing_tx = query.first()
-        if existing_tx:
-            logger.info(f"[SMS-INGEST] Duplicate SMS detected, already processed as transaction {existing_tx.id}")
-            return {
-                "status": "duplicate",
-                "reason": "This SMS has already been processed",
-                "transaction_id": existing_tx.id,
-                "transaction": {
-                    "id": existing_tx.id,
-                    "merchant": existing_tx.merchant,
-                    "amount": existing_tx.amount,
-                    "type": str(existing_tx.type),
-                    "status": str(existing_tx.status)
-                }
-            }
+    # 0c. DUPLICATE CHECK: Handled in _create_transaction_logic with proper fragment matching.
+    # (Early check removed — it used generic lines like "PoS" causing false positives)
     
     # 1. Create Raw Message record (will be deleted if not a transaction)
     raw_msg = models.RawMessage(

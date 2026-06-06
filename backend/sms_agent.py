@@ -798,38 +798,56 @@ async def _create_transaction_logic(db, result, source_account, source_credit_ca
     _dup_logger = _dup_logging.getLogger(__name__)
     
     if msg_text and msg_text.strip():
-        # Strategy 1: Normalized SMS body match (catches re-sends of identical messages)
-        # Normalize: strip, collapse whitespace, compare case-insensitively
-        normalized_body = '\n'.join(line.strip() for line in msg_text.strip().splitlines() if line.strip())
+        # Strategy 1: Match by unique transaction-identifying fragments from the SMS
+        # We extract the SPECIFIC fields that differentiate one transaction from another:
+        # - Merchant line (At:XXX) — unique per transaction
+        # - Amount line (Amount:SAR X) — combined with merchant, highly specific
+        # - Date line (Date:XX/X/XX or standalone date pattern) — timestamps the transaction
+        # Generic lines like "PoS", "By:9365" appear in ALL transactions and are EXCLUDED.
+        import re as _dup_re
         
-        # Query all transactions and compare normalized bodies
-        # Use ILIKE with key content fragments for DB-level filtering first
         body_lines = [line.strip() for line in msg_text.strip().splitlines() if line.strip()]
-        # Skip header lines (date/time from BankName pattern)
-        content_lines = []
-        for line in body_lines:
-            line_lower = line.lower()
-            if ' from ' in line_lower and any(kw in line_lower for kw in ['bank', 'alrajhi', 'stc', 'alinma', 'albilad', 'anb']):
-                continue
-            if line:
-                content_lines.append(line)
         
-        if len(content_lines) >= 2:
-            # Use first content line + one more for a robust check
-            search_key1 = content_lines[0][:60]
-            search_key2 = content_lines[1][:60]
+        # Extract unique fragments
+        dup_fragments = []
+        for line in body_lines:
+            line_lower = line.lower().strip()
             
-            existing_by_body = db.query(models.Transaction).filter(
-                models.Transaction.raw_sms_content.ilike(f"%{search_key1}%"),
-                models.Transaction.raw_sms_content.ilike(f"%{search_key2}%"),
+            # Skip generic/shared lines
+            if line_lower in ['pos', 'pos international', 'purchase']:
+                continue
+            if line_lower.startswith('by:'):
+                continue  # Card number — same across all transactions from this card
+            if ' from ' in line_lower and any(kw in line_lower for kw in ['bank', 'alrajhi', 'stc', 'alinma', 'albilad', 'anb']):
+                continue  # Header line
+            if line_lower.startswith('country:'):
+                continue  # Country is shared across many transactions
+            
+            # Keep: Amount, Merchant (At:), Date, and other unique content
+            if line.strip():
+                dup_fragments.append(line.strip())
+        
+        # Only check if we have enough unique fragments (at least 3: amount + merchant + date)
+        if len(dup_fragments) >= 3:
+            dup_query = db.query(models.Transaction).filter(
                 models.Transaction.status.in_(["completed", "pending_transfer", "pending_action"])
-            ).first()
+            )
+            
+            # ALL fragments must be present in the stored SMS
+            for frag in dup_fragments:
+                # Use the full fragment for precise matching
+                safe_frag = frag[:80]
+                dup_query = dup_query.filter(
+                    models.Transaction.raw_sms_content.ilike(f"%{safe_frag}%")
+                )
+            
+            existing_by_body = dup_query.first()
             
             if existing_by_body:
                 _dup_logger.warning(
                     f"[DUPLICATE] Blocked duplicate transaction — SMS content match "
                     f"(existing tx={existing_by_body.id}, merchant={existing_by_body.merchant}, "
-                    f"amount={existing_by_body.amount})"
+                    f"amount={existing_by_body.amount}, fragments={dup_fragments})"
                 )
                 raise ValueError(
                     f"Duplicate transaction detected: this SMS was already processed "
