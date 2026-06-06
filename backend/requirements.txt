@@ -13,3 +13,5 @@ beautifulsoup4
 python-multipart
 openpyxl
 pdfplumber
+pyjwt
+passlib[bcrypt]

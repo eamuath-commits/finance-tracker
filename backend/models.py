@@ -1,10 +1,24 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Date, Enum, Text, Boolean, JSON
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Date, Enum, Text, Boolean, JSON, UniqueConstraint
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 import enum
 from datetime import datetime
 from database import Base
+
+
+class User(Base):
+    """User profile for multi-tenant authentication"""
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    username = Column(String, unique=True, index=True, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=True)
+    hashed_password = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True)
+    telegram_user_id = Column(String, unique=True, index=True, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 
 class AccountType(enum.Enum):
     CHECKING = "Checking"
@@ -16,12 +30,13 @@ class Account(Base):
     __tablename__ = "accounts"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)
     name = Column(String, nullable=False)
     account_type = Column(Enum(AccountType), nullable=False)
     first_4_digits = Column(String, nullable=True) # Optional for verification
     bank_name = Column(String, nullable=True) # User requested mandatory for new, but keep nullable for legacy/migration safety
     bank_logo_url = Column(String, nullable=True)
-    last_4_digits = Column(String, unique=True, index=True) # Critical for SMS matching
+    last_4_digits = Column(String, index=True) # Critical for SMS matching (unique per user via __table_args__)
     current_balance = Column(Float, default=0.0)
     notes = Column(Text, nullable=True)
     credit_limit = Column(Float, nullable=True) 
@@ -29,7 +44,10 @@ class Account(Base):
     minimum_payment = Column(Float, nullable=True) # Minimum monthly payment
     is_income = Column(Boolean, default=False)
     last_successful_audit_date = Column(DateTime, nullable=True)
-    
+
+    __table_args__ = (UniqueConstraint('user_id', 'last_4_digits', name='uq_account_user_last4'),)
+
+    user = relationship("User", backref="accounts")
     transactions = relationship("Transaction", back_populates="account")
     aliases = relationship("AccountAlias", back_populates="account", cascade="all, delete-orphan")
     audits = relationship("AccountAudit", back_populates="account", cascade="all, delete-orphan")
@@ -40,10 +58,11 @@ class CreditCard(Base):
     __tablename__ = "credit_cards"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)
     name = Column(String, nullable=False)           # e.g., "Riyad Bank Visa"
     bank_name = Column(String, nullable=True)
     bank_logo_url = Column(String, nullable=True)
-    last_4_digits = Column(String, unique=True, index=True)  # For SMS matching
+    last_4_digits = Column(String, index=True)  # For SMS matching (unique per user via __table_args__)
     
     # Balance & Limits
     current_balance = Column(Float, default=0.0)    # What you owe (positive = debt)
@@ -60,8 +79,11 @@ class CreditCard(Base):
     # Metadata
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+
+    __table_args__ = (UniqueConstraint('user_id', 'last_4_digits', name='uq_cc_user_last4'),)
+
     # Relationships
+    user = relationship("User", backref="credit_cards")
     transactions = relationship("Transaction", back_populates="credit_card")
     
     @property
@@ -135,6 +157,7 @@ class Beneficiary(Base):
     __tablename__ = "beneficiaries"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)
     name = Column(String, nullable=False)                # Full name from SMS
     display_name = Column(String, nullable=True)         # Nickname e.g. "Dad"
     bank_name = Column(String, nullable=True)            # e.g. "AlRajhi"
@@ -167,6 +190,7 @@ class Transaction(Base):
     __tablename__ = "transactions"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)
     account_id = Column(String, ForeignKey("accounts.id"), nullable=True)  # Nullable for CC transactions
     credit_card_id = Column(String, ForeignKey("credit_cards.id"), nullable=True)  # NEW: For credit card transactions
     amount = Column(Float, nullable=False)
@@ -205,6 +229,7 @@ class Loan(Base):
     __tablename__ = "loans"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)
     name = Column(String, nullable=False)
     principal_amount = Column(Float, nullable=False)
     interest_rate = Column(Float, nullable=False) # Annual percentage
@@ -220,6 +245,7 @@ class MonthlyObligation(Base):
     __tablename__ = "obligations"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)
     name = Column(String, nullable=False)
     amount = Column(Float, nullable=True) # User requested optional amount
     due_day = Column(Integer, nullable=False) # e.g. 1 for 1st of month
@@ -242,6 +268,7 @@ class Payment(Base):
     __tablename__ = "payments"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)
     obligation_id = Column(String, ForeignKey("obligations.id"))
     amount = Column(Float)
     planned_amount = Column(Float, nullable=True) # Snapshot of budget at time of payment creation
@@ -265,6 +292,7 @@ class RawMessage(Base):
     __tablename__ = "raw_messages"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)
     sender = Column(String, nullable=True)
     body = Column(Text, nullable=False)
     timestamp = Column(DateTime, default=datetime.now)
@@ -282,6 +310,7 @@ class SavingsGoal(Base):
     __tablename__ = "savings_goals"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)
     name = Column(String, nullable=False)
     target_amount = Column(Float, nullable=False)
     current_amount = Column(Float, default=0.0)
@@ -301,6 +330,7 @@ class AllocationRule(Base):
     __tablename__ = "allocation_rules"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)
     rule_type = Column(String, nullable=False)  # 'CATEGORY' or 'LOAN'
     identifier = Column(String, nullable=False)  # Category name or Loan name
     target_account_id = Column(String, ForeignKey("accounts.id"), nullable=False)  # Target envelope account
@@ -309,6 +339,7 @@ class AllocationHistory(Base):
     __tablename__ = "allocation_history"
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)
     month = Column(String, nullable=False) # YYYY-MM
     income = Column(Float, default=0.0)
     needs_planned = Column(Float, default=0.0)
@@ -323,6 +354,7 @@ class Distribution(Base):
     __tablename__ = "distributions"
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)
     source_account_id = Column(String, ForeignKey("accounts.id"), nullable=False)
     target_account_id = Column(String, ForeignKey("accounts.id"), nullable=False)
     obligation_id = Column(String, ForeignKey("obligations.id"), nullable=True)  # Which obligation this transfer is for
@@ -398,7 +430,10 @@ class UserSettings(Base):
     __tablename__ = "user_settings"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    key = Column(String, nullable=False, unique=True, index=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)
+    key = Column(String, nullable=False, index=True)
     value = Column(String, nullable=False, default="")
     label = Column(String, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint('user_id', 'key', name='uq_settings_user_key'),)
