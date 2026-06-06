@@ -23,6 +23,9 @@ import queue_processor
 from rate_limiter import RateLimitMiddleware
 from webhook import router as webhook_router
 from settlement_service import router as settlement_router
+from auth_router import router as auth_router
+from auth_middleware import AuthMiddleware
+from auth import get_current_user
 
 # --- Migration Logic ---
 def run_migrations(engine):
@@ -197,6 +200,12 @@ app.add_middleware(
 
 # Rate limiting middleware (must be added after CORS)
 app.add_middleware(RateLimitMiddleware)
+
+# Auth middleware - enforces JWT on all non-public routes
+app.add_middleware(AuthMiddleware)
+
+# Include auth router (register, login, profile)
+app.include_router(auth_router)
 
 # Include webhook router for Cloudflare Tunnel SMS integration
 app.include_router(webhook_router)
