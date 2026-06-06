@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Wallet, CreditCard, Receipt, FileBarChart, Settings, TrendingDown, Layers, Tags, ClipboardCheck, Store, FileSearch } from 'lucide-react';
+import { LayoutDashboard, Wallet, CreditCard, Receipt, FileBarChart, Settings, TrendingDown, Layers, Tags, ClipboardCheck, Store, FileSearch, LogOut } from 'lucide-react';
+import { authUtils } from '../utils/api';
 
 const Sidebar = () => {
     const navItems = [
@@ -59,9 +60,20 @@ const Sidebar = () => {
                     <span className="font-medium">Settings</span>
                 </NavLink>
 
-                <div className="mt-4 px-4 py-2 bg-slate-800 rounded-lg">
-                    <p className="text-xs text-gray-500">Logged in as</p>
-                    <p className="text-sm font-medium text-white truncate">Muath AlAsiri</p>
+                <div className="mt-4 px-4 py-2 bg-slate-800 rounded-lg flex items-center justify-between">
+                    <div className="min-w-0">
+                        <p className="text-xs text-gray-500">Logged in as</p>
+                        <p className="text-sm font-medium text-white truncate">
+                            {authUtils.getUser()?.username || 'User'}
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => authUtils.logout()}
+                        className="ml-2 p-1.5 text-gray-400 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-colors flex-shrink-0"
+                        title="Logout"
+                    >
+                        <LogOut size={16} />
+                    </button>
                 </div>
             </div>
         </aside>

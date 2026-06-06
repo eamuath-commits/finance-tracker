@@ -1,7 +1,9 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
+import Login from './pages/Login';
+import Register from './pages/Register';
 
 import Obligations from './pages/Obligations';
 
@@ -19,11 +21,32 @@ import Audit from './pages/Audit';
 import Settings from './pages/Settings';
 import Settlement from './pages/Settlement';
 
+import { authUtils } from './utils/api';
+
+/**
+ * PrivateRoute wrapper — redirects to /login if not authenticated.
+ */
+const PrivateRoute = ({ children }) => {
+    return authUtils.isAuthenticated() ? children : <Navigate to="/login" replace />;
+};
+
 function App() {
     return (
         <Router>
             <Routes>
-                <Route path="/" element={<MainLayout />}>
+                {/* Public routes */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+
+                {/* Protected routes */}
+                <Route
+                    path="/"
+                    element={
+                        <PrivateRoute>
+                            <MainLayout />
+                        </PrivateRoute>
+                    }
+                >
                     <Route index element={<Dashboard />} />
                     <Route path="accounts" element={<Accounts />} />
                     <Route path="credit-cards" element={<CreditCards />} />
@@ -45,4 +68,3 @@ function App() {
 }
 
 export default App;
-
