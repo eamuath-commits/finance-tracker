@@ -2170,6 +2170,7 @@ async def ingest_sms(payload: schemas.SMSIngest, background_tasks: BackgroundTas
     body_for_parsing = payload.body
     
     # Check first line for header pattern
+    body_lines = payload.body.strip().split('\n')
     first_line = body_lines[0] if body_lines else ""
     import re
     header_match = re.search(r'^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+from\s+(.+)$', first_line.strip(), re.IGNORECASE)
