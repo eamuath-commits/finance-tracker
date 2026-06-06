@@ -16,7 +16,7 @@ class UserResponse(BaseModel):
     email: Optional[str] = None
     is_active: bool
     telegram_user_id: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
