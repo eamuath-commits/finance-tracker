@@ -22,8 +22,8 @@ import {
     Loader2,
     Search,
     Trash2,
-    Eye,
-    Zap
+    Copy,
+    ClipboardCheck
 } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || 'http://' + window.location.hostname + ':8000';
@@ -103,10 +103,10 @@ export default function Settlement() {
     const [previousReport, setPreviousReport] = useState(null);
     const [rerunning, setRerunning] = useState(false);
 
-    // Dismiss + Rerun state
+    // Dismiss + Collect SMS state
     const [dismissedIds, setDismissedIds] = useState(new Set());
-    const [rerunPreview, setRerunPreview] = useState(null); // { tx, preview, loading, confirming }
-    const [rerunLoadingIdx, setRerunLoadingIdx] = useState(null);
+    const [collectModal, setCollectModal] = useState(null); // { text, count, copied }
+
 
     // === Effects ===
     useEffect(() => {
@@ -379,57 +379,32 @@ export default function Settlement() {
         });
     };
 
-    // === SMS Rerun (AI parse preview) ===
-    const handleRerunPreview = async (tx) => {
-        setRerunLoadingIdx(tx.index);
-        setError(null);
+    // === Collect SMS (bulk copy raw text) ===
+    const handleCollectSms = () => {
+        const separator = '\n----------------------------------------------------\n';
+        const selected = sortedMissing.filter(tx => selectedIndices.has(tx.index));
+        const texts = selected.map(tx => (tx.raw_line || tx.description).trim());
+        const combined = texts.join(separator);
 
-        try {
-            const res = await axios.post(`${API}/settlement/parse-sms`, {
-                sms_text: tx.raw_line || tx.description,
-                account_id: isAllAccounts ? null : selectedAccountId
-            }, { timeout: 30000 });
-
-            setRerunPreview({
-                tx,
-                preview: res.data,
-                confirming: false
-            });
-        } catch (err) {
-            const detail = err.response?.data?.detail;
-            setError(`Rerun failed: ${typeof detail === 'string' ? detail : 'AI parsing error'}`);
-        } finally {
-            setRerunLoadingIdx(null);
-        }
+        setCollectModal({
+            text: combined,
+            count: texts.length,
+            copied: false
+        });
     };
 
-    const handleConfirmRerun = async () => {
-        if (!rerunPreview) return;
-        const { tx, preview } = rerunPreview;
-        setRerunPreview(prev => ({ ...prev, confirming: true }));
-
+    const handleCopyCollected = async () => {
+        if (!collectModal) return;
         try {
-            const accountId = preview.resolved_account_id || selectedAccountId;
-            await axios.post(`${API}/settlement/confirm-sms-ingest`, {
-                sms_text: tx.raw_line || tx.description,
-                account_id: accountId,
-                amount: preview.amount,
-                merchant: preview.merchant || preview.description,
-                description: preview.description,
-                category: preview.category,
-                transaction_type: preview.transaction_type,
-                timestamp: preview.timestamp
-            });
-
-            setLoggedIds(prev => new Set([...prev, tx.index]));
-            setRerunPreview(null);
-        } catch (err) {
-            setError(`Confirm failed: ${err.response?.data?.detail || err.message}`);
-            setRerunPreview(prev => ({ ...prev, confirming: false }));
+            await navigator.clipboard.writeText(collectModal.text);
+            setCollectModal(prev => ({ ...prev, copied: true }));
+            setTimeout(() => setCollectModal(prev => prev ? { ...prev, copied: false } : null), 2000);
+        } catch {
+            // Fallback: select the textarea
+            const el = document.getElementById('collect-sms-textarea');
+            if (el) { el.select(); document.execCommand('copy'); }
         }
     };
-
-    const handleCancelRerun = () => setRerunPreview(null);
 
     // === Reset ===
     const handleReset = () => {
@@ -438,8 +413,7 @@ export default function Settlement() {
         setReport(null);
         setPreviousReport(null);
         setDismissedIds(new Set());
-        setRerunPreview(null);
-        setRerunLoadingIdx(null);
+        setCollectModal(null);
         setSelectedIndices(new Set());
         setLoggedIds(new Set());
         setError(null);
@@ -875,6 +849,13 @@ export default function Settlement() {
                                         <Trash2 size={14} />
                                         Dismiss ({selectedIndices.size})
                                     </button>
+                                    <button
+                                        onClick={handleCollectSms}
+                                        className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-purple-600/80 text-gray-300 hover:text-white font-medium text-sm rounded-lg transition-all active:scale-95"
+                                    >
+                                        <Copy size={14} />
+                                        Collect SMS ({selectedIndices.size})
+                                    </button>
                                     {!isAllAccounts && (
                                     <button
                                         id="settlement-log-selected-btn"
@@ -1022,18 +1003,7 @@ export default function Settlement() {
                                                                     >
                                                                         <Trash2 size={12} />
                                                                     </button>
-                                                                    <button
-                                                                        onClick={() => handleRerunPreview(tx)}
-                                                                        disabled={rerunLoadingIdx === tx.index}
-                                                                        title="Rerun via AI"
-                                                                        className="p-1.5 bg-slate-700 hover:bg-purple-600/80 text-gray-400 hover:text-white rounded-md transition-all disabled:opacity-50"
-                                                                    >
-                                                                        {rerunLoadingIdx === tx.index ? (
-                                                                            <Loader2 size={12} className="animate-spin" />
-                                                                        ) : (
-                                                                            <Zap size={12} />
-                                                                        )}
-                                                                    </button>
+
                                                                     {!isAllAccounts && (
                                                                     <button
                                                                         onClick={() => handleLogSingle(tx)}
@@ -1125,108 +1095,61 @@ export default function Settlement() {
                     )}
                 </div>
             )}
-            {/* Rerun Preview Modal */}
-            {rerunPreview && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={handleCancelRerun}>
-                    <div className="bg-slate-800 rounded-2xl border border-slate-600 shadow-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {/* Collect SMS Modal */}
+            {collectModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setCollectModal(null)}>
+                    <div className="bg-slate-800 rounded-2xl border border-slate-600 shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
                         {/* Modal header */}
-                        <div className="flex items-center justify-between p-5 border-b border-slate-700">
+                        <div className="flex items-center justify-between p-5 border-b border-slate-700 shrink-0">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                                    <Zap size={20} className="text-purple-400" />
+                                    <Copy size={20} className="text-purple-400" />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold text-white">AI Parse Preview</h3>
-                                    <p className="text-xs text-gray-500">Review before confirming</p>
+                                    <h3 className="text-lg font-bold text-white">Collected SMS Messages</h3>
+                                    <p className="text-xs text-gray-500">{collectModal.count} message{collectModal.count !== 1 ? 's' : ''} — ready to copy</p>
                                 </div>
                             </div>
-                            <button onClick={handleCancelRerun} className="p-2 hover:bg-slate-700 rounded-lg transition">
+                            <button onClick={() => setCollectModal(null)} className="p-2 hover:bg-slate-700 rounded-lg transition">
                                 <X size={18} className="text-gray-400" />
                             </button>
                         </div>
 
-                        {/* Original SMS */}
-                        <div className="p-5 border-b border-slate-700">
-                            <p className="text-xs text-gray-500 uppercase font-medium mb-2">Original SMS Text</p>
-                            <div className="bg-slate-900/60 rounded-xl p-3 text-sm text-gray-300 font-mono leading-relaxed whitespace-pre-wrap break-all">
-                                {rerunPreview.tx.raw_line || rerunPreview.tx.description}
-                            </div>
-                        </div>
-
-                        {/* Parsed result */}
-                        <div className="p-5 space-y-3">
-                            <p className="text-xs text-gray-500 uppercase font-medium mb-2">AI-Parsed Result</p>
-
-                            {!rerunPreview.preview.is_transaction && (
-                                <div className="flex items-start gap-2 p-3 bg-amber-500/10 rounded-xl border border-amber-500/20">
-                                    <AlertTriangle size={14} className="text-amber-400 mt-0.5 shrink-0" />
-                                    <span className="text-sm text-amber-400">AI determined this is not a transaction</span>
-                                </div>
-                            )}
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-slate-900/40 rounded-xl p-3">
-                                    <p className="text-[10px] text-gray-500 uppercase mb-1">Amount</p>
-                                    <p className={`text-xl font-bold font-mono ${rerunPreview.preview.transaction_type === 'credit' ? 'text-emerald-400' : 'text-red-400'}`}>
-                                        {rerunPreview.preview.transaction_type === 'credit' ? '+' : '-'}{formatCurrency(rerunPreview.preview.amount)}
-                                    </p>
-                                </div>
-                                <div className="bg-slate-900/40 rounded-xl p-3">
-                                    <p className="text-[10px] text-gray-500 uppercase mb-1">Type</p>
-                                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-bold uppercase border ${
-                                        rerunPreview.preview.transaction_type === 'credit'
-                                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                            : 'bg-red-500/10 text-red-400 border-red-500/20'
-                                    }`}>
-                                        {rerunPreview.preview.transaction_type}
-                                    </span>
-                                    {rerunPreview.preview.sub_type && (
-                                        <span className="ml-2 text-xs text-gray-500">{rerunPreview.preview.sub_type}</span>
-                                    )}
-                                </div>
-                            </div>
-
-                            {[
-                                { label: 'Merchant', value: rerunPreview.preview.merchant },
-                                { label: 'Brand', value: rerunPreview.preview.brand_name },
-                                { label: 'Description', value: rerunPreview.preview.description },
-                                { label: 'Category', value: rerunPreview.preview.category },
-                                { label: 'Date/Time', value: rerunPreview.preview.timestamp },
-                                { label: 'Source Bank', value: rerunPreview.preview.source_bank },
-                                { label: 'Source Account', value: rerunPreview.preview.source_account_last4 ? `•${rerunPreview.preview.source_account_last4}` : null },
-                                { label: 'Dest Account', value: rerunPreview.preview.destination_account_last4 ? `•${rerunPreview.preview.destination_account_last4}` : null },
-                                { label: 'Beneficiary', value: rerunPreview.preview.beneficiary },
-                                { label: 'Matched Account', value: rerunPreview.preview.resolved_account_name },
-                            ].filter(f => f.value).map((field, i) => (
-                                <div key={i} className="flex items-center justify-between py-1.5 px-1 border-b border-slate-700/30 last:border-0">
-                                    <span className="text-xs text-gray-500">{field.label}</span>
-                                    <span className="text-sm text-white font-medium">{field.value}</span>
-                                </div>
-                            ))}
+                        {/* Text area */}
+                        <div className="p-5 flex-1 overflow-hidden">
+                            <textarea
+                                id="collect-sms-textarea"
+                                readOnly
+                                value={collectModal.text}
+                                className="w-full h-[50vh] bg-slate-900/60 border border-slate-700 rounded-xl p-4 text-sm text-gray-300 font-mono leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                            />
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center gap-3 p-5 border-t border-slate-700">
+                        <div className="flex items-center gap-3 p-5 border-t border-slate-700 shrink-0">
                             <button
-                                onClick={handleCancelRerun}
+                                onClick={() => setCollectModal(null)}
                                 className="flex-1 py-2.5 px-4 bg-slate-700 hover:bg-slate-600 text-gray-300 font-medium rounded-xl transition-all text-sm"
                             >
-                                Cancel
+                                Close
                             </button>
                             <button
-                                onClick={handleConfirmRerun}
-                                disabled={rerunPreview.confirming || !rerunPreview.preview.is_transaction || (!rerunPreview.preview.resolved_account_id && isAllAccounts)}
-                                className="flex-1 py-2.5 px-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold rounded-xl shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
+                                onClick={handleCopyCollected}
+                                className={`flex-1 py-2.5 px-4 font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-sm ${
+                                    collectModal.copied
+                                        ? 'bg-emerald-600 text-white'
+                                        : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white'
+                                }`}
                             >
-                                {rerunPreview.confirming ? (
+                                {collectModal.copied ? (
                                     <>
-                                        <Loader2 size={14} className="animate-spin" />
-                                        Logging...
+                                        <ClipboardCheck size={14} />
+                                        Copied!
                                     </>
                                 ) : (
                                     <>
-                                        <Check size={14} />
-                                        Confirm & Log
+                                        <Copy size={14} />
+                                        Copy to Clipboard
                                     </>
                                 )}
                             </button>
