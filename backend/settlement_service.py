@@ -37,11 +37,21 @@ router = APIRouter(prefix="/settlement", tags=["Settlement"])
 
 class ParsedTransaction(BaseModel):
     """A single transaction extracted from the uploaded bank statement."""
-    date: str  # ISO format string
+    date: str  # ISO format string (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)
     amount: float
     description: str
     type: str  # "credit" or "debit"
     raw_line: Optional[str] = None  # Original line for debugging
+
+
+def _parse_flexible_date(date_str: str) -> datetime:
+    """Parse date string that may include time: 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS'."""
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(date_str.strip(), fmt)
+        except ValueError:
+            continue
+    raise ValueError(f"Cannot parse date: {date_str}")
 
 
 class MatchedTransaction(BaseModel):
@@ -904,10 +914,15 @@ def parse_text(file_content: bytes, filename: str) -> tuple:
                 sender = header_match.group(3).strip()  # "AlRajhiBank"
 
                 try:
-                    block_date = datetime.strptime(date_str, "%Y-%m-%d")
+                    # Use full datetime from header (most accurate timestamp)
+                    block_date = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S")
                     dates_found += 1
                 except ValueError:
-                    pass
+                    try:
+                        block_date = datetime.strptime(date_str, "%Y-%m-%d")
+                        dates_found += 1
+                    except ValueError:
+                        pass
 
                 # SMS body is everything after the header (skip blank lines after header)
                 body_lines = []
@@ -1007,8 +1022,17 @@ def parse_text(file_content: bytes, filename: str) -> tuple:
                             break
 
             parsed += 1
+            # Use full datetime format when header time is available
+            if block_date:
+                # Include time if it's not midnight (i.e. header had a real time)
+                if block_date.hour or block_date.minute or block_date.second:
+                    date_str = block_date.strftime("%Y-%m-%d %H:%M:%S")
+                else:
+                    date_str = block_date.strftime("%Y-%m-%d")
+            else:
+                date_str = datetime.now().strftime("%Y-%m-%d")
             transactions.append(ParsedTransaction(
-                date=block_date.strftime("%Y-%m-%d") if block_date else datetime.now().strftime("%Y-%m-%d"),
+                date=date_str,
                 amount=tx_data["amount"],
                 description=description,
                 type=tx_data["type"],
@@ -1120,7 +1144,7 @@ def match_transactions(
     used_system_ids = set()
 
     for idx, bank_tx in enumerate(bank_transactions):
-        bank_date = datetime.strptime(bank_tx.date, "%Y-%m-%d")
+        bank_date = _parse_flexible_date(bank_tx.date)
         bank_amount = round(bank_tx.amount, 2)
 
         # Find candidates with matching amount
@@ -1267,7 +1291,7 @@ async def upload_and_reconcile(
         )
 
     # Determine date range from parsed transactions
-    parsed_dates = [datetime.strptime(t.date, "%Y-%m-%d") for t in bank_transactions]
+    parsed_dates = [_parse_flexible_date(t.date) for t in bank_transactions]
     min_date = min(parsed_dates)
     max_date = max(parsed_dates)
 
@@ -1322,9 +1346,9 @@ def log_missing_transaction(
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    # Parse date
+    # Parse date (supports 'YYYY-MM-DD' and 'YYYY-MM-DD HH:MM:SS')
     try:
-        timestamp = datetime.strptime(req.date, "%Y-%m-%d")
+        timestamp = _parse_flexible_date(req.date)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid date format: {req.date}")
 
@@ -1375,7 +1399,7 @@ def log_batch_transactions(
 
     for i, tx_req in enumerate(req.transactions):
         try:
-            timestamp = datetime.strptime(tx_req.date, "%Y-%m-%d")
+            timestamp = _parse_flexible_date(tx_req.date)
 
             tx_data = schemas.TransactionCreate(
                 account_id=req.account_id,

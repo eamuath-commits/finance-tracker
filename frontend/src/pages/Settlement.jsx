@@ -40,12 +40,20 @@ const formatCurrency = (amount) => {
 
 const formatDate = (dateStr) => {
     if (!dateStr) return '—';
-    const date = new Date(dateStr + 'T00:00:00');
-    return date.toLocaleDateString('en-GB', {
+    // Handle both 'YYYY-MM-DD' and 'YYYY-MM-DD HH:MM:SS'
+    const hasTime = dateStr.length > 10;
+    const date = hasTime ? new Date(dateStr.replace(' ', 'T')) : new Date(dateStr + 'T00:00:00');
+    const opts = {
         day: '2-digit',
         month: 'short',
         year: 'numeric'
-    });
+    };
+    if (hasTime) {
+        opts.hour = '2-digit';
+        opts.minute = '2-digit';
+        opts.hour12 = false;
+    }
+    return date.toLocaleDateString('en-GB', opts);
 };
 
 // File format badge
