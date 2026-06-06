@@ -3,6 +3,33 @@ from typing import List, Optional
 from datetime import datetime, date
 import enum
 
+
+# --- User / Auth Schemas ---
+class UserCreate(BaseModel):
+    username: str
+    email: Optional[str] = None
+    password: str
+
+class UserResponse(BaseModel):
+    id: str
+    username: str
+    email: Optional[str] = None
+    is_active: bool
+    telegram_user_id: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+class UserUpdate(BaseModel):
+    email: Optional[str] = None
+    telegram_user_id: Optional[str] = None
+
+
 # --- Currency Wallet Schemas ---
 class CurrencyWalletBase(BaseModel):
     currency_code: str
