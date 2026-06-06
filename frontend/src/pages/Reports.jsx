@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api, { API_URL } from '../utils/api';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { Card, SectionHeader, formatCurrency } from '../components/UI';
 
@@ -12,11 +12,10 @@ const Reports = () => {
     const [categoryData, setCategoryData] = useState([]);
 
     // Allow overriding API URL via environment variable for remote development
-    const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
-
+    
     const fetchData = async () => {
         try {
-            const res = await axios.get(`${API_URL}/transactions/`);
+            const res = await api.get(`${API_URL}/transactions/`);
             processData(res.data);
             setTransactions(res.data);
         } catch (error) {

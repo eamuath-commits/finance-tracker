@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import api, { API_URL } from '../utils/api';
 import { Settings as SettingsIcon, Save, Calendar, Tag, CheckCircle, Loader2 } from 'lucide-react';
-import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
 const Settings = () => {
     const [periodStartDay, setPeriodStartDay] = useState('1');
@@ -14,7 +13,7 @@ const Settings = () => {
     useEffect(() => {
         const fetchSettings = async () => {
             try {
-                const res = await axios.get(`${API_URL}/settings`);
+                const res = await api.get(`${API_URL}/settings`);
                 const psd = res.data?.period_start_day;
                 if (psd) {
                     setPeriodStartDay(psd.value || '1');
@@ -33,7 +32,7 @@ const Settings = () => {
         setSaving(true);
         setSaved(false);
         try {
-            await axios.put(`${API_URL}/settings/period_start_day`, {
+            await api.put(`${API_URL}/settings/period_start_day`, {
                 value: String(Math.min(28, Math.max(1, parseInt(periodStartDay) || 1))),
                 label: periodLabel,
             });

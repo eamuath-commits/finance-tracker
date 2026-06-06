@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import axios from 'axios';
+import api, { API_URL } from '../utils/api';
 import {
     FileSearch,
     Upload,
@@ -123,7 +123,7 @@ export default function Settlement() {
 
     const fetchAccounts = async () => {
         try {
-            const res = await axios.get(`${API}/accounts`);
+            const res = await api.get(`${API}/accounts`);
             setAccounts(res.data);
         } catch (err) {
             console.error('Failed to fetch accounts:', err);
@@ -175,7 +175,7 @@ export default function Settlement() {
         formData.append('account_id', selectedAccountId);
 
         try {
-            const res = await axios.post(`${API}/settlement/upload`, formData, {
+            const res = await api.post(`${API}/settlement/upload`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
                 timeout: 60000
             });
@@ -210,7 +210,7 @@ export default function Settlement() {
         formData.append('account_id', selectedAccountId);
 
         try {
-            const res = await axios.post(`${API}/settlement/upload`, formData, {
+            const res = await api.post(`${API}/settlement/upload`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
                 timeout: 60000
             });
@@ -234,7 +234,7 @@ export default function Settlement() {
     const handleLogSingle = async (tx) => {
         setLoggingIds(prev => new Set([...prev, tx.index]));
         try {
-            await axios.post(`${API}/settlement/log-transaction`, {
+            await api.post(`${API}/settlement/log-transaction`, {
                 account_id: selectedAccountId,
                 date: tx.date,
                 amount: tx.amount,
@@ -275,7 +275,7 @@ export default function Settlement() {
             }));
 
         try {
-            const res = await axios.post(`${API}/settlement/log-batch`, {
+            const res = await api.post(`${API}/settlement/log-batch`, {
                 account_id: selectedAccountId,
                 transactions
             });

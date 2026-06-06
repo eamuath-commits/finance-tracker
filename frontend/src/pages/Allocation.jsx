@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import axios from 'axios';
+import api, { API_URL } from '../utils/api';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowUpRight, CheckCircle, Clock, Receipt } from 'lucide-react';
 import { SectionHeader, formatCurrency } from '../components/UI';
 import AllocationRules from '../components/AllocationRules';
 import Distributions from '../components/Distributions';
 
-const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
 const Allocation = () => {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -31,7 +30,7 @@ const Allocation = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const accRes = await axios.get(`${API_URL}/accounts/`);
+            const accRes = await api.get(`${API_URL}/accounts/`);
             setAccounts(accRes.data);
         } catch (error) {
             console.error("Error fetching allocation data:", error);
@@ -60,7 +59,7 @@ const Allocation = () => {
 
         setLoadingPreview(true);
         try {
-            const res = await axios.post(`${API_URL}/allocation/preview`, {
+            const res = await api.post(`${API_URL}/allocation/preview`, {
                 source_account_id: sourceAccountId,
                 month_offset: monthOffset
             });

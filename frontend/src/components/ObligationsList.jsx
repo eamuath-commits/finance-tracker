@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import api, { API_URL } from '../utils/api';
 import { CheckCircle, History, Pencil, Trash2, Banknote, Home, Zap, Utensils, Car, Shield, Smartphone, Landmark, CreditCard, Clock, Box, GripVertical, Download, Link } from 'lucide-react';
 import { formatCurrency, EditIcon, Modal } from '../components/UI';
-import axios from 'axios';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { exportToCSV } from '../utils/csvExport';
 
 
-const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
 const CATEGORY_ICONS = {
     "Salary": <Banknote size={20} className="text-emerald-400" />,
@@ -267,7 +266,7 @@ const ObligationsList = ({
             await Promise.all(unpaid.map(async (o) => {
                 try {
                     // Only fetch if not already paid
-                    const res = await axios.get(`${API_URL}/obligations/${o.id}/matches`);
+                    const res = await api.get(`${API_URL}/obligations/${o.id}/matches`);
                     if (res.data && res.data.length > 0) {
                         // Filter out rejected matches locally
                         const validMatches = res.data.filter(tx => !rejectedMatches.has(tx.id));
@@ -293,7 +292,7 @@ const ObligationsList = ({
             const targetMonth = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
             const billingDateStr = `${targetMonth.getFullYear()}-${(targetMonth.getMonth() + 1).toString().padStart(2, '0')}-01`;
 
-            await axios.post(`${API_URL}/obligations/${obl.id}/pay`, {
+            await api.post(`${API_URL}/obligations/${obl.id}/pay`, {
                 payment_date: tx.timestamp,
                 billing_month: billingDateStr,
                 amount: tx.amount,

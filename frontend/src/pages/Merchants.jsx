@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api, { API_URL } from '../utils/api';
 import { useNavigate } from "react-router-dom";
 import { Search, Edit3, Trash2, RefreshCw, Store, ExternalLink, X, Plus } from "lucide-react";
 import { Modal, inputClass, selectClass } from "../components/UI";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
 function Merchants() {
     const navigate = useNavigate();
@@ -28,7 +27,7 @@ function Merchants() {
 
     const fetchMerchants = async () => {
         try {
-            const res = await axios.get(`${API_URL}/merchants/`);
+            const res = await api.get(`${API_URL}/merchants/`);
             setMerchants(res.data);
         } catch (e) {
             console.error("Failed to fetch merchants:", e);
@@ -39,13 +38,13 @@ function Merchants() {
 
     useEffect(() => {
         fetchMerchants();
-        axios.get(`${API_URL}/categories`).then(res => setCategories(res.data)).catch(() => { });
+        api.get(`${API_URL}/categories`).then(res => setCategories(res.data)).catch(() => { });
     }, []);
 
     const handleBackfill = async () => {
         setBackfilling(true);
         try {
-            const res = await axios.post(`${API_URL}/merchants/backfill`);
+            const res = await api.post(`${API_URL}/merchants/backfill`);
             alert(`Updated ${res.data.updated} merchants`);
             fetchMerchants();
         } catch (e) {
@@ -58,7 +57,7 @@ function Merchants() {
     const handleSave = async (e) => {
         e.preventDefault();
         try {
-            await axios.put(`${API_URL}/merchants/${editingMerchant.id}`, {
+            await api.put(`${API_URL}/merchants/${editingMerchant.id}`, {
                 name: editingMerchant.name,
                 display_name: editingMerchant.display_name || null,
                 logo_url: editingMerchant.logo_url || null,
@@ -80,7 +79,7 @@ function Merchants() {
             message: `Delete merchant "${name}"?`,
             onConfirm: async () => {
                 try {
-                    await axios.delete(`${API_URL}/merchants/${id}`);
+                    await api.delete(`${API_URL}/merchants/${id}`);
                     fetchMerchants();
                 } catch (e) {
                     console.error("Delete failed:", e);

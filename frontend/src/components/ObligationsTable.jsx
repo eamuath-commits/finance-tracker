@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import api, { API_URL } from '../utils/api';
 import { formatCurrency, Modal } from './UI';
 import { CheckCircle, Circle, Box, Home, Zap, Car, Shield, Smartphone, Landmark, CreditCard, Clock, Utensils, Banknote, Edit2, Link } from 'lucide-react';
-import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
 // --- Icons ---
 const CATEGORY_ICONS = {
@@ -259,7 +258,7 @@ const ObligationsTable = ({ obligations, getMonthStatus, monthOffset, openPaymen
             const newMatches = {};
             await Promise.all(unpaidObligations.map(async (o) => {
                 try {
-                    const res = await axios.get(`${API_URL}/obligations/${o.id}/matches`);
+                    const res = await api.get(`${API_URL}/obligations/${o.id}/matches`);
                     if (res.data && res.data.length > 0) {
                         const validMatches = res.data.filter(tx => !rejectedMatches.has(tx.id));
                         if (validMatches.length > 0) {
@@ -281,7 +280,7 @@ const ObligationsTable = ({ obligations, getMonthStatus, monthOffset, openPaymen
             const targetMonth = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
             const billingDateStr = `${targetMonth.getFullYear()}-${(targetMonth.getMonth() + 1).toString().padStart(2, '0')}-01`;
 
-            await axios.post(`${API_URL}/obligations/${obl.id}/pay`, {
+            await api.post(`${API_URL}/obligations/${obl.id}/pay`, {
                 payment_date: tx.timestamp,
                 billing_month: billingDateStr,
                 amount: tx.amount,

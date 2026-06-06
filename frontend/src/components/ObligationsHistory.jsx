@@ -1,13 +1,12 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import api, { API_URL } from '../utils/api';
 import { formatCurrency, selectClass, Modal } from '../components/UI';
 import TransactionDetailModal from '../components/TransactionDetailModal';
 import TransactionSelectorModal from '../components/TransactionSelectorModal';
 import { CATEGORY_ICONS, CATEGORY_COLORS, CategoryHeader, CategorySectionWrapper } from './categoryStyles';
 import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Eye, List, LayoutGrid, PlusCircle, ArrowUpRight, Clock, DollarSign, MessageSquare, Box } from 'lucide-react';
 import { exportToCSV } from '../utils/csvExport';
-import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
 const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDelete, onRefresh, forecast }) => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -270,8 +269,8 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
         try {
             // Fetch suggestions AND existing linked transactions
             const [suggestRes, linkedRes] = await Promise.all([
-                axios.get(`${API_URL}/payments/${payment.id}/suggested-transactions`).catch(() => ({ data: [] })),
-                axios.get(`${API_URL}/payments/${payment.id}/transactions`).catch(() => ({ data: [] }))
+                api.get(`${API_URL}/payments/${payment.id}/suggested-transactions`).catch(() => ({ data: [] })),
+                api.get(`${API_URL}/payments/${payment.id}/transactions`).catch(() => ({ data: [] }))
             ]);
             setSuggestedTransactions(suggestRes.data);
             setLinkedTransactionIds(linkedRes.data.map(tx => tx.id));
@@ -292,7 +291,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
         if (!linkingPayment) return;
 
         try {
-            await axios.post(`${API_URL}/payments/${linkingPayment.id}/link-transaction?transaction_id=${transactionId}`);
+            await api.post(`${API_URL}/payments/${linkingPayment.id}/link-transaction?transaction_id=${transactionId}`);
             setShowLinkModal(false);
             setLinkingPayment(null);
             if (onRefresh) onRefresh();
@@ -307,7 +306,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
         if (!linkingPayment || !transactionIds.length) return;
 
         try {
-            await axios.post(`${API_URL}/payments/${linkingPayment.id}/transactions`, {
+            await api.post(`${API_URL}/payments/${linkingPayment.id}/transactions`, {
                 transaction_ids: transactionIds
             });
             setShowMultiLinkModal(false);
@@ -323,7 +322,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
         if (!confirm("Remove the link to this transaction?")) return;
 
         try {
-            await axios.delete(`${API_URL}/payments/${paymentId}/unlink-transaction`);
+            await api.delete(`${API_URL}/payments/${paymentId}/unlink-transaction`);
             if (onRefresh) onRefresh();
         } catch (err) {
             console.error("Error unlinking:", err);
@@ -335,7 +334,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
         if (!confirm("Remove the link to this transaction?")) return;
 
         try {
-            await axios.delete(`${API_URL}/payments/${paymentId}/transactions/${transactionId}`);
+            await api.delete(`${API_URL}/payments/${paymentId}/transactions/${transactionId}`);
             if (onRefresh) onRefresh();
         } catch (err) {
             console.error("Error unlinking transaction:", err);
@@ -348,7 +347,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
         try {
             // Create a payment record for this obligation+month
             const payAmount = plannedAmount || obl.amount || 0;
-            const payRes = await axios.post(`${API_URL}/obligations/${obl.id}/pay`, {
+            const payRes = await api.post(`${API_URL}/obligations/${obl.id}/pay`, {
                 amount: payAmount,
                 billing_month: billingMonth,
                 status: 'Paid',
@@ -361,11 +360,11 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
 
                 // Try to auto-link the best matching transaction
                 try {
-                    const suggestRes = await axios.get(`${API_URL}/payments/${newPayment.id}/suggested-transactions`);
+                    const suggestRes = await api.get(`${API_URL}/payments/${newPayment.id}/suggested-transactions`);
                     const suggestions = suggestRes.data || [];
                     const bestMatch = suggestions.length > 0 ? suggestions[0] : null;
                     if (bestMatch && bestMatch.score >= 80 && !bestMatch.already_linked) {
-                        await axios.post(`${API_URL}/payments/${newPayment.id}/transactions`, {
+                        await api.post(`${API_URL}/payments/${newPayment.id}/transactions`, {
                             transaction_ids: [bestMatch.transaction_id],
                             link_source: 'auto'
                         });
@@ -378,7 +377,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                 // If auto-linked, update payment source to 'auto'
                 if (didAutoLink) {
                     try {
-                        await axios.put(`${API_URL}/obligations/history/${newPayment.id}`, {
+                        await api.put(`${API_URL}/obligations/history/${newPayment.id}`, {
                             source: 'auto',
                             note: `Auto-linked to best match`
                         });
@@ -405,7 +404,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
     const handleMarkPaid = async (obl, billingMonth, plannedAmount) => {
         try {
             const payAmount = plannedAmount || obl.amount || 0;
-            await axios.post(`${API_URL}/obligations/${obl.id}/pay`, {
+            await api.post(`${API_URL}/obligations/${obl.id}/pay`, {
                 amount: payAmount,
                 billing_month: billingMonth,
                 status: 'Paid',

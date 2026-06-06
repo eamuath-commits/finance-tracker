@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api, { API_URL } from '../utils/api';
 import { Send, CheckCircle, AlertTriangle, XCircle, Loader2, RefreshCw, Upload, Clock, Ban, ChevronDown, ChevronRight, Eye, Copy } from "lucide-react";
 import { formatCurrency } from "./UI";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
 const STORAGE_KEY = "sms_ingest_results";
 
@@ -121,7 +120,7 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
                 addStep({ action: "Extracting", detail: "Gemini extracting transaction details..." });
                 setAgentStatus(`🤖 Gemini: Extracting transaction from SMS ${i + 1}...`);
 
-                const res = await axios.post(`${API_URL}/api/sms/ingest`, {
+                const res = await api.post(`${API_URL}/api/sms/ingest`, {
                     sender: "WebUI",
                     body: msg
                 });
@@ -235,7 +234,7 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
                 params.append("account_id", accountId);
             }
 
-            const res = await axios.post(`${API_URL}/api/sms/assign-account?${params.toString()}`);
+            const res = await api.post(`${API_URL}/api/sms/assign-account?${params.toString()}`);
 
             setResults(prev => prev.map(r => {
                 if ((r.result?.transaction_id === txId) || r.id === resultId) {
@@ -267,7 +266,7 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
         // If there's a transaction in the database, delete it
         if (transactionId) {
             try {
-                await axios.delete(`${API_URL}/transactions/${transactionId}`);
+                await api.delete(`${API_URL}/transactions/${transactionId}`);
             } catch (err) {
                 console.log("Transaction may not exist:", err.message);
             }
@@ -360,7 +359,7 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
         ));
 
         try {
-            const res = await axios.post(`${API_URL}/api/sms/ingest`, {
+            const res = await api.post(`${API_URL}/api/sms/ingest`, {
                 sender: "WebUI",
                 body: msg
             });
@@ -425,7 +424,7 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
             setResults(prev => [...prev, { id: itemId, sms: msg, status: "parsing", result: null }]);
 
             try {
-                const res = await axios.post(`${API_URL}/api/sms/ingest`, {
+                const res = await api.post(`${API_URL}/api/sms/ingest`, {
                     sender: "WebUI",
                     body: msg
                 });
@@ -513,7 +512,7 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
             try {
                 await new Promise(r => setTimeout(r, 100));
 
-                const res = await axios.post(`${API_URL}/api/sms/ingest`, {
+                const res = await api.post(`${API_URL}/api/sms/ingest`, {
                     sender: "WebUI",
                     body: msg
                 });

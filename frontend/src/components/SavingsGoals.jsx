@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api, { API_URL } from '../utils/api';
 import { formatCurrency, Card } from '../components/UI';
 import { Target, Plus, Trash2 } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8000`;
 
 const SavingsGoals = () => {
     const [goals, setGoals] = useState([]);
@@ -21,7 +20,7 @@ const SavingsGoals = () => {
 
     const fetchGoals = async () => {
         try {
-            const res = await axios.get(`${API_URL}/goals/`);
+            const res = await api.get(`${API_URL}/goals/`);
             setGoals(res.data);
         } catch (error) {
             console.error("Error fetching goals", error);
@@ -52,7 +51,7 @@ const SavingsGoals = () => {
 
         try {
             console.log("Sending payload...");
-            await axios.post(`${API_URL}/goals/`, {
+            await api.post(`${API_URL}/goals/`, {
                 name: newGoal.name,
                 target_amount: parseFloat(newGoal.target_amount),
                 current_amount: parseFloat(newGoal.current_amount || 0),
@@ -154,7 +153,7 @@ const SavingsGoals = () => {
     const handleDelete = async (id) => {
         if (!confirm("Delete this goal?")) return;
         try {
-            await axios.delete(`${API_URL}/goals/${id}`);
+            await api.delete(`${API_URL}/goals/${id}`);
             fetchGoals();
         } catch (error) {
             console.error("Error deleting goal", error);

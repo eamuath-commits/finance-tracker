@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
-import axios from "axios";
+import api, { API_URL } from '../utils/api';
 import { useSearchParams } from 'react-router-dom';
 import { format } from "date-fns";
 import { Search, Edit3, Trash2, Plus, User, Calendar, Filter, X, MessageSquare, Upload, ChevronLeft, ChevronRight } from "lucide-react";
 import { Modal, formatCurrency, inputClass, selectClass } from "../components/UI";
 import SMSIngestTab from "../components/SMSIngestTab";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
 // Categories list
 const Categories = [
@@ -128,7 +127,7 @@ function Transactions() {
 
     // Fetch periodStartDay from settings
     useEffect(() => {
-        axios.get(`${API_URL}/settings`).then(res => {
+        api.get(`${API_URL}/settings`).then(res => {
             const val = res.data?.period_start_day?.value;
             if (val) setPeriodStartDay(parseInt(val) || 1);
         }).catch(() => { });
@@ -173,14 +172,14 @@ function Transactions() {
         setLoading(true);
         try {
             if (activeTab === "inbox") {
-                const res = await axios.get(`${API_URL}/messages/`);
+                const res = await api.get(`${API_URL}/messages/`);
                 setInboxMessages(res.data);
             } else {
                 const [txRes, accRes, ccRes, pendingRes] = await Promise.all([
-                    axios.get(`${API_URL}/transactions/`),
-                    axios.get(`${API_URL}/accounts/`),
-                    axios.get(`${API_URL}/credit-cards/`),
-                    axios.get(`${API_URL}/transactions/pending`)
+                    api.get(`${API_URL}/transactions/`),
+                    api.get(`${API_URL}/accounts/`),
+                    api.get(`${API_URL}/credit-cards/`),
+                    api.get(`${API_URL}/transactions/pending`)
                 ]);
                 setTransactions(txRes.data);
                 setAccounts(accRes.data);
@@ -299,7 +298,7 @@ function Transactions() {
             message: 'Delete this transaction?',
             onConfirm: async () => {
                 try {
-                    await axios.delete(`${API_URL}/transactions/${id}`);
+                    await api.delete(`${API_URL}/transactions/${id}`);
                     setTransactions(prev => prev.filter(t => t.id !== id));
                 } catch (e) {
                     console.error("Delete failed:", e);
@@ -312,7 +311,7 @@ function Transactions() {
     const handleDeleteMsg = async (id) => {
         if (!window.confirm("Are you sure?")) return;
         try {
-            await axios.post(`${API_URL}/messages/bulk-delete`, { ids: [id] });
+            await api.post(`${API_URL}/messages/bulk-delete`, { ids: [id] });
             setInboxMessages(inboxMessages.filter(m => m.id !== id));
         } catch (e) {
             console.error("Delete failed:", e);
@@ -393,14 +392,14 @@ function Transactions() {
                 }
 
                 console.log('[TX-EDIT] PUT payload:', JSON.stringify(payload), 'source_type:', txForm.source_type, 'source_id:', txForm.source_id, 'account_id:', txForm.account_id);
-                await axios.put(`${API_URL}/transactions/${editingTx.id}`, payload);
+                await api.put(`${API_URL}/transactions/${editingTx.id}`, payload);
             } else if (txForm.type === 'transfer' && txForm.is_internal && txForm.target_account_id) {
                 // Internal transfer - create TWO transactions
                 const sourceAcc = accounts.find(a => a.id === txForm.account_id);
                 const targetAcc = accounts.find(a => a.id === txForm.target_account_id);
 
                 // 1. Debit from source (outgoing)
-                await axios.post(`${API_URL}/transactions/`, {
+                await api.post(`${API_URL}/transactions/`, {
                     account_id: txForm.account_id,
                     amount: amount,
                     merchant: txForm.merchant || `Transfer to ${targetAcc?.name || 'Account'}`,
@@ -411,7 +410,7 @@ function Transactions() {
                 });
 
                 // 2. Credit to target (incoming)
-                await axios.post(`${API_URL}/transactions/`, {
+                await api.post(`${API_URL}/transactions/`, {
                     account_id: txForm.target_account_id,
                     amount: amount,
                     merchant: txForm.merchant || `Transfer from ${sourceAcc?.name || 'Account'}`,
@@ -423,7 +422,7 @@ function Transactions() {
             } else if (txForm.type === 'transfer' && !txForm.is_internal) {
                 // External transfer - single transaction with beneficiary
                 const isOutgoing = txForm.transfer_direction === 'outgoing';
-                await axios.post(`${API_URL}/transactions/`, {
+                await api.post(`${API_URL}/transactions/`, {
                     account_id: txForm.account_id,
                     amount: amount,
                     merchant: txForm.merchant, // Beneficiary name
@@ -450,7 +449,7 @@ function Transactions() {
                     payload.account_id = txForm.account_id || txForm.source_id;
                 }
 
-                await axios.post(`${API_URL}/transactions/`, payload);
+                await api.post(`${API_URL}/transactions/`, payload);
             }
             setShowTxModal(false);
             fetchData();
@@ -468,10 +467,10 @@ function Transactions() {
             onConfirm: async () => {
                 try {
                     if (activeTab === 'inbox') {
-                        await axios.post(`${API_URL}/messages/bulk-delete`, { ids });
+                        await api.post(`${API_URL}/messages/bulk-delete`, { ids });
                         setSelectedMsgIds(new Set());
                     } else {
-                        await axios.post(`${API_URL}/transactions/bulk-delete`, { ids });
+                        await api.post(`${API_URL}/transactions/bulk-delete`, { ids });
                         setSelectedTxIds(new Set());
                     }
                     setIsSelectionMode(false);
@@ -486,7 +485,7 @@ function Transactions() {
 
     const handleRetry = async (msgId) => {
         try {
-            const res = await axios.post(`${API_URL}/messages/${msgId}/retry`);
+            const res = await api.post(`${API_URL}/messages/${msgId}/retry`);
             alert(res.data.message || "Success");
             fetchData();
         } catch (e) {
@@ -507,7 +506,7 @@ function Transactions() {
 
     const completePendingTransfer = async (txId, sourceAccountId) => {
         try {
-            await axios.post(`${API_URL}/transactions/${txId}/complete-transfer?source_account_id=${sourceAccountId}`);
+            await api.post(`${API_URL}/transactions/${txId}/complete-transfer?source_account_id=${sourceAccountId}`);
             fetchData();
         } catch (e) {
             console.error(e);
@@ -1646,7 +1645,7 @@ function Transactions() {
                             <button
                                 onClick={async () => {
                                     try {
-                                        await axios.put(`${API_URL}/transactions/${resolveModal.tx.id}/resolve-discrepancy`, {
+                                        await api.put(`${API_URL}/transactions/${resolveModal.tx.id}/resolve-discrepancy`, {
                                             reason: resolveReason
                                         });
                                         setResolveModal({ open: false, tx: null, discrepancy: null });

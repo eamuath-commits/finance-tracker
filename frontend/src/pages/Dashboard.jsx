@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import axios from 'axios';
+import api, { API_URL } from '../utils/api';
 import { Card, SectionHeader, Modal, formatCurrency, formatCurrencyText, inputClass, selectClass } from '../components/UI';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, verticalListSortingStrategy, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable';
@@ -389,15 +389,14 @@ const Dashboard = () => {
         }
     };
 
-    const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
-
+    
     const fetchData = async () => {
         try {
             const [accRes, txRes, oblRes, analysisRes] = await Promise.all([
-                axios.get(`${API_URL}/accounts/`),
-                axios.get(`${API_URL}/transactions/`),
-                axios.get(`${API_URL}/obligations/`),
-                axios.get(`${API_URL}/analysis/allocation`)
+                api.get(`${API_URL}/accounts/`),
+                api.get(`${API_URL}/transactions/`),
+                api.get(`${API_URL}/obligations/`),
+                api.get(`${API_URL}/analysis/allocation`)
             ]);
             setAccounts(accRes.data);
             setTransactions(txRes.data);
@@ -421,7 +420,7 @@ const Dashboard = () => {
     const handleSaveTransaction = async (e) => {
         e.preventDefault();
         try {
-            await axios.put(`${API_URL}/transactions/${editingId}`, transactionForm);
+            await api.put(`${API_URL}/transactions/${editingId}`, transactionForm);
             setShowTransactionModal(false);
             setEditingId(null);
             fetchData();

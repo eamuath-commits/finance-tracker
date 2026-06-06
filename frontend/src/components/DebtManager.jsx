@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api, { API_URL } from '../utils/api';
 import { formatCurrency, Card } from '../components/UI';
 import { TrendingDown, Target, ArrowRight } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8000`;
 
 const DebtManager = () => {
     const [debts, setDebts] = useState([]);
@@ -28,8 +27,8 @@ const DebtManager = () => {
             // Need a new endpoint or aggregate existing ones
             // For now, let's pretend we fetch standard accounts/loans and map them
             const [accountsRes, loansRes] = await Promise.all([
-                axios.get(`${API_URL}/accounts/`),
-                axios.get(`${API_URL}/loans/`)
+                api.get(`${API_URL}/accounts/`),
+                api.get(`${API_URL}/loans/`)
             ]);
 
             const creditCards = accountsRes.data

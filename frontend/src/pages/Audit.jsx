@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api, { API_URL } from '../utils/api';
 import {
     ClipboardCheck,
     CheckCircle,
@@ -67,7 +67,7 @@ export default function Audit() {
 
     const fetchAccounts = async () => {
         try {
-            const res = await axios.get(`${API}/accounts`);
+            const res = await api.get(`${API}/accounts`);
             setAccounts(res.data);
         } catch (err) {
             console.error('Failed to fetch accounts:', err);
@@ -84,14 +84,14 @@ export default function Audit() {
         setAuditResult(null);
 
         try {
-            const res = await axios.post(`${API}/audit/check`, {
+            const res = await api.post(`${API}/audit/check`, {
                 account_id: selectedAccountId,
                 actual_balance: parseFloat(actualBalance)
             });
             setAuditResult(res.data);
 
             // Fetch audit history
-            const historyRes = await axios.get(`${API}/audit/history/${selectedAccountId}`);
+            const historyRes = await api.get(`${API}/audit/history/${selectedAccountId}`);
             setAuditHistory(historyRes.data);
         } catch (err) {
             setError(err.response?.data?.detail || 'Failed to check audit');
@@ -112,7 +112,7 @@ export default function Audit() {
         setError(null);
 
         try {
-            await axios.post(`${API}/audit/confirm`, {
+            await api.post(`${API}/audit/confirm`, {
                 account_id: selectedAccountId,
                 actual_balance: parseFloat(actualBalance),
                 notes: notes.trim() || null,

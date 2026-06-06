@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api, { API_URL } from '../utils/api';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Plus, Edit2, Trash2, Search } from 'lucide-react';
 import { inputClass } from '../components/UI';
@@ -27,11 +27,10 @@ const Categories = () => {
     const setSortDir = (v) => { setSortDirRaw(v); _persistCat('sortDir', v); };
 
     // Environment API URL
-    const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
-
+    
     const fetchCategories = async () => {
         try {
-            const res = await axios.get(`${API_URL}/categories`);
+            const res = await api.get(`${API_URL}/categories`);
             setCategories(res.data);
         } catch (error) {
             console.error("Error fetching categories", error);
@@ -59,7 +58,7 @@ const Categories = () => {
         }
 
         try {
-            await axios.post(`${API_URL}/categories`, {
+            await api.post(`${API_URL}/categories`, {
                 name: newCategoryName.trim(),
                 type: activeTab
             });
@@ -72,7 +71,7 @@ const Categories = () => {
 
     const handleUpdateCategory = async (id, updates) => {
         try {
-            await axios.put(`${API_URL}/categories/${id}`, updates);
+            await api.put(`${API_URL}/categories/${id}`, updates);
             setEditingCategory(null);
             fetchCategories();
         } catch (error) {
@@ -83,7 +82,7 @@ const Categories = () => {
     const handleDeleteCategory = async (id) => {
         if (!confirm("Delete this category? Associated items will become Uncategorized.")) return;
         try {
-            await axios.delete(`${API_URL}/categories/${id}`);
+            await api.delete(`${API_URL}/categories/${id}`);
             fetchCategories();
         } catch (error) {
             alert("Failed to delete category");

@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import axios from 'axios';
+import api, { API_URL } from '../utils/api';
 import { formatCurrency, selectClass } from './UI';
 import TransactionDetailModal from './TransactionDetailModal';
 import TransactionSelectorModal from './TransactionSelectorModal';
 import ConfirmDialog from './ConfirmDialog';
 import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Trash2, Eye, ArrowUpRight, Clock, LayoutGrid, List, PlusCircle } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
 const Distributions = ({ accounts }) => {
     const [transfers, setTransfers] = useState([]);
@@ -47,7 +46,7 @@ const Distributions = ({ accounts }) => {
         setLoading(true);
         try {
             const [distRes, previewRes] = await Promise.all([
-                axios.get(`${API_URL}/distributions`),
+                api.get(`${API_URL}/distributions`),
                 fetchAllocationPreview()
             ]);
             setTransfers(distRes.data);
@@ -72,7 +71,7 @@ const Distributions = ({ accounts }) => {
                 offset = (targetDate.getFullYear() - now.getFullYear()) * 12 + (targetDate.getMonth() - now.getMonth());
             }
 
-            const res = await axios.post(`${API_URL}/allocation/preview`, {
+            const res = await api.post(`${API_URL}/allocation/preview`, {
                 source_account_id: incomeAcc.id,
                 month_offset: offset
             });
@@ -239,7 +238,7 @@ const Distributions = ({ accounts }) => {
         setLinkedTransactionIds([]);
 
         try {
-            const linkedRes = await axios.get(`${API_URL}/distributions/${transfer.id}/transactions`).catch(() => ({ data: [] }));
+            const linkedRes = await api.get(`${API_URL}/distributions/${transfer.id}/transactions`).catch(() => ({ data: [] }));
             setLinkedTransactionIds(linkedRes.data.map(tx => tx.id));
         } catch (err) {
             console.error("Error fetching linked transactions:", err);
@@ -266,14 +265,14 @@ const Distributions = ({ accounts }) => {
 
             // Create ONE distribution for all obligations in this envelope
             const oblIds = plannedItems.map(p => p.obligation_id);
-            await axios.post(`${API_URL}/allocation/execute`, {
+            await api.post(`${API_URL}/allocation/execute`, {
                 source_account_id: incomeAcc.id,
                 month_offset: offset,
                 obligation_ids: oblIds
             });
 
             // Re-fetch to get the new distribution
-            const distRes = await axios.get(`${API_URL}/distributions`);
+            const distRes = await api.get(`${API_URL}/distributions`);
             setTransfers(distRes.data);
 
             // Find the newly created distribution for this target account + month
@@ -300,7 +299,7 @@ const Distributions = ({ accounts }) => {
         if (!linkingTransfer) return;
 
         try {
-            await axios.post(`${API_URL}/distributions/${linkingTransfer.id}/link?transaction_id=${transactionId}`);
+            await api.post(`${API_URL}/distributions/${linkingTransfer.id}/link?transaction_id=${transactionId}`);
             setShowLinkModal(false);
             setLinkingTransfer(null);
             fetchTransfers();
@@ -314,7 +313,7 @@ const Distributions = ({ accounts }) => {
         if (!linkingTransfer || !transactionIds.length) return;
 
         try {
-            await axios.post(`${API_URL}/distributions/${linkingTransfer.id}/transactions`, {
+            await api.post(`${API_URL}/distributions/${linkingTransfer.id}/transactions`, {
                 transaction_ids: transactionIds
             });
             setShowMultiLinkModal(false);
@@ -333,7 +332,7 @@ const Distributions = ({ accounts }) => {
             message: 'Remove the link to this transaction?',
             onConfirm: async () => {
                 try {
-                    await axios.put(`${API_URL}/distributions/${transferId}`, { transaction_id: null });
+                    await api.put(`${API_URL}/distributions/${transferId}`, { transaction_id: null });
                     fetchTransfers();
                 } catch (err) {
                     console.error("Error unlinking:", err);
@@ -351,7 +350,7 @@ const Distributions = ({ accounts }) => {
             message: 'Remove the link to this transaction?',
             onConfirm: async () => {
                 try {
-                    await axios.delete(`${API_URL}/distributions/${distributionId}/transactions/${transactionId}`);
+                    await api.delete(`${API_URL}/distributions/${distributionId}/transactions/${transactionId}`);
                     fetchTransfers();
                 } catch (err) {
                     console.error("Error unlinking transaction:", err);
@@ -369,7 +368,7 @@ const Distributions = ({ accounts }) => {
             message: 'Are you sure you want to delete this distribution record?',
             onConfirm: async () => {
                 try {
-                    await axios.delete(`${API_URL}/distributions/${transferId}`);
+                    await api.delete(`${API_URL}/distributions/${transferId}`);
                     fetchTransfers();
                 } catch (error) {
                     console.error("Failed to delete transfer:", error);

@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import api, { API_URL } from '../utils/api';
 import { formatCurrency } from './UI';
 import {
     TrendingUp, TrendingDown, Minus, CheckCircle,
     Download, ChevronDown, ChevronRight, Box, Edit3, DollarSign, X, Trash2
 } from 'lucide-react';
 import { CATEGORY_ICONS, CATEGORY_COLORS } from './categoryStyles';
-import axios from 'axios';
 import { exportToCSV } from '../utils/csvExport';
 
-const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
 const TREND_ICONS = {
     increasing: <TrendingUp size={11} className="text-red-400" />,
@@ -154,7 +153,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
         const fetchForecast = async () => {
             setLoading(true);
             try {
-                const res = await axios.get(`${API_URL}/obligations/forecast?months_ahead=1`);
+                const res = await api.get(`${API_URL}/obligations/forecast?months_ahead=1`);
                 setForecast(res.data);
                 const cats = new Set((res.data.obligations || []).map(o => o.category));
                 setExpandedCats(cats);
@@ -302,7 +301,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
             const existing = oblPayments.find(p => (p.billing_month || '').startsWith(monthKey));
             if (existing) {
                 try {
-                    await axios.delete(`${API_URL}/obligations/history/${existing.id}`);
+                    await api.delete(`${API_URL}/obligations/history/${existing.id}`);
                     if (onRefresh) onRefresh();
                 } catch (err) {
                     console.error('Error deleting payment:', err);
@@ -319,7 +318,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
     const handleDeletePayment = async (paymentId) => {
         if (!confirm('Delete this payment entry?')) return;
         try {
-            await axios.delete(`${API_URL}/obligations/history/${paymentId}`);
+            await api.delete(`${API_URL}/obligations/history/${paymentId}`);
             if (onRefresh) onRefresh();
         } catch (err) {
             console.error('Error deleting payment:', err);

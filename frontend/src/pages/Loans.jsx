@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api, { API_URL } from '../utils/api';
 import { Card, SectionHeader, Modal, EditIcon, formatCurrency, inputClass } from '../components/UI';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -190,11 +190,10 @@ const Loans = () => {
     const [editingId, setEditingId] = useState(null);
     const [loanForm, setLoanForm] = useState({ name: '', principal_amount: '', interest_rate: '', start_date: '', term_months: '', monthly_payment: '', due_day: '', notes: '' });
 
-    const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
-
+    
     const fetchLoans = async () => {
         try {
-            const res = await axios.get(`${API_URL}/loans/`);
+            const res = await api.get(`${API_URL}/loans/`);
             setLoans(res.data);
         } catch (error) {
             console.error("Error fetching loans", error);
@@ -223,7 +222,7 @@ const Loans = () => {
 
                 // Save Order
                 const ids = newOrder.map(l => l.id);
-                axios.put(`${API_URL}/loans/reorder`, { ordered_ids: ids }).catch(err => console.error("Reorder failed", err));
+                api.put(`${API_URL}/loans/reorder`, { ordered_ids: ids }).catch(err => console.error("Reorder failed", err));
 
                 return newOrder;
             });
@@ -241,9 +240,9 @@ const Loans = () => {
             };
 
             if (editingId) {
-                await axios.put(`${API_URL}/loans/${editingId}`, payload);
+                await api.put(`${API_URL}/loans/${editingId}`, payload);
             } else {
-                await axios.post(`${API_URL}/loans/`, payload);
+                await api.post(`${API_URL}/loans/`, payload);
             }
             setShowLoanModal(false);
             setEditingId(null);
@@ -264,7 +263,7 @@ const Loans = () => {
         if (!targetId) return;
         if (!confirm("Are you sure you want to delete this loan?")) return;
         try {
-            await axios.delete(`${API_URL}/loans/${targetId}`);
+            await api.delete(`${API_URL}/loans/${targetId}`);
             setShowLoanModal(false);
             setEditingId(null);
             fetchLoans();

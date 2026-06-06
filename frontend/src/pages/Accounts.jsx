@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import api, { API_URL } from '../utils/api';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { Wallet, PiggyBank, CreditCard, LayoutGrid, List, Receipt, CreditCard as ChipIcon, Edit3, Trash2, Plus, Search, Filter, MessageSquareText, User, Upload, RefreshCw } from 'lucide-react';
 import { Card, SectionHeader, Modal, formatCurrency, inputClass, selectClass } from '../components/UI';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
@@ -367,13 +367,12 @@ const Accounts = () => {
     // Backward compatibility fallback for legacy transactions without type field
     const LEGACY_CREDIT_CATEGORIES = ['Income', 'Deposit', 'Refund', 'Interest'];
     const isCredit = (tx) => tx.type ? tx.type === 'credit' : LEGACY_CREDIT_CATEGORIES.includes(tx.category);
-    const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
-
+    
     const fetchData = async () => {
         try {
             const [accRes, txRes] = await Promise.all([
-                axios.get(`${API_URL}/accounts/`),
-                axios.get(`${API_URL}/transactions/`)
+                api.get(`${API_URL}/accounts/`),
+                api.get(`${API_URL}/transactions/`)
             ]);
             setAccounts(accRes.data);
             setTransactions(txRes.data);
@@ -482,7 +481,7 @@ const Accounts = () => {
         e.preventDefault();
         try {
             if (editingTx) {
-                await axios.put(`${API_URL}/transactions/${editingTx.id}`, {
+                await api.put(`${API_URL}/transactions/${editingTx.id}`, {
                     merchant: txForm.merchant,
                     category: txForm.category,
                     amount: parseFloat(txForm.amount),
@@ -491,7 +490,7 @@ const Accounts = () => {
                     timestamp: new Date(txForm.timestamp).toISOString()
                 });
             } else {
-                await axios.post(`${API_URL}/transactions/`, {
+                await api.post(`${API_URL}/transactions/`, {
                     ...txForm,
                     amount: parseFloat(txForm.amount),
                     timestamp: new Date(txForm.timestamp).toISOString()
@@ -505,7 +504,7 @@ const Accounts = () => {
     const handleDeleteTx = async (id) => {
         if (confirm('Are you sure you want to delete this transaction?')) {
             try {
-                await axios.delete(`${API_URL}/transactions/${id}`);
+                await api.delete(`${API_URL}/transactions/${id}`);
                 fetchData();
             } catch (err) { alert('Error deleting transaction'); }
         }
@@ -514,7 +513,7 @@ const Accounts = () => {
     const handleDeleteAccount = async () => {
         if (!editingId || !confirm('Are you sure you want to delete this account? This action cannot be undone.')) return;
         try {
-            await axios.delete(`${API_URL}/accounts/${editingId}`);
+            await api.delete(`${API_URL}/accounts/${editingId}`);
             setShowAccountModal(false);
             setEditingId(null);
             fetchData();
@@ -533,9 +532,9 @@ const Accounts = () => {
             delete payload.aliases;
 
             if (editingId) {
-                await axios.put(`${API_URL}/accounts/${editingId}`, payload);
+                await api.put(`${API_URL}/accounts/${editingId}`, payload);
             } else {
-                await axios.post(`${API_URL}/accounts/`, payload);
+                await api.post(`${API_URL}/accounts/`, payload);
             }
             setShowAccountModal(false);
             setEditingId(null);
@@ -739,7 +738,7 @@ const Accounts = () => {
                                                     onClick={async () => {
                                                         if (!confirm(`Recalculate ${acc.name} balance from transactions?`)) return;
                                                         try {
-                                                            const res = await axios.post(`${API_URL}/accounts/${acc.id}/recalculate-balance`);
+                                                            const res = await api.post(`${API_URL}/accounts/${acc.id}/recalculate-balance`);
                                                             const d = res.data;
                                                             const fmt = (v) => v.toLocaleString('en-SA', {style:'currency',currency:'SAR'});
                                                             const baseline = d.baseline != null ? `\nBaseline: ${fmt(d.baseline)} (${d.baseline_tx})` : '';
@@ -783,7 +782,7 @@ const Accounts = () => {
                                     onClick={async () => {
                                         if (!window.confirm(`Delete ${selectedTxIds.size} transaction(s)?`)) return;
                                         try {
-                                            await axios.post(`${API_URL}/transactions/bulk-delete`, { ids: Array.from(selectedTxIds) });
+                                            await api.post(`${API_URL}/transactions/bulk-delete`, { ids: Array.from(selectedTxIds) });
                                             setSelectedTxIds(new Set());
                                             setIsSelectionMode(false);
                                             fetchData();
@@ -1243,7 +1242,7 @@ const Accounts = () => {
                                         type="button"
                                         onClick={async () => {
                                             try {
-                                                const res = await axios.post(`${API_URL}/accounts/${editingId}/recalculate-balance`);
+                                                const res = await api.post(`${API_URL}/accounts/${editingId}/recalculate-balance`);
                                                 const d = res.data;
                                                 const diff = d.new_balance - d.old_balance;
                                                 const diffStr = diff >= 0 ? `+${diff.toFixed(2)}` : diff.toFixed(2);
@@ -1284,7 +1283,7 @@ const Accounts = () => {
                                             onClick={async () => {
                                                 if (!confirm('Delete this alias?')) return;
                                                 try {
-                                                    await axios.delete(`${API_URL}/aliases/${alias.id}`);
+                                                    await api.delete(`${API_URL}/aliases/${alias.id}`);
                                                     // Refresh list locally
                                                     setAccountForm(prev => ({
                                                         ...prev,
@@ -1313,7 +1312,7 @@ const Accounts = () => {
                                     if (!aliasName || !aliasLast4) return;
 
                                     try {
-                                        const res = await axios.post(`${API_URL}/accounts/${editingId}/aliases`, {
+                                        const res = await api.post(`${API_URL}/accounts/${editingId}/aliases`, {
                                             alias_name: aliasName,
                                             last_4_digits: aliasLast4
                                         });

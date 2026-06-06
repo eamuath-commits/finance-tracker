@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api, { API_URL } from '../utils/api';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Modal, formatCurrency, inputClass, selectClass } from '../components/UI';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -88,17 +88,16 @@ const Obligations = () => {
         [obligations, paymentForm.id]
     );
 
-    const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
-
+    
     // --- Data Fetching ---
     const fetchData = async () => {
         console.log("🚀 Starting fetchData...");
         setLoading(true);
         try {
             const [oblRes, catRes, forecastRes] = await Promise.all([
-                axios.get(`${API_URL}/obligations/`),
-                axios.get(`${API_URL}/categories`),
-                axios.get(`${API_URL}/obligations/forecast?months_ahead=1`).catch(() => ({ data: null }))
+                api.get(`${API_URL}/obligations/`),
+                api.get(`${API_URL}/categories`),
+                api.get(`${API_URL}/obligations/forecast?months_ahead=1`).catch(() => ({ data: null }))
             ]);
 
             setObligations(oblRes.data);
@@ -112,10 +111,10 @@ const Obligations = () => {
                     console.log("Migrating categories...");
                     for (const cName of uniqueFromObs) {
                         try {
-                            await axios.post(`${API_URL}/categories`, { name: cName });
+                            await api.post(`${API_URL}/categories`, { name: cName });
                         } catch (e) { }
                     }
-                    const updatedCats = await axios.get(`${API_URL}/categories`);
+                    const updatedCats = await api.get(`${API_URL}/categories`);
                     finalCategories = updatedCats.data;
                 }
             }
@@ -125,7 +124,7 @@ const Obligations = () => {
             console.log("⏳ Fetching payments...");
             await Promise.all(oblRes.data.map(async (obl) => {
                 try {
-                    const hRes = await axios.get(`${API_URL}/obligations/${obl.id}/payments`);
+                    const hRes = await api.get(`${API_URL}/obligations/${obl.id}/payments`);
                     paymentsData[obl.id] = hRes.data;
                 } catch (hErr) {
                     paymentsData[obl.id] = [];
@@ -142,7 +141,7 @@ const Obligations = () => {
     useEffect(() => {
         fetchData();
         // Fetch period settings
-        axios.get(`${API_URL}/settings`).then(res => {
+        api.get(`${API_URL}/settings`).then(res => {
             const psd = res.data?.period_start_day;
             if (psd) setPeriodStartDay(parseInt(psd.value) || 1);
         }).catch(() => { });
@@ -211,9 +210,9 @@ const Obligations = () => {
 
         try {
             if (editingId) {
-                await axios.put(`${API_URL}/obligations/${editingId}`, payload);
+                await api.put(`${API_URL}/obligations/${editingId}`, payload);
             } else {
-                await axios.post(`${API_URL}/obligations/`, payload);
+                await api.post(`${API_URL}/obligations/`, payload);
             }
             setShowObligationModal(false);
             setEditingId(null);
@@ -229,7 +228,7 @@ const Obligations = () => {
             "This will permanently remove this obligation and all its payment history.",
             async () => {
                 try {
-                    await axios.delete(`${API_URL}/obligations/${editingId}`);
+                    await api.delete(`${API_URL}/obligations/${editingId}`);
                     setShowObligationModal(false);
                     setEditingId(null);
                     fetchData();
@@ -243,7 +242,7 @@ const Obligations = () => {
         setObligations(newOrderedObligations);
         try {
             const ids = newOrderedObligations.map(o => o.id);
-            await axios.put(`${API_URL}/obligations/reorder`, { ordered_ids: ids });
+            await api.put(`${API_URL}/obligations/reorder`, { ordered_ids: ids });
         } catch (err) { console.error("Reorder failed", err); }
     };
 
@@ -252,7 +251,7 @@ const Obligations = () => {
         e.preventDefault();
         if (!newCategoryName.trim()) return;
         try {
-            await axios.post(`${API_URL}/categories`, { name: newCategoryName });
+            await api.post(`${API_URL}/categories`, { name: newCategoryName });
             setNewCategoryName('');
             fetchData();
         } catch (error) { alert("Failed to add category"); }
@@ -261,7 +260,7 @@ const Obligations = () => {
     const handleUpdateCategory = async (id, newName) => {
         if (!newName.trim()) return;
         try {
-            await axios.put(`${API_URL}/categories/${id}`, { name: newName });
+            await api.put(`${API_URL}/categories/${id}`, { name: newName });
             setEditingCategory(null);
             fetchData();
         } catch (error) { alert("Failed to update category"); }
@@ -273,7 +272,7 @@ const Obligations = () => {
             "Associated obligations will become Uncategorized.",
             async () => {
                 try {
-                    await axios.delete(`${API_URL}/categories/${id}`);
+                    await api.delete(`${API_URL}/categories/${id}`);
                     fetchData();
                 } catch (error) { alert("Failed to delete category"); }
                 closeConfirm();
@@ -308,13 +307,13 @@ const Obligations = () => {
                 billing_month: data.billing_month, note: data.note, status: data.status
             };
             if (data.id && data.historyId) {
-                await axios.put(`${API_URL}/obligations/history/${data.historyId}`, payload);
+                await api.put(`${API_URL}/obligations/history/${data.historyId}`, payload);
             } else {
-                await axios.post(`${API_URL}/obligations/${paymentForm.id}/pay`, payload);
+                await api.post(`${API_URL}/obligations/${paymentForm.id}/pay`, payload);
             }
             setShowPaymentModal(false);
             if (viewingHistoryId) {
-                const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/payments`);
+                const hRes = await api.get(`${API_URL}/obligations/${viewingHistoryId}/payments`);
                 setSelectedHistory(hRes.data);
             }
             fetchData();
@@ -327,7 +326,7 @@ const Obligations = () => {
                 payment_date: new Date().toISOString(), amount: parseFloat(amount),
                 billing_month: billingMonth, note: status === "BUDGET" ? "Budgeted Amount" : "Quick Pay", status: status
             };
-            await axios.post(`${API_URL}/obligations/${oblId}/pay`, payload);
+            await api.post(`${API_URL}/obligations/${oblId}/pay`, payload);
             fetchData();
         } catch (err) { alert("Error processing quick payment"); }
     };
@@ -338,9 +337,9 @@ const Obligations = () => {
             "This payment record will be permanently removed.",
             async () => {
                 try {
-                    await axios.delete(`${API_URL}/obligations/history/${historyId}`);
+                    await api.delete(`${API_URL}/obligations/history/${historyId}`);
                     if (viewingHistoryId) {
-                        const hRes = await axios.get(`${API_URL}/obligations/${viewingHistoryId}/payments`);
+                        const hRes = await api.get(`${API_URL}/obligations/${viewingHistoryId}/payments`);
                         setSelectedHistory(hRes.data);
                     }
                     fetchData();

@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import axios from 'axios';
+import api, { API_URL } from '../utils/api';
 import { Layers, ArrowRight, ChevronRight, CheckCircle, AlertTriangle, Search } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
 const CATEGORY_COLORS = {
     "Salary": "border-emerald-500/40",
@@ -30,7 +29,7 @@ const AllocationRules = ({ accounts }) => {
 
     const fetchData = async () => {
         try {
-            const res = await axios.get(`${API_URL}/obligations/`);
+            const res = await api.get(`${API_URL}/obligations/`);
             setObligations(res.data);
         } catch (error) {
             console.error("Error fetching obligations", error);
@@ -46,7 +45,7 @@ const AllocationRules = ({ accounts }) => {
     const handleAssignAccount = async (obligationId, targetAccountId) => {
         setSaving(obligationId);
         try {
-            await axios.put(`${API_URL}/obligations/${obligationId}`, {
+            await api.put(`${API_URL}/obligations/${obligationId}`, {
                 target_account_id: targetAccountId || null
             });
             // Update local state immediately

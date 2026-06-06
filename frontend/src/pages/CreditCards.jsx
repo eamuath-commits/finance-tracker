@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from "react";
+import api, { API_URL } from '../utils/api';
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import { format } from "date-fns";
 import { CreditCard as CreditCardIcon, Plus, Edit3, Trash2, DollarSign, TrendingUp, Calendar, Percent, ChevronDown, ChevronUp } from "lucide-react";
 import { Modal, formatCurrency, formatCurrencyText, inputClass, selectClass } from "../components/UI";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
 
 // Get bank-specific card background image for credit cards
 const getBankCardTheme = (bankName) => {
@@ -194,8 +193,8 @@ function CreditCards() {
         setLoading(true);
         try {
             const [cardsRes, accRes] = await Promise.all([
-                axios.get(`${API_URL}/credit-cards/`),
-                axios.get(`${API_URL}/accounts/`)
+                api.get(`${API_URL}/credit-cards/`),
+                api.get(`${API_URL}/accounts/`)
             ]);
             setCreditCards(cardsRes.data);
             setAccounts(accRes.data);
@@ -208,7 +207,7 @@ function CreditCards() {
 
     const fetchCardTransactions = async (cardId) => {
         try {
-            const res = await axios.get(`${API_URL}/credit-cards/${cardId}/transactions`);
+            const res = await api.get(`${API_URL}/credit-cards/${cardId}/transactions`);
             setCardTransactions(prev => ({ ...prev, [cardId]: res.data }));
         } catch (err) {
             console.error("Error fetching transactions:", err);
@@ -228,9 +227,9 @@ function CreditCards() {
             };
 
             if (editingCard) {
-                await axios.put(`${API_URL}/credit-cards/${editingCard.id}`, payload);
+                await api.put(`${API_URL}/credit-cards/${editingCard.id}`, payload);
             } else {
-                await axios.post(`${API_URL}/credit-cards/`, payload);
+                await api.post(`${API_URL}/credit-cards/`, payload);
             }
             setShowModal(false);
             resetForm();
@@ -244,7 +243,7 @@ function CreditCards() {
     const handleDelete = async (cardId) => {
         if (!confirm("Delete this credit card? All associated transactions will be orphaned.")) return;
         try {
-            await axios.delete(`${API_URL}/credit-cards/${cardId}`);
+            await api.delete(`${API_URL}/credit-cards/${cardId}`);
             fetchData();
         } catch (err) {
             console.error("Error deleting card:", err);
@@ -257,7 +256,7 @@ function CreditCards() {
         if (!paymentCard || !paymentAmount) return;
         try {
             const url = `${API_URL}/credit-cards/${paymentCard.id}/payment?amount=${paymentAmount}${paymentFromAccount ? `&from_account_id=${paymentFromAccount}` : ''}`;
-            await axios.post(url);
+            await api.post(url);
             setShowPaymentModal(false);
             setPaymentCard(null);
             setPaymentAmount('');
