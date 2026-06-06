@@ -605,18 +605,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         db = database.SessionLocal()
         
-        # DEDUPLICATION CHECK - DISABLED PER USER REQUEST (to allow testing)
-        # existing_msg = db.query(models.RawMessage).filter(
-        #     models.RawMessage.sender == f"Telegram-{user_id}",
-        #     models.RawMessage.body == msg_text,
-        #     models.RawMessage.status.in_([models.MessageStatus.PARSED, models.MessageStatus.PENDING])
-        # ).first()
-        #
-        # if existing_msg:
-        #      logger.info(f"Skipping duplicate message from {user_id} (ID: {existing_msg.id})")
-        #      await message.reply_text("ℹ️ Skipped duplicate message.")
-        #      db.close()
-        #      return
+        # DEDUPLICATION CHECK
+        existing_msg = db.query(models.RawMessage).filter(
+            models.RawMessage.sender == f"Telegram-{user_id}",
+            models.RawMessage.body == msg_text,
+            models.RawMessage.status.in_([models.MessageStatus.PARSED, models.MessageStatus.PENDING])
+        ).first()
+
+        if existing_msg:
+             logger.info(f"Skipping duplicate message from {user_id} (ID: {existing_msg.id})")
+             await message.reply_text("ℹ️ Skipped duplicate message.")
+             db.close()
+             return
 
         raw_msg = models.RawMessage(
             sender=sms_sender or "Unknown",
@@ -791,6 +791,98 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if 'db' in locals(): db.close()
 
 async def _create_transaction_logic(db, result, source_account, source_credit_card, msg_text, reply_target=None, source="telegram"):
+    # --- DUPLICATE GUARD: Prevent the same SMS from creating multiple transactions ---
+    # Check by raw_sms_content (normalized match) OR by account+amount+merchant
+    from datetime import timedelta
+    import logging as _dup_logging
+    _dup_logger = _dup_logging.getLogger(__name__)
+    
+    if msg_text and msg_text.strip():
+        # Strategy 1: Normalized SMS body match (catches re-sends of identical messages)
+        # Normalize: strip, collapse whitespace, compare case-insensitively
+        normalized_body = '\n'.join(line.strip() for line in msg_text.strip().splitlines() if line.strip())
+        
+        # Query all transactions and compare normalized bodies
+        # Use ILIKE with key content fragments for DB-level filtering first
+        body_lines = [line.strip() for line in msg_text.strip().splitlines() if line.strip()]
+        # Skip header lines (date/time from BankName pattern)
+        content_lines = []
+        for line in body_lines:
+            line_lower = line.lower()
+            if ' from ' in line_lower and any(kw in line_lower for kw in ['bank', 'alrajhi', 'stc', 'alinma', 'albilad', 'anb']):
+                continue
+            if line:
+                content_lines.append(line)
+        
+        if len(content_lines) >= 2:
+            # Use first content line + one more for a robust check
+            search_key1 = content_lines[0][:60]
+            search_key2 = content_lines[1][:60]
+            
+            existing_by_body = db.query(models.Transaction).filter(
+                models.Transaction.raw_sms_content.ilike(f"%{search_key1}%"),
+                models.Transaction.raw_sms_content.ilike(f"%{search_key2}%"),
+                models.Transaction.status.in_(["completed", "pending_transfer", "pending_action"])
+            ).first()
+            
+            if existing_by_body:
+                _dup_logger.warning(
+                    f"[DUPLICATE] Blocked duplicate transaction — SMS content match "
+                    f"(existing tx={existing_by_body.id}, merchant={existing_by_body.merchant}, "
+                    f"amount={existing_by_body.amount})"
+                )
+                raise ValueError(
+                    f"Duplicate transaction detected: this SMS was already processed "
+                    f"(transaction {existing_by_body.id}, {existing_by_body.merchant}, "
+                    f"{existing_by_body.amount} SAR)"
+                )
+    
+    # Strategy 2: Same account + amount + type + merchant (catches near-identical transactions)
+    parsed_amount = result.get('amount')
+    parsed_type = (result.get('transaction_type') or 'debit').lower()
+    parsed_merchant = result.get('merchant') or result.get('description') or ''
+    target_account_id = source_account.id if source_account else None
+    target_cc_id = source_credit_card.id if source_credit_card else None
+    
+    if parsed_amount and parsed_merchant and (target_account_id or target_cc_id):
+        dup_query = db.query(models.Transaction).filter(
+            models.Transaction.amount == parsed_amount,
+            models.Transaction.type == parsed_type,
+            models.Transaction.status.in_(["completed", "pending_transfer"]),
+            models.Transaction.merchant.ilike(f"%{parsed_merchant[:30]}%"),
+        )
+        
+        if target_account_id:
+            dup_query = dup_query.filter(models.Transaction.account_id == target_account_id)
+        else:
+            dup_query = dup_query.filter(models.Transaction.credit_card_id == target_cc_id)
+        
+        # Also match on parsed SMS timestamp if available (e.g., Date:14/4/26 06:32)
+        parsed_ts = result.get('timestamp')
+        if parsed_ts:
+            try:
+                from dateutil import parser as _ts_parser
+                sms_ts = _ts_parser.parse(parsed_ts)
+                window = timedelta(minutes=10)
+                dup_query = dup_query.filter(
+                    models.Transaction.timestamp >= sms_ts - window,
+                    models.Transaction.timestamp <= sms_ts + window,
+                )
+            except:
+                pass  # If timestamp parsing fails, skip time filter (rely on amount+merchant+account)
+        
+        existing_by_match = dup_query.first()
+        if existing_by_match:
+            _dup_logger.warning(
+                f"[DUPLICATE] Blocked duplicate transaction — same account/amount/merchant match "
+                f"(existing tx={existing_by_match.id}, merchant={existing_by_match.merchant})"
+            )
+            raise ValueError(
+                f"Duplicate transaction detected: same amount ({parsed_amount} SAR) "
+                f"and merchant ({parsed_merchant}) already exists "
+                f"(transaction {existing_by_match.id})"
+            )
+
     # --- 0. Timestamp Handling: Use SMS timestamp for WebUI, current time for Telegram ---
     from dateutil import parser as date_parser
     import re
