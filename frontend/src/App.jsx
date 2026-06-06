@@ -20,6 +20,7 @@ import Merchants from './pages/Merchants';
 import Audit from './pages/Audit';
 import Settings from './pages/Settings';
 import Settlement from './pages/Settlement';
+import UserManagement from './pages/UserManagement';
 
 import { authUtils } from './utils/api';
 
@@ -61,6 +62,7 @@ function App() {
                     <Route path="audit" element={<Audit />} />
                     <Route path="settlement" element={<Settlement />} />
                     <Route path="settings" element={<Settings />} />
+                    <Route path="users" element={<UserManagement />} />
                 </Route>
             </Routes>
         </Router>

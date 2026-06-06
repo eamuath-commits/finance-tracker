@@ -125,3 +125,109 @@ def update_profile(
     db.commit()
     db.refresh(current_user)
     return current_user
+
+
+@router.put("/me/password")
+def change_own_password(
+    payload: schemas.ChangePassword,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Change the current user's password (requires current password)."""
+    if not verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    if len(payload.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    current_user.hashed_password = get_password_hash(payload.new_password)
+    db.commit()
+    return {"message": "Password changed successfully"}
+
+
+# ==============================
+# ADMIN — User Management
+# ==============================
+
+@router.get("/users", response_model=list[schemas.UserResponse])
+def list_users(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """List all users. Admin only (username == 'admin')."""
+    if current_user.username != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return db.query(models.User).order_by(models.User.created_at.asc()).all()
+
+
+@router.put("/users/{user_id}", response_model=schemas.UserResponse)
+def admin_update_user(
+    user_id: str,
+    payload: schemas.AdminUserUpdate,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update a user (email, is_active, telegram_user_id). Admin only."""
+    if current_user.username != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if payload.email is not None:
+        user.email = payload.email
+    if payload.is_active is not None:
+        user.is_active = payload.is_active
+    if payload.telegram_user_id is not None:
+        user.telegram_user_id = payload.telegram_user_id
+
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.post("/users/{user_id}/reset-password")
+def admin_reset_password(
+    user_id: str,
+    payload: schemas.AdminResetPassword,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Reset a user's password. Admin only."""
+    if current_user.username != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if len(payload.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    user.hashed_password = get_password_hash(payload.new_password)
+    db.commit()
+    return {"message": f"Password reset successfully for user '{user.username}'"}
+
+
+@router.delete("/users/{user_id}")
+def admin_delete_user(
+    user_id: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete a user. Admin only. Cannot delete self."""
+    if current_user.username != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    db.delete(user)
+    db.commit()
+    return {"message": f"User '{user.username}' deleted successfully"}
+

@@ -29,6 +29,18 @@ class UserUpdate(BaseModel):
     email: Optional[str] = None
     telegram_user_id: Optional[str] = None
 
+class AdminResetPassword(BaseModel):
+    new_password: str
+
+class AdminUserUpdate(BaseModel):
+    email: Optional[str] = None
+    is_active: Optional[bool] = None
+    telegram_user_id: Optional[str] = None
+
+class ChangePassword(BaseModel):
+    current_password: str
+    new_password: str
+
 
 # --- Currency Wallet Schemas ---
 class CurrencyWalletBase(BaseModel):
