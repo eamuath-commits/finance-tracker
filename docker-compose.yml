@@ -31,6 +31,10 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/finance_db
       - TZ=Asia/Riyadh
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - ALRAJHI_API_KEY=${ALRAJHI_API_KEY:-}
+      - ALRAJHI_API_SECRET=${ALRAJHI_API_SECRET:-}
+      - ALRAJHI_REDIRECT_URI=${ALRAJHI_REDIRECT_URI:-https://qayd.io/api/bank/callback}
+      - FRONTEND_URL=${FRONTEND_URL:-https://qayd.io}
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ./backend:/app

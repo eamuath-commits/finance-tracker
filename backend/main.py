@@ -14,6 +14,7 @@ logging.basicConfig(level=logging.INFO)
 import models
 import schemas
 import crud
+import bank_models
 from database import engine, get_db
 from sms_parser import parser
 import sms_agent
@@ -24,6 +25,7 @@ from rate_limiter import RateLimitMiddleware
 from webhook import router as webhook_router
 from settlement_service import router as settlement_router
 from auth_router import router as auth_router
+from alrajhi_router import router as alrajhi_router
 from auth_middleware import AuthMiddleware
 from auth import get_current_user
 
@@ -212,6 +214,9 @@ app.include_router(webhook_router)
 
 # Include settlement router for bank statement reconciliation
 app.include_router(settlement_router)
+
+# Include Al Rajhi bank integration router
+app.include_router(alrajhi_router)
 
 @app.get("/")
 def read_root():

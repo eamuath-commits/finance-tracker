@@ -19,6 +19,7 @@ PUBLIC_PATHS = {
     "/auth/token",
     "/webhook/sms",           # Telegram webhook (authenticated via ALLOWED_TELEGRAM_USERS)
     "/webhook/telegram",      # Telegram webhook alternate path
+    "/api/bank/callback",     # OAuth callback from Al Rajhi (no JWT in redirect)
 }
 
 # Path prefixes that are public (checked with startswith)
