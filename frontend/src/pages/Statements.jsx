@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../utils/api';
-import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, ArrowLeft, ArrowUpRight, ArrowDownLeft, ChevronRight, RefreshCw, Filter, Wallet, Calendar, Search, X } from 'lucide-react';
+import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, ArrowLeft, ArrowUpRight, ArrowDownLeft, ChevronRight, RefreshCw, Filter, Wallet, Calendar, Search, X, Download, Edit3, Check, MoreVertical, Eye } from 'lucide-react';
 
 const Statements = () => {
     const [statements, setStatements] = useState([]);
@@ -24,6 +24,17 @@ const Statements = () => {
     const [txAmountMin, setTxAmountMin] = useState('');
     const [txAmountMax, setTxAmountMax] = useState('');
     const [txCountLimit, setTxCountLimit] = useState('');
+    // List management state
+    const [selectedIds, setSelectedIds] = useState(new Set());
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [sortColumn, setSortColumn] = useState('imported_at');
+    const [sortDir, setSortDir] = useState('desc');
+    const [editingId, setEditingId] = useState(null);
+    const [editingField, setEditingField] = useState(null);
+    const [editValue, setEditValue] = useState('');
+    const [actionMenuId, setActionMenuId] = useState(null);
+    const [API_URL] = useState('/api/statements');
     // Accounts for filter dropdown (not needed - derived from statements)
 
     const fetchStatements = useCallback(async () => {
@@ -498,6 +509,148 @@ const Statements = () => {
         );
     }
 
+    // ─────────────── LIST MANAGEMENT HELPERS ───────────────
+
+    const handleSort = (col) => {
+        if (sortColumn === col) {
+            setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortColumn(col);
+            setSortDir(col === 'imported_at' ? 'desc' : 'asc');
+        }
+    };
+
+    const sortedFilteredStatements = useMemo(() => {
+        let result = [...filteredStatements];
+        if (statusFilter !== 'all') {
+            result = result.filter(s => s.status === statusFilter);
+        }
+        result.sort((a, b) => {
+            let aVal, bVal;
+            switch (sortColumn) {
+                case 'filename': aVal = a.original_filename || ''; bVal = b.original_filename || ''; break;
+                case 'account': aVal = a.account_name || a.account_number || ''; bVal = b.account_name || b.account_number || ''; break;
+                case 'period': aVal = a.statement_period_start || ''; bVal = b.statement_period_start || ''; break;
+                case 'tx_count': aVal = a.transaction_count || 0; bVal = b.transaction_count || 0; break;
+                case 'status': aVal = a.status || ''; bVal = b.status || ''; break;
+                case 'imported_at': default: aVal = a.imported_at || ''; bVal = b.imported_at || ''; break;
+            }
+            if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+            return 0;
+        });
+        return result;
+    }, [filteredStatements, statusFilter, sortColumn, sortDir]);
+
+    const summaryStats = useMemo(() => {
+        const s = filteredStatements;
+        return {
+            totalStatements: s.length,
+            totalTransactions: s.reduce((sum, st) => sum + (st.transaction_count || 0), 0),
+            totalDebits: s.reduce((sum, st) => {
+                if (st.opening_balance != null && st.closing_balance != null) {
+                    const diff = st.opening_balance - st.closing_balance;
+                    return sum + Math.max(0, diff);
+                }
+                return sum;
+            }, 0),
+        };
+    }, [filteredStatements]);
+
+    const toggleSelectAll = () => {
+        if (selectedIds.size === sortedFilteredStatements.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(sortedFilteredStatements.map(s => s.id)));
+        }
+    };
+
+    const toggleSelect = (id) => {
+        const next = new Set(selectedIds);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        setSelectedIds(next);
+    };
+
+    const handleBulkDelete = async () => {
+        if (!window.confirm(`Delete ${selectedIds.size} statement(s)?`)) return;
+        try {
+            await api.post('/api/statements/bulk-delete', { ids: Array.from(selectedIds) });
+            setSelectedIds(new Set());
+            setIsSelectionMode(false);
+            fetchStatements();
+        } catch (err) {
+            setError(err.response?.data?.detail || 'Bulk delete failed');
+        }
+    };
+
+    const handleBulkReparse = async () => {
+        try {
+            const res = await api.post('/api/statements/bulk-reparse', { ids: Array.from(selectedIds) });
+            setSelectedIds(new Set());
+            fetchStatements();
+            setUploadResult({ message: `Re-parsed ${res.data.results?.length || 0} statements` });
+        } catch (err) {
+            setError(err.response?.data?.detail || 'Bulk re-parse failed');
+        }
+    };
+
+    const handleBulkStatus = async (status) => {
+        try {
+            await api.post('/api/statements/bulk-status', { ids: Array.from(selectedIds), status });
+            setSelectedIds(new Set());
+            fetchStatements();
+        } catch (err) {
+            setError(err.response?.data?.detail || 'Status update failed');
+        }
+    };
+
+    const handleInlineEdit = async (id, field, value) => {
+        try {
+            await api.patch(`/api/statements/${id}`, { [field]: value });
+            fetchStatements();
+        } catch (err) {
+            setError(err.response?.data?.detail || 'Update failed');
+        }
+        setEditingId(null);
+        setEditingField(null);
+    };
+
+    const handleStatusChange = async (id, status) => {
+        try {
+            await api.patch(`/api/statements/${id}`, { status });
+            fetchStatements();
+        } catch (err) {
+            setError(err.response?.data?.detail || 'Status update failed');
+        }
+        setActionMenuId(null);
+    };
+
+    const downloadPdf = (id) => {
+        window.open(`/api/statements/${id}/pdf`, '_blank');
+    };
+
+    const getStatusConfig = (status) => {
+        const configs = {
+            draft: { color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20', icon: Clock, label: 'Draft' },
+            reviewed: { color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', icon: Eye, label: 'Reviewed' },
+            approved: { color: 'bg-green-500/10 text-green-400 border-green-500/20', icon: CheckCircle2, label: 'Approved' },
+            rejected: { color: 'bg-red-500/10 text-red-400 border-red-500/20', icon: XCircle, label: 'Rejected' },
+        };
+        return configs[status] || configs.draft;
+    };
+
+    const SortHeader = ({ col, label, align = 'left' }) => (
+        <th
+            className={`px-4 py-3 text-${align} text-[11px] text-gray-500 uppercase tracking-wider cursor-pointer hover:text-white transition-colors group whitespace-nowrap`}
+            onClick={() => handleSort(col)}
+        >
+            <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
+                {label}
+                {sortColumn === col && <span className="text-blue-400">{sortDir === 'asc' ? '↑' : '↓'}</span>}
+            </span>
+        </th>
+    );
+
     // ─────────────── LIST VIEW ───────────────
     return (
         <div className="space-y-6">
@@ -509,11 +662,20 @@ const Statements = () => {
                 </div>
                 <div className="flex items-center gap-3">
                     <button
-                        onClick={() => document.getElementById('pdf-file-input').click()}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors"
+                        onClick={() => { setIsSelectionMode(!isSelectionMode); if (isSelectionMode) setSelectedIds(new Set()); }}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition border ${
+                            isSelectionMode
+                                ? 'bg-yellow-600 hover:bg-yellow-700 border-yellow-500 text-white'
+                                : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-gray-300'
+                        }`}
                     >
-                        <Upload size={16} />
-                        Upload PDF
+                        {isSelectionMode ? 'Cancel' : 'Select'}
+                    </button>
+                    <button
+                        onClick={() => document.getElementById('pdf-file-input').click()}
+                        className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors"
+                    >
+                        <Upload size={16} />Upload PDF
                     </button>
                 </div>
             </div>
@@ -524,47 +686,33 @@ const Statements = () => {
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
-                className={`rounded-xl border-2 border-dashed transition-all duration-300 p-6 text-center cursor-pointer ${
-                    dragActive
-                        ? 'border-blue-500 bg-blue-500/5'
-                        : 'border-slate-800 bg-slate-900/30 hover:border-slate-700 hover:bg-slate-900/50'
+                className={`rounded-xl border-2 border-dashed transition-all duration-300 p-5 text-center cursor-pointer ${
+                    dragActive ? 'border-blue-500 bg-blue-500/5' : 'border-slate-800 bg-slate-900/30 hover:border-slate-700'
                 }`}
                 onClick={() => document.getElementById('pdf-file-input').click()}
             >
                 <input id="pdf-file-input" type="file" accept=".pdf,application/pdf" className="hidden" onChange={handleFileInput} />
                 {uploading ? (
                     <div className="flex items-center justify-center gap-3">
-                        <Loader2 size={20} className="text-blue-400 animate-spin" />
-                        <p className="text-gray-300 text-sm">Uploading & parsing PDF...</p>
+                        <Loader2 size={18} className="text-blue-400 animate-spin" />
+                        <p className="text-gray-300 text-sm">Uploading & parsing...</p>
                     </div>
                 ) : (
                     <div className="flex items-center justify-center gap-3">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${dragActive ? 'bg-blue-500/20' : 'bg-slate-800'}`}>
-                            <Upload size={18} className={dragActive ? 'text-blue-400' : 'text-gray-500'} />
-                        </div>
-                        <div className="text-left">
-                            <p className="text-gray-300 text-sm font-medium">Drop a PDF here or click to browse</p>
-                            <p className="text-gray-600 text-xs">Al Rajhi bank statements (.pdf)</p>
-                        </div>
+                        <Upload size={16} className={dragActive ? 'text-blue-400' : 'text-gray-600'} />
+                        <span className="text-gray-400 text-sm">Drop PDF here or click to browse</span>
                     </div>
                 )}
             </div>
 
-            {/* Upload Result Toast */}
+            {/* Upload Result */}
             {uploadResult && (
                 <div className={`rounded-xl border p-4 ${uploadResult.warning ? 'bg-amber-500/5 border-amber-500/20' : 'bg-emerald-500/5 border-emerald-500/20'}`}>
                     <div className="flex items-start gap-3">
                         {uploadResult.warning ? <AlertTriangle size={18} className="text-amber-400 mt-0.5" /> : <CheckCircle2 size={18} className="text-emerald-400 mt-0.5" />}
-                        <div className="flex-1 text-sm">
-                            <p className={`font-medium ${uploadResult.warning ? 'text-amber-300' : 'text-emerald-300'}`}>
-                                {uploadResult.warning || uploadResult.message}
-                            </p>
-                            <div className="mt-1.5 flex items-center gap-4 text-xs text-gray-400">
-                                <span>{uploadResult.original_filename}</span>
-                                {uploadResult.account_number && <span>Account: {uploadResult.account_number}</span>}
-                                {uploadResult.transaction_count > 0 && <span className="text-emerald-400">{uploadResult.transaction_count} transactions</span>}
-                            </div>
-                        </div>
+                        <p className={`flex-1 text-sm font-medium ${uploadResult.warning ? 'text-amber-300' : 'text-emerald-300'}`}>
+                            {uploadResult.warning || uploadResult.message}
+                        </p>
                         <button onClick={() => setUploadResult(null)} className="text-gray-500 hover:text-gray-300"><XCircle size={16} /></button>
                     </div>
                 </div>
@@ -578,10 +726,33 @@ const Statements = () => {
                 </div>
             )}
 
+            {/* Summary Stats */}
+            {statements.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4">
+                        <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1">Statements</p>
+                        <p className="text-xl text-white font-bold">{summaryStats.totalStatements}</p>
+                    </div>
+                    <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4">
+                        <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1">Total Transactions</p>
+                        <p className="text-xl text-white font-bold">{summaryStats.totalTransactions.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4">
+                        <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1">Accounts</p>
+                        <p className="text-xl text-white font-bold">{statementAccounts.length}</p>
+                    </div>
+                    <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4">
+                        <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1">Net Change</p>
+                        <p className={`text-xl font-bold ${summaryStats.totalDebits >= 0 ? 'text-red-400' : 'text-green-400'}`}>
+                            {formatAmount(summaryStats.totalDebits)} <span className="text-[11px] text-gray-500">SAR</span>
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {/* Filters Bar */}
             {statements.length > 0 && (
                 <div className="flex items-center gap-3 flex-wrap">
-                    {/* Search */}
                     <div className="relative flex-1 min-w-[200px] max-w-sm">
                         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
                         <input
@@ -592,8 +763,6 @@ const Statements = () => {
                             className="w-full pl-9 pr-4 py-2 rounded-lg bg-slate-900 border border-slate-800 text-sm text-gray-300 placeholder-gray-600 focus:outline-none focus:border-blue-500/50 transition-colors"
                         />
                     </div>
-
-                    {/* Account Filter Pills */}
                     <div className="flex items-center gap-1.5">
                         <Filter size={14} className="text-gray-500 mr-1" />
                         <button
@@ -616,21 +785,52 @@ const Statements = () => {
                                         : 'bg-slate-900 text-gray-400 border border-slate-800 hover:border-slate-700'
                                 }`}
                             >
-                                <Wallet size={12} />
-                                {acct.name}
-                                <span className="text-gray-600 ml-0.5">({acct.count})</span>
+                                <Wallet size={12} />{acct.name}
+                                <span className="text-gray-600">({acct.count})</span>
                             </button>
                         ))}
+                    </div>
+                    <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="px-3 py-1.5 rounded-lg text-xs bg-slate-900 text-gray-300 border border-slate-800 focus:outline-none focus:border-blue-500/50 appearance-none"
+                    >
+                        <option value="all">All Status</option>
+                        <option value="draft">Draft</option>
+                        <option value="reviewed">Reviewed</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                    </select>
+                </div>
+            )}
+
+            {/* Bulk Action Bar */}
+            {isSelectionMode && selectedIds.size > 0 && (
+                <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-3 flex items-center gap-3 flex-wrap">
+                    <span className="text-sm text-blue-300 font-medium">{selectedIds.size} selected</span>
+                    <div className="flex gap-2 ml-auto">
+                        <button onClick={() => handleBulkStatus('reviewed')} className="px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-300 text-xs font-medium border border-blue-500/30 hover:bg-blue-600/30 transition">
+                            <Eye size={12} className="inline mr-1" />Mark Reviewed
+                        </button>
+                        <button onClick={() => handleBulkStatus('approved')} className="px-3 py-1.5 rounded-lg bg-green-600/20 text-green-300 text-xs font-medium border border-green-500/30 hover:bg-green-600/30 transition">
+                            <CheckCircle2 size={12} className="inline mr-1" />Approve
+                        </button>
+                        <button onClick={handleBulkReparse} className="px-3 py-1.5 rounded-lg bg-slate-700 text-gray-300 text-xs font-medium border border-slate-600 hover:bg-slate-600 transition">
+                            <RefreshCw size={12} className="inline mr-1" />Re-parse All
+                        </button>
+                        <button onClick={handleBulkDelete} className="px-3 py-1.5 rounded-lg bg-red-600/20 text-red-300 text-xs font-medium border border-red-500/30 hover:bg-red-600/30 transition">
+                            <Trash2 size={12} className="inline mr-1" />Delete
+                        </button>
                     </div>
                 </div>
             )}
 
-            {/* Statements Grid */}
+            {/* Statements Table */}
             {loading ? (
                 <div className="flex items-center justify-center py-20">
                     <Loader2 size={32} className="text-blue-400 animate-spin" />
                 </div>
-            ) : filteredStatements.length === 0 ? (
+            ) : sortedFilteredStatements.length === 0 ? (
                 <div className="text-center py-20 bg-slate-900/30 rounded-2xl border border-slate-800">
                     {statements.length === 0 ? (
                         <>
@@ -641,81 +841,196 @@ const Statements = () => {
                     ) : (
                         <>
                             <Search size={40} className="text-gray-700 mx-auto mb-4" />
-                            <p className="text-gray-400">No statements match your filter</p>
-                            <button onClick={() => { setAccountFilter('all'); setSearchQuery(''); }} className="text-blue-400 text-sm mt-2 hover:underline">Clear filters</button>
+                            <p className="text-gray-400">No statements match your filters</p>
+                            <button onClick={() => { setAccountFilter('all'); setSearchQuery(''); setStatusFilter('all'); }} className="text-blue-400 text-sm mt-2 hover:underline">Clear filters</button>
                         </>
                     )}
                 </div>
             ) : (
-                <div className="space-y-2.5">
-                    {filteredStatements.map((s) => (
-                        <div
-                            key={s.id}
-                            onClick={() => openStatementDetail(s.id)}
-                            className="bg-slate-900/60 rounded-xl border border-slate-800/80 hover:border-blue-500/25 hover:bg-slate-900/90 transition-all cursor-pointer group"
-                        >
-                            <div className="flex items-center p-4 gap-4">
-                                {/* Icon */}
-                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border border-blue-500/15 flex items-center justify-center flex-shrink-0">
-                                    <FileText size={20} className="text-blue-400" />
-                                </div>
-
-                                {/* Info */}
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <p className="text-white font-medium text-sm truncate">{s.original_filename}</p>
-                                        {getStatusBadge(s.status)}
-                                    </div>
-                                    <div className="flex items-center gap-3 mt-1.5">
-                                        {/* Account badge */}
-                                        {(s.account_name || s.account_number) && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 text-xs text-gray-300 border border-slate-700">
-                                                <Wallet size={10} className="text-blue-400" />
-                                                {s.account_name || `****${s.account_number.slice(-4)}`}
-                                                {s.account_last4 && <span className="text-gray-500 font-mono ml-0.5">({s.account_last4})</span>}
-                                            </span>
-                                        )}
-                                        {/* Period */}
-                                        {s.statement_period_start && s.statement_period_end && (
-                                            <span className="inline-flex items-center gap-1 text-xs text-gray-500">
-                                                <Calendar size={10} />
-                                                {formatDate(s.statement_period_start)} – {formatDate(s.statement_period_end)}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Right side stats */}
-                                <div className="flex items-center gap-5 flex-shrink-0">
-                                    {/* Balance range */}
-                                    {s.opening_balance != null && s.closing_balance != null && (
-                                        <div className="text-right hidden md:block">
-                                            <p className="text-xs text-gray-500">Balance</p>
-                                            <p className="text-xs font-mono text-gray-400">
-                                                {formatAmount(s.opening_balance)} → {formatAmount(s.closing_balance)}
-                                            </p>
-                                        </div>
+                <div className="bg-slate-900/60 rounded-xl border border-slate-800 overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-slate-800">
+                                    {isSelectionMode && (
+                                        <th className="px-4 py-3 w-10">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.size === sortedFilteredStatements.length && sortedFilteredStatements.length > 0}
+                                                onChange={toggleSelectAll}
+                                                className="w-4 h-4 accent-blue-500 rounded"
+                                            />
+                                        </th>
                                     )}
-                                    {/* Transaction count */}
-                                    {s.transaction_count > 0 && (
-                                        <div className="text-right">
-                                            <p className="text-lg font-semibold text-white">{s.transaction_count}</p>
-                                            <p className="text-[10px] text-gray-500 uppercase tracking-wider">txns</p>
-                                        </div>
-                                    )}
-                                    {/* Delete */}
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); handleDelete(s.id); }}
-                                        className="p-2 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
-                                        title="Delete"
-                                    >
-                                        <Trash2 size={15} />
-                                    </button>
-                                    <ChevronRight size={16} className="text-gray-700 group-hover:text-blue-400 transition-colors" />
-                                </div>
-                            </div>
-                        </div>
-                    ))}
+                                    <SortHeader col="filename" label="Statement" />
+                                    <SortHeader col="account" label="Account" />
+                                    <SortHeader col="period" label="Period" />
+                                    <SortHeader col="tx_count" label="Txns" align="right" />
+                                    <th className="px-4 py-3 text-right text-[11px] text-gray-500 uppercase tracking-wider">Balance</th>
+                                    <SortHeader col="status" label="Status" />
+                                    <th className="px-4 py-3 text-[11px] text-gray-500 uppercase tracking-wider">Notes</th>
+                                    <SortHeader col="imported_at" label="Imported" />
+                                    <th className="px-4 py-3 text-right text-[11px] text-gray-500 uppercase tracking-wider w-28">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {sortedFilteredStatements.map((s) => {
+                                    const sc = getStatusConfig(s.status);
+                                    const StatusIcon = sc.icon;
+                                    return (
+                                        <tr
+                                            key={s.id}
+                                            className={`border-b border-slate-800/50 hover:bg-slate-800/40 transition-colors group ${
+                                                selectedIds.has(s.id) ? 'bg-blue-900/15' : ''
+                                            }`}
+                                        >
+                                            {isSelectionMode && (
+                                                <td className="px-4 py-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedIds.has(s.id)}
+                                                        onChange={() => toggleSelect(s.id)}
+                                                        className="w-4 h-4 accent-blue-500 rounded"
+                                                    />
+                                                </td>
+                                            )}
+                                            <td className="px-4 py-3">
+                                                {editingId === s.id && editingField === 'original_filename' ? (
+                                                    <div className="flex items-center gap-1">
+                                                        <input
+                                                            autoFocus
+                                                            className="bg-slate-800 border border-blue-500 rounded px-2 py-1 text-xs text-white w-48 focus:outline-none"
+                                                            value={editValue}
+                                                            onChange={e => setEditValue(e.target.value)}
+                                                            onKeyDown={e => { if (e.key === 'Enter') handleInlineEdit(s.id, 'original_filename', editValue); if (e.key === 'Escape') setEditingId(null); }}
+                                                        />
+                                                        <button onClick={() => handleInlineEdit(s.id, 'original_filename', editValue)} className="text-green-400 hover:text-green-300"><Check size={14} /></button>
+                                                        <button onClick={() => setEditingId(null)} className="text-gray-500 hover:text-gray-300"><X size={14} /></button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-2 cursor-pointer group/name" onClick={() => openStatementDetail(s.id)}>
+                                                        <FileText size={16} className="text-blue-400 flex-shrink-0" />
+                                                        <div className="min-w-0">
+                                                            <p className="text-white text-xs font-medium truncate max-w-[200px] group-hover/name:text-blue-400 transition-colors">{s.original_filename}</p>
+                                                            <p className="text-[10px] text-gray-600">{s.bank_name}</p>
+                                                        </div>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); setEditingId(s.id); setEditingField('original_filename'); setEditValue(s.original_filename || ''); }}
+                                                            className="text-gray-700 hover:text-gray-400 opacity-0 group-hover:opacity-100 transition"
+                                                            title="Rename"
+                                                        >
+                                                            <Edit3 size={12} />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {(s.account_name || s.account_number) ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 text-xs text-gray-300 border border-slate-700">
+                                                        <Wallet size={10} className="text-blue-400" />
+                                                        {s.account_name || `****${s.account_number?.slice(-4)}`}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-gray-600">—</span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 whitespace-nowrap">
+                                                {s.statement_period_start ? (
+                                                    <span className="text-xs text-gray-400">
+                                                        {formatDate(s.statement_period_start)}
+                                                        <br/>
+                                                        <span className="text-gray-600">to</span> {formatDate(s.statement_period_end)}
+                                                    </span>
+                                                ) : <span className="text-xs text-gray-600">—</span>}
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <span className="text-xs text-white font-semibold">{s.transaction_count || 0}</span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right whitespace-nowrap">
+                                                {s.opening_balance != null ? (
+                                                    <div className="text-xs font-mono">
+                                                        <span className="text-gray-400">{formatAmount(s.opening_balance)}</span>
+                                                        <span className="text-gray-600 mx-1">→</span>
+                                                        <span className="text-gray-300">{formatAmount(s.closing_balance)}</span>
+                                                    </div>
+                                                ) : <span className="text-xs text-gray-600">—</span>}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="relative">
+                                                    <button
+                                                        onClick={() => setActionMenuId(actionMenuId === s.id + '-status' ? null : s.id + '-status')}
+                                                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border cursor-pointer transition hover:opacity-80 ${sc.color}`}
+                                                    >
+                                                        <StatusIcon size={11} />{sc.label}
+                                                    </button>
+                                                    {actionMenuId === s.id + '-status' && (
+                                                        <>
+                                                            <div className="fixed inset-0 z-40" onClick={() => setActionMenuId(null)} />
+                                                            <div className="absolute left-0 mt-1 w-36 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-50 overflow-hidden">
+                                                                {['draft', 'reviewed', 'approved', 'rejected'].map(st => (
+                                                                    <button
+                                                                        key={st}
+                                                                        onClick={() => handleStatusChange(s.id, st)}
+                                                                        className={`w-full px-3 py-2 text-left text-xs flex items-center gap-2 transition ${
+                                                                            s.status === st ? 'bg-blue-600/20 text-blue-300' : 'text-gray-300 hover:bg-slate-700'
+                                                                        }`}
+                                                                    >
+                                                                        {React.createElement(getStatusConfig(st).icon, { size: 12 })}
+                                                                        {getStatusConfig(st).label}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {editingId === s.id && editingField === 'notes' ? (
+                                                    <div className="flex items-center gap-1">
+                                                        <input
+                                                            autoFocus
+                                                            className="bg-slate-800 border border-blue-500 rounded px-2 py-1 text-xs text-white w-32 focus:outline-none"
+                                                            value={editValue}
+                                                            onChange={e => setEditValue(e.target.value)}
+                                                            placeholder="Add notes..."
+                                                            onKeyDown={e => { if (e.key === 'Enter') handleInlineEdit(s.id, 'notes', editValue); if (e.key === 'Escape') setEditingId(null); }}
+                                                        />
+                                                        <button onClick={() => handleInlineEdit(s.id, 'notes', editValue)} className="text-green-400 hover:text-green-300"><Check size={14} /></button>
+                                                    </div>
+                                                ) : (
+                                                    <span
+                                                        className="text-xs text-gray-500 cursor-pointer hover:text-gray-300 transition max-w-[120px] truncate block"
+                                                        title={s.notes || 'Click to add notes'}
+                                                        onClick={() => { setEditingId(s.id); setEditingField('notes'); setEditValue(s.notes || ''); }}
+                                                    >
+                                                        {s.notes || <span className="text-gray-700 italic">Add notes...</span>}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 whitespace-nowrap">
+                                                <span className="text-[11px] text-gray-500">
+                                                    {s.imported_at ? new Date(s.imported_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition">
+                                                    <button onClick={() => openStatementDetail(s.id)} className="p-1.5 rounded text-gray-500 hover:text-blue-400 hover:bg-blue-500/10 transition" title="View transactions">
+                                                        <Eye size={14} />
+                                                    </button>
+                                                    <button onClick={() => downloadPdf(s.id)} className="p-1.5 rounded text-gray-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition" title="Download PDF">
+                                                        <Download size={14} />
+                                                    </button>
+                                                    <button onClick={(e) => { e.stopPropagation(); handleDelete(s.id); }} className="p-1.5 rounded text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition" title="Delete">
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
         </div>

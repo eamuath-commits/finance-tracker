@@ -20,6 +20,8 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import Optional, List
 
 from database import get_db
 import models
@@ -270,6 +272,7 @@ def list_statements(
             "reconciliation_status": s.reconciliation_status,
             "status": s.status,
             "pdf_type": s.pdf_type,
+            "notes": s.notes,
             "imported_at": s.imported_at.isoformat() if s.imported_at else None,
         }
         for s in statements
@@ -311,6 +314,7 @@ def get_statement(
         "reconciliation_errors": statement.reconciliation_errors,
         "status": statement.status,
         "pdf_type": statement.pdf_type,
+        "notes": statement.notes,
         "imported_at": statement.imported_at.isoformat() if statement.imported_at else None,
     }
 
@@ -338,6 +342,128 @@ def serve_statement_pdf(
         media_type="application/pdf",
         filename=statement.original_filename or f"statement_{statement_id}.pdf",
     )
+
+class StatementUpdateRequest(BaseModel):
+    original_filename: Optional[str] = None
+    notes: Optional[str] = None
+    status: Optional[str] = None
+
+
+@router.patch("/{statement_id}")
+def update_statement(
+    statement_id: str,
+    body: StatementUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Update statement metadata (rename, notes, status)."""
+    statement = db.query(models.Statement).filter(
+        models.Statement.id == statement_id,
+        models.Statement.user_id == current_user.id,
+    ).first()
+    
+    if not statement:
+        raise HTTPException(status_code=404, detail="Statement not found")
+    
+    if body.original_filename is not None:
+        statement.original_filename = body.original_filename
+    if body.notes is not None:
+        statement.notes = body.notes
+    if body.status is not None:
+        if body.status not in ("draft", "reviewed", "approved", "rejected"):
+            raise HTTPException(status_code=400, detail="Invalid status. Must be draft, reviewed, approved, or rejected.")
+        statement.status = body.status
+    
+    db.commit()
+    return {"message": "Statement updated", "id": statement.id}
+
+
+class BulkIdsRequest(BaseModel):
+    ids: List[str]
+
+
+@router.post("/bulk-delete")
+def bulk_delete_statements(
+    body: BulkIdsRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Delete multiple statements and their draft transactions."""
+    statements = db.query(models.Statement).filter(
+        models.Statement.id.in_(body.ids),
+        models.Statement.user_id == current_user.id,
+    ).all()
+    
+    deleted = 0
+    skipped = 0
+    for s in statements:
+        if s.status == "approved":
+            skipped += 1
+            continue
+        # Delete draft transactions
+        db.query(models.Transaction).filter(
+            models.Transaction.statement_id == s.id,
+            models.Transaction.status == "draft",
+        ).delete(synchronize_session=False)
+        # Delete PDF
+        if s.file_path and os.path.exists(s.file_path):
+            try:
+                os.remove(s.file_path)
+            except OSError:
+                pass
+        db.delete(s)
+        deleted += 1
+    
+    db.commit()
+    return {"message": f"Deleted {deleted} statements", "deleted": deleted, "skipped": skipped}
+
+
+@router.post("/bulk-reparse")
+def bulk_reparse_statements(
+    body: BulkIdsRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Re-parse multiple statements."""
+    statements = db.query(models.Statement).filter(
+        models.Statement.id.in_(body.ids),
+        models.Statement.user_id == current_user.id,
+        models.Statement.pdf_type == "text",
+    ).all()
+    
+    results = []
+    for s in statements:
+        if s.file_path and os.path.exists(s.file_path):
+            parsed = _parse_and_store(s, db)
+            results.append({
+                "id": s.id,
+                "filename": s.original_filename,
+                "transaction_count": len(parsed.get("transactions", [])),
+                "error": parsed.get("error"),
+            })
+    
+    return {"message": f"Re-parsed {len(results)} statements", "results": results}
+
+
+@router.post("/bulk-status")
+def bulk_update_status(
+    body: dict,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Update status of multiple statements."""
+    ids = body.get("ids", [])
+    status = body.get("status", "")
+    if status not in ("draft", "reviewed", "approved", "rejected"):
+        raise HTTPException(status_code=400, detail="Invalid status")
+    
+    updated = db.query(models.Statement).filter(
+        models.Statement.id.in_(ids),
+        models.Statement.user_id == current_user.id,
+    ).update({"status": status}, synchronize_session=False)
+    
+    db.commit()
+    return {"message": f"Updated {updated} statements to {status}", "updated": updated}
 
 
 @router.delete("/{statement_id}")

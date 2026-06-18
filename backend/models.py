@@ -448,6 +448,7 @@ class Statement(Base):
     reconciliation_errors = Column(Text, nullable=True)  # JSON: details of mismatches
     status = Column(String, default="draft")  # draft / approved / rejected
     pdf_type = Column(String, nullable=True)  # text / scanned
+    notes = Column(Text, nullable=True)  # User-added notes/tags
     imported_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
