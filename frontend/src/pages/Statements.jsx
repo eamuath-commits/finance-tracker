@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../utils/api';
-import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, ArrowLeft, ArrowUpRight, ArrowDownLeft, ChevronRight, RefreshCw, Filter, Wallet, Calendar, Search, X, Download, Edit3, Check, MoreVertical, Eye } from 'lucide-react';
+import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, ArrowLeft, ArrowUpRight, ArrowDownLeft, ChevronRight, ChevronDown, RefreshCw, Filter, Wallet, Calendar, Search, X, Download, Edit3, Check, MoreVertical, Eye, ShieldCheck } from 'lucide-react';
 
 const Statements = () => {
     const [statements, setStatements] = useState([]);
@@ -38,6 +38,10 @@ const Statements = () => {
     // Commit to ledger state
     const [committing, setCommitting] = useState(false);
     const [commitResult, setCommitResult] = useState(null);
+    // Validation state
+    const [validationResult, setValidationResult] = useState(null);
+    const [validating, setValidating] = useState(false);
+    const [showValidationDetails, setShowValidationDetails] = useState(false);
     // Accounts for filter dropdown (not needed - derived from statements)
 
     const fetchStatements = useCallback(async () => {
@@ -189,6 +193,21 @@ const Statements = () => {
             setError(err.response?.data?.detail || 'Commit to ledger failed');
         } finally {
             setCommitting(false);
+        }
+    };
+
+    const handleValidate = async () => {
+        if (!selectedStatement) return;
+        setValidating(true);
+        setValidationResult(null);
+        try {
+            const res = await api.get(`/api/statements/${selectedStatement}/validate`);
+            setValidationResult(res.data);
+            setShowValidationDetails(true);
+        } catch (err) {
+            setError(err.response?.data?.detail || 'Validation failed');
+        } finally {
+            setValidating(false);
         }
     };
 
@@ -409,6 +428,132 @@ const Statements = () => {
                         </div>
                     </div>
                 )}
+
+                {/* Validation Panel */}
+                <div className="bg-slate-900/80 rounded-xl border border-slate-800 overflow-hidden">
+                    <button
+                        onClick={() => validationResult ? setShowValidationDetails(!showValidationDetails) : handleValidate()}
+                        disabled={validating}
+                        className="w-full px-5 py-3.5 flex items-center gap-3 hover:bg-slate-800/50 transition-colors"
+                    >
+                        {validating ? (
+                            <Loader2 size={16} className="text-blue-400 animate-spin" />
+                        ) : validationResult?.valid ? (
+                            <ShieldCheck size={16} className="text-emerald-400" />
+                        ) : validationResult ? (
+                            <AlertTriangle size={16} className="text-amber-400" />
+                        ) : (
+                            <ShieldCheck size={16} className="text-gray-500" />
+                        )}
+                        <span className={`text-sm font-medium flex-1 text-left ${
+                            validationResult?.valid ? 'text-emerald-300' : validationResult ? 'text-amber-300' : 'text-gray-300'
+                        }`}>
+                            {validating ? 'Validating...' : validationResult ? validationResult.summary : 'Validate Balance Chain'}
+                        </span>
+                        {validationResult && (
+                            <ChevronDown size={16} className={`text-gray-500 transition-transform ${showValidationDetails ? 'rotate-180' : ''}`} />
+                        )}
+                        {!validationResult && !validating && (
+                            <span className="text-xs text-gray-600">Click to run</span>
+                        )}
+                    </button>
+
+                    {showValidationDetails && validationResult && (
+                        <div className="border-t border-slate-800 px-5 py-4 space-y-3">
+                            {/* Check results */}
+                            <div className="space-y-2">
+                                {validationResult.checks.map((check, i) => (
+                                    <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border ${
+                                        check.status === 'pass'
+                                            ? 'bg-emerald-500/5 border-emerald-500/20'
+                                            : 'bg-red-500/5 border-red-500/20'
+                                    }`}>
+                                        {check.status === 'pass' ? (
+                                            <CheckCircle2 size={16} className="text-emerald-400 mt-0.5 flex-shrink-0" />
+                                        ) : (
+                                            <XCircle size={16} className="text-red-400 mt-0.5 flex-shrink-0" />
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                            <p className={`text-sm font-medium ${check.status === 'pass' ? 'text-emerald-300' : 'text-red-300'}`}>
+                                                {check.name}
+                                            </p>
+                                            <p className="text-xs text-gray-400 mt-0.5 font-mono">{check.detail}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Aggregates */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-2">
+                                <div className="text-center p-2 bg-slate-800/50 rounded-lg">
+                                    <p className="text-[10px] text-gray-500 uppercase">Total Debits</p>
+                                    <p className="text-sm text-red-400 font-mono">{validationResult.total_debits?.toLocaleString('en-SA', { minimumFractionDigits: 2 })}</p>
+                                </div>
+                                <div className="text-center p-2 bg-slate-800/50 rounded-lg">
+                                    <p className="text-[10px] text-gray-500 uppercase">Total Credits</p>
+                                    <p className="text-sm text-green-400 font-mono">{validationResult.total_credits?.toLocaleString('en-SA', { minimumFractionDigits: 2 })}</p>
+                                </div>
+                                <div className="text-center p-2 bg-slate-800/50 rounded-lg">
+                                    <p className="text-[10px] text-gray-500 uppercase">Net Change</p>
+                                    <p className="text-sm text-gray-300 font-mono">{(validationResult.total_debits - validationResult.total_credits)?.toLocaleString('en-SA', { minimumFractionDigits: 2 })}</p>
+                                </div>
+                                <div className="text-center p-2 bg-slate-800/50 rounded-lg">
+                                    <p className="text-[10px] text-gray-500 uppercase">Rows Checked</p>
+                                    <p className="text-sm text-gray-300">{validationResult.transaction_count}</p>
+                                </div>
+                            </div>
+
+                            {/* Row errors table */}
+                            {validationResult.row_errors?.length > 0 && (
+                                <div className="mt-3">
+                                    <p className="text-xs text-red-400 font-medium mb-2">Row-Level Errors ({validationResult.row_error_count})</p>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-xs">
+                                            <thead>
+                                                <tr className="text-[10px] text-gray-500 uppercase border-b border-slate-700">
+                                                    <th className="px-3 py-2 text-left">Row</th>
+                                                    <th className="px-3 py-2 text-left">Date</th>
+                                                    <th className="px-3 py-2 text-left">Merchant</th>
+                                                    <th className="px-3 py-2 text-right">Amount</th>
+                                                    <th className="px-3 py-2 text-right">Expected</th>
+                                                    <th className="px-3 py-2 text-right">Reported</th>
+                                                    <th className="px-3 py-2 text-right">Drift</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {validationResult.row_errors.map((err, i) => (
+                                                    <tr key={i} className="border-b border-slate-800/50">
+                                                        <td className="px-3 py-2 text-gray-400">#{err.row}</td>
+                                                        <td className="px-3 py-2 text-gray-300 font-mono">{err.date}</td>
+                                                        <td className="px-3 py-2 text-gray-300 truncate max-w-[150px]">{err.merchant}</td>
+                                                        <td className="px-3 py-2 text-right font-mono">
+                                                            {err.debit > 0 ? <span className="text-red-400">{err.debit.toFixed(2)}</span> : <span className="text-green-400">{err.credit.toFixed(2)}</span>}
+                                                        </td>
+                                                        <td className="px-3 py-2 text-right font-mono text-gray-400">{err.expected_balance.toFixed(2)}</td>
+                                                        <td className="px-3 py-2 text-right font-mono text-gray-300">{err.reported_balance.toFixed(2)}</td>
+                                                        <td className="px-3 py-2 text-right font-mono text-red-400">{err.drift > 0 ? '+' : ''}{err.drift.toFixed(2)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Re-validate button */}
+                            <div className="flex justify-end pt-1">
+                                <button
+                                    onClick={handleValidate}
+                                    disabled={validating}
+                                    className="text-xs text-gray-500 hover:text-gray-300 transition flex items-center gap-1"
+                                >
+                                    <RefreshCw size={12} className={validating ? 'animate-spin' : ''} />
+                                    Re-validate
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
 
                 {/* Summary Cards */}
                 {statementDetail && (

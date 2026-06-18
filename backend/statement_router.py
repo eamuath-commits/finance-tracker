@@ -773,3 +773,175 @@ def get_statement_transactions(
         "transactions": parsed.get("transactions", []),
         "transaction_count": len(parsed.get("transactions", [])),
     }
+
+
+@router.get("/{statement_id}/validate")
+def validate_statement(
+    statement_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    Validate a statement's balance chain integrity.
+    
+    Performs deterministic arithmetic checks:
+    1. Row-level: each row's balance = previous_balance ± amount
+    2. Anchor check: first row anchors to opening_balance  
+    3. Terminal check: last row balance matches closing_balance
+    4. Aggregate: sum(debits) - sum(credits) = opening - closing
+    
+    Returns a detailed validation report.
+    """
+    statement = db.query(models.Statement).filter(
+        models.Statement.id == statement_id,
+        models.Statement.user_id == current_user.id,
+    ).first()
+    
+    if not statement:
+        raise HTTPException(status_code=404, detail="Statement not found")
+    
+    if not statement.file_path or not os.path.exists(statement.file_path):
+        raise HTTPException(status_code=404, detail="PDF file not found on server")
+    
+    # Re-parse to get raw transactions in print order
+    parsed = parse_statement_pdf(statement.file_path)
+    if parsed.get("error"):
+        raise HTTPException(status_code=500, detail=f"Parse failed: {parsed['error']}")
+    
+    header = parsed.get("header", {})
+    transactions = parsed.get("transactions", [])
+    
+    opening_balance = header.get("opening_balance")
+    closing_balance = header.get("closing_balance")
+    
+    if opening_balance is None:
+        return {
+            "valid": False,
+            "summary": "Cannot validate: opening balance not found in statement header",
+            "checks": [],
+        }
+    
+    # ─── Deterministic validation (no floating-point shortcuts) ───
+    # Use integer cents to avoid floating point drift
+    def to_cents(val):
+        if val is None:
+            return 0
+        return round(val * 100)
+    
+    def from_cents(val):
+        return val / 100.0
+    
+    checks = []
+    row_errors = []
+    
+    opening_c = to_cents(opening_balance)
+    closing_c = to_cents(closing_balance) if closing_balance is not None else None
+    
+    running_balance_c = opening_c
+    total_debits_c = 0
+    total_credits_c = 0
+    
+    for i, tx in enumerate(transactions):
+        row_num = i + 1
+        debit_c = to_cents(tx.get("debit_amount", 0) or 0)
+        credit_c = to_cents(tx.get("credit_amount", 0) or 0)
+        reported_balance_c = to_cents(tx.get("balance"))
+        
+        total_debits_c += debit_c
+        total_credits_c += credit_c
+        
+        # Calculate expected balance after this transaction
+        expected_balance_c = running_balance_c - debit_c + credit_c
+        
+        # Check against reported balance
+        if reported_balance_c != 0:  # 0 means balance was not parsed
+            drift_c = expected_balance_c - reported_balance_c
+            
+            if drift_c != 0:
+                row_errors.append({
+                    "row": row_num,
+                    "date": tx.get("transaction_date"),
+                    "merchant": tx.get("merchant_or_beneficiary", "—"),
+                    "debit": from_cents(debit_c),
+                    "credit": from_cents(credit_c),
+                    "expected_balance": from_cents(expected_balance_c),
+                    "reported_balance": from_cents(reported_balance_c),
+                    "drift": from_cents(drift_c),
+                })
+            
+            # Trust the reported balance for next iteration (PDF is source of truth)
+            running_balance_c = reported_balance_c
+        else:
+            # No balance reported; carry forward calculated
+            running_balance_c = expected_balance_c
+    
+    # ─── Check 1: Opening balance anchor ───
+    if len(transactions) > 0:
+        first_tx = transactions[0]
+        first_debit_c = to_cents(first_tx.get("debit_amount", 0) or 0)
+        first_credit_c = to_cents(first_tx.get("credit_amount", 0) or 0)
+        first_bal_c = to_cents(first_tx.get("balance"))
+        
+        expected_first_c = opening_c - first_debit_c + first_credit_c
+        anchor_ok = (first_bal_c == expected_first_c)
+        
+        checks.append({
+            "name": "Opening Balance Anchor",
+            "status": "pass" if anchor_ok else "fail",
+            "detail": f"Opening {from_cents(opening_c)} {'−' if first_debit_c else '+'} {from_cents(first_debit_c or first_credit_c)} = {from_cents(expected_first_c)}, reported = {from_cents(first_bal_c)}",
+            "expected": from_cents(expected_first_c),
+            "actual": from_cents(first_bal_c),
+        })
+    
+    # ─── Check 2: Closing balance terminal ───
+    if closing_c is not None and len(transactions) > 0:
+        last_bal_c = to_cents(transactions[-1].get("balance"))
+        terminal_ok = (last_bal_c == closing_c)
+        
+        checks.append({
+            "name": "Closing Balance Match",
+            "status": "pass" if terminal_ok else "fail",
+            "detail": f"Last transaction balance {from_cents(last_bal_c)} vs closing balance {from_cents(closing_c)}",
+            "expected": from_cents(closing_c),
+            "actual": from_cents(last_bal_c),
+        })
+    
+    # ─── Check 3: Aggregate reconciliation ───
+    if closing_c is not None:
+        expected_diff_c = opening_c - closing_c
+        actual_diff_c = total_debits_c - total_credits_c
+        agg_ok = (expected_diff_c == actual_diff_c)
+        
+        checks.append({
+            "name": "Aggregate Reconciliation",
+            "status": "pass" if agg_ok else "fail",
+            "detail": f"Opening − Closing = {from_cents(expected_diff_c)}, Sum(Debits) − Sum(Credits) = {from_cents(actual_diff_c)}",
+            "expected": from_cents(expected_diff_c),
+            "actual": from_cents(actual_diff_c),
+        })
+    
+    # ─── Check 4: Row-level chain ───
+    chain_ok = len(row_errors) == 0
+    checks.append({
+        "name": "Row-Level Balance Chain",
+        "status": "pass" if chain_ok else "fail",
+        "detail": f"{len(row_errors)} row(s) with balance drift" if not chain_ok else f"All {len(transactions)} rows verified",
+        "error_count": len(row_errors),
+    })
+    
+    # Overall result
+    all_pass = all(c["status"] == "pass" for c in checks)
+    
+    return {
+        "valid": all_pass,
+        "summary": "✅ All checks passed — statement is arithmetically correct" if all_pass else f"⚠️ {sum(1 for c in checks if c['status'] == 'fail')} check(s) failed",
+        "statement_id": statement.id,
+        "opening_balance": opening_balance,
+        "closing_balance": closing_balance,
+        "total_debits": from_cents(total_debits_c),
+        "total_credits": from_cents(total_credits_c),
+        "transaction_count": len(transactions),
+        "checks": checks,
+        "row_errors": row_errors[:20],  # Cap at 20 for response size
+        "row_error_count": len(row_errors),
+    }
