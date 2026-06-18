@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../utils/api';
-import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, ArrowLeft, ArrowUpRight, ArrowDownLeft, ChevronRight, RefreshCw, Filter, Wallet, Calendar, Search } from 'lucide-react';
+import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, ArrowLeft, ArrowUpRight, ArrowDownLeft, ChevronRight, RefreshCw, Filter, Wallet, Calendar, Search, X } from 'lucide-react';
 
 const Statements = () => {
     const [statements, setStatements] = useState([]);
@@ -17,6 +17,13 @@ const Statements = () => {
     const [statementDetail, setStatementDetail] = useState(null);
     const [parsedTransactions, setParsedTransactions] = useState([]);
     const [loadingDetail, setLoadingDetail] = useState(false);
+    // Detail view filters (matching Transactions page pattern)
+    const [txSearch, setTxSearch] = useState('');
+    const [txTypeFilter, setTxTypeFilter] = useState('');
+    const [txDateRange, setTxDateRange] = useState({ start: '', end: '' });
+    const [txAmountMin, setTxAmountMin] = useState('');
+    const [txAmountMax, setTxAmountMax] = useState('');
+    const [txCountLimit, setTxCountLimit] = useState('');
     // Accounts for filter dropdown (not needed - derived from statements)
 
     const fetchStatements = useCallback(async () => {
@@ -190,17 +197,65 @@ const Statements = () => {
         );
     };
 
+    // Filter parsed transactions (must be above conditional return — React hooks rules)
+    const filteredParsedTx = useMemo(() => {
+        let result = [...parsedTransactions];
+
+        if (txSearch.trim()) {
+            const q = txSearch.toLowerCase();
+            result = result.filter(tx =>
+                (tx.merchant_or_beneficiary || '').toLowerCase().includes(q) ||
+                (tx.type_line || '').toLowerCase().includes(q) ||
+                (tx.note_text || '').toLowerCase().includes(q)
+            );
+        }
+
+        if (txTypeFilter === 'debit') {
+            result = result.filter(tx => tx.direction === 'debit');
+        } else if (txTypeFilter === 'credit') {
+            result = result.filter(tx => tx.direction === 'credit');
+        }
+
+        if (txDateRange.start) {
+            const start = txDateRange.start.replace(/-/g, '/');
+            result = result.filter(tx => tx.transaction_date && tx.transaction_date >= start);
+        }
+        if (txDateRange.end) {
+            const end = txDateRange.end.replace(/-/g, '/');
+            result = result.filter(tx => tx.transaction_date && tx.transaction_date <= end);
+        }
+
+        if (txAmountMin) {
+            const min = parseFloat(txAmountMin);
+            if (!isNaN(min)) result = result.filter(tx => (tx.debit_amount || tx.credit_amount || 0) >= min);
+        }
+        if (txAmountMax) {
+            const max = parseFloat(txAmountMax);
+            if (!isNaN(max)) result = result.filter(tx => (tx.debit_amount || tx.credit_amount || 0) <= max);
+        }
+
+        if (txCountLimit) {
+            const limit = parseInt(txCountLimit);
+            if (!isNaN(limit) && limit > 0) result = result.slice(0, limit);
+        }
+
+        return result;
+    }, [parsedTransactions, txSearch, txTypeFilter, txDateRange, txAmountMin, txAmountMax, txCountLimit]);
+
+    const totalDebits = filteredParsedTx.reduce((sum, tx) => sum + (tx.debit_amount || 0), 0);
+    const totalCredits = filteredParsedTx.reduce((sum, tx) => sum + (tx.credit_amount || 0), 0);
+    const hasTxFilters = txSearch || txTypeFilter || txDateRange.start || txDateRange.end || txAmountMin || txAmountMax || txCountLimit;
+    const clearTxFilters = () => { setTxSearch(''); setTxTypeFilter(''); setTxDateRange({ start: '', end: '' }); setTxAmountMin(''); setTxAmountMax(''); setTxCountLimit(''); };
+
     // ─────────────── DETAIL VIEW ───────────────
     if (selectedStatement) {
-        const totalDebits = parsedTransactions.reduce((sum, tx) => sum + (tx.debit_amount || 0), 0);
-        const totalCredits = parsedTransactions.reduce((sum, tx) => sum + (tx.credit_amount || 0), 0);
 
         return (
             <div className="space-y-6">
                 {/* Back + Header */}
                 <div className="flex items-center gap-4">
                     <button
-                        onClick={() => { setSelectedStatement(null); setStatementDetail(null); setParsedTransactions([]); }}
+                        onClick={() => { setSelectedStatement(null); setStatementDetail(null); setParsedTransactions([]); clearTxFilters(); }}
                         className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-gray-400 hover:text-white transition-colors"
                     >
                         <ArrowLeft size={18} />
@@ -256,17 +311,114 @@ const Statements = () => {
                             <p className="text-lg text-white font-semibold">{formatAmount(statementDetail.closing_balance)} <span className="text-[11px] text-gray-500">SAR</span></p>
                         </div>
                         <div className="bg-slate-900/80 rounded-xl border border-red-500/10 p-4">
-                            <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1.5">Total Debits</p>
+                            <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1.5">Total Debits{hasTxFilters ? ' (filtered)' : ''}</p>
                             <p className="text-lg text-red-400 font-semibold">{formatAmount(totalDebits)} <span className="text-[11px] text-gray-500">SAR</span></p>
                         </div>
                         <div className="bg-slate-900/80 rounded-xl border border-green-500/10 p-4">
-                            <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1.5">Total Credits</p>
+                            <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1.5">Total Credits{hasTxFilters ? ' (filtered)' : ''}</p>
                             <p className="text-lg text-green-400 font-semibold">{formatAmount(totalCredits)} <span className="text-[11px] text-gray-500">SAR</span></p>
                         </div>
                         <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4">
                             <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1.5">Transactions</p>
-                            <p className="text-lg text-white font-semibold">{parsedTransactions.length}</p>
+                            <p className="text-lg text-white font-semibold">
+                                {hasTxFilters ? `${filteredParsedTx.length} / ${parsedTransactions.length}` : parsedTransactions.length}
+                            </p>
                         </div>
+                    </div>
+                )}
+
+                {/* Transaction Filters Bar */}
+                {parsedTransactions.length > 0 && (
+                    <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg space-y-4">
+                        {/* Search Row */}
+                        <div className="relative">
+                            <Search className="absolute left-3 top-3 text-gray-400" size={18} />
+                            <input
+                                type="text"
+                                placeholder="Search merchant, type, or note..."
+                                className="w-full pl-10 pr-4 py-2.5 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                                value={txSearch}
+                                onChange={e => setTxSearch(e.target.value)}
+                            />
+                        </div>
+
+                        {/* Filters Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                            {/* Type */}
+                            <div className="relative">
+                                <select
+                                    className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 appearance-none"
+                                    value={txTypeFilter}
+                                    onChange={e => setTxTypeFilter(e.target.value)}
+                                >
+                                    <option value="">All Types</option>
+                                    <option value="debit">Debit (Expense)</option>
+                                    <option value="credit">Credit (Income)</option>
+                                </select>
+                                <div className="absolute right-3 top-3.5 text-gray-400 pointer-events-none text-xs">▼</div>
+                            </div>
+
+                            {/* Amount Min */}
+                            <input
+                                type="number"
+                                placeholder="Min amount"
+                                className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                                value={txAmountMin}
+                                onChange={e => setTxAmountMin(e.target.value)}
+                            />
+
+                            {/* Amount Max */}
+                            <input
+                                type="number"
+                                placeholder="Max amount"
+                                className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                                value={txAmountMax}
+                                onChange={e => setTxAmountMax(e.target.value)}
+                            />
+
+                            {/* Start Date */}
+                            <input
+                                type="date"
+                                className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                                value={txDateRange.start}
+                                onChange={e => setTxDateRange({ ...txDateRange, start: e.target.value })}
+                            />
+
+                            {/* End Date */}
+                            <input
+                                type="date"
+                                className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                                value={txDateRange.end}
+                                onChange={e => setTxDateRange({ ...txDateRange, end: e.target.value })}
+                            />
+
+                            {/* Count Limit */}
+                            <div className="relative">
+                                <select
+                                    className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 appearance-none"
+                                    value={txCountLimit}
+                                    onChange={e => setTxCountLimit(e.target.value)}
+                                >
+                                    <option value="">Show All</option>
+                                    <option value="10">First 10</option>
+                                    <option value="25">First 25</option>
+                                    <option value="50">First 50</option>
+                                    <option value="100">First 100</option>
+                                </select>
+                                <div className="absolute right-3 top-3.5 text-gray-400 pointer-events-none text-xs">▼</div>
+                            </div>
+                        </div>
+
+                        {hasTxFilters && (
+                            <div className="flex justify-between items-center">
+                                <span className="text-sm text-gray-400">
+                                    Showing {filteredParsedTx.length} of {parsedTransactions.length} transactions
+                                </span>
+                                <button onClick={clearTxFilters} className="text-sm text-gray-400 hover:text-white flex items-center gap-1 transition-colors">
+                                    <X size={14} /> Clear Filters
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -275,10 +427,12 @@ const Statements = () => {
                     <div className="flex items-center justify-center py-16">
                         <Loader2 size={32} className="text-blue-400 animate-spin" />
                     </div>
-                ) : parsedTransactions.length > 0 ? (
+                ) : filteredParsedTx.length > 0 ? (
                     <div className="bg-slate-900/80 rounded-xl border border-slate-800 overflow-hidden">
                         <div className="px-5 py-3 border-b border-slate-800 flex items-center justify-between">
-                            <h3 className="text-white font-medium">Parsed Transactions ({parsedTransactions.length})</h3>
+                            <h3 className="text-white font-medium">
+                                {hasTxFilters ? `Filtered Transactions (${filteredParsedTx.length})` : `Parsed Transactions (${parsedTransactions.length})`}
+                            </h3>
                             <span className="text-xs text-gray-500">Print order preserved</span>
                         </div>
                         <div className="overflow-x-auto">
@@ -296,7 +450,7 @@ const Statements = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {parsedTransactions.map((tx, idx) => (
+                                    {filteredParsedTx.map((tx, idx) => (
                                         <tr key={idx} className="border-b border-slate-800/50 hover:bg-slate-800/40 transition-colors">
                                             <td className="px-4 py-2.5 text-gray-600 text-xs">{tx.row_index + 1}</td>
                                             <td className="px-4 py-2.5 text-gray-300 font-mono text-xs whitespace-nowrap">{tx.transaction_date || '—'}</td>
@@ -328,6 +482,12 @@ const Statements = () => {
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                ) : parsedTransactions.length > 0 ? (
+                    <div className="text-center py-12 text-gray-500">
+                        <Search size={32} className="mx-auto mb-3 text-gray-700" />
+                        <p>No transactions match your filters</p>
+                        <button onClick={clearTxFilters} className="text-blue-400 text-sm mt-2 hover:underline">Clear filters</button>
                     </div>
                 ) : (
                     <div className="text-center py-12 text-gray-500">
