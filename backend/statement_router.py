@@ -17,7 +17,7 @@ import logging
 from datetime import datetime, date
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -203,6 +203,17 @@ def _parse_and_store(statement: models.Statement, db: Session) -> dict:
                 pass
     
     statement.transaction_count = len(result.get("transactions", []))
+    
+    # Auto-resolve account_id from account_number's last 4 digits
+    if header and header.get("account_number") and not statement.account_id:
+        last4 = header["account_number"][-4:]
+        matching_account = db.query(models.Account).filter(
+            models.Account.last_4_digits == last4
+        ).first()
+        if matching_account:
+            statement.account_id = matching_account.id
+            logger.info(f"Auto-resolved account: {matching_account.name} (last4={last4})")
+    
     db.commit()
     
     return result
@@ -212,26 +223,49 @@ def _parse_and_store(statement: models.Statement, db: Session) -> dict:
 def list_statements(
     skip: int = 0,
     limit: int = 50,
+    account_number: str = Query(None, description="Filter by account number (exact or last 4 digits)"),
+    account_id: str = Query(None, description="Filter by account ID"),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    """List all imported statements for the current user."""
+    """List all imported statements for the current user, optionally filtered by account."""
+    query = db.query(models.Statement).filter(
+        models.Statement.user_id == current_user.id
+    )
+    
+    if account_number:
+        query = query.filter(models.Statement.account_number.like(f"%{account_number}"))
+    if account_id:
+        query = query.filter(models.Statement.account_id == account_id)
+    
     statements = (
-        db.query(models.Statement)
-        .filter(models.Statement.user_id == current_user.id)
+        query
         .order_by(models.Statement.imported_at.desc())
         .offset(skip)
         .limit(limit)
         .all()
     )
+    
+    # Build account name lookup
+    account_ids = {s.account_id for s in statements if s.account_id}
+    accounts_map = {}
+    if account_ids:
+        accounts = db.query(models.Account).filter(models.Account.id.in_(account_ids)).all()
+        accounts_map = {a.id: a for a in accounts}
+    
     return [
         {
             "id": s.id,
             "bank_name": s.bank_name,
             "original_filename": s.original_filename,
             "account_number": s.account_number,
+            "account_id": s.account_id,
+            "account_name": accounts_map[s.account_id].name if s.account_id and s.account_id in accounts_map else None,
+            "account_last4": accounts_map[s.account_id].last_4_digits if s.account_id and s.account_id in accounts_map else (s.account_number[-4:] if s.account_number else None),
             "statement_period_start": s.statement_period_start.isoformat() if s.statement_period_start else None,
             "statement_period_end": s.statement_period_end.isoformat() if s.statement_period_end else None,
+            "opening_balance": s.opening_balance,
+            "closing_balance": s.closing_balance,
             "transaction_count": s.transaction_count,
             "reconciliation_status": s.reconciliation_status,
             "status": s.status,
