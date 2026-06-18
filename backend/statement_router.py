@@ -211,7 +211,8 @@ def _parse_and_store(statement: models.Statement, db: Session) -> dict:
     if header and header.get("account_number") and not statement.account_id:
         last4 = header["account_number"][-4:]
         matching_account = db.query(models.Account).filter(
-            models.Account.last_4_digits == last4
+            models.Account.last_4_digits == last4,
+            models.Account.user_id == current_user.id,
         ).first()
         if matching_account:
             statement.account_id = matching_account.id

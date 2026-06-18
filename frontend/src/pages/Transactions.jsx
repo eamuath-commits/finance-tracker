@@ -1108,13 +1108,13 @@ function Transactions() {
                                                         {tx.beneficiary_info ? (
                                                             <span className="inline-flex items-center gap-1.5">
                                                                 <span className="text-[10px] bg-blue-600/30 text-blue-300 px-1.5 py-0.5 rounded font-medium">Beneficiary</span>
-                                                                <span>{tx.beneficiary_info.name}</span>
+                                                                <span dir="auto">{tx.beneficiary_info.name}</span>
                                                                 {tx.beneficiary_info.bank_name && <span className="text-xs text-gray-500">({tx.beneficiary_info.bank_name})</span>}
                                                             </span>
                                                         ) : tx.biller_info ? (
                                                             <span className="inline-flex items-center gap-1.5">
                                                                 <span className="text-[10px] bg-amber-600/30 text-amber-300 px-1.5 py-0.5 rounded font-medium">Biller</span>
-                                                                <span>{tx.biller_info.name}</span>
+                                                                <span dir="auto">{tx.biller_info.name}</span>
                                                             </span>
                                                         ) : tx.merchant_info ? (
                                                             <span className="inline-flex items-center gap-1.5">
@@ -1127,10 +1127,10 @@ function Transactions() {
                                                                     />
                                                                 )}
                                                                 <span className="text-[10px] bg-emerald-600/30 text-emerald-300 px-1.5 py-0.5 rounded font-medium">Merchant</span>
-                                                                <span>{tx.merchant_info.name}</span>
+                                                                <span dir="auto">{tx.merchant_info.name}</span>
                                                             </span>
                                                         ) : (
-                                                            <span>{tx.merchant || 'Unknown'}</span>
+                                                            <span dir="auto">{tx.merchant || 'Unknown'}</span>
                                                         )}
                                                         {tx.status === 'pending_transfer' && (
                                                             <span className="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-900/40 text-amber-400 border border-amber-700">⏳ Pending</span>

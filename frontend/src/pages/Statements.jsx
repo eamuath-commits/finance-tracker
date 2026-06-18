@@ -746,7 +746,7 @@ const Statements = () => {
                                                     ) : (
                                                         <ArrowUpRight size={14} className="text-red-400 flex-shrink-0" />
                                                     )}
-                                                    <span className="text-gray-200 text-xs truncate max-w-[220px]" title={tx.merchant_or_beneficiary || tx.note_text}>
+                                                    <span dir="auto" className="text-gray-200 text-xs truncate max-w-[220px]" title={tx.merchant_or_beneficiary || tx.note_text}>
                                                         {tx.merchant_or_beneficiary || tx.note_text?.substring(0, 40) || '—'}
                                                     </span>
                                                 </div>
