@@ -214,8 +214,11 @@ const Statements = () => {
                 )}
 
                 {/* Summary Cards */}
-                {statementDetail && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {statementDetail && (() => {
+                    const totalDebits = parsedTransactions.reduce((sum, tx) => sum + (tx.debit_amount || 0), 0);
+                    const totalCredits = parsedTransactions.reduce((sum, tx) => sum + (tx.credit_amount || 0), 0);
+                    return (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                         <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4">
                             <p className="text-xs text-gray-500 mb-1">Period</p>
                             <p className="text-sm text-white font-medium">
@@ -231,12 +234,21 @@ const Statements = () => {
                             <p className="text-xs text-gray-500 mb-1">Closing Balance</p>
                             <p className="text-lg text-white font-semibold">{formatAmount(statementDetail.closing_balance)} <span className="text-xs text-gray-500">SAR</span></p>
                         </div>
+                        <div className="bg-slate-900/80 rounded-xl border border-red-500/10 p-4">
+                            <p className="text-xs text-gray-500 mb-1">Total Debits</p>
+                            <p className="text-lg text-red-400 font-semibold">{formatAmount(totalDebits)} <span className="text-xs text-gray-500">SAR</span></p>
+                        </div>
+                        <div className="bg-slate-900/80 rounded-xl border border-green-500/10 p-4">
+                            <p className="text-xs text-gray-500 mb-1">Total Credits</p>
+                            <p className="text-lg text-green-400 font-semibold">{formatAmount(totalCredits)} <span className="text-xs text-gray-500">SAR</span></p>
+                        </div>
                         <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4">
                             <p className="text-xs text-gray-500 mb-1">Transactions</p>
-                            <p className="text-lg text-white font-semibold">{statementDetail.transaction_count}</p>
+                            <p className="text-lg text-white font-semibold">{parsedTransactions.length}</p>
                         </div>
                     </div>
-                )}
+                    );
+                })()}
 
                 {/* Parsed Transactions Table */}
                 {loadingDetail ? (
