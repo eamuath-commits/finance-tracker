@@ -1976,7 +1976,7 @@ def read_messages(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
     return db.query(models.RawMessage).filter(models.RawMessage.user_id == current_user.id).order_by(models.RawMessage.timestamp.desc()).offset(skip).limit(limit).all()
 
 @app.post("/messages/{message_id}/retry")
-async def retry_message(message_id: str, db: Session = Depends(get_db)):
+async def retry_message(message_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     # Fetch Message
     msg = db.query(models.RawMessage).filter(models.RawMessage.id == message_id).first()
     if not msg:
@@ -2049,7 +2049,7 @@ async def retry_message(message_id: str, db: Session = Depends(get_db)):
 
     # 3. Create Logic
     try:
-        await sms_agent._create_transaction_logic(db, result, account, credit_card, msg.body, reply_target=None, source="webui")
+        await sms_agent._create_transaction_logic(db, result, account, credit_card, msg.body, reply_target=None, source="webui", user_id=current_user.id)
         msg.status = models.MessageStatus.PARSED
         msg.error_log = None
         db.commit()
