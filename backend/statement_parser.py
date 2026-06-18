@@ -167,7 +167,11 @@ def parse_merchant_from_note(note_text: str, type_line: str) -> tuple:
     if not note_text:
         return (None, None)
     
-    note = note_text.strip()
+    # Join wrapped lines — PDF wraps long Note: text across lines
+    note = ' '.join(note_text.strip().split('\n'))
+    # Collapse multiple spaces
+    note = re.sub(r'\s+', ' ', note).strip()
+    
     reference_id = None
     merchant = None
     
@@ -199,12 +203,17 @@ def parse_merchant_from_note(note_text: str, type_line: str) -> tuple:
     
     # Pattern 3: Card settlement — W - Visa/Mastercard : Advance payment - ...
     if 'Visa/Mastercard' in note and ('Advance payment' in note or 'Refund' in note):
-        # No merchant for card settlements
-        return (None, None)
+        # Extract card last4 from the note for reference
+        card_match = re.search(r'(\d{6}\*{6}\d{4})', note)
+        ref = card_match.group(1) if card_match else None
+        return ("Credit Card Settlement", ref)
     
     # Pattern 4: Internal Transfer — W-/TOACCT/... or W-/FRACCT/...
-    if note.startswith('W-/') or note.startswith('W-\n/'):
-        return (None, None)
+    if 'TOACCT' in note or 'FRACCT' in note:
+        # Try to extract the beneficiary name after TO/FR + Arabic
+        acct_match = re.search(r'(?:TO|FR)(.+?)(?:\s*-|$)', note)
+        beneficiary = acct_match.group(1).strip() if acct_match else None
+        return (beneficiary, None)
     
     # Pattern 5: IPS Transfer — ref/beneficiary_name
     m = re.match(r'^(\d+)/(.+)', note)
@@ -215,25 +224,16 @@ def parse_merchant_from_note(note_text: str, type_line: str) -> tuple:
     
     # Pattern 6: Sadad — W#... or W -/...
     if note.startswith('W#') or note.startswith('W -/'):
-        return (None, None)
+        return ("Sadad Payment", None)
     
-    # Pattern 7: TABBY/Agmt style — (CODE -ref) Agmt ..., MERCHANT, CITY, COUNTRY
-    m = re.match(r'^\(([^)]+)\)\s*(.+)', note)
+    # Pattern 7: International card — 409201******9365 : MERCHANT CITY COUNTRY
+    m = re.match(r'^(\d{6}\*{6}\d{4})\s*:\s*(.+)', note)
     if m:
-        reference_id = m.group(1).strip()
-        rest = m.group(2).strip()
-        parts = rest.split(',')
-        if len(parts) >= 2:
-            merchant = parts[-3].strip() if len(parts) >= 3 else parts[0].strip()
+        reference_id = m.group(1)
+        merchant = m.group(2).strip()
         return (merchant, reference_id)
     
-    # Pattern 8: International card — 409201******9365 : MERCHANT CITY COUNTRY
-    m = re.match(r'^\d{6}\*{6}\d{4}\s*:\s*(.+)', note)
-    if m:
-        merchant = m.group(1).strip()
-        return (merchant, None)
-    
-    # Fallback: return the note as-is if nothing matched
+    # Fallback: return the note as-is if short enough
     return (note.strip() if len(note) < 100 else None, None)
 
 
