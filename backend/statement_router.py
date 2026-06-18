@@ -28,6 +28,7 @@ import models
 import schemas
 from auth import get_current_user
 from statement_parser import parse_statement_pdf
+from statement_category_mapper import map_type_to_category
 
 logger = logging.getLogger("statement_router")
 
@@ -549,6 +550,193 @@ def parse_statement(
         "transactions": parsed.get("transactions", []),
         "transaction_count": len(parsed.get("transactions", [])),
         "page_count": parsed.get("page_count", 0),
+    }
+
+
+@router.post("/{statement_id}/commit")
+def commit_statement_to_ledger(
+    statement_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    Commit parsed statement transactions into the master Transaction ledger.
+    
+    Creates Transaction records with status='draft'. They will NOT affect
+    account balances until explicitly approved. Runs deduplication checks
+    against existing transactions on the same account.
+    """
+    statement = db.query(models.Statement).filter(
+        models.Statement.id == statement_id,
+        models.Statement.user_id == current_user.id,
+    ).first()
+    
+    if not statement:
+        raise HTTPException(status_code=404, detail="Statement not found")
+    
+    if statement.status not in ("draft", "reviewed"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Statement must be in draft or reviewed status to commit (current: {statement.status})"
+        )
+    
+    if not statement.account_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Statement must be linked to an account before committing. "
+                   "The account could not be auto-resolved from the statement header."
+        )
+    
+    if not statement.file_path or not os.path.exists(statement.file_path):
+        raise HTTPException(status_code=404, detail="PDF file not found on server")
+    
+    # Check if already committed (has draft transactions)
+    existing_draft_count = db.query(models.Transaction).filter(
+        models.Transaction.statement_id == statement_id,
+        models.Transaction.status == "draft",
+    ).count()
+    
+    if existing_draft_count > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Statement already has {existing_draft_count} draft transactions. "
+                   "Delete them first or approve the existing ones."
+        )
+    
+    # Parse the PDF
+    parsed = parse_statement_pdf(statement.file_path)
+    if parsed.get("error"):
+        raise HTTPException(status_code=500, detail=f"Parse failed: {parsed['error']}")
+    
+    raw_transactions = parsed.get("transactions", [])
+    if not raw_transactions:
+        raise HTTPException(status_code=400, detail="No transactions found in statement")
+    
+    # --- Deduplication: load existing transactions for this account in the date range ---
+    # Collect date range from parsed transactions
+    tx_dates = [tx.get("transaction_date") for tx in raw_transactions if tx.get("transaction_date")]
+    existing_lookup = set()
+    if tx_dates:
+        min_date_str = min(tx_dates)
+        max_date_str = max(tx_dates)
+        try:
+            from datetime import timedelta
+            min_dt = datetime.strptime(min_date_str.replace('/', '-'), "%Y-%m-%d") - timedelta(days=1)
+            max_dt = datetime.strptime(max_date_str.replace('/', '-'), "%Y-%m-%d") + timedelta(days=1)
+            
+            existing_txs = db.query(models.Transaction).filter(
+                models.Transaction.account_id == statement.account_id,
+                models.Transaction.source != "statement",  # Only check non-statement sources
+                models.Transaction.timestamp >= min_dt,
+                models.Transaction.timestamp <= max_dt,
+            ).all()
+            
+            # Build lookup: (date_str, amount, type) → True
+            for etx in existing_txs:
+                if etx.timestamp and etx.amount:
+                    date_key = etx.timestamp.strftime("%Y/%m/%d")
+                    existing_lookup.add((date_key, round(etx.amount, 2), etx.type))
+        except Exception as e:
+            logger.warning(f"Deduplication lookup failed: {e}")
+    
+    # --- Create Transaction records ---
+    created = []
+    duplicates_flagged = 0
+    skipped = 0
+    
+    for tx in raw_transactions:
+        tx_date_str = tx.get("transaction_date")  # YYYY/MM/DD
+        tx_time_str = tx.get("transaction_time")  # HH:MM:SS
+        direction = tx.get("direction", "debit")
+        
+        # Determine amount
+        if direction == "credit":
+            amount = tx.get("credit_amount") or tx.get("amount") or 0
+        else:
+            amount = tx.get("debit_amount") or tx.get("amount") or 0
+        
+        if amount <= 0:
+            skipped += 1
+            continue
+        
+        # Build timestamp
+        timestamp = None
+        if tx_date_str:
+            try:
+                date_part = tx_date_str.replace('/', '-')
+                if tx_time_str:
+                    timestamp = datetime.strptime(f"{date_part} {tx_time_str}", "%Y-%m-%d %H:%M:%S")
+                else:
+                    timestamp = datetime.strptime(date_part, "%Y-%m-%d")
+            except ValueError:
+                timestamp = datetime.utcnow()
+        else:
+            timestamp = datetime.utcnow()
+        
+        # Deduplication check
+        is_duplicate = False
+        if tx_date_str:
+            dup_key = (tx_date_str, round(amount, 2), direction)
+            if dup_key in existing_lookup:
+                is_duplicate = True
+                duplicates_flagged += 1
+        
+        # Map category from type_line
+        category = map_type_to_category(tx.get("type_line", ""))
+        
+        # Build notes
+        parts = []
+        if tx.get("type_line"):
+            parts.append(f"Type: {tx['type_line']}")
+        if tx.get("note_text"):
+            parts.append(f"Note: {tx['note_text']}")
+        if is_duplicate:
+            parts.append("⚠️ POTENTIAL DUPLICATE (matches existing SMS transaction)")
+        notes_text = "\n".join(parts) if parts else None
+        
+        new_tx = models.Transaction(
+            id=str(uuid.uuid4()),
+            user_id=current_user.id,
+            account_id=statement.account_id,
+            amount=round(amount, 2),
+            merchant=tx.get("merchant_or_beneficiary"),
+            type=direction,
+            timestamp=timestamp,
+            balance_after_transaction=tx.get("balance"),
+            category=category,
+            notes=notes_text,
+            raw_sms_content=tx.get("raw_description", ""),
+            source="statement",
+            statement_id=statement.id,
+            status="draft",
+            fees=0.0,
+        )
+        db.add(new_tx)
+        created.append({
+            "id": new_tx.id,
+            "amount": new_tx.amount,
+            "merchant": new_tx.merchant,
+            "type": new_tx.type,
+            "category": category,
+            "timestamp": timestamp.isoformat() if timestamp else None,
+            "is_duplicate": is_duplicate,
+        })
+    
+    # Update statement status
+    statement.status = "reviewed"
+    db.commit()
+    
+    logger.info(
+        f"Committed statement {statement_id}: "
+        f"{len(created)} created, {duplicates_flagged} duplicates flagged, {skipped} skipped"
+    )
+    
+    return {
+        "statement_id": statement.id,
+        "created": len(created),
+        "duplicates_flagged": duplicates_flagged,
+        "skipped": skipped,
+        "transactions": created[:20],  # Preview first 20
     }
 
 

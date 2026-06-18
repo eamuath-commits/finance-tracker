@@ -35,6 +35,9 @@ const Statements = () => {
     const [editValue, setEditValue] = useState('');
     const [actionMenuId, setActionMenuId] = useState(null);
     const [API_URL] = useState('/api/statements');
+    // Commit to ledger state
+    const [committing, setCommitting] = useState(false);
+    const [commitResult, setCommitResult] = useState(null);
     // Accounts for filter dropdown (not needed - derived from statements)
 
     const fetchStatements = useCallback(async () => {
@@ -165,6 +168,29 @@ const Statements = () => {
     const handleDragOver = (e) => { e.preventDefault(); e.stopPropagation(); setDragActive(true); };
     const handleDragLeave = (e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); };
     const handleFileInput = (e) => { const file = e.target.files?.[0]; if (file) handleFileUpload(file); e.target.value = ''; };
+
+    const handleCommitToLedger = async () => {
+        if (!selectedStatement) return;
+        const txCount = parsedTransactions.length;
+        const acctLabel = statementDetail?.account_number ? `****${statementDetail.account_number.slice(-4)}` : 'linked account';
+        if (!window.confirm(`This will create ${txCount} draft transactions in the main ledger for account ${acctLabel}.\n\nDraft transactions do NOT affect your account balance until approved.\n\nContinue?`)) return;
+        
+        setCommitting(true);
+        setCommitResult(null);
+        setError(null);
+        try {
+            const res = await api.post(`/api/statements/${selectedStatement}/commit`);
+            setCommitResult(res.data);
+            // Refresh detail to show updated status
+            const detailRes = await api.get(`/api/statements/${selectedStatement}`);
+            setStatementDetail(detailRes.data);
+            fetchStatements();
+        } catch (err) {
+            setError(err.response?.data?.detail || 'Commit to ledger failed');
+        } finally {
+            setCommitting(false);
+        }
+    };
 
     const handleDelete = async (id) => {
         if (!window.confirm('Delete this statement and all its draft transactions?')) return;
@@ -326,11 +352,24 @@ const Statements = () => {
                     <button
                         onClick={handleReParse}
                         disabled={loadingDetail}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors disabled:opacity-50"
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-gray-300 text-sm font-medium transition-colors disabled:opacity-50"
                     >
                         <RefreshCw size={14} className={loadingDetail ? 'animate-spin' : ''} />
                         Re-parse
                     </button>
+                    {parsedTransactions.length > 0 && statementDetail?.status !== 'approved' && (
+                        <button
+                            onClick={handleCommitToLedger}
+                            disabled={committing || loadingDetail}
+                            className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors disabled:opacity-50 shadow-lg shadow-emerald-600/20"
+                        >
+                            {committing ? (
+                                <><Loader2 size={14} className="animate-spin" />Committing...</>
+                            ) : (
+                                <><CheckCircle2 size={14} />Commit to Ledger</>
+                            )}
+                        </button>
+                    )}
                 </div>
 
                 {error && (
@@ -338,6 +377,36 @@ const Statements = () => {
                         <AlertTriangle size={18} className="text-red-400" />
                         <p className="text-red-300 text-sm flex-1">{error}</p>
                         <button onClick={() => setError(null)} className="text-gray-500 hover:text-gray-300"><XCircle size={16} /></button>
+                    </div>
+                )}
+
+                {/* Commit Result Banner */}
+                {commitResult && (
+                    <div className={`rounded-xl border p-4 ${commitResult.duplicates_flagged > 0 ? 'bg-amber-500/5 border-amber-500/20' : 'bg-emerald-500/5 border-emerald-500/20'}`}>
+                        <div className="flex items-start gap-3">
+                            {commitResult.duplicates_flagged > 0 ? (
+                                <AlertTriangle size={18} className="text-amber-400 mt-0.5" />
+                            ) : (
+                                <CheckCircle2 size={18} className="text-emerald-400 mt-0.5" />
+                            )}
+                            <div className="flex-1">
+                                <p className={`text-sm font-medium ${commitResult.duplicates_flagged > 0 ? 'text-amber-300' : 'text-emerald-300'}`}>
+                                    Committed {commitResult.created} draft transactions to the ledger
+                                </p>
+                                <div className="flex gap-4 mt-1 text-xs text-gray-400">
+                                    <span>{commitResult.created} created</span>
+                                    {commitResult.duplicates_flagged > 0 && (
+                                        <span className="text-amber-400">{commitResult.duplicates_flagged} potential duplicates flagged</span>
+                                    )}
+                                    {commitResult.skipped > 0 && (
+                                        <span>{commitResult.skipped} skipped (zero amount)</span>
+                                    )}
+                                </div>
+                            </div>
+                            <button onClick={() => setCommitResult(null)} className="text-gray-500 hover:text-gray-300">
+                                <XCircle size={16} />
+                            </button>
+                        </div>
                     </div>
                 )}
 
