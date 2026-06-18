@@ -12,8 +12,9 @@ Endpoints:
 """
 import os
 import uuid
+import json
 import logging
-from datetime import datetime
+from datetime import datetime, date
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -24,6 +25,7 @@ from database import get_db
 import models
 import schemas
 from auth import get_current_user
+from statement_parser import parse_statement_pdf
 
 logger = logging.getLogger("statement_router")
 
@@ -135,6 +137,13 @@ async def upload_statement(
     db.commit()
     db.refresh(statement)
     
+    # Auto-parse if text-based
+    parsed_data = None
+    if pdf_type == "text":
+        parsed_data = _parse_and_store(statement, db)
+    
+    db.refresh(statement)
+    
     # Build response
     result = {
         "id": statement.id,
@@ -150,7 +159,51 @@ async def upload_statement(
     elif pdf_type == "unknown":
         result["warning"] = "Could not determine PDF type. Please verify the file is a valid bank statement."
     else:
-        result["message"] = "PDF uploaded successfully. Text-based statement detected — ready for parsing."
+        result["message"] = "PDF uploaded and parsed successfully."
+        if parsed_data:
+            result["account_number"] = parsed_data["header"].get("account_number") if parsed_data["header"] else None
+            result["iban"] = parsed_data["header"].get("iban") if parsed_data["header"] else None
+            result["opening_balance"] = parsed_data["header"].get("opening_balance") if parsed_data["header"] else None
+            result["closing_balance"] = parsed_data["header"].get("closing_balance") if parsed_data["header"] else None
+            result["period_start"] = parsed_data["header"].get("period_start") if parsed_data["header"] else None
+            result["period_end"] = parsed_data["header"].get("period_end") if parsed_data["header"] else None
+            result["transaction_count"] = len(parsed_data.get("transactions", []))
+            result["transactions"] = parsed_data.get("transactions", [])[:10]  # Preview first 10
+    
+    return result
+
+
+def _parse_and_store(statement: models.Statement, db: Session) -> dict:
+    """
+    Parse a statement's PDF and update the statement record with header metadata.
+    Returns the full parsed data dict.
+    """
+    result = parse_statement_pdf(statement.file_path)
+    
+    if result.get("error"):
+        logger.error(f"Parse error for statement {statement.id}: {result['error']}")
+        return result
+    
+    header = result.get("header", {})
+    if header:
+        statement.account_number = header.get("account_number")
+        if header.get("opening_balance") is not None:
+            statement.opening_balance = header["opening_balance"]
+        if header.get("closing_balance") is not None:
+            statement.closing_balance = header["closing_balance"]
+        if header.get("period_start"):
+            try:
+                statement.statement_period_start = date.fromisoformat(header["period_start"])
+            except ValueError:
+                pass
+        if header.get("period_end"):
+            try:
+                statement.statement_period_end = date.fromisoformat(header["period_end"])
+            except ValueError:
+                pass
+    
+    statement.transaction_count = len(result.get("transactions", []))
+    db.commit()
     
     return result
 
@@ -298,4 +351,77 @@ def delete_statement(
     return {
         "message": "Statement deleted",
         "deleted_transactions": deleted_tx_count,
+    }
+
+
+@router.post("/{statement_id}/parse")
+def parse_statement(
+    statement_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    (Re-)parse an uploaded statement PDF.
+    Returns the full list of parsed transactions.
+    """
+    statement = db.query(models.Statement).filter(
+        models.Statement.id == statement_id,
+        models.Statement.user_id == current_user.id,
+    ).first()
+    
+    if not statement:
+        raise HTTPException(status_code=404, detail="Statement not found")
+    
+    if statement.pdf_type != "text":
+        raise HTTPException(status_code=400, detail="Only text-based PDFs can be parsed")
+    
+    if not statement.file_path or not os.path.exists(statement.file_path):
+        raise HTTPException(status_code=404, detail="PDF file not found on server")
+    
+    parsed = _parse_and_store(statement, db)
+    
+    if parsed.get("error"):
+        raise HTTPException(status_code=500, detail=f"Parse failed: {parsed['error']}")
+    
+    return {
+        "statement_id": statement.id,
+        "header": parsed.get("header"),
+        "transactions": parsed.get("transactions", []),
+        "transaction_count": len(parsed.get("transactions", [])),
+        "page_count": parsed.get("page_count", 0),
+    }
+
+
+@router.get("/{statement_id}/transactions")
+def get_statement_transactions(
+    statement_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    Get parsed transactions for a statement.
+    If no transactions are stored yet, re-parse the PDF on the fly.
+    """
+    statement = db.query(models.Statement).filter(
+        models.Statement.id == statement_id,
+        models.Statement.user_id == current_user.id,
+    ).first()
+    
+    if not statement:
+        raise HTTPException(status_code=404, detail="Statement not found")
+    
+    # Parse the PDF to get raw transaction data
+    if not statement.file_path or not os.path.exists(statement.file_path):
+        raise HTTPException(status_code=404, detail="PDF file not found on server")
+    
+    parsed = parse_statement_pdf(statement.file_path)
+    
+    if parsed.get("error"):
+        raise HTTPException(status_code=500, detail=f"Parse failed: {parsed['error']}")
+    
+    return {
+        "statement_id": statement.id,
+        "header": parsed.get("header"),
+        "transactions": parsed.get("transactions", []),
+        "transaction_count": len(parsed.get("transactions", [])),
     }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
-import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, Eye } from 'lucide-react';
+import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, Eye, ArrowLeft, ArrowUpRight, ArrowDownLeft, ChevronRight, RefreshCw } from 'lucide-react';
 
 const Statements = () => {
     const [statements, setStatements] = useState([]);
@@ -9,6 +9,11 @@ const Statements = () => {
     const [dragActive, setDragActive] = useState(false);
     const [uploadResult, setUploadResult] = useState(null);
     const [error, setError] = useState(null);
+    // Detail view state
+    const [selectedStatement, setSelectedStatement] = useState(null);
+    const [statementDetail, setStatementDetail] = useState(null);
+    const [parsedTransactions, setParsedTransactions] = useState([]);
+    const [loadingDetail, setLoadingDetail] = useState(false);
 
     const fetchStatements = useCallback(async () => {
         try {
@@ -46,12 +51,51 @@ const Statements = () => {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
             setUploadResult(res.data);
-            fetchStatements(); // Refresh list
+            fetchStatements();
+            // If parsing succeeded, auto-open the detail view
+            if (res.data.transaction_count > 0) {
+                openStatementDetail(res.data.id);
+            }
         } catch (err) {
             const detail = err.response?.data?.detail || 'Upload failed';
             setError(detail);
         } finally {
             setUploading(false);
+        }
+    };
+
+    const openStatementDetail = async (statementId) => {
+        setLoadingDetail(true);
+        setSelectedStatement(statementId);
+        try {
+            const [detailRes, txRes] = await Promise.all([
+                api.get(`/api/statements/${statementId}`),
+                api.get(`/api/statements/${statementId}/transactions`),
+            ]);
+            setStatementDetail(detailRes.data);
+            setParsedTransactions(txRes.data.transactions || []);
+        } catch (err) {
+            console.error('Failed to load statement detail:', err);
+            setError('Failed to load statement details');
+        } finally {
+            setLoadingDetail(false);
+        }
+    };
+
+    const handleReParse = async () => {
+        if (!selectedStatement) return;
+        setLoadingDetail(true);
+        try {
+            const res = await api.post(`/api/statements/${selectedStatement}/parse`);
+            setParsedTransactions(res.data.transactions || []);
+            // Refresh detail
+            const detailRes = await api.get(`/api/statements/${selectedStatement}`);
+            setStatementDetail(detailRes.data);
+            fetchStatements();
+        } catch (err) {
+            setError(err.response?.data?.detail || 'Re-parse failed');
+        } finally {
+            setLoadingDetail(false);
         }
     };
 
@@ -78,7 +122,6 @@ const Statements = () => {
     const handleFileInput = (e) => {
         const file = e.target.files?.[0];
         if (file) handleFileUpload(file);
-        // Reset input so same file can be re-uploaded
         e.target.value = '';
     };
 
@@ -87,16 +130,22 @@ const Statements = () => {
         try {
             await api.delete(`/api/statements/${id}`);
             fetchStatements();
+            if (selectedStatement === id) {
+                setSelectedStatement(null);
+                setStatementDetail(null);
+                setParsedTransactions([]);
+            }
         } catch (err) {
-            const detail = err.response?.data?.detail || 'Delete failed';
-            setError(detail);
+            setError(err.response?.data?.detail || 'Delete failed');
         }
     };
 
-    const handleViewPdf = (id) => {
-        // Open PDF in new tab
-        const token = localStorage.getItem('auth_token');
-        window.open(`${api.defaults.baseURL}/api/statements/${id}/pdf`, '_blank');
+    const formatAmount = (amount) => {
+        if (amount == null) return '—';
+        return new Intl.NumberFormat('en-SA', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }).format(amount);
     };
 
     const getStatusBadge = (status) => {
@@ -115,25 +164,9 @@ const Statements = () => {
         );
     };
 
-    const getReconciliationBadge = (status) => {
-        const configs = {
-            pending: { color: 'text-gray-400', icon: Clock, label: 'Pending' },
-            reconciled: { color: 'text-green-400', icon: CheckCircle2, label: 'Reconciled ✓' },
-            flagged: { color: 'text-amber-400', icon: AlertTriangle, label: 'Flagged ⚠' },
-        };
-        const config = configs[status] || configs.pending;
-        const Icon = config.icon;
-        return (
-            <span className={`inline-flex items-center gap-1 text-xs ${config.color}`}>
-                <Icon size={12} />
-                {config.label}
-            </span>
-        );
-    };
-
     const getPdfTypeBadge = (type) => {
         if (type === 'text') {
-            return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><FileText size={10} />Text PDF</span>;
+            return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><FileText size={10} />Text</span>;
         }
         if (type === 'scanned') {
             return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-orange-500/10 text-orange-400 border border-orange-500/20"><AlertTriangle size={10} />Scanned</span>;
@@ -141,6 +174,151 @@ const Statements = () => {
         return <span className="text-xs text-gray-500">Unknown</span>;
     };
 
+    // ─────────────── DETAIL VIEW ───────────────
+    if (selectedStatement) {
+        return (
+            <div className="space-y-6">
+                {/* Back + Header */}
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => { setSelectedStatement(null); setStatementDetail(null); setParsedTransactions([]); }}
+                        className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-gray-400 hover:text-white transition-colors"
+                    >
+                        <ArrowLeft size={18} />
+                    </button>
+                    <div className="flex-1">
+                        <h1 className="text-2xl font-bold text-white">
+                            {statementDetail?.original_filename || 'Statement'}
+                        </h1>
+                        <p className="text-gray-400 text-sm mt-0.5">
+                            {statementDetail?.bank_name} • Account: {statementDetail?.account_number || '—'}
+                        </p>
+                    </div>
+                    <button
+                        onClick={handleReParse}
+                        disabled={loadingDetail}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors disabled:opacity-50"
+                    >
+                        <RefreshCw size={14} className={loadingDetail ? 'animate-spin' : ''} />
+                        Re-parse
+                    </button>
+                </div>
+
+                {/* Error */}
+                {error && (
+                    <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 flex items-center gap-3">
+                        <AlertTriangle size={18} className="text-red-400 flex-shrink-0" />
+                        <p className="text-red-300 text-sm">{error}</p>
+                        <button onClick={() => setError(null)} className="ml-auto text-gray-500 hover:text-gray-300"><XCircle size={16} /></button>
+                    </div>
+                )}
+
+                {/* Summary Cards */}
+                {statementDetail && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4">
+                            <p className="text-xs text-gray-500 mb-1">Period</p>
+                            <p className="text-sm text-white font-medium">
+                                {statementDetail.statement_period_start || '—'}<br/>
+                                to {statementDetail.statement_period_end || '—'}
+                            </p>
+                        </div>
+                        <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4">
+                            <p className="text-xs text-gray-500 mb-1">Opening Balance</p>
+                            <p className="text-lg text-white font-semibold">{formatAmount(statementDetail.opening_balance)} <span className="text-xs text-gray-500">SAR</span></p>
+                        </div>
+                        <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4">
+                            <p className="text-xs text-gray-500 mb-1">Closing Balance</p>
+                            <p className="text-lg text-white font-semibold">{formatAmount(statementDetail.closing_balance)} <span className="text-xs text-gray-500">SAR</span></p>
+                        </div>
+                        <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4">
+                            <p className="text-xs text-gray-500 mb-1">Transactions</p>
+                            <p className="text-lg text-white font-semibold">{statementDetail.transaction_count}</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Parsed Transactions Table */}
+                {loadingDetail ? (
+                    <div className="flex items-center justify-center py-16">
+                        <Loader2 size={32} className="text-blue-400 animate-spin" />
+                    </div>
+                ) : parsedTransactions.length > 0 ? (
+                    <div className="bg-slate-900/80 rounded-xl border border-slate-800 overflow-hidden">
+                        <div className="px-5 py-3 border-b border-slate-800 flex items-center justify-between">
+                            <h3 className="text-white font-medium">Parsed Transactions ({parsedTransactions.length})</h3>
+                            <span className="text-xs text-gray-500">Print order preserved</span>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="text-xs text-gray-500 uppercase tracking-wider border-b border-slate-800">
+                                        <th className="px-4 py-3 text-left w-8">#</th>
+                                        <th className="px-4 py-3 text-left">Date</th>
+                                        <th className="px-4 py-3 text-left">Time</th>
+                                        <th className="px-4 py-3 text-left">Type</th>
+                                        <th className="px-4 py-3 text-left">Merchant / Beneficiary</th>
+                                        <th className="px-4 py-3 text-right">Debit</th>
+                                        <th className="px-4 py-3 text-right">Credit</th>
+                                        <th className="px-4 py-3 text-right">Balance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {parsedTransactions.map((tx, idx) => (
+                                        <tr key={idx} className="border-b border-slate-800/50 hover:bg-slate-800/40 transition-colors">
+                                            <td className="px-4 py-2.5 text-gray-600 text-xs">{tx.row_index + 1}</td>
+                                            <td className="px-4 py-2.5 text-gray-300 font-mono text-xs whitespace-nowrap">{tx.transaction_date || '—'}</td>
+                                            <td className="px-4 py-2.5 text-gray-400 font-mono text-xs whitespace-nowrap">{tx.transaction_time || '—'}</td>
+                                            <td className="px-4 py-2.5">
+                                                <span className="text-gray-400 text-xs leading-tight block max-w-[200px] truncate" title={tx.type_line}>
+                                                    {tx.type_line || '—'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-2.5">
+                                                <div className="flex items-center gap-2">
+                                                    {tx.direction === 'credit' ? (
+                                                        <ArrowDownLeft size={14} className="text-green-400 flex-shrink-0" />
+                                                    ) : (
+                                                        <ArrowUpRight size={14} className="text-red-400 flex-shrink-0" />
+                                                    )}
+                                                    <span className="text-gray-200 text-xs truncate max-w-[220px]" title={tx.merchant_or_beneficiary || tx.note_text}>
+                                                        {tx.merchant_or_beneficiary || tx.note_text?.substring(0, 40) || '—'}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-2.5 text-right font-mono text-xs whitespace-nowrap">
+                                                {tx.debit_amount > 0 ? (
+                                                    <span className="text-red-400">{formatAmount(tx.debit_amount)}</span>
+                                                ) : (
+                                                    <span className="text-gray-700">—</span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-2.5 text-right font-mono text-xs whitespace-nowrap">
+                                                {tx.credit_amount > 0 ? (
+                                                    <span className="text-green-400">{formatAmount(tx.credit_amount)}</span>
+                                                ) : (
+                                                    <span className="text-gray-700">—</span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-2.5 text-right font-mono text-xs text-gray-300 whitespace-nowrap">
+                                                {formatAmount(tx.balance)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="text-center py-12 text-gray-500">
+                        <p>No transactions parsed. Click "Re-parse" to try again.</p>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // ─────────────── LIST VIEW ───────────────
     return (
         <div className="space-y-8">
             {/* Header */}
@@ -173,7 +351,7 @@ const Statements = () => {
                 {uploading ? (
                     <div className="flex flex-col items-center gap-3">
                         <Loader2 size={48} className="text-blue-400 animate-spin" />
-                        <p className="text-gray-300 font-medium">Uploading & analyzing PDF...</p>
+                        <p className="text-gray-300 font-medium">Uploading & parsing PDF...</p>
                     </div>
                 ) : (
                     <div className="flex flex-col items-center gap-4">
@@ -205,18 +383,26 @@ const Statements = () => {
                         ) : (
                             <CheckCircle2 size={20} className="text-emerald-400 mt-0.5 flex-shrink-0" />
                         )}
-                        <div>
+                        <div className="flex-1">
                             <p className={`font-medium ${uploadResult.warning ? 'text-amber-300' : 'text-emerald-300'}`}>
                                 {uploadResult.warning || uploadResult.message}
                             </p>
                             <div className="mt-2 space-y-1 text-sm text-gray-400">
                                 <p>File: <span className="text-gray-300">{uploadResult.original_filename}</span></p>
-                                <p>Type: {getPdfTypeBadge(uploadResult.pdf_type)}</p>
+                                {uploadResult.account_number && (
+                                    <p>Account: <span className="text-gray-300">{uploadResult.account_number}</span></p>
+                                )}
+                                {uploadResult.transaction_count > 0 && (
+                                    <p>Transactions parsed: <span className="text-emerald-400 font-medium">{uploadResult.transaction_count}</span></p>
+                                )}
+                                {uploadResult.period_start && uploadResult.period_end && (
+                                    <p>Period: <span className="text-gray-300">{uploadResult.period_start} → {uploadResult.period_end}</span></p>
+                                )}
                             </div>
                         </div>
                         <button
                             onClick={() => setUploadResult(null)}
-                            className="ml-auto text-gray-500 hover:text-gray-300"
+                            className="text-gray-500 hover:text-gray-300"
                         >
                             <XCircle size={16} />
                         </button>
@@ -254,7 +440,8 @@ const Statements = () => {
                         {statements.map((s) => (
                             <div
                                 key={s.id}
-                                className="bg-slate-900/80 rounded-xl border border-slate-800 p-5 hover:border-slate-700 transition-colors"
+                                onClick={() => openStatementDetail(s.id)}
+                                className="bg-slate-900/80 rounded-xl border border-slate-800 p-5 hover:border-blue-500/30 hover:bg-slate-900 transition-all cursor-pointer group"
                             >
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-4 min-w-0">
@@ -274,29 +461,22 @@ const Statements = () => {
                                                     </span>
                                                 )}
                                                 {s.transaction_count > 0 && (
-                                                    <span className="text-xs text-gray-500">{s.transaction_count} transactions</span>
+                                                    <span className="text-xs text-emerald-400 font-medium">{s.transaction_count} transactions</span>
                                                 )}
                                             </div>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3 flex-shrink-0 ml-4">
                                         {getPdfTypeBadge(s.pdf_type)}
-                                        {getReconciliationBadge(s.reconciliation_status)}
                                         {getStatusBadge(s.status)}
                                         <button
-                                            onClick={() => handleViewPdf(s.id)}
-                                            className="p-2 rounded-lg text-gray-400 hover:text-blue-400 hover:bg-slate-800 transition-colors"
-                                            title="View PDF"
-                                        >
-                                            <Eye size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete(s.id)}
-                                            className="p-2 rounded-lg text-gray-400 hover:text-red-400 hover:bg-slate-800 transition-colors"
+                                            onClick={(e) => { e.stopPropagation(); handleDelete(s.id); }}
+                                            className="p-2 rounded-lg text-gray-400 hover:text-red-400 hover:bg-slate-800 transition-colors opacity-0 group-hover:opacity-100"
                                             title="Delete"
                                         >
                                             <Trash2 size={16} />
                                         </button>
+                                        <ChevronRight size={18} className="text-gray-600 group-hover:text-blue-400 transition-colors" />
                                     </div>
                                 </div>
                                 {s.imported_at && (
