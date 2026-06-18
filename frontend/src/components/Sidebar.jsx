@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Wallet, CreditCard, Receipt, FileBarChart, Settings, TrendingDown, Layers, Tags, ClipboardCheck, Store, FileSearch, LogOut, Users, User, ChevronDown, Key } from 'lucide-react';
+import { LayoutDashboard, Wallet, CreditCard, Receipt, FileBarChart, Settings, TrendingDown, Layers, Tags, ClipboardCheck, Store, FileSearch, LogOut, Users, User, ChevronDown, Key, FileUp } from 'lucide-react';
 import { authUtils } from '../utils/api';
 
 const Sidebar = () => {
@@ -22,6 +22,7 @@ const Sidebar = () => {
         { path: '/planning', label: 'Planning', icon: TrendingDown },
         { path: '/audit', label: 'Audit', icon: ClipboardCheck },
         { path: '/settlement', label: 'Settlement', icon: FileSearch },
+        { path: '/statements', label: 'Statements', icon: FileUp },
     ];
 
     const handleLogout = () => {

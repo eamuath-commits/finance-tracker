@@ -26,6 +26,7 @@ from webhook import router as webhook_router
 from settlement_service import router as settlement_router
 from auth_router import router as auth_router
 from alrajhi_router import router as alrajhi_router
+from statement_router import router as statement_router
 from auth_middleware import AuthMiddleware
 from auth import get_current_user
 
@@ -181,6 +182,25 @@ def run_migrations(engine):
                     conn.commit()
                 # Let create_all recreate with new schema
 
+        # --- Statement PDF Import Migrations ---
+        # Add account_number to accounts (full IBAN for statement matching)
+        if 'accounts' in inspector.get_table_names():
+            a_columns = [col['name'] for col in inspector.get_columns('accounts')]
+            if 'account_number' not in a_columns:
+                print("Migrating: Adding account_number to accounts")
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE accounts ADD COLUMN account_number VARCHAR"))
+                    conn.commit()
+
+        # Add statement_id FK to transactions
+        if 'transactions' in inspector.get_table_names():
+            t_columns = [col['name'] for col in inspector.get_columns('transactions')]
+            if 'statement_id' not in t_columns:
+                print("Migrating: Adding statement_id to transactions")
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE transactions ADD COLUMN statement_id VARCHAR"))
+                    conn.commit()
+
     except Exception as e:
         print(f"Migration failed: {e}")
 
@@ -217,6 +237,9 @@ app.include_router(settlement_router)
 
 # Include Al Rajhi bank integration router
 app.include_router(alrajhi_router)
+
+# Include statement PDF import router
+app.include_router(statement_router)
 
 @app.get("/")
 def read_root():

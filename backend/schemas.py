@@ -605,3 +605,48 @@ class TransactionWithLinkInfo(Transaction):
     """Transaction with additional linking info"""
     linked_to_payment_id: Optional[int] = None
     linked_to_distribution_id: Optional[str] = None
+
+
+# --- Statement Schemas (PDF Import) ---
+class StatementResponse(BaseModel):
+    id: str
+    bank_name: Optional[str] = None
+    original_filename: Optional[str] = None
+    account_id: Optional[str] = None
+    account_number: Optional[str] = None
+    statement_period_start: Optional[date] = None
+    statement_period_end: Optional[date] = None
+    opening_balance: Optional[float] = None
+    closing_balance: Optional[float] = None
+    transaction_count: int = 0
+    reconciliation_status: str = "pending"
+    reconciliation_errors: Optional[str] = None
+    status: str = "draft"
+    pdf_type: Optional[str] = None
+    imported_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class StatementListResponse(BaseModel):
+    id: str
+    bank_name: Optional[str] = None
+    original_filename: Optional[str] = None
+    account_number: Optional[str] = None
+    statement_period_start: Optional[date] = None
+    statement_period_end: Optional[date] = None
+    transaction_count: int = 0
+    reconciliation_status: str = "pending"
+    status: str = "draft"
+    pdf_type: Optional[str] = None
+    imported_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class StatementUpdate(BaseModel):
+    bank_name: Optional[str] = None
+    account_id: Optional[str] = None
+    status: Optional[str] = None
+    reconciliation_status: Optional[str] = None
+
