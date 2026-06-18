@@ -32,7 +32,7 @@ def get_credit_card(db: Session, card_id: str):
     """Get a single credit card by ID"""
     return db.query(models.CreditCard).filter(models.CreditCard.id == card_id).first()
 
-def create_credit_card(db: Session, card: schemas.CreditCardCreate):
+def create_credit_card(db: Session, card: schemas.CreditCardCreate, user_id: str = None):
     """Create a new credit card"""
     import uuid
     db_card = models.CreditCard(
@@ -46,7 +46,8 @@ def create_credit_card(db: Session, card: schemas.CreditCardCreate):
         apr=card.apr,
         minimum_payment_percent=card.minimum_payment_percent,
         notes=card.notes,
-        current_balance=0.0
+        current_balance=0.0,
+        user_id=user_id
     )
     db.add(db_card)
     db.commit()
@@ -83,7 +84,7 @@ def get_account_by_name(db: Session, name: str):
 def get_account(db: Session, account_id: str):
     return db.query(models.Account).filter(models.Account.id == account_id).first()
 
-def create_account(db: Session, account: schemas.AccountCreate):
+def create_account(db: Session, account: schemas.AccountCreate, user_id: str = None):
     # Convert account_type string to enum
     account_type_enum = account.account_type
     if isinstance(account.account_type, str):
@@ -104,7 +105,8 @@ def create_account(db: Session, account: schemas.AccountCreate):
         account_type=account_type_enum,
         last_4_digits=account.last_4_digits,
         current_balance=account.current_balance,
-        credit_limit=account.credit_limit
+        credit_limit=account.credit_limit,
+        user_id=user_id
     )
     db.add(db_account)
     db.commit()
@@ -686,7 +688,7 @@ def assign_account_to_transaction(db: Session, transaction_id: str, account_id: 
     db.refresh(tx)
     return tx
 
-def create_loan(db: Session, loan: schemas.LoanCreate):
+def create_loan(db: Session, loan: schemas.LoanCreate, user_id: str = None):
     # Initial remaining balance = principal
     db_loan = models.Loan(
         name=loan.name,
@@ -694,7 +696,8 @@ def create_loan(db: Session, loan: schemas.LoanCreate):
         interest_rate=loan.interest_rate,
         start_date=loan.start_date,
         term_months=loan.term_months,
-        remaining_balance=loan.principal_amount 
+        remaining_balance=loan.principal_amount,
+        user_id=user_id
     )
     db.add(db_loan)
     db.commit()
@@ -734,13 +737,14 @@ def delete_loan(db: Session, loan_id: str):
 def get_obligation(db: Session, obligation_id: str):
     return db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
 
-def create_obligation(db: Session, obligation: schemas.ObligationCreate):
+def create_obligation(db: Session, obligation: schemas.ObligationCreate, user_id: str = None):
     db_obj = models.MonthlyObligation(
         name=obligation.name,
         due_day=obligation.due_day,
         category=obligation.category,
         provider=obligation.provider,
-        notes=obligation.notes
+        notes=obligation.notes,
+        user_id=user_id
     )
     db.add(db_obj)
     db.commit()
@@ -1364,8 +1368,10 @@ def update_currency_wallet(db: Session, wallet_id: str, update_data: schemas.Cur
 
 # --- Allocation Rules ---
 
-def create_allocation_rule(db: Session, rule: schemas.AllocationRuleCreate):
-    db_rule = models.AllocationRule(**rule.dict())
+def create_allocation_rule(db: Session, rule: schemas.AllocationRuleCreate, user_id: str = None):
+    rule_data = rule.dict()
+    rule_data['user_id'] = user_id
+    db_rule = models.AllocationRule(**rule_data)
     db.add(db_rule)
     db.commit()
     db.refresh(db_rule)

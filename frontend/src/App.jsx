@@ -22,6 +22,8 @@ import Settings from './pages/Settings';
 import Settlement from './pages/Settlement';
 import BankCallback from './pages/BankCallback';
 import UserManagement from './pages/UserManagement';
+import Profile from './pages/Profile';
+import ChangePassword from './pages/ChangePassword';
 
 import { authUtils } from './utils/api';
 
@@ -65,6 +67,8 @@ function App() {
                     <Route path="settings" element={<Settings />} />
                     <Route path="bank/callback" element={<BankCallback />} />
                     <Route path="users" element={<UserManagement />} />
+                    <Route path="profile" element={<Profile />} />
+                    <Route path="change-password" element={<ChangePassword />} />
                 </Route>
             </Routes>
         </Router>

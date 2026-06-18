@@ -224,23 +224,23 @@ def read_root():
 
 # --- Account Endpoints ---
 @app.post("/accounts/", response_model=schemas.Account)
-def create_account(account: schemas.AccountCreate, db: Session = Depends(get_db)):
-    return crud.create_account(db=db, account=account)
+def create_account(account: schemas.AccountCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return crud.create_account(db=db, account=account, user_id=current_user.id)
 
 @app.get("/accounts/", response_model=List[schemas.Account])
-def read_accounts(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    accounts = crud.get_accounts(db, skip=skip, limit=limit)
+def read_accounts(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    accounts = db.query(models.Account).filter(models.Account.user_id == current_user.id).offset(skip).limit(limit).all()
     return accounts
 
 @app.put("/accounts/{account_id}", response_model=schemas.Account)
-def update_account(account_id: str, account_update: schemas.AccountUpdate, db: Session = Depends(get_db)):
+def update_account(account_id: str, account_update: schemas.AccountUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     updated_account = crud.update_account(db, account_id, account_update)
     if not updated_account:
         raise HTTPException(status_code=404, detail="Account not found")
     return updated_account
 
 @app.delete("/accounts/{account_id}")
-def delete_account(account_id: str, db: Session = Depends(get_db)):
+def delete_account(account_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     deleted_account = crud.delete_account(db, account_id)
     if not deleted_account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -317,7 +317,7 @@ def _recalculate_account_balance(db: Session, account_id: str):
 
 
 @app.post("/accounts/{account_id}/recalculate-balance")
-def recalculate_account_balance(account_id: str, db: Session = Depends(get_db)):
+def recalculate_account_balance(account_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Recalculate account balance using the first transaction as baseline, then replaying forward."""
     result = _recalculate_account_balance(db, account_id)
     if result is None:
@@ -327,7 +327,7 @@ def recalculate_account_balance(account_id: str, db: Session = Depends(get_db)):
     return result
 
 @app.post("/accounts/recalculate-all-balances")
-def recalculate_all_account_balances(db: Session = Depends(get_db)):
+def recalculate_all_account_balances(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Recalculate all account balances from transaction history"""
     accounts = db.query(models.Account).all()
     results = []
@@ -360,36 +360,36 @@ def recalculate_all_account_balances(db: Session = Depends(get_db)):
 
 # --- Credit Card Endpoints ---
 @app.post("/credit-cards/", response_model=schemas.CreditCard)
-def create_credit_card(card: schemas.CreditCardCreate, db: Session = Depends(get_db)):
-    return crud.create_credit_card(db=db, card=card)
+def create_credit_card(card: schemas.CreditCardCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return crud.create_credit_card(db=db, card=card, user_id=current_user.id)
 
 @app.get("/credit-cards/", response_model=List[schemas.CreditCard])
-def read_credit_cards(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return crud.get_credit_cards(db, skip=skip, limit=limit)
+def read_credit_cards(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return db.query(models.CreditCard).filter(models.CreditCard.user_id == current_user.id).offset(skip).limit(limit).all()
 
 @app.get("/credit-cards/{card_id}", response_model=schemas.CreditCard)
-def read_credit_card(card_id: str, db: Session = Depends(get_db)):
+def read_credit_card(card_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     card = crud.get_credit_card(db, card_id)
     if not card:
         raise HTTPException(status_code=404, detail="Credit card not found")
     return card
 
 @app.put("/credit-cards/{card_id}", response_model=schemas.CreditCard)
-def update_credit_card(card_id: str, card_update: schemas.CreditCardUpdate, db: Session = Depends(get_db)):
+def update_credit_card(card_id: str, card_update: schemas.CreditCardUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     updated_card = crud.update_credit_card(db, card_id, card_update)
     if not updated_card:
         raise HTTPException(status_code=404, detail="Credit card not found")
     return updated_card
 
 @app.delete("/credit-cards/{card_id}")
-def delete_credit_card(card_id: str, db: Session = Depends(get_db)):
+def delete_credit_card(card_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     deleted = crud.delete_credit_card(db, card_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Credit card not found")
     return {"message": "Credit card deleted successfully"}
 
 @app.get("/credit-cards/{card_id}/transactions", response_model=List[schemas.Transaction])
-def get_credit_card_transactions(card_id: str, db: Session = Depends(get_db)):
+def get_credit_card_transactions(card_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Get all transactions for a specific credit card"""
     card = crud.get_credit_card(db, card_id)
     if not card:
@@ -400,7 +400,7 @@ def get_credit_card_transactions(card_id: str, db: Session = Depends(get_db)):
     return transactions
 
 @app.post("/credit-cards/{card_id}/payment")
-def record_credit_card_payment(card_id: str, amount: float, from_account_id: Optional[str] = None, db: Session = Depends(get_db)):
+def record_credit_card_payment(card_id: str, amount: float, from_account_id: Optional[str] = None, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Record a payment to a credit card (reduces balance)"""
     card = crud.get_credit_card(db, card_id)
     if not card:
@@ -437,7 +437,7 @@ def record_credit_card_payment(card_id: str, amount: float, from_account_id: Opt
     return {"message": f"Payment of {amount} SAR recorded", "new_balance": card.current_balance}
 
 @app.post("/accounts/{account_id}/aliases", response_model=schemas.AccountAlias)
-def create_alias(account_id: str, alias: schemas.AccountAliasCreate, db: Session = Depends(get_db)):
+def create_alias(account_id: str, alias: schemas.AccountAliasCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     # Verify account exists
     account = db.query(models.Account).filter(models.Account.id == account_id).first()
     if not account:
@@ -445,7 +445,7 @@ def create_alias(account_id: str, alias: schemas.AccountAliasCreate, db: Session
     return crud.create_account_alias(db, account_id, alias)
 
 @app.delete("/aliases/{alias_id}")
-def delete_alias(alias_id: int, db: Session = Depends(get_db)):
+def delete_alias(alias_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     deleted = crud.delete_account_alias(db, alias_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Alias not found")
@@ -453,21 +453,21 @@ def delete_alias(alias_id: int, db: Session = Depends(get_db)):
 
 # --- Loan Endpoints ---
 @app.post("/loans/", response_model=schemas.Loan)
-def create_loan(loan: schemas.LoanCreate, db: Session = Depends(get_db)):
-    return crud.create_loan(db=db, loan=loan)
+def create_loan(loan: schemas.LoanCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return crud.create_loan(db=db, loan=loan, user_id=current_user.id)
 
 @app.get("/loans/", response_model=List[schemas.Loan])
-def read_loans(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    loans = crud.get_loans(db, skip=skip, limit=limit)
+def read_loans(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    loans = db.query(models.Loan).filter(models.Loan.user_id == current_user.id).order_by(models.Loan.display_order.asc(), models.Loan.name.asc()).offset(skip).limit(limit).all()
     return loans
 
 @app.put("/loans/reorder")
-def reorder_loans(payload: schemas.ReorderSchema, db: Session = Depends(get_db)):
+def reorder_loans(payload: schemas.ReorderSchema, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     crud.reorder_loans(db, payload.ordered_ids)
     return {"status": "success"}
 
 @app.put("/loans/{loan_id}", response_model=schemas.Loan)
-def update_loan(loan_id: str, loan_update: schemas.LoanUpdate, db: Session = Depends(get_db)):
+def update_loan(loan_id: str, loan_update: schemas.LoanUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     updated_loan = crud.update_loan(db, loan_id, loan_update)
     if not updated_loan:
         raise HTTPException(status_code=404, detail="Loan not found")
@@ -476,7 +476,7 @@ def update_loan(loan_id: str, loan_update: schemas.LoanUpdate, db: Session = Dep
     return updated_loan
 
 @app.delete("/loans/{loan_id}", response_model=schemas.Loan)
-def delete_loan(loan_id: str, db: Session = Depends(get_db)):
+def delete_loan(loan_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     deleted = crud.delete_loan(db, loan_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Loan not found")
@@ -484,34 +484,34 @@ def delete_loan(loan_id: str, db: Session = Depends(get_db)):
 
 # --- Obligation Endpoints ---
 @app.post("/obligations/", response_model=schemas.Obligation)
-def create_obligation(obligation: schemas.ObligationCreate, db: Session = Depends(get_db)):
-    return crud.create_obligation(db=db, obligation=obligation)
+def create_obligation(obligation: schemas.ObligationCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return crud.create_obligation(db=db, obligation=obligation, user_id=current_user.id)
 
 @app.get("/obligations/", response_model=List[schemas.Obligation])
-def read_obligations(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return crud.get_obligations(db, skip=skip, limit=limit)
+def read_obligations(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return db.query(models.MonthlyObligation).filter(models.MonthlyObligation.user_id == current_user.id).order_by(models.MonthlyObligation.display_order.asc(), models.MonthlyObligation.due_day.asc()).offset(skip).limit(limit).all()
 
 @app.put("/obligations/reorder")
-def reorder_obligations(payload: schemas.ReorderSchema, db: Session = Depends(get_db)):
+def reorder_obligations(payload: schemas.ReorderSchema, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     crud.reorder_obligations(db, payload.ordered_ids)
     return {"status": "success"}
 
 @app.put("/obligations/{obligation_id}", response_model=schemas.Obligation)
-def update_obligation(obligation_id: str, obligation_update: schemas.ObligationUpdate, db: Session = Depends(get_db)):
+def update_obligation(obligation_id: str, obligation_update: schemas.ObligationUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     updated_obj = crud.update_obligation(db, obligation_id, obligation_update)
     if not updated_obj:
         raise HTTPException(status_code=404, detail="Obligation not found")
     return updated_obj
 
 @app.delete("/obligations/{obligation_id}", response_model=schemas.Obligation)
-def delete_obligation(obligation_id: str, db: Session = Depends(get_db)):
+def delete_obligation(obligation_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     deleted_obj = crud.delete_obligation(db, obligation_id)
     if not deleted_obj:
         raise HTTPException(status_code=404, detail="Obligation not found")
     return deleted_obj
 
 @app.get("/obligations/monthly-status")
-def get_obligations_monthly_status(month_offset: int = 0, db: Session = Depends(get_db)):
+def get_obligations_monthly_status(month_offset: int = 0, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """
     Get payment status for all obligations for a given month.
     Returns paid/unpaid/overdue counts and per-obligation status.
@@ -527,7 +527,7 @@ def get_obligations_monthly_status(month_offset: int = 0, db: Session = Depends(
     month_str = f"{year}-{str(month).zfill(2)}"
     month_label = target_date.strftime("%B %Y")
 
-    obligations = db.query(models.MonthlyObligation).order_by(models.MonthlyObligation.display_order).all()
+    obligations = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.user_id == current_user.id).order_by(models.MonthlyObligation.display_order).all()
 
     # Get all payments for this month in one query
     all_payments = db.query(models.Payment).filter(
@@ -600,7 +600,7 @@ def get_obligations_monthly_status(month_offset: int = 0, db: Session = Depends(
 
 
 @app.get("/obligations/forecast")
-def get_obligations_forecast(months_ahead: int = 1, db: Session = Depends(get_db)):
+def get_obligations_forecast(months_ahead: int = 1, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """
     Forecast next month's expected expenses based on payment history.
     Uses up to 6 months of payment history per obligation for trend analysis.
@@ -614,7 +614,7 @@ def get_obligations_forecast(months_ahead: int = 1, db: Session = Depends(get_db
     forecast_month = f"{year}-{str(month).zfill(2)}"
     forecast_label = datetime(year, month, 1).strftime("%B %Y")
 
-    obligations = db.query(models.MonthlyObligation).order_by(models.MonthlyObligation.display_order).all()
+    obligations = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.user_id == current_user.id).order_by(models.MonthlyObligation.display_order).all()
 
     # Get last 6 months of payments using LIKE to match both YYYY-MM and YYYY-MM-DD formats
     history_months = []
@@ -720,7 +720,7 @@ def get_obligations_forecast(months_ahead: int = 1, db: Session = Depends(get_db
 
 
 @app.get("/obligations/all-matches")
-def get_all_obligation_matches(db: Session = Depends(get_db)):
+def get_all_obligation_matches(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """
     Find transaction matches for ALL unpaid obligations in the current month.
     Returns a dict keyed by obligation_id with match arrays.
@@ -729,7 +729,7 @@ def get_all_obligation_matches(db: Session = Depends(get_db)):
     now = datetime.now()
     month_str = f"{now.year}-{str(now.month).zfill(2)}"
 
-    obligations = db.query(models.MonthlyObligation).all()
+    obligations = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.user_id == current_user.id).all()
 
     # Get payments for current month to identify unpaid ones
     current_payments = db.query(models.Payment).filter(
@@ -844,7 +844,7 @@ def get_all_obligation_matches(db: Session = Depends(get_db)):
 
 
 @app.get("/obligations/{obligation_id}/matches", response_model=List[schemas.Transaction])
-def get_obligation_matches(obligation_id: str, db: Session = Depends(get_db)):
+def get_obligation_matches(obligation_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     # 1. Get Obligation
     obligation = crud.get_obligation(db, obligation_id)
     if not obligation:
@@ -1338,8 +1338,8 @@ def unlink_payment_transaction(payment_id: int, db: Session = Depends(get_db)):
 
 # --- Transaction Endpoints ---
 @app.get("/transactions/")
-def read_transactions(skip: int = 0, limit: int = 1000, db: Session = Depends(get_db)):
-    txs = crud.get_transactions(db, skip=skip, limit=limit)
+def read_transactions(skip: int = 0, limit: int = 1000, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    txs = db.query(models.Transaction).filter(models.Transaction.user_id == current_user.id).order_by(models.Transaction.timestamp.desc()).offset(skip).limit(limit).all()
     result = []
     for tx in txs:
         tx_dict = {c.name: getattr(tx, c.name) for c in tx.__table__.columns}
@@ -1588,7 +1588,7 @@ def resolve_discrepancy(transaction_id: str, body: dict, db: Session = Depends(g
     return {"message": "Discrepancy resolved", "resolved": parsed['discrepancy_resolved']}
 
 @app.post("/transactions/bulk-delete")
-def bulk_delete_transactions(payload: schemas.BulkDeleteRequest, db: Session = Depends(get_db)):
+def bulk_delete_transactions(payload: schemas.BulkDeleteRequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     deleted_count = 0
     for tx_id in payload.ids:
         crud.delete_transaction(db, tx_id)
@@ -1705,7 +1705,7 @@ def complete_pending_transfer(transaction_id: str, source_account_id: str, db: S
     }
 
 @app.get("/transactions/pending")
-def get_pending_transactions(db: Session = Depends(get_db)):
+def get_pending_transactions(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Get all pending transactions that need user action"""
     pending = db.query(models.Transaction).filter(
         models.Transaction.status == "pending_action"
@@ -1718,7 +1718,7 @@ def get_queue_status(db: Session = Depends(get_db)):
     return queue_processor.get_queue_status(db)
 
 @app.get("/queue/blocked")
-def get_blocked_transactions(db: Session = Depends(get_db)):
+def get_blocked_transactions(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Get all blocked transactions requiring resolution"""
     return queue_processor.get_blocked_transactions(db)
 
@@ -1971,8 +1971,8 @@ async def receive_sms(request: Request, background_tasks: BackgroundTasks, db: S
 
 # --- SMS Inbox Endpoints ---
 @app.get("/messages/", response_model=List[schemas.RawMessage])
-def read_messages(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return db.query(models.RawMessage).order_by(models.RawMessage.timestamp.desc()).offset(skip).limit(limit).all()
+def read_messages(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return db.query(models.RawMessage).filter(models.RawMessage.user_id == current_user.id).order_by(models.RawMessage.timestamp.desc()).offset(skip).limit(limit).all()
 
 @app.post("/messages/{message_id}/retry")
 async def retry_message(message_id: str, db: Session = Depends(get_db)):
@@ -2601,15 +2601,15 @@ def delete_goal(goal_id: str, db: Session = Depends(get_db)):
 # --- Allocation Rules ---
 
 @app.post("/allocation/rules", response_model=schemas.AllocationRule)
-def create_allocation_rule(rule: schemas.AllocationRuleCreate, db: Session = Depends(get_db)):
-    return crud.create_allocation_rule(db, rule)
+def create_allocation_rule(rule: schemas.AllocationRuleCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return crud.create_allocation_rule(db, rule, user_id=current_user.id)
 
 @app.get("/allocation/rules", response_model=List[schemas.AllocationRule])
-def get_allocation_rules(db: Session = Depends(get_db)):
-    return crud.get_allocation_rules(db)
+def get_allocation_rules(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return db.query(models.AllocationRule).filter(models.AllocationRule.user_id == current_user.id).all()
 
 @app.delete("/allocation/rules/{rule_id}")
-def delete_allocation_rule(rule_id: str, db: Session = Depends(get_db)):
+def delete_allocation_rule(rule_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     success = crud.delete_allocation_rule(db, rule_id)
     return {"success": success}
 
@@ -2653,7 +2653,7 @@ def get_payment_history(obligation_id: str, db: Session = Depends(get_db)):
     return crud.get_payment_history(db, obligation_id)
 
 @app.post("/obligations/{obligation_id}/pay", response_model=schemas.Payment)
-def create_payment(obligation_id: str, payment: schemas.PaymentCreate, db: Session = Depends(get_db)):
+def create_payment(obligation_id: str, payment: schemas.PaymentCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return crud.create_payment(db, obligation_id, payment)
 
 @app.put("/obligations/history/{payment_id}", response_model=schemas.Payment)
@@ -2669,11 +2669,11 @@ def delete_payment(payment_id: int, db: Session = Depends(get_db)):
     return {"message": "Rule deleted"}
 
 @app.post("/allocation/preview", response_model=schemas.AllocationPreviewResponse)
-def preview_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depends(get_db)):
+def preview_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return crud.calculate_allocation_preview(db, req.source_account_id, req.month_offset)
 
 @app.post("/allocation/execute")
-def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depends(get_db)):
+def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     preview = crud.calculate_allocation_preview(db, req.source_account_id, req.month_offset)
     
     source_acc = crud.get_account(db, req.source_account_id)
@@ -2748,7 +2748,7 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
     }
 
 @app.post("/allocation/reverse")
-def reverse_allocation(req: schemas.AllocationReverseRequest, db: Session = Depends(get_db)):
+def reverse_allocation(req: schemas.AllocationReverseRequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Reverse/undo a payday distribution for specific obligations or envelopes."""
     from dateutil.relativedelta import relativedelta
     target_date = datetime.now() + relativedelta(months=req.month_offset)
@@ -2851,7 +2851,7 @@ def delete_category(category_id: str, db: Session = Depends(get_db)):
 # --- Audit Endpoints ---
 
 @app.post("/audit/check", response_model=schemas.AuditCheckResponse)
-def check_audit(request: schemas.AuditCheckRequest, db: Session = Depends(get_db)):
+def check_audit(request: schemas.AuditCheckRequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Check system balance against actual balance and return discrepancy with transaction history."""
     result = crud.check_audit(db, request.account_id, request.actual_balance)
     if result is None:
@@ -2859,7 +2859,7 @@ def check_audit(request: schemas.AuditCheckRequest, db: Session = Depends(get_db
     return result
 
 @app.post("/audit/confirm", response_model=schemas.Audit)
-def confirm_audit(request: schemas.AuditConfirmRequest, db: Session = Depends(get_db)):
+def confirm_audit(request: schemas.AuditConfirmRequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Confirm an audit (create audit record). For mismatches, requires force_confirm=True and notes."""
     # Validate: if mismatch and force_confirm, notes are required
     check_result = crud.check_audit(db, request.account_id, request.actual_balance)
@@ -2886,7 +2886,7 @@ def confirm_audit(request: schemas.AuditConfirmRequest, db: Session = Depends(ge
     return result
 
 @app.get("/audit/history/{account_id}", response_model=List[schemas.Audit])
-def get_audit_history(account_id: str, limit: int = 20, db: Session = Depends(get_db)):
+def get_audit_history(account_id: str, limit: int = 20, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Get audit history for an account."""
     return crud.get_audit_history(db, account_id, limit)
 
@@ -2894,7 +2894,7 @@ def get_audit_history(account_id: str, limit: int = 20, db: Session = Depends(ge
 # --- Distribution Endpoints ---
 
 @app.post("/distributions", response_model=schemas.Distribution)
-def create_distribution(distribution: schemas.DistributionCreate, db: Session = Depends(get_db)):
+def create_distribution(distribution: schemas.DistributionCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Create a distribution record."""
     db_distribution = crud.create_distribution(db, distribution)
     
@@ -3171,10 +3171,11 @@ def search_transactions(
     end_date: Optional[str] = None,
     type: Optional[str] = None,
     limit: int = 50,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
 ):
     """Search transactions with filters for the transaction selector modal."""
-    q = db.query(models.Transaction)
+    q = db.query(models.Transaction).filter(models.Transaction.user_id == current_user.id)
     
     if query:
         q = q.filter(
