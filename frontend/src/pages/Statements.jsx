@@ -42,6 +42,8 @@ const Statements = () => {
     const [validationResult, setValidationResult] = useState(null);
     const [validating, setValidating] = useState(false);
     const [showValidationDetails, setShowValidationDetails] = useState(false);
+    // Confirmation dialog state
+    const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null });
     // Accounts for filter dropdown (not needed - derived from statements)
 
     const fetchStatements = useCallback(async () => {
@@ -177,23 +179,30 @@ const Statements = () => {
         if (!selectedStatement) return;
         const txCount = parsedTransactions.length;
         const acctLabel = statementDetail?.account_number ? `****${statementDetail.account_number.slice(-4)}` : 'linked account';
-        if (!window.confirm(`This will create ${txCount} draft transactions in the main ledger for account ${acctLabel}.\n\nDraft transactions do NOT affect your account balance until approved.\n\nContinue?`)) return;
         
-        setCommitting(true);
-        setCommitResult(null);
-        setError(null);
-        try {
-            const res = await api.post(`/api/statements/${selectedStatement}/commit`);
-            setCommitResult(res.data);
-            // Refresh detail to show updated status
-            const detailRes = await api.get(`/api/statements/${selectedStatement}`);
-            setStatementDetail(detailRes.data);
-            fetchStatements();
-        } catch (err) {
-            setError(err.response?.data?.detail || 'Commit to ledger failed');
-        } finally {
-            setCommitting(false);
-        }
+        setConfirmDialog({
+            open: true,
+            title: 'Commit to Ledger',
+            message: `This will create ${txCount} draft transactions in the main ledger for account ${acctLabel}.\n\nDraft transactions do NOT affect your account balance until approved.`,
+            variant: 'primary',
+            onConfirm: async () => {
+                setConfirmDialog(prev => ({ ...prev, open: false }));
+                setCommitting(true);
+                setCommitResult(null);
+                setError(null);
+                try {
+                    const res = await api.post(`/api/statements/${selectedStatement}/commit`);
+                    setCommitResult(res.data);
+                    const detailRes = await api.get(`/api/statements/${selectedStatement}`);
+                    setStatementDetail(detailRes.data);
+                    fetchStatements();
+                } catch (err) {
+                    setError(err.response?.data?.detail || 'Commit to ledger failed');
+                } finally {
+                    setCommitting(false);
+                }
+            }
+        });
     };
 
     const handleValidate = async () => {
@@ -212,18 +221,26 @@ const Statements = () => {
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm('Delete this statement and all its draft transactions?')) return;
-        try {
-            await api.delete(`/api/statements/${id}`);
-            fetchStatements();
-            if (selectedStatement === id) {
-                setSelectedStatement(null);
-                setStatementDetail(null);
-                setParsedTransactions([]);
+        setConfirmDialog({
+            open: true,
+            title: 'Delete Statement',
+            message: 'Delete this statement and all its draft transactions? This action cannot be undone.',
+            variant: 'danger',
+            onConfirm: async () => {
+                setConfirmDialog(prev => ({ ...prev, open: false }));
+                try {
+                    await api.delete(`/api/statements/${id}`);
+                    fetchStatements();
+                    if (selectedStatement === id) {
+                        setSelectedStatement(null);
+                        setStatementDetail(null);
+                        setParsedTransactions([]);
+                    }
+                } catch (err) {
+                    setError(err.response?.data?.detail || 'Delete failed');
+                }
             }
-        } catch (err) {
-            setError(err.response?.data?.detail || 'Delete failed');
-        }
+        });
     };
 
     const formatAmount = (amount) => {
@@ -345,6 +362,7 @@ const Statements = () => {
     if (selectedStatement) {
 
         return (
+        <>
             <div className="space-y-6">
                 {/* Back + Header */}
                 <div className="flex items-center gap-4">
@@ -758,6 +776,35 @@ const Statements = () => {
                     </div>
                 )}
             </div>
+
+            {/* Confirmation Dialog Modal */}
+            {confirmDialog.open && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setConfirmDialog(prev => ({ ...prev, open: false }))}>
+                    <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-lg font-semibold text-white mb-3">{confirmDialog.title}</h3>
+                        <p className="text-sm text-gray-400 whitespace-pre-line mb-6">{confirmDialog.message}</p>
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => setConfirmDialog(prev => ({ ...prev, open: false }))}
+                                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-gray-300 text-sm font-medium transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDialog.onConfirm}
+                                className={`px-5 py-2 rounded-lg text-white text-sm font-medium transition-colors ${
+                                    confirmDialog.variant === 'danger'
+                                        ? 'bg-red-600 hover:bg-red-500'
+                                        : 'bg-emerald-600 hover:bg-emerald-500'
+                                }`}
+                            >
+                                {confirmDialog.variant === 'danger' ? 'Delete' : 'Confirm'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
         );
     }
 
@@ -869,6 +916,7 @@ const Statements = () => {
 
     // ─────────────── LIST VIEW ───────────────
     return (
+    <>
         <div className="space-y-6">
             {/* Header Row */}
             <div className="flex items-center justify-between">
@@ -1250,6 +1298,35 @@ const Statements = () => {
                 </div>
             )}
         </div>
+
+        {/* Confirmation Dialog Modal */}
+        {confirmDialog.open && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setConfirmDialog(prev => ({ ...prev, open: false }))}>
+                <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6" onClick={e => e.stopPropagation()}>
+                    <h3 className="text-lg font-semibold text-white mb-3">{confirmDialog.title}</h3>
+                    <p className="text-sm text-gray-400 whitespace-pre-line mb-6">{confirmDialog.message}</p>
+                    <div className="flex gap-3 justify-end">
+                        <button
+                            onClick={() => setConfirmDialog(prev => ({ ...prev, open: false }))}
+                            className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-gray-300 text-sm font-medium transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={confirmDialog.onConfirm}
+                            className={`px-5 py-2 rounded-lg text-white text-sm font-medium transition-colors ${
+                                confirmDialog.variant === 'danger'
+                                    ? 'bg-red-600 hover:bg-red-500'
+                                    : 'bg-emerald-600 hover:bg-emerald-500'
+                            }`}
+                        >
+                            {confirmDialog.variant === 'danger' ? 'Delete' : 'Confirm'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+    </>
     );
 };
 
