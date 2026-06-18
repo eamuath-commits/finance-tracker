@@ -1493,7 +1493,7 @@ def update_transaction(transaction_id: str, transaction_update: schemas.Transact
     return updated_tx
 
 @app.post("/transactions/", response_model=schemas.Transaction)
-def create_transaction(transaction: schemas.TransactionCreate, db: Session = Depends(get_db)):
+def create_transaction(transaction: schemas.TransactionCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     # Verify account or credit card exists
     if transaction.account_id:
         account = db.query(models.Account).filter(models.Account.id == transaction.account_id).first()
@@ -1505,6 +1505,7 @@ def create_transaction(transaction: schemas.TransactionCreate, db: Session = Dep
             raise HTTPException(status_code=404, detail="Credit card not found")
     else:
         raise HTTPException(status_code=400, detail="Either account_id or credit_card_id is required")
+    transaction.user_id = current_user.id
     return crud.create_transaction(db=db, transaction=transaction)
 
 @app.delete("/transactions/{transaction_id}")
@@ -2070,7 +2071,7 @@ def bulk_delete_messages(payload: schemas.BulkDeleteRequest, db: Session = Depen
 
 # --- Direct SMS Ingest (for iPhone Shortcuts and Web UI) ---
 @app.post("/api/sms/ingest")
-async def ingest_sms(payload: schemas.SMSIngest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+async def ingest_sms(payload: schemas.SMSIngest, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """
     Direct SMS ingest endpoint for iPhone Shortcuts and Web UI.
     Accepts separate 'sender' and 'body' fields.
@@ -2113,7 +2114,8 @@ async def ingest_sms(payload: schemas.SMSIngest, background_tasks: BackgroundTas
             sender=payload.sender or "Unknown",
             body=payload.body.strip(),
             source="webui",
-            status=models.MessageStatus.IGNORED
+            status=models.MessageStatus.IGNORED,
+            user_id=current_user.id
         )
         raw_msg.error_log = f"Skipped: masked account ({masked_account_match.group()}) — not a registered account format"
         db.add(raw_msg)
@@ -2131,7 +2133,8 @@ async def ingest_sms(payload: schemas.SMSIngest, background_tasks: BackgroundTas
         raw_msg = models.RawMessage(
             sender=payload.sender or "Unknown",
             body=payload.body.strip(),
-            status=models.MessageStatus.IGNORED
+            status=models.MessageStatus.IGNORED,
+            user_id=current_user.id
         )
         raw_msg.error_log = "Skipped: credit card statement/reminder notification"
         db.add(raw_msg)
@@ -2147,7 +2150,8 @@ async def ingest_sms(payload: schemas.SMSIngest, background_tasks: BackgroundTas
             sender=payload.sender,
             body=payload.body,
             status=models.MessageStatus.PENDING,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
+            user_id=current_user.id
         )
         db.add(raw_msg)
         db.commit()
@@ -2172,7 +2176,8 @@ async def ingest_sms(payload: schemas.SMSIngest, background_tasks: BackgroundTas
         sender=payload.sender,
         body=payload.body,
         status=models.MessageStatus.PENDING,
-        timestamp=datetime.now()
+        timestamp=datetime.now(),
+        user_id=current_user.id
     )
     db.add(raw_msg)
     db.commit()
@@ -2266,8 +2271,8 @@ async def ingest_sms(payload: schemas.SMSIngest, background_tasks: BackgroundTas
         bank_lower = bank_to_check.lower().strip()
         
         # Get all bank names from user's accounts and credit cards
-        user_accounts = db.query(models.Account).all()
-        user_credit_cards = db.query(models.CreditCard).all()
+        user_accounts = db.query(models.Account).filter(models.Account.user_id == current_user.id).all()
+        user_credit_cards = db.query(models.CreditCard).filter(models.CreditCard.user_id == current_user.id).all()
         
         user_bank_names = set()
         for acc in user_accounts:
@@ -2333,6 +2338,7 @@ async def ingest_sms(payload: schemas.SMSIngest, background_tasks: BackgroundTas
                     category="Transfer",
                     type="debit",
                     status="pending_action",
+                    user_id=current_user.id,
                 )
                 db.add(pending_tx)
                 db.commit()
@@ -2422,6 +2428,7 @@ async def ingest_sms(payload: schemas.SMSIngest, background_tasks: BackgroundTas
             type=tx_type,
             status="pending_action",
             merchant_id=pending_merchant_id,
+            user_id=current_user.id,
         )
         db.add(pending_tx)
         db.commit()
@@ -2463,7 +2470,7 @@ async def ingest_sms(payload: schemas.SMSIngest, background_tasks: BackgroundTas
     
     # 6. Create transaction using existing sms_agent logic
     try:
-        await sms_agent._create_transaction_logic(db, result, account, credit_card, payload.body, reply_target=None, source="webui")
+        await sms_agent._create_transaction_logic(db, result, account, credit_card, payload.body, reply_target=None, source="webui", user_id=current_user.id)
         raw_msg.status = models.MessageStatus.PARSED
         raw_msg.error_log = None
         db.commit()
@@ -2504,7 +2511,8 @@ def assign_account_to_pending_tx(
     transaction_id: str,
     account_id: str = None,
     credit_card_id: str = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
 ):
     """
     Assign an account or credit card to a pending_action transaction.
