@@ -258,6 +258,44 @@ const Statements = () => {
     const hasTxFilters = txSearch || txTypeFilter || txDateRange.start || txDateRange.end || txAmountMin || txAmountMax || txCountLimit;
     const clearTxFilters = () => { setTxSearch(''); setTxTypeFilter(''); setTxDateRange({ start: '', end: '' }); setTxAmountMin(''); setTxAmountMax(''); setTxCountLimit(''); };
 
+    // Must be before conditional return (React hooks rules)
+    const sortedFilteredStatements = useMemo(() => {
+        let result = [...filteredStatements];
+        if (statusFilter !== 'all') {
+            result = result.filter(s => s.status === statusFilter);
+        }
+        result.sort((a, b) => {
+            let aVal, bVal;
+            switch (sortColumn) {
+                case 'filename': aVal = a.original_filename || ''; bVal = b.original_filename || ''; break;
+                case 'account': aVal = a.account_name || a.account_number || ''; bVal = b.account_name || b.account_number || ''; break;
+                case 'period': aVal = a.statement_period_start || ''; bVal = b.statement_period_start || ''; break;
+                case 'tx_count': aVal = a.transaction_count || 0; bVal = b.transaction_count || 0; break;
+                case 'status': aVal = a.status || ''; bVal = b.status || ''; break;
+                case 'imported_at': default: aVal = a.imported_at || ''; bVal = b.imported_at || ''; break;
+            }
+            if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+            return 0;
+        });
+        return result;
+    }, [filteredStatements, statusFilter, sortColumn, sortDir]);
+
+    const summaryStats = useMemo(() => {
+        const s = filteredStatements;
+        return {
+            totalStatements: s.length,
+            totalTransactions: s.reduce((sum, st) => sum + (st.transaction_count || 0), 0),
+            totalDebits: s.reduce((sum, st) => {
+                if (st.opening_balance != null && st.closing_balance != null) {
+                    const diff = st.opening_balance - st.closing_balance;
+                    return sum + Math.max(0, diff);
+                }
+                return sum;
+            }, 0),
+        };
+    }, [filteredStatements]);
+
     // ─────────────── DETAIL VIEW ───────────────
     if (selectedStatement) {
 
@@ -520,42 +558,6 @@ const Statements = () => {
         }
     };
 
-    const sortedFilteredStatements = useMemo(() => {
-        let result = [...filteredStatements];
-        if (statusFilter !== 'all') {
-            result = result.filter(s => s.status === statusFilter);
-        }
-        result.sort((a, b) => {
-            let aVal, bVal;
-            switch (sortColumn) {
-                case 'filename': aVal = a.original_filename || ''; bVal = b.original_filename || ''; break;
-                case 'account': aVal = a.account_name || a.account_number || ''; bVal = b.account_name || b.account_number || ''; break;
-                case 'period': aVal = a.statement_period_start || ''; bVal = b.statement_period_start || ''; break;
-                case 'tx_count': aVal = a.transaction_count || 0; bVal = b.transaction_count || 0; break;
-                case 'status': aVal = a.status || ''; bVal = b.status || ''; break;
-                case 'imported_at': default: aVal = a.imported_at || ''; bVal = b.imported_at || ''; break;
-            }
-            if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
-            if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
-            return 0;
-        });
-        return result;
-    }, [filteredStatements, statusFilter, sortColumn, sortDir]);
-
-    const summaryStats = useMemo(() => {
-        const s = filteredStatements;
-        return {
-            totalStatements: s.length,
-            totalTransactions: s.reduce((sum, st) => sum + (st.transaction_count || 0), 0),
-            totalDebits: s.reduce((sum, st) => {
-                if (st.opening_balance != null && st.closing_balance != null) {
-                    const diff = st.opening_balance - st.closing_balance;
-                    return sum + Math.max(0, diff);
-                }
-                return sum;
-            }, 0),
-        };
-    }, [filteredStatements]);
 
     const toggleSelectAll = () => {
         if (selectedIds.size === sortedFilteredStatements.length) {
