@@ -8,10 +8,37 @@ IMPORTANT: Row order is preserved as printed in the PDF. Never re-sort by date o
 """
 import re
 import logging
+import unicodedata
 from typing import Optional
 from dataclasses import dataclass, field, asdict
 
 logger = logging.getLogger("statement_parser")
+
+
+# ─── Arabic text normalization ───
+# pdfplumber extracts Arabic presentation forms (U+FB50–U+FEFF) in
+# left-to-right order, producing reversed, non-joining characters.
+# We normalise with NFKC (which maps presentation forms to standard
+# Arabic U+0600–U+06FF), then reverse each contiguous Arabic run so
+# the text reads correctly right-to-left.
+
+_ARABIC_RE = re.compile(r'[\u0600-\u06FF\uFB50-\uFDFF\uFE70-\uFEFF]+')
+
+
+def normalize_arabic(text: str) -> str:
+    """
+    Fix Arabic text extracted from PDF:
+    1. NFKC-normalize presentation forms → standard Arabic codepoints
+    2. Reverse each contiguous Arabic run (pdfplumber gives them LTR)
+    """
+    if not text:
+        return text
+    # Step 1: normalize presentation forms
+    text = unicodedata.normalize('NFKC', text)
+    # Step 2: reverse each Arabic run
+    def _reverse_match(m):
+        return m.group(0)[::-1]
+    return _ARABIC_RE.sub(_reverse_match, text)
 
 
 @dataclass
@@ -423,10 +450,11 @@ def parse_statement_pdf(file_path: str) -> dict:
                 return {"header": None, "transactions": [], "page_count": 0,
                         "error": "PDF has no pages"}
             
-            # Extract text from all pages
+            # Extract text from all pages, normalizing Arabic
             all_text = []
             for page in pdf.pages:
                 text = page.extract_text() or ""
+                text = normalize_arabic(text)
                 all_text.append(text)
             
             # Parse header from first page
