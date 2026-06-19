@@ -38,6 +38,9 @@ const Statements = () => {
     // Commit to ledger state
     const [committing, setCommitting] = useState(false);
     const [commitResult, setCommitResult] = useState(null);
+    // Approve state
+    const [approving, setApproving] = useState(false);
+    const [approveResult, setApproveResult] = useState(null);
     // Validation state
     const [validationResult, setValidationResult] = useState(null);
     const [validating, setValidating] = useState(false);
@@ -200,6 +203,36 @@ const Statements = () => {
                     setError(err.response?.data?.detail || 'Commit to ledger failed');
                 } finally {
                     setCommitting(false);
+                }
+            }
+        });
+    };
+
+    const handleApprove = async () => {
+        if (!selectedStatement) return;
+        const draftCount = parsedTransactions.length;
+        const acctLabel = statementDetail?.account_number ? `****${statementDetail.account_number.slice(-4)}` : 'linked account';
+        
+        setConfirmDialog({
+            open: true,
+            title: 'Approve All Transactions',
+            message: `This will promote ${draftCount} draft transactions to completed for account ${acctLabel}.\n\nThis will update the account balance. This action cannot be undone.`,
+            variant: 'primary',
+            onConfirm: async () => {
+                setConfirmDialog(prev => ({ ...prev, open: false }));
+                setApproving(true);
+                setApproveResult(null);
+                setError(null);
+                try {
+                    const res = await api.post(`/api/statements/${selectedStatement}/approve`);
+                    setApproveResult(res.data);
+                    const detailRes = await api.get(`/api/statements/${selectedStatement}`);
+                    setStatementDetail(detailRes.data);
+                    fetchStatements();
+                } catch (err) {
+                    setError(err.response?.data?.detail || 'Approval failed');
+                } finally {
+                    setApproving(false);
                 }
             }
         });
@@ -394,7 +427,7 @@ const Statements = () => {
                         <RefreshCw size={14} className={loadingDetail ? 'animate-spin' : ''} />
                         Re-parse
                     </button>
-                    {parsedTransactions.length > 0 && statementDetail?.status !== 'approved' && (
+                    {parsedTransactions.length > 0 && statementDetail?.status === 'draft' && (
                         <button
                             onClick={handleCommitToLedger}
                             disabled={committing || loadingDetail}
@@ -404,6 +437,19 @@ const Statements = () => {
                                 <><Loader2 size={14} className="animate-spin" />Committing...</>
                             ) : (
                                 <><CheckCircle2 size={14} />Commit to Ledger</>
+                            )}
+                        </button>
+                    )}
+                    {statementDetail?.status === 'reviewed' && (
+                        <button
+                            onClick={handleApprove}
+                            disabled={approving || loadingDetail}
+                            className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors disabled:opacity-50 shadow-lg shadow-blue-600/20"
+                        >
+                            {approving ? (
+                                <><Loader2 size={14} className="animate-spin" />Approving...</>
+                            ) : (
+                                <><CheckCircle2 size={14} />Approve All Transactions</>
                             )}
                         </button>
                     )}
@@ -441,6 +487,31 @@ const Statements = () => {
                                 </div>
                             </div>
                             <button onClick={() => setCommitResult(null)} className="text-gray-500 hover:text-gray-300">
+                                <XCircle size={16} />
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Approve Result Banner */}
+                {approveResult && (
+                    <div className="rounded-xl border p-4 bg-blue-500/5 border-blue-500/20">
+                        <div className="flex items-start gap-3">
+                            <CheckCircle2 size={18} className="text-blue-400 mt-0.5" />
+                            <div className="flex-1">
+                                <p className="text-sm font-medium text-blue-300">
+                                    ✓ Approved {approveResult.approved_count} transactions
+                                </p>
+                                <div className="flex gap-4 mt-1 text-xs text-gray-400">
+                                    <span>{approveResult.approved_count} promoted to completed</span>
+                                    {approveResult.old_balance != null && approveResult.new_balance != null && (
+                                        <span className="text-blue-400">
+                                            Balance: {Number(approveResult.old_balance).toLocaleString('en-US', {minimumFractionDigits: 2})} → {Number(approveResult.new_balance).toLocaleString('en-US', {minimumFractionDigits: 2})} SAR
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <button onClick={() => setApproveResult(null)} className="text-gray-500 hover:text-gray-300">
                                 <XCircle size={16} />
                             </button>
                         </div>

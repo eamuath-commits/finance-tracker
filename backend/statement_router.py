@@ -741,6 +741,88 @@ def commit_statement_to_ledger(
     }
 
 
+@router.post("/{statement_id}/approve")
+def approve_statement_transactions(
+    statement_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    Approve all draft transactions for a statement:
+    1. Promote status from 'draft' → 'completed'
+    2. Update statement status to 'approved'
+    3. Recalculate the account balance chain
+    """
+    statement = db.query(models.Statement).filter(
+        models.Statement.id == statement_id,
+        models.Statement.user_id == current_user.id,
+    ).first()
+    
+    if not statement:
+        raise HTTPException(status_code=404, detail="Statement not found")
+    
+    if statement.status != "reviewed":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Statement must be in 'reviewed' status to approve (current: {statement.status}). "
+                   "Commit the statement first."
+        )
+    
+    # Find all draft transactions for this statement
+    draft_txs = db.query(models.Transaction).filter(
+        models.Transaction.statement_id == statement_id,
+        models.Transaction.status == "draft",
+    ).all()
+    
+    if not draft_txs:
+        raise HTTPException(
+            status_code=400,
+            detail="No draft transactions found for this statement."
+        )
+    
+    approved_count = len(draft_txs)
+    
+    # Promote all drafts to completed
+    for tx in draft_txs:
+        tx.status = "completed"
+    
+    # Update statement status
+    statement.status = "approved"
+    db.flush()
+    
+    # Recalculate account balance chain
+    old_balance = None
+    new_balance = None
+    if statement.account_id:
+        account = db.query(models.Account).filter(
+            models.Account.id == statement.account_id
+        ).first()
+        if account:
+            old_balance = round(account.current_balance or 0, 2)
+        
+        # Import and call the recalculation function
+        from main import _recalculate_account_balance
+        result = _recalculate_account_balance(db, statement.account_id)
+        if result:
+            new_balance = result.get("new_balance")
+    
+    db.commit()
+    
+    logger.info(
+        f"Approved statement {statement_id}: {approved_count} transactions promoted, "
+        f"balance {old_balance} → {new_balance}"
+    )
+    
+    return {
+        "statement_id": statement.id,
+        "approved_count": approved_count,
+        "account_id": statement.account_id,
+        "old_balance": old_balance,
+        "new_balance": new_balance,
+        "message": f"{approved_count} transactions approved. Account balance updated.",
+    }
+
+
 @router.get("/{statement_id}/transactions")
 def get_statement_transactions(
     statement_id: str,
