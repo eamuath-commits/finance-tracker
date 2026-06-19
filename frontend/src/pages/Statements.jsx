@@ -47,7 +47,8 @@ const Statements = () => {
     const [showValidationDetails, setShowValidationDetails] = useState(false);
     // Confirmation dialog state
     const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null });
-    // Accounts for filter dropdown (not needed - derived from statements)
+    // Accounts for linking
+    const [accounts, setAccounts] = useState([]);
 
     const fetchStatements = useCallback(async () => {
         try {
@@ -65,6 +66,8 @@ const Statements = () => {
 
     useEffect(() => {
         fetchStatements();
+        // Fetch accounts for linking
+        api.get('/accounts/').then(res => setAccounts(res.data)).catch(() => {});
     }, [fetchStatements]);
 
     // Derive unique accounts from statements' own parsed account numbers
@@ -417,7 +420,44 @@ const Statements = () => {
                                     <span className="text-sm text-blue-400 font-mono">****{statementDetail.account_number.slice(-4)}</span>
                                 </>
                             )}
+                            {!statementDetail?.account_id && (
+                                <span className="text-xs bg-amber-600/20 text-amber-400 px-2 py-0.5 rounded">⚠ No account linked</span>
+                            )}
+                            {statementDetail?.account_name && (
+                                <>
+                                    <span className="text-gray-600">→</span>
+                                    <span className="text-sm text-emerald-400">{statementDetail.account_name}</span>
+                                </>
+                            )}
                         </div>
+                        {/* Account Link Selector — shown when no account is linked */}
+                        {!statementDetail?.account_id && statementDetail?.status === 'draft' && (
+                            <div className="flex items-center gap-2 mt-1">
+                                <Wallet size={14} className="text-amber-400" />
+                                <select
+                                    className="bg-slate-800 border border-amber-600/50 text-amber-300 rounded px-2 py-1 text-xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                    defaultValue=""
+                                    onChange={async (e) => {
+                                        const accountId = e.target.value;
+                                        if (!accountId) return;
+                                        try {
+                                            await api.patch(`/api/statements/${selectedStatement}`, { account_id: accountId });
+                                            // Refresh detail
+                                            const detailRes = await api.get(`/api/statements/${selectedStatement}`);
+                                            setStatementDetail(detailRes.data);
+                                            fetchStatements();
+                                        } catch (err) {
+                                            setError(err.response?.data?.detail || 'Failed to link account');
+                                        }
+                                    }}
+                                >
+                                    <option value="">Link to account...</option>
+                                    {accounts.map(a => (
+                                        <option key={a.id} value={a.id}>{a.name} {a.last_4_digits ? `•••• ${a.last_4_digits}` : ''}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
                     </div>
                     <button
                         onClick={handleReParse}

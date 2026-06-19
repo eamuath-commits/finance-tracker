@@ -301,11 +301,19 @@ def get_statement(
         models.Transaction.statement_id == statement_id
     ).count()
     
+    # Resolve account name
+    account_name = None
+    if statement.account_id:
+        acct = db.query(models.Account).filter(models.Account.id == statement.account_id).first()
+        if acct:
+            account_name = acct.name
+    
     return {
         "id": statement.id,
         "bank_name": statement.bank_name,
         "original_filename": statement.original_filename,
         "account_id": statement.account_id,
+        "account_name": account_name,
         "account_number": statement.account_number,
         "statement_period_start": statement.statement_period_start.isoformat() if statement.statement_period_start else None,
         "statement_period_end": statement.statement_period_end.isoformat() if statement.statement_period_end else None,
@@ -349,6 +357,7 @@ class StatementUpdateRequest(BaseModel):
     original_filename: Optional[str] = None
     notes: Optional[str] = None
     status: Optional[str] = None
+    account_id: Optional[str] = None
 
 
 @router.patch("/{statement_id}")
@@ -375,6 +384,15 @@ def update_statement(
         if body.status not in ("draft", "reviewed", "approved", "rejected"):
             raise HTTPException(status_code=400, detail="Invalid status. Must be draft, reviewed, approved, or rejected.")
         statement.status = body.status
+    if body.account_id is not None:
+        # Verify account belongs to current user
+        account = db.query(models.Account).filter(
+            models.Account.id == body.account_id,
+            models.Account.user_id == current_user.id,
+        ).first()
+        if not account:
+            raise HTTPException(status_code=404, detail="Account not found or does not belong to you.")
+        statement.account_id = body.account_id
     
     db.commit()
     return {"message": "Statement updated", "id": statement.id}
