@@ -235,12 +235,16 @@ def parse_merchant_from_note(note_text: str, type_line: str) -> tuple:
         ref = card_match.group(1) if card_match else None
         return ("Credit Card Settlement", ref)
     
-    # Pattern 4: Internal Transfer — W-/TOACCT/... or W-/FRACCT/...
+    # Pattern 4: Internal Transfer — W-/TOACCT/...TOname or W-/FRACCT/...FRname
     if 'TOACCT' in note or 'FRACCT' in note:
-        # Try to extract the beneficiary name after TO/FR + Arabic
-        acct_match = re.search(r'(?:TO|FR)(.+?)(?:\s*-|$)', note)
+        # Extract beneficiary: the text after the last TO/FR marker
+        # e.g. "W-/TOACCT/18100608010120450TOصباح-" → "صباح"
+        acct_match = re.search(r'(?:TOACCT|FRACCT)/\d+(?:TO|FR)(.+?)(?:\s*-|$)', note)
         beneficiary = acct_match.group(1).strip() if acct_match else None
-        return (beneficiary, None)
+        # Extract account number for reference
+        ref_match = re.search(r'(?:TOACCT|FRACCT)/(\d+)', note)
+        ref = ref_match.group(1) if ref_match else None
+        return (beneficiary, ref)
     
     # Pattern 5: IPS Transfer — ref/beneficiary_name
     m = re.match(r'^(\d+)/(.+)', note)
