@@ -759,17 +759,22 @@ def commit_statement_to_ledger(
     }
 
 
+class ApproveRequest(BaseModel):
+    transaction_ids: Optional[List[str]] = None  # If None, approve all drafts
+
+
 @router.post("/{statement_id}/approve")
 def approve_statement_transactions(
     statement_id: str,
+    body: ApproveRequest = ApproveRequest(),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
     """
-    Approve all draft transactions for a statement:
-    1. Promote status from 'draft' → 'completed'
-    2. Update statement status to 'approved'
-    3. Recalculate the account balance chain
+    Approve draft transactions for a statement:
+    - If transaction_ids is provided, only approve those specific transactions
+    - If transaction_ids is None/empty, approve ALL draft transactions
+    Then recalculate the account balance chain.
     """
     statement = db.query(models.Statement).filter(
         models.Statement.id == statement_id,
@@ -779,33 +784,46 @@ def approve_statement_transactions(
     if not statement:
         raise HTTPException(status_code=404, detail="Statement not found")
     
-    if statement.status != "reviewed":
+    if statement.status not in ("reviewed", "approved"):
         raise HTTPException(
             status_code=400,
             detail=f"Statement must be in 'reviewed' status to approve (current: {statement.status}). "
                    "Commit the statement first."
         )
     
-    # Find all draft transactions for this statement
-    draft_txs = db.query(models.Transaction).filter(
+    # Find draft transactions to approve
+    query = db.query(models.Transaction).filter(
         models.Transaction.statement_id == statement_id,
         models.Transaction.status == "draft",
-    ).all()
+    )
+    
+    if body.transaction_ids:
+        # Only approve selected transactions
+        query = query.filter(models.Transaction.id.in_(body.transaction_ids))
+    
+    draft_txs = query.all()
     
     if not draft_txs:
         raise HTTPException(
             status_code=400,
-            detail="No draft transactions found for this statement."
+            detail="No draft transactions found to approve."
         )
     
     approved_count = len(draft_txs)
     
-    # Promote all drafts to completed
+    # Promote selected drafts to completed
     for tx in draft_txs:
         tx.status = "completed"
     
-    # Update statement status
-    statement.status = "approved"
+    # Check if any drafts remain — only mark statement as approved if none left
+    remaining_drafts = db.query(models.Transaction).filter(
+        models.Transaction.statement_id == statement_id,
+        models.Transaction.status == "draft",
+    ).count()
+    
+    if remaining_drafts == 0:
+        statement.status = "approved"
+    
     db.flush()
     
     # Recalculate account balance chain
@@ -828,12 +846,13 @@ def approve_statement_transactions(
     
     logger.info(
         f"Approved statement {statement_id}: {approved_count} transactions promoted, "
-        f"balance {old_balance} → {new_balance}"
+        f"balance {old_balance} → {new_balance}, {remaining_drafts} drafts remaining"
     )
     
     return {
         "statement_id": statement.id,
         "approved_count": approved_count,
+        "remaining_drafts": remaining_drafts,
         "account_id": statement.account_id,
         "old_balance": old_balance,
         "new_balance": new_balance,
@@ -868,11 +887,24 @@ def get_statement_transactions(
     if parsed.get("error"):
         raise HTTPException(status_code=500, detail=f"Parse failed: {parsed['error']}")
     
+    # If statement has been committed, also fetch committed DB transactions
+    # to provide their IDs and statuses for the approval UI
+    committed_txs = []
+    if statement.status in ("reviewed", "approved"):
+        db_txs = db.query(models.Transaction).filter(
+            models.Transaction.statement_id == statement_id,
+        ).order_by(models.Transaction.timestamp.asc()).all()
+        committed_txs = [
+            {"id": tx.id, "status": tx.status, "amount": tx.amount, "merchant": tx.merchant}
+            for tx in db_txs
+        ]
+    
     return {
         "statement_id": statement.id,
         "header": parsed.get("header"),
         "transactions": parsed.get("transactions", []),
         "transaction_count": len(parsed.get("transactions", [])),
+        "committed_transactions": committed_txs,
     }
 
 

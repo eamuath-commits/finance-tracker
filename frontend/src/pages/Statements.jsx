@@ -41,6 +41,9 @@ const Statements = () => {
     // Approve state
     const [approving, setApproving] = useState(false);
     const [approveResult, setApproveResult] = useState(null);
+    // Selection state for approval
+    const [committedTxs, setCommittedTxs] = useState([]);  // DB transactions with IDs
+    const [selectedTxIds, setSelectedTxIds] = useState(new Set());
     // Validation state
     const [validationResult, setValidationResult] = useState(null);
     const [validating, setValidating] = useState(false);
@@ -153,6 +156,11 @@ const Statements = () => {
             ]);
             setStatementDetail(detailRes.data);
             setParsedTransactions(txRes.data.transactions || []);
+            // Store committed DB transactions for selection
+            const cTxs = txRes.data.committed_transactions || [];
+            setCommittedTxs(cTxs);
+            // Auto-select all draft transactions
+            setSelectedTxIds(new Set(cTxs.filter(t => t.status === 'draft').map(t => t.id)));
         } catch (err) {
             setError('Failed to load statement details');
         } finally {
@@ -213,13 +221,15 @@ const Statements = () => {
 
     const handleApprove = async () => {
         if (!selectedStatement) return;
-        const draftCount = parsedTransactions.length;
+        const draftTxs = committedTxs.filter(t => t.status === 'draft');
+        const selectedCount = selectedTxIds.size;
+        const allSelected = selectedCount === draftTxs.length;
         const acctLabel = statementDetail?.account_number ? `****${statementDetail.account_number.slice(-4)}` : 'linked account';
         
         setConfirmDialog({
             open: true,
-            title: 'Approve All Transactions',
-            message: `This will promote ${draftCount} draft transactions to completed for account ${acctLabel}.\n\nThis will update the account balance. This action cannot be undone.`,
+            title: allSelected ? 'Approve All Transactions' : `Approve ${selectedCount} Transactions`,
+            message: `This will promote ${selectedCount} draft transaction${selectedCount !== 1 ? 's' : ''} to completed for account ${acctLabel}.\n\nThis will update the account balance. This action cannot be undone.`,
             variant: 'primary',
             onConfirm: async () => {
                 setConfirmDialog(prev => ({ ...prev, open: false }));
@@ -227,10 +237,19 @@ const Statements = () => {
                 setApproveResult(null);
                 setError(null);
                 try {
-                    const res = await api.post(`/api/statements/${selectedStatement}/approve`);
+                    const payload = allSelected ? {} : { transaction_ids: [...selectedTxIds] };
+                    const res = await api.post(`/api/statements/${selectedStatement}/approve`, payload);
                     setApproveResult(res.data);
-                    const detailRes = await api.get(`/api/statements/${selectedStatement}`);
+                    // Refresh detail and transactions
+                    const [detailRes, txRes] = await Promise.all([
+                        api.get(`/api/statements/${selectedStatement}`),
+                        api.get(`/api/statements/${selectedStatement}/transactions`),
+                    ]);
                     setStatementDetail(detailRes.data);
+                    setParsedTransactions(txRes.data.transactions || []);
+                    const cTxs = txRes.data.committed_transactions || [];
+                    setCommittedTxs(cTxs);
+                    setSelectedTxIds(new Set(cTxs.filter(t => t.status === 'draft').map(t => t.id)));
                     fetchStatements();
                 } catch (err) {
                     setError(err.response?.data?.detail || 'Approval failed');
@@ -480,7 +499,7 @@ const Statements = () => {
                             )}
                         </button>
                     )}
-                    {statementDetail?.status === 'reviewed' && (
+                    {(statementDetail?.status === 'reviewed' || (statementDetail?.status === 'approved' && committedTxs.some(t => t.status === 'draft'))) && selectedTxIds.size > 0 && (
                         <button
                             onClick={handleApprove}
                             disabled={approving || loadingDetail}
@@ -489,7 +508,7 @@ const Statements = () => {
                             {approving ? (
                                 <><Loader2 size={14} className="animate-spin" />Approving...</>
                             ) : (
-                                <><CheckCircle2 size={14} />Approve All Transactions</>
+                                <><CheckCircle2 size={14} />Approve {selectedTxIds.size === committedTxs.filter(t => t.status === 'draft').length ? 'All' : selectedTxIds.size} Transaction{selectedTxIds.size !== 1 ? 's' : ''}</>
                             )}
                         </button>
                     )}
@@ -831,6 +850,22 @@ const Statements = () => {
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="text-[11px] text-gray-500 uppercase tracking-wider border-b border-slate-800">
+                                        {committedTxs.some(t => t.status === 'draft') && (
+                                            <th className="px-2 py-3 w-8">
+                                                <input
+                                                    type="checkbox"
+                                                    className="rounded border-gray-600 bg-slate-800 text-blue-500 focus:ring-blue-500 cursor-pointer"
+                                                    checked={selectedTxIds.size > 0 && selectedTxIds.size === committedTxs.filter(t => t.status === 'draft').length}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            setSelectedTxIds(new Set(committedTxs.filter(t => t.status === 'draft').map(t => t.id)));
+                                                        } else {
+                                                            setSelectedTxIds(new Set());
+                                                        }
+                                                    }}
+                                                />
+                                            </th>
+                                        )}
                                         <th className="px-4 py-3 text-left w-8">#</th>
                                         <th className="px-4 py-3 text-left">Date</th>
                                         <th className="px-4 py-3 text-left">Time</th>
@@ -842,8 +877,34 @@ const Statements = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredParsedTx.map((tx, idx) => (
-                                        <tr key={idx} className="border-b border-slate-800/50 hover:bg-slate-800/40 transition-colors">
+                                    {filteredParsedTx.map((tx, idx) => {
+                                        // Match parsed tx to committed DB tx by index
+                                        const dbTx = committedTxs[tx.row_index];
+                                        const isDraft = dbTx?.status === 'draft';
+                                        const isApproved = dbTx?.status === 'completed';
+                                        return (
+                                        <tr key={idx} className={`border-b border-slate-800/50 hover:bg-slate-800/40 transition-colors ${isApproved ? 'opacity-60' : ''}`}>
+                                            {committedTxs.some(t => t.status === 'draft') && (
+                                                <td className="px-2 py-2.5 text-center">
+                                                    {isDraft && dbTx ? (
+                                                        <input
+                                                            type="checkbox"
+                                                            className="rounded border-gray-600 bg-slate-800 text-blue-500 focus:ring-blue-500 cursor-pointer"
+                                                            checked={selectedTxIds.has(dbTx.id)}
+                                                            onChange={(e) => {
+                                                                setSelectedTxIds(prev => {
+                                                                    const next = new Set(prev);
+                                                                    if (e.target.checked) next.add(dbTx.id);
+                                                                    else next.delete(dbTx.id);
+                                                                    return next;
+                                                                });
+                                                            }}
+                                                        />
+                                                    ) : isApproved ? (
+                                                        <CheckCircle2 size={14} className="text-emerald-500 mx-auto" />
+                                                    ) : null}
+                                                </td>
+                                            )}
                                             <td className="px-4 py-2.5 text-gray-600 text-xs">{tx.row_index + 1}</td>
                                             <td className="px-4 py-2.5 text-gray-300 font-mono text-xs whitespace-nowrap">{tx.transaction_date || '—'}</td>
                                             <td className="px-4 py-2.5 text-gray-400 font-mono text-xs whitespace-nowrap">{tx.transaction_time || '—'}</td>
@@ -870,7 +931,7 @@ const Statements = () => {
                                             </td>
                                             <td className="px-4 py-2.5 text-right font-mono text-xs text-gray-300 whitespace-nowrap">{formatAmount(tx.balance)}</td>
                                         </tr>
-                                    ))}
+                                    )})
                                 </tbody>
                             </table>
                         </div>
