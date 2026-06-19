@@ -143,7 +143,7 @@ async def upload_statement(
     # Auto-parse if text-based
     parsed_data = None
     if pdf_type == "text":
-        parsed_data = _parse_and_store(statement, db)
+        parsed_data = _parse_and_store(statement, db, current_user.id)
     
     db.refresh(statement)
     
@@ -176,7 +176,7 @@ async def upload_statement(
     return result
 
 
-def _parse_and_store(statement: models.Statement, db: Session) -> dict:
+def _parse_and_store(statement: models.Statement, db: Session, user_id: str = None) -> dict:
     """
     Parse a statement's PDF and update the statement record with header metadata.
     Returns the full parsed data dict.
@@ -208,11 +208,12 @@ def _parse_and_store(statement: models.Statement, db: Session) -> dict:
     statement.transaction_count = len(result.get("transactions", []))
     
     # Auto-resolve account_id from account_number's last 4 digits
-    if header and header.get("account_number") and not statement.account_id:
+    resolve_user_id = user_id or statement.user_id
+    if header and header.get("account_number") and not statement.account_id and resolve_user_id:
         last4 = header["account_number"][-4:]
         matching_account = db.query(models.Account).filter(
             models.Account.last_4_digits == last4,
-            models.Account.user_id == current_user.id,
+            models.Account.user_id == resolve_user_id,
         ).first()
         if matching_account:
             statement.account_id = matching_account.id
@@ -454,7 +455,7 @@ def bulk_reparse_statements(
     results = []
     for s in statements:
         if s.file_path and os.path.exists(s.file_path):
-            parsed = _parse_and_store(s, db)
+            parsed = _parse_and_store(s, db, current_user.id)
             results.append({
                 "id": s.id,
                 "filename": s.original_filename,
@@ -558,7 +559,7 @@ def parse_statement(
     if not statement.file_path or not os.path.exists(statement.file_path):
         raise HTTPException(status_code=404, detail="PDF file not found on server")
     
-    parsed = _parse_and_store(statement, db)
+    parsed = _parse_and_store(statement, db, current_user.id)
     
     if parsed.get("error"):
         raise HTTPException(status_code=500, detail=f"Parse failed: {parsed['error']}")
