@@ -931,7 +931,8 @@ const Statements = () => {
                                             </td>
                                             <td className="px-4 py-2.5 text-right font-mono text-xs text-gray-300 whitespace-nowrap">{formatAmount(tx.balance)}</td>
                                         </tr>
-                                    )})
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
