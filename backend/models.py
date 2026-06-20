@@ -213,6 +213,7 @@ class Transaction(Base):
     parsed_data = Column(Text, nullable=True)  # JSON: Full AI-extracted data from SMS
     source = Column(String, nullable=True)  # Source of transaction: 'telegram', 'webui', 'manual', 'statement'
     statement_id = Column(String, ForeignKey("statements.id", ondelete="SET NULL"), nullable=True)  # FK to imported statement
+    statement_row_index = Column(Integer, nullable=True)  # PDF print order index (bank processing order)
     
     # Counterparty references (only ONE should be set per transaction)
     merchant_id = Column(String, ForeignKey("merchants.id"), nullable=True)

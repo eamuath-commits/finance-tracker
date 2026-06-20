@@ -728,6 +728,7 @@ def commit_statement_to_ledger(
             raw_sms_content=tx.get("raw_description", ""),
             source="statement",
             statement_id=statement.id,
+            statement_row_index=tx.get("row_index"),
             status="draft",
             fees=0.0,
         )

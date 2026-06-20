@@ -272,8 +272,14 @@ def delete_account(account_id: str, db: Session = Depends(get_db), current_user:
 def _recalculate_account_balance(db: Session, account_id: str):
     """
     Internal helper: recalculate account balance from first transaction baseline.
-    Replays all transactions chronologically, fixing each balance_after_transaction.
-    Returns dict with old/new balance info, or None if account not found.
+    
+    For statement-sourced transactions: uses the statement's opening_balance as anchor
+    and sorts by statement_row_index (bank processing order, NOT timestamp).
+    
+    For non-statement transactions: uses timestamp ordering and the existing
+    balance chain from the last statement transaction as the anchor.
+    
+    Uses integer-cent arithmetic to avoid floating-point drift.
     """
     account = db.query(models.Account).filter(models.Account.id == account_id).first()
     if not account:
@@ -281,60 +287,111 @@ def _recalculate_account_balance(db: Session, account_id: str):
     
     old_balance = account.current_balance
     
-    transactions = db.query(models.Transaction).filter(
+    # Get all completed transactions on this account
+    all_txs = db.query(models.Transaction).filter(
         models.Transaction.account_id == account_id
-    ).order_by(models.Transaction.timestamp.asc()).all()
+    ).all()
     
-    if not transactions:
+    if not all_txs:
         return {"old_balance": old_balance, "new_balance": old_balance, "transaction_count": 0, "corrections": 0}
     
-    first_tx = transactions[0]
-    baseline = first_tx.balance_after_transaction
+    # Separate statement vs non-statement transactions
+    stmt_txs = [tx for tx in all_txs if tx.source == "statement" and tx.statement_row_index is not None]
+    non_stmt_txs = [tx for tx in all_txs if tx not in stmt_txs]
+    
+    # Sort statement transactions by (statement_id, statement_row_index) — bank processing order
+    stmt_txs.sort(key=lambda tx: (tx.statement_id or "", tx.statement_row_index or 0))
+    
+    # Sort non-statement transactions by timestamp
+    non_stmt_txs.sort(key=lambda tx: (tx.timestamp or datetime(2000, 1, 1)))
+    
+    # Find opening balance from the linked statement(s)
+    stmt_ids = set(tx.statement_id for tx in stmt_txs if tx.statement_id)
+    opening_balance = None
+    if stmt_ids:
+        # Get the earliest statement's opening balance
+        statements = db.query(models.Statement).filter(
+            models.Statement.id.in_(stmt_ids)
+        ).order_by(models.Statement.statement_period_start.asc().nullslast()).all()
+        if statements and statements[0].opening_balance is not None:
+            opening_balance = statements[0].opening_balance
+    
     corrections = 0
     
-    if baseline is not None:
-        if first_tx.type == "credit":
-            running = baseline - first_tx.amount
-        else:
-            running = baseline + first_tx.amount
-        if first_tx.fees:
-            running += first_tx.fees
+    if opening_balance is not None and stmt_txs:
+        # Use statement opening_balance as anchor (integer-cent arithmetic)
+        running_cents = round(opening_balance * 100)
         
-        for tx in transactions:
+        # Process statement transactions first (in bank processing order)
+        for tx in stmt_txs:
+            amount_cents = round(tx.amount * 100)
+            fee_cents = round((tx.fees or 0) * 100)
             if tx.type == "credit":
-                running += tx.amount
+                running_cents += amount_cents
             else:
-                running -= tx.amount
-            if tx.fees:
-                running -= tx.fees
-            expected = round(running, 2)
+                running_cents -= amount_cents
+            running_cents -= fee_cents
+            expected = running_cents / 100
+            if tx.balance_after_transaction != expected:
+                corrections += 1
+            tx.balance_after_transaction = expected
+        
+        # Process non-statement transactions after (by timestamp)
+        for tx in non_stmt_txs:
+            amount_cents = round(tx.amount * 100)
+            fee_cents = round((tx.fees or 0) * 100)
+            if tx.type == "credit":
+                running_cents += amount_cents
+            else:
+                running_cents -= amount_cents
+            running_cents -= fee_cents
+            expected = running_cents / 100
             if tx.balance_after_transaction != expected:
                 corrections += 1
             tx.balance_after_transaction = expected
     else:
-        running = 0
-        for tx in transactions:
-            if tx.type == "credit":
-                running += tx.amount
+        # No statement anchor — use legacy behavior (first tx baseline)
+        # Merge all transactions sorted by timestamp
+        merged = sorted(all_txs, key=lambda tx: (tx.timestamp or datetime(2000, 1, 1)))
+        first_tx = merged[0]
+        baseline = first_tx.balance_after_transaction
+        
+        if baseline is not None:
+            if first_tx.type == "credit":
+                running_cents = round((baseline - first_tx.amount) * 100)
             else:
-                running -= tx.amount
-            if tx.fees:
-                running -= tx.fees
-            expected = round(running, 2)
+                running_cents = round((baseline + first_tx.amount) * 100)
+            if first_tx.fees:
+                running_cents += round(first_tx.fees * 100)
+        else:
+            running_cents = 0
+        
+        for tx in merged:
+            amount_cents = round(tx.amount * 100)
+            fee_cents = round((tx.fees or 0) * 100)
+            if tx.type == "credit":
+                running_cents += amount_cents
+            else:
+                running_cents -= amount_cents
+            running_cents -= fee_cents
+            expected = running_cents / 100
             if tx.balance_after_transaction != expected:
                 corrections += 1
             tx.balance_after_transaction = expected
     
-    account.current_balance = round(running, 2)
+    account.current_balance = running_cents / 100
     db.commit()
+    
+    total_txs = len(all_txs)
+    first_tx = stmt_txs[0] if stmt_txs else (non_stmt_txs[0] if non_stmt_txs else None)
     
     return {
         "old_balance": round(old_balance, 2),
         "new_balance": account.current_balance,
-        "baseline": baseline,
-        "baseline_tx": first_tx.merchant or "Unknown",
-        "baseline_date": first_tx.timestamp.isoformat(),
-        "transaction_count": len(transactions),
+        "baseline": opening_balance,
+        "baseline_tx": first_tx.merchant or "Unknown" if first_tx else "N/A",
+        "baseline_date": first_tx.timestamp.isoformat() if first_tx and first_tx.timestamp else "N/A",
+        "transaction_count": total_txs,
         "corrections": corrections
     }
 
