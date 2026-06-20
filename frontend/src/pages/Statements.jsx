@@ -375,13 +375,14 @@ const Statements = () => {
     const hasTxFilters = txSearch || txTypeFilter || txDateRange.start || txDateRange.end || txAmountMin || txAmountMax || txCountLimit;
     const clearTxFilters = () => { setTxSearch(''); setTxTypeFilter(''); setTxDateRange({ start: '', end: '' }); setTxAmountMin(''); setTxAmountMax(''); setTxCountLimit(''); };
 
-    // System-computed balance: independent running balance from opening_balance
+    // System-computed balance: independent running balance from account's pre-statement balance
+    // Uses the account's balance BEFORE statement transactions as anchor (not the bank's opening_balance)
     // Uses integer-cent arithmetic to avoid floating-point drift
     const systemBalances = useMemo(() => {
-        const opening = statementDetail?.opening_balance;
-        if (opening == null || parsedTransactions.length === 0) return {};
+        const preStmtBalance = statementDetail?.account_balance_before_statement;
+        if (preStmtBalance == null || parsedTransactions.length === 0) return {};
         const map = {};
-        let runningCents = Math.round(opening * 100);
+        let runningCents = Math.round(preStmtBalance * 100);
         for (const tx of parsedTransactions) {
             const debitCents = Math.round((tx.debit_amount || 0) * 100);
             const creditCents = Math.round((tx.credit_amount || 0) * 100);
@@ -389,7 +390,7 @@ const Statements = () => {
             map[tx.row_index] = runningCents / 100;
         }
         return map;
-    }, [parsedTransactions, statementDetail?.opening_balance]);
+    }, [parsedTransactions, statementDetail?.account_balance_before_statement]);
 
     // Must be before conditional return (React hooks rules)
     const sortedFilteredStatements = useMemo(() => {
@@ -721,7 +722,7 @@ const Statements = () => {
 
                 {/* Summary Cards */}
                 {statementDetail && (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
                         <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4">
                             <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1.5">Period</p>
                             <p className="text-sm text-white font-medium">
@@ -730,12 +731,16 @@ const Statements = () => {
                             </p>
                         </div>
                         <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4">
-                            <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1.5">Opening</p>
+                            <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1.5">Bank Opening</p>
                             <p className="text-lg text-white font-semibold">{formatAmount(statementDetail.opening_balance)} <span className="text-[11px] text-gray-500">SAR</span></p>
                         </div>
                         <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4">
-                            <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1.5">Closing</p>
+                            <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1.5">Bank Closing</p>
                             <p className="text-lg text-white font-semibold">{formatAmount(statementDetail.closing_balance)} <span className="text-[11px] text-gray-500">SAR</span></p>
+                        </div>
+                        <div className="bg-slate-900/80 rounded-xl border border-blue-500/20 p-4">
+                            <p className="text-[11px] text-blue-400 uppercase tracking-wider mb-1.5">System Start</p>
+                            <p className="text-lg text-blue-300 font-semibold">{statementDetail.account_balance_before_statement != null ? formatAmount(statementDetail.account_balance_before_statement) : '—'} <span className="text-[11px] text-gray-500">SAR</span></p>
                         </div>
                         <div className="bg-slate-900/80 rounded-xl border border-red-500/10 p-4">
                             <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1.5">Total Debits{hasTxFilters ? ' (filtered)' : ''}</p>

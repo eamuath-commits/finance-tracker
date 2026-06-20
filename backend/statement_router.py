@@ -302,12 +302,26 @@ def get_statement(
         models.Transaction.statement_id == statement_id
     ).count()
     
-    # Resolve account name
+    # Resolve account name and pre-statement balance
     account_name = None
+    account_balance_before_stmt = None
     if statement.account_id:
         acct = db.query(models.Account).filter(models.Account.id == statement.account_id).first()
         if acct:
             account_name = acct.name
+            # Calculate account balance EXCLUDING this statement's transactions
+            # This is the system's independent anchor for balance verification
+            from sqlalchemy import func
+            stmt_credits = db.query(func.coalesce(func.sum(models.Transaction.amount), 0)).filter(
+                models.Transaction.statement_id == statement_id,
+                models.Transaction.type == "credit"
+            ).scalar()
+            stmt_debits = db.query(func.coalesce(func.sum(models.Transaction.amount), 0)).filter(
+                models.Transaction.statement_id == statement_id,
+                models.Transaction.type == "debit"
+            ).scalar()
+            # Account balance before statement = current - credits + debits
+            account_balance_before_stmt = round(acct.current_balance - stmt_credits + stmt_debits, 2)
     
     return {
         "id": statement.id,
@@ -320,6 +334,7 @@ def get_statement(
         "statement_period_end": statement.statement_period_end.isoformat() if statement.statement_period_end else None,
         "opening_balance": statement.opening_balance,
         "closing_balance": statement.closing_balance,
+        "account_balance_before_statement": account_balance_before_stmt,
         "transaction_count": tx_count,
         "reconciliation_status": statement.reconciliation_status,
         "reconciliation_errors": statement.reconciliation_errors,
@@ -679,15 +694,22 @@ def commit_statement_to_ledger(
             skipped += 1
             continue
         
-        # Build timestamp
+        # Build timestamp — use row_index for ordering within the same date
+        # Bank statements process transactions in a different order than the actual time,
+        # so we use sequential seconds based on row_index to preserve the bank's processing order.
+        # The real time is preserved in notes for reference.
         timestamp = None
+        row_idx = tx.get("row_index", 0)
         if tx_date_str:
             try:
                 date_part = tx_date_str.replace('/', '-')
-                if tx_time_str:
-                    timestamp = datetime.strptime(f"{date_part} {tx_time_str}", "%Y-%m-%d %H:%M:%S")
-                else:
-                    timestamp = datetime.strptime(date_part, "%Y-%m-%d")
+                # Use row_index as seconds within the day to preserve bank order
+                hour = (row_idx // 3600) % 24
+                minute = (row_idx % 3600) // 60
+                second = row_idx % 60
+                timestamp = datetime.strptime(date_part, "%Y-%m-%d").replace(
+                    hour=hour, minute=minute, second=second
+                )
             except ValueError:
                 timestamp = datetime.utcnow()
         else:
@@ -706,6 +728,8 @@ def commit_statement_to_ledger(
         
         # Build notes
         parts = []
+        if tx_time_str:
+            parts.append(f"Original Time: {tx_time_str}")
         if tx.get("type_line"):
             parts.append(f"Type: {tx['type_line']}")
         if tx.get("note_text"):
