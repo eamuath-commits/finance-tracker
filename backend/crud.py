@@ -6,23 +6,32 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 import re
 
-def get_account_by_last_4(db: Session, last_4: str):
-    # 1. Try matching main account last_4
-    account = db.query(models.Account).filter(models.Account.last_4_digits == last_4).first()
+def get_account_by_last_4(db: Session, last_4: str, user_id: str = None):
+    # 1. Try matching main account last_4 (filtered by user_id if provided)
+    query = db.query(models.Account).filter(models.Account.last_4_digits == last_4)
+    if user_id:
+        query = query.filter(models.Account.user_id == user_id)
+    account = query.first()
     if account:
         return account
     
     # 2. Try matching aliases
-    alias = db.query(models.AccountAlias).filter(models.AccountAlias.last_4_digits == last_4).first()
+    alias_query = db.query(models.AccountAlias).filter(models.AccountAlias.last_4_digits == last_4)
+    if user_id:
+        alias_query = alias_query.join(models.Account).filter(models.Account.user_id == user_id)
+    alias = alias_query.first()
     if alias:
         return alias.account
         
     return None
 
 # --- Credit Card CRUD ---
-def get_credit_card_by_last4(db: Session, last_4: str):
-    """Find a credit card by last 4 digits"""
-    return db.query(models.CreditCard).filter(models.CreditCard.last_4_digits == last_4).first()
+def get_credit_card_by_last4(db: Session, last_4: str, user_id: str = None):
+    """Find a credit card by last 4 digits (filtered by user_id if provided)"""
+    query = db.query(models.CreditCard).filter(models.CreditCard.last_4_digits == last_4)
+    if user_id:
+        query = query.filter(models.CreditCard.user_id == user_id)
+    return query.first()
 
 def get_credit_cards(db: Session, skip: int = 0, limit: int = 100):
     """Get all credit cards"""
