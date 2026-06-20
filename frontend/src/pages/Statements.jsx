@@ -375,6 +375,22 @@ const Statements = () => {
     const hasTxFilters = txSearch || txTypeFilter || txDateRange.start || txDateRange.end || txAmountMin || txAmountMax || txCountLimit;
     const clearTxFilters = () => { setTxSearch(''); setTxTypeFilter(''); setTxDateRange({ start: '', end: '' }); setTxAmountMin(''); setTxAmountMax(''); setTxCountLimit(''); };
 
+    // System-computed balance: independent running balance from opening_balance
+    // Uses integer-cent arithmetic to avoid floating-point drift
+    const systemBalances = useMemo(() => {
+        const opening = statementDetail?.opening_balance;
+        if (opening == null || parsedTransactions.length === 0) return {};
+        const map = {};
+        let runningCents = Math.round(opening * 100);
+        for (const tx of parsedTransactions) {
+            const debitCents = Math.round((tx.debit_amount || 0) * 100);
+            const creditCents = Math.round((tx.credit_amount || 0) * 100);
+            runningCents = runningCents - debitCents + creditCents;
+            map[tx.row_index] = runningCents / 100;
+        }
+        return map;
+    }, [parsedTransactions, statementDetail?.opening_balance]);
+
     // Must be before conditional return (React hooks rules)
     const sortedFilteredStatements = useMemo(() => {
         let result = [...filteredStatements];
@@ -873,7 +889,8 @@ const Statements = () => {
                                         <th className="px-4 py-3 text-left">Merchant / Beneficiary</th>
                                         <th className="px-4 py-3 text-right">Debit</th>
                                         <th className="px-4 py-3 text-right">Credit</th>
-                                        <th className="px-4 py-3 text-right">Balance</th>
+                                        <th className="px-4 py-3 text-right">Bank Bal</th>
+                                        <th className="px-4 py-3 text-right">System Bal</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -930,6 +947,19 @@ const Statements = () => {
                                                 {tx.credit_amount > 0 ? <span className="text-green-400">{formatAmount(tx.credit_amount)}</span> : <span className="text-gray-700">—</span>}
                                             </td>
                                             <td className="px-4 py-2.5 text-right font-mono text-xs text-gray-300 whitespace-nowrap">{formatAmount(tx.balance)}</td>
+                                            <td className="px-4 py-2.5 text-right font-mono text-xs whitespace-nowrap">
+                                                {(() => {
+                                                    const sysBal = systemBalances[tx.row_index];
+                                                    if (sysBal == null) return <span className="text-gray-700">—</span>;
+                                                    const bankBal = tx.balance;
+                                                    const mismatch = Math.abs(sysBal - bankBal) > 0.01;
+                                                    return (
+                                                        <span className={mismatch ? 'text-amber-400' : 'text-emerald-400'}>
+                                                            {mismatch && '⚠ '}{formatAmount(sysBal)}
+                                                        </span>
+                                                    );
+                                                })()}
+                                            </td>
                                         </tr>
                                         );
                                     })}
