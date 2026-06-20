@@ -1314,7 +1314,7 @@ const Statements = () => {
                     )}
                 </div>
             ) : (
-                <div className="bg-slate-900/60 rounded-xl border border-slate-800 overflow-hidden">
+                <div className="bg-slate-900/60 rounded-xl border border-slate-800">
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
@@ -1433,7 +1433,7 @@ const Statements = () => {
                                                     {actionMenuId === s.id + '-status' && (
                                                         <>
                                                             <div className="fixed inset-0 z-40" onClick={() => setActionMenuId(null)} />
-                                                            <div className="absolute left-0 mt-1 w-36 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-50 overflow-hidden">
+                                                            <div className="absolute left-0 bottom-full mb-1 w-36 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-50 overflow-hidden">
                                                                 {['draft', 'reviewed', 'approved', 'rejected'].map(st => (
                                                                     <button
                                                                         key={st}
