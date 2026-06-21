@@ -72,6 +72,24 @@ class AlRajhiParser(BaseBankParser):
         if by_match and result.get('sub_type') in ('purchase', 'pos', 'online', 'atm'):
             result['source_account_last4'] = by_match.group(1)
         
+        # --- FIX TIMESTAMP: AlRajhi uses DD/M/YY HH:MM format ---
+        # The AI often misinterprets this as MM/DD/YY, swapping month and day.
+        # Re-parse the raw date from SMS text to ensure correct day-first interpretation.
+        # Patterns: "12/6/26 21:21" or "Date:14/4/26 06:32" or "6/6/26 14:37"
+        date_match = re.search(r'(?:Date:)?\s*(\d{1,2}/\d{1,2}/\d{2})\s+(\d{1,2}:\d{2})', sms_text)
+        if date_match:
+            try:
+                from dateutil import parser as date_parser
+                raw_date_str = f"{date_match.group(1)} {date_match.group(2)}"
+                # Parse with dayfirst=True since AlRajhi format is DD/M/YY
+                parsed_dt = date_parser.parse(raw_date_str, dayfirst=True)
+                # Fix 2-digit year: dateutil may interpret "26" as 2026 or 1926
+                if parsed_dt.year < 2000:
+                    parsed_dt = parsed_dt.replace(year=parsed_dt.year + 100)
+                result['timestamp'] = parsed_dt.strftime('%Y-%m-%d %H:%M')
+            except Exception:
+                pass  # Keep AI's timestamp if parsing fails
+        
         return result
     
     def handle_ambiguous(self, result: Dict[str, Any], sms_text: str) -> Dict[str, Any]:
