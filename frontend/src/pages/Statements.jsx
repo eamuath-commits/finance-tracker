@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import api from '../utils/api';
-import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, ArrowLeft, ArrowUpRight, ArrowDownLeft, ChevronRight, ChevronDown, RefreshCw, Filter, Wallet, Calendar, Search, X, Download, Edit3, Check, MoreVertical, Eye, ShieldCheck, Link2, GitBranch, BarChart3, TrendingUp, TrendingDown, LayoutGrid, List, FileSearch, MessageSquare } from 'lucide-react';
+import api, { API_URL } from '../utils/api';
+import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, ArrowLeft, ArrowUpRight, ArrowDownLeft, ChevronRight, ChevronDown, RefreshCw, Filter, Wallet, Calendar, Search, X, Download, Edit3, Check, MoreVertical, Eye, ShieldCheck, Link2, GitBranch, BarChart3, TrendingUp, TrendingDown, LayoutGrid, List, FileSearch, MessageSquare, Repeat, Tag, FileSpreadsheet } from 'lucide-react';
 
 const Statements = () => {
     const [statements, setStatements] = useState([]);
@@ -34,7 +34,6 @@ const Statements = () => {
     const [editingField, setEditingField] = useState(null);
     const [editValue, setEditValue] = useState('');
     const [actionMenuId, setActionMenuId] = useState(null);
-    const [API_URL] = useState('/api/statements');
     // List view mode
     const [listViewMode, setListViewMode] = useState('table'); // 'table' | 'grouped'
     // Commit to ledger state
@@ -67,6 +66,13 @@ const Statements = () => {
     // Per-transaction notes
     const [editingNoteId, setEditingNoteId] = useState(null);
     const [noteValue, setNoteValue] = useState('');
+    // Multi-upload queue
+    const [uploadQueue, setUploadQueue] = useState([]); // [{file, status: 'pending'|'uploading'|'done'|'error', result}]
+    // Recurring patterns
+    const [recurringPatterns, setRecurringPatterns] = useState(null);
+    const [showRecurring, setShowRecurring] = useState(false);
+    // Auto-categorization
+    const [merchantCategories, setMerchantCategories] = useState({});
 
     const fetchStatements = useCallback(async () => {
         try {
@@ -86,6 +92,8 @@ const Statements = () => {
         fetchStatements();
         // Fetch accounts for linking
         api.get('/accounts/').then(res => setAccounts(res.data)).catch(() => {});
+        // Fetch learned categories for auto-suggestion
+        fetchAutoCategories();
     }, [fetchStatements]);
 
     // Derive unique accounts from statements' own parsed account numbers
@@ -161,6 +169,31 @@ const Statements = () => {
         }
     };
 
+    // Multi-file upload
+    const handleMultiFileUpload = async (files) => {
+        const pdfFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+        if (pdfFiles.length === 0) { setError('Only PDF files are accepted'); return; }
+        if (pdfFiles.length === 1) { handleFileUpload(pdfFiles[0]); return; }
+        
+        const queue = pdfFiles.map(f => ({ file: f, status: 'pending', result: null, error: null }));
+        setUploadQueue(queue);
+        
+        for (let i = 0; i < queue.length; i++) {
+            setUploadQueue(prev => prev.map((item, idx) => idx === i ? { ...item, status: 'uploading' } : item));
+            const formData = new FormData();
+            formData.append('file', queue[i].file);
+            try {
+                const res = await api.post('/api/statements/upload', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                });
+                setUploadQueue(prev => prev.map((item, idx) => idx === i ? { ...item, status: 'done', result: res.data } : item));
+            } catch (err) {
+                setUploadQueue(prev => prev.map((item, idx) => idx === i ? { ...item, status: 'error', error: err.response?.data?.detail || 'Failed' } : item));
+            }
+        }
+        fetchStatements();
+    };
+
     const openStatementDetail = async (statementId) => {
         setLoadingDetail(true);
         setSelectedStatement(statementId);
@@ -214,10 +247,10 @@ const Statements = () => {
         }
     };
 
-    const handleDrop = (e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); const file = e.dataTransfer?.files?.[0]; if (file) handleFileUpload(file); };
+    const handleDrop = (e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); const files = e.dataTransfer?.files; if (files?.length > 1) handleMultiFileUpload(files); else if (files?.[0]) handleFileUpload(files[0]); };
     const handleDragOver = (e) => { e.preventDefault(); e.stopPropagation(); setDragActive(true); };
     const handleDragLeave = (e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); };
-    const handleFileInput = (e) => { const file = e.target.files?.[0]; if (file) handleFileUpload(file); e.target.value = ''; };
+    const handleFileInput = (e) => { const files = e.target.files; if (files?.length > 1) handleMultiFileUpload(files); else if (files?.[0]) handleFileUpload(files[0]); e.target.value = ''; };
 
     const handleCommitToLedger = async () => {
         if (!selectedStatement) return;
@@ -646,6 +679,41 @@ const Statements = () => {
         setEditingNoteId(null);
     };
 
+    // Fetch recurring patterns
+    const fetchRecurring = async (stmtId) => {
+        try {
+            const res = await api.get(`/api/statements/${stmtId}/recurring`);
+            setRecurringPatterns(res.data);
+        } catch (err) {
+            console.error('Failed to fetch recurring:', err);
+        }
+    };
+
+    // Fetch auto-categories
+    const fetchAutoCategories = async () => {
+        try {
+            const res = await api.get('/api/statements/auto-categories');
+            setMerchantCategories(res.data.merchant_categories || {});
+        } catch (err) {
+            console.error('Failed to fetch auto-categories:', err);
+        }
+    };
+
+    // Export CSV
+    const exportCsv = async (stmtId) => {
+        try {
+            const res = await api.get(`/api/statements/${stmtId}/export`, { responseType: 'blob' });
+            const url = URL.createObjectURL(res.data);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `statement_export.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Export failed:', err);
+        }
+    };
+
     // ─────────────── DETAIL VIEW ───────────────
     if (selectedStatement) {
 
@@ -730,6 +798,22 @@ const Statements = () => {
                     >
                         {loadingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileSearch size={14} />}
                         {showPdfPreview ? 'Hide PDF' : 'View PDF'}
+                    </button>
+                    <button
+                        onClick={() => exportCsv(selectedStatement)}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-gray-300 text-sm font-medium transition-colors"
+                    >
+                        <FileSpreadsheet size={14} />Export CSV
+                    </button>
+                    <button
+                        onClick={() => { if (!recurringPatterns) fetchRecurring(selectedStatement); setShowRecurring(!showRecurring); }}
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            showRecurring
+                                ? 'bg-cyan-600/20 text-cyan-300 border border-cyan-500/30'
+                                : 'bg-slate-700 hover:bg-slate-600 text-gray-300'
+                        }`}
+                    >
+                        <Repeat size={14} />{showRecurring ? 'Hide Patterns' : 'Recurring'}
                     </button>
                     {parsedTransactions.length > 0 && statementDetail?.status === 'draft' && (
                         <div className="flex items-center gap-2">
@@ -1131,6 +1215,57 @@ const Statements = () => {
                     </div>
                 )}
 
+                {/* Recurring Patterns Panel */}
+                {showRecurring && recurringPatterns && (
+                    <div className="bg-slate-900/80 rounded-xl border border-cyan-500/20 overflow-hidden">
+                        <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Repeat size={14} className="text-cyan-400" />
+                                <span className="text-sm text-white font-medium">Recurring Patterns</span>
+                                <span className="text-xs text-gray-500">
+                                    {recurringPatterns.total_patterns} patterns, {recurringPatterns.total_recurring} transactions
+                                </span>
+                            </div>
+                            <button onClick={() => setShowRecurring(false)} className="text-gray-500 hover:text-gray-300">
+                                <X size={14} />
+                            </button>
+                        </div>
+                        <div className="divide-y divide-slate-800/50">
+                            {recurringPatterns.patterns.length === 0 ? (
+                                <div className="text-center py-8 text-gray-500 text-sm">No recurring patterns detected</div>
+                            ) : recurringPatterns.patterns.slice(0, 10).map((p, i) => (
+                                <div key={i} className="px-4 py-3 flex items-center gap-4 hover:bg-slate-800/30 transition-colors">
+                                    <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
+                                        <span className="text-cyan-400 text-xs font-bold">{p.occurrences}×</span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <span dir="auto" className="text-sm text-white font-medium truncate">{p.merchant}</span>
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                                                p.frequency === 'monthly' ? 'bg-blue-500/15 text-blue-400' :
+                                                p.frequency === 'weekly' ? 'bg-green-500/15 text-green-400' :
+                                                p.frequency === 'daily' ? 'bg-amber-500/15 text-amber-400' :
+                                                'bg-gray-500/15 text-gray-400'
+                                            }`}>
+                                                {p.frequency}
+                                            </span>
+                                        </div>
+                                        <span className="text-xs text-gray-500">
+                                            Avg {p.avg_interval_days ? `every ${p.avg_interval_days}d` : '—'} · {p.direction}
+                                        </span>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className={`text-sm font-mono font-medium ${p.direction === 'credit' ? 'text-green-400' : 'text-red-400'}`}>
+                                            {p.direction === 'credit' ? '+' : '-'}{p.total_amount.toLocaleString()}
+                                        </div>
+                                        <div className="text-[10px] text-gray-600">avg {p.average_amount.toLocaleString()}</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* Reconciliation Timeline */}
                 {timelineData && timelineData.timeline.length > 0 && (
                     <div className="bg-slate-900/80 rounded-xl border border-slate-800 overflow-hidden">
@@ -1447,6 +1582,7 @@ const Statements = () => {
                                         <th className="px-4 py-3 text-left">Date</th>
                                         <th className="px-4 py-3 text-left">Time</th>
                                         <th className="px-4 py-3 text-left">Type</th>
+                                        <th className="px-3 py-3 text-left"><div className="flex items-center gap-1"><Tag size={11} />Category</div></th>
                                         <th className="px-4 py-3 text-left">Merchant / Beneficiary</th>
                                         <th className="px-4 py-3 text-right">Debit</th>
                                         <th className="px-4 py-3 text-right">Credit</th>
@@ -1491,6 +1627,34 @@ const Statements = () => {
                                             <td className="px-4 py-2.5 text-gray-400 font-mono text-xs whitespace-nowrap">{tx.transaction_time || '—'}</td>
                                             <td className="px-4 py-2.5">
                                                 <span className="text-gray-400 text-xs block max-w-[200px] truncate" title={tx.type_line}>{tx.type_line || '—'}</span>
+                                            </td>
+                                            <td className="px-3 py-2.5">
+                                                {(() => {
+                                                    const CATEGORY_COLORS = {
+                                                        'Shopping': 'bg-pink-500/15 text-pink-400',
+                                                        'Transfer': 'bg-blue-500/15 text-blue-400',
+                                                        'Bills': 'bg-amber-500/15 text-amber-400',
+                                                        'Income': 'bg-emerald-500/15 text-emerald-400',
+                                                        'Cash': 'bg-gray-500/15 text-gray-300',
+                                                        'Government': 'bg-indigo-500/15 text-indigo-400',
+                                                        'Fees': 'bg-red-500/15 text-red-400',
+                                                        'Refund': 'bg-teal-500/15 text-teal-400',
+                                                    };
+                                                    let cat = tx.category;
+                                                    if (!cat || cat === 'Other') {
+                                                        const merchant = tx.merchant_or_beneficiary || tx.note_text || '';
+                                                        const learned = Object.entries(merchantCategories).find(([m]) =>
+                                                            merchant.toLowerCase().includes(m.toLowerCase()) || m.toLowerCase().includes(merchant.toLowerCase().substring(0, 10))
+                                                        );
+                                                        if (learned) cat = learned[1];
+                                                    }
+                                                    if (!cat || cat === 'Other') return <span className="text-gray-600 text-[10px]">—</span>;
+                                                    return (
+                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${CATEGORY_COLORS[cat] || 'bg-slate-600/30 text-gray-400'}`}>
+                                                            {cat}
+                                                        </span>
+                                                    );
+                                                })()}
                                             </td>
                                             <td className="px-4 py-2.5">
                                                 <div className="flex items-center gap-2">
@@ -1765,7 +1929,7 @@ const Statements = () => {
                 }`}
                 onClick={() => document.getElementById('pdf-file-input').click()}
             >
-                <input id="pdf-file-input" type="file" accept=".pdf,application/pdf" className="hidden" onChange={handleFileInput} />
+                <input id="pdf-file-input" type="file" accept=".pdf,application/pdf" multiple className="hidden" onChange={handleFileInput} />
                 {uploading ? (
                     <div className="flex items-center justify-center gap-3">
                         <Loader2 size={18} className="text-blue-400 animate-spin" />
@@ -1778,6 +1942,44 @@ const Statements = () => {
                     </div>
                 )}
             </div>
+
+            {/* Multi-Upload Queue Progress */}
+            {uploadQueue.length > 0 && (
+                <div className="bg-slate-900/80 rounded-xl border border-slate-800 overflow-hidden">
+                    <div className="px-4 py-2 border-b border-slate-800 flex items-center justify-between">
+                        <span className="text-sm text-white font-medium">
+                            Uploading {uploadQueue.filter(q => q.status === 'done').length}/{uploadQueue.length} files
+                        </span>
+                        {uploadQueue.every(q => q.status === 'done' || q.status === 'error') && (
+                            <button onClick={() => setUploadQueue([])} className="text-xs text-gray-500 hover:text-gray-300">Dismiss</button>
+                        )}
+                    </div>
+                    <div className="divide-y divide-slate-800/50">
+                        {uploadQueue.map((item, i) => (
+                            <div key={i} className="px-4 py-2 flex items-center gap-3">
+                                {item.status === 'pending' && <Clock size={14} className="text-gray-500" />}
+                                {item.status === 'uploading' && <Loader2 size={14} className="text-blue-400 animate-spin" />}
+                                {item.status === 'done' && <CheckCircle2 size={14} className="text-emerald-400" />}
+                                {item.status === 'error' && <XCircle size={14} className="text-red-400" />}
+                                <span className="text-sm text-gray-300 flex-1 truncate">{item.file.name}</span>
+                                {item.result && (
+                                    <span className="text-xs text-emerald-400">{item.result.transaction_count} txs</span>
+                                )}
+                                {item.error && (
+                                    <span className="text-xs text-red-400 truncate max-w-[200px]">{item.error}</span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                    {/* Progress bar */}
+                    <div className="h-1 bg-slate-800">
+                        <div
+                            className="h-1 bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-500"
+                            style={{ width: `${(uploadQueue.filter(q => q.status === 'done' || q.status === 'error').length / uploadQueue.length) * 100}%` }}
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* Upload Result */}
             {uploadResult && (

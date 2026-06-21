@@ -282,6 +282,112 @@ def list_statements(
     ]
 
 
+# ─────────────── A: AUTO-CATEGORIZATION ───────────────
+
+@router.get("/auto-categories")
+def get_auto_categories(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    Build a merchant→category mapping learned from existing transactions.
+    Returns the most common category per merchant name for auto-suggestion.
+    """
+    from sqlalchemy import func as sqlfunc
+    
+    rows = db.query(
+        models.Transaction.merchant,
+        models.Transaction.category,
+        sqlfunc.count().label("cnt"),
+    ).filter(
+        models.Transaction.user_id == current_user.id,
+        models.Transaction.merchant.isnot(None),
+        models.Transaction.merchant != "",
+        models.Transaction.category.isnot(None),
+        models.Transaction.category != "",
+        models.Transaction.category != "Other",
+    ).group_by(
+        models.Transaction.merchant,
+        models.Transaction.category,
+    ).all()
+    
+    merchant_map = {}
+    for merchant, category, count in rows:
+        key = merchant.strip().lower()
+        if key not in merchant_map or count > merchant_map[key]["count"]:
+            merchant_map[key] = {"category": category, "count": count, "merchant": merchant}
+    
+    return {
+        "merchant_categories": {
+            v["merchant"]: v["category"]
+            for v in merchant_map.values()
+        },
+        "total_merchants": len(merchant_map),
+    }
+
+
+# ─────────────── G: DASHBOARD STATEMENT HEALTH ───────────────
+
+@router.get("/health/summary")
+def statement_health_summary(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    Dashboard health widget data.
+    Returns pending drafts, coverage gaps, and unreconciled periods.
+    """
+    from sqlalchemy import func as sqlfunc
+    
+    statements = db.query(models.Statement).filter(
+        models.Statement.user_id == current_user.id,
+    ).all()
+    
+    total = len(statements)
+    drafts = sum(1 for s in statements if s.status == "draft")
+    reviewed = sum(1 for s in statements if s.status == "reviewed")
+    approved = sum(1 for s in statements if s.status == "approved")
+    total_txs = sum(s.transaction_count or 0 for s in statements)
+    
+    covered_months = set()
+    for s in statements:
+        if s.statement_period_start and s.statement_period_end:
+            start = s.statement_period_start if isinstance(s.statement_period_start, date) else datetime.strptime(str(s.statement_period_start), "%Y-%m-%d").date()
+            end = s.statement_period_end if isinstance(s.statement_period_end, date) else datetime.strptime(str(s.statement_period_end), "%Y-%m-%d").date()
+            current = start.replace(day=1)
+            while current <= end:
+                covered_months.add(f"{current.year}-{current.month:02d}")
+                if current.month == 12:
+                    current = current.replace(year=current.year+1, month=1)
+                else:
+                    current = current.replace(month=current.month+1)
+    
+    accounts_with_statements = set(s.account_id for s in statements if s.account_id)
+    unreconciled = drafts + reviewed
+    
+    recent = None
+    if statements:
+        latest = max(statements, key=lambda s: s.imported_at or datetime.min)
+        recent = {
+            "filename": latest.original_filename,
+            "status": latest.status,
+            "imported_at": latest.imported_at.isoformat() if latest.imported_at else None,
+            "transaction_count": latest.transaction_count,
+        }
+    
+    return {
+        "total_statements": total,
+        "drafts": drafts,
+        "reviewed": reviewed,
+        "approved": approved,
+        "total_transactions": total_txs,
+        "covered_months": len(covered_months),
+        "accounts_with_statements": len(accounts_with_statements),
+        "unreconciled": unreconciled,
+        "recent": recent,
+    }
+
+
 @router.get("/{statement_id}")
 def get_statement(
     statement_id: str,
@@ -1413,3 +1519,5 @@ def get_reconciliation_timeline(
         "timeline": timeline,
         "checks": checks,
     }
+    }
+
