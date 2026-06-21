@@ -161,6 +161,17 @@ DATE_AMOUNTS_RE = re.compile(
     r'([\d,]+\.?\d*)\s+SAR$'             # Balance
 )
 
+# Alternate format: date + Time:**Note:...text... DEBIT CREDIT BALANCE
+# Used by Al Rajhi for some transactions (e.g. salary/payroll credits)
+# Example: 2026/01/25 Time:09:50:55**Note:PAYROLL-PRJHI26025050618- 0.00 SAR 110,095.73 SAR 110,095.73 SAR
+INLINE_DATE_RE = re.compile(
+    r'^(\d{4}/\d{2}/\d{2})\s+'                     # Date
+    r'Time:(\d{2}:\d{2}:\d{2})\*\*Note:(.*?)\s+'    # Inline Time:**Note:...
+    r'([\d,]+\.?\d*)\s+SAR\s+'                     # Debit amount
+    r'([\d,]+\.?\d*)\s+SAR\s+'                     # Credit amount
+    r'([\d,]+\.?\d*)\s+SAR$'                       # Balance
+)
+
 # Time and Note line: Time:HH:MM:SS**Note:...
 TIME_NOTE_RE = re.compile(r'^Time:(\d{2}:\d{2}:\d{2})\*\*Note:(.*)', re.DOTALL)
 
@@ -296,7 +307,84 @@ def parse_transactions_from_text(all_pages_text: list[str]) -> list[RawTransacti
                 i += 1
                 continue
             
-            # Look for a date+amounts line — this anchors a transaction
+            # ── Check for INLINE format first ──
+            # e.g. "2026/01/25 Time:09:50:55**Note:PAYROLL-... 0.00 SAR 110,095.73 SAR 110,095.73 SAR"
+            inline_match = INLINE_DATE_RE.match(line)
+            if inline_match:
+                tx_date = inline_match.group(1)
+                time_val = inline_match.group(2)
+                inline_note = inline_match.group(3).strip()
+                debit_raw = inline_match.group(4)
+                credit_raw = inline_match.group(5)
+                balance_raw = inline_match.group(6)
+                
+                debit_amt = parse_amount(debit_raw + ' SAR')
+                credit_amt = parse_amount(credit_raw + ' SAR')
+                balance_amt = parse_amount(balance_raw + ' SAR')
+                
+                # Determine direction
+                if credit_amt and credit_amt > 0 and (debit_amt is None or debit_amt == 0):
+                    direction = "credit"
+                    amount = credit_amt
+                else:
+                    direction = "debit"
+                    amount = debit_amt
+                
+                # Collect continuation lines (wrapped note/merchant text)
+                note_lines = [inline_note] if inline_note else []
+                i += 1
+                while i < len(lines):
+                    next_line = lines[i].strip()
+                    if not next_line:
+                        i += 1
+                        continue
+                    if DATE_AMOUNTS_RE.match(next_line) or INLINE_DATE_RE.match(next_line):
+                        break
+                    if is_page_header(next_line):
+                        i += 1
+                        continue
+                    if TIME_NOTE_RE.match(next_line):
+                        break
+                    # Check if next line after this is a date line (making this a type line for next tx)
+                    if i + 1 < len(lines):
+                        peek = lines[i + 1].strip()
+                        if DATE_AMOUNTS_RE.match(peek) or INLINE_DATE_RE.match(peek):
+                            break
+                    note_lines.append(next_line)
+                    i += 1
+                
+                note_text = '\n'.join(note_lines).strip() if note_lines else None
+                
+                merchant, reference_id = parse_merchant_from_note(
+                    note_text,
+                    pending_type_line if 'pending_type_line' in dir() else ""
+                )
+                
+                raw_desc = pending_type_line + '\n' if 'pending_type_line' in dir() and pending_type_line else ''
+                raw_desc += f'{tx_date} Time:{time_val}**Note:{note_text or ""}'
+                raw_desc += f'\n{debit_raw} SAR {credit_raw} SAR {balance_raw} SAR'
+                
+                tx = RawTransaction(
+                    row_index=row_index,
+                    transaction_date=tx_date,
+                    transaction_time=time_val,
+                    type_line=pending_type_line if 'pending_type_line' in dir() else None,
+                    raw_description=raw_desc.strip(),
+                    debit_amount=debit_amt,
+                    credit_amount=credit_amt,
+                    amount=amount,
+                    direction=direction,
+                    balance=balance_amt,
+                    merchant_or_beneficiary=merchant,
+                    reference_id=reference_id,
+                    note_text=note_text,
+                )
+                transactions.append(tx)
+                row_index += 1
+                pending_type_line = ""
+                continue
+            
+            # ── Standard format: date + amounts on one line ──
             date_match = DATE_AMOUNTS_RE.match(line)
             if date_match:
                 tx_date = date_match.group(1)
@@ -307,11 +395,6 @@ def parse_transactions_from_text(all_pages_text: list[str]) -> list[RawTransacti
                 debit_amt = parse_amount(debit_raw + ' SAR')
                 credit_amt = parse_amount(credit_raw + ' SAR')
                 balance_amt = parse_amount(balance_raw + ' SAR')
-                
-                # The type line is the line(s) BEFORE this date line
-                # We need to look back to find it. The type line is what we
-                # accumulated since the last transaction ended.
-                # We handle this by collecting "pending" lines.
                 
                 # Determine direction
                 if credit_amt and credit_amt > 0 and (debit_amt is None or debit_amt == 0):
@@ -327,9 +410,6 @@ def parse_transactions_from_text(all_pages_text: list[str]) -> list[RawTransacti
                 note_lines = []
                 raw_desc_parts = []
                 
-                # Add the type line (collected before this date line)
-                # We'll handle this below
-                
                 i += 1
                 # Collect continuation lines (Time:, Note:, wrapped merchant text)
                 while i < len(lines):
@@ -339,9 +419,7 @@ def parse_transactions_from_text(all_pages_text: list[str]) -> list[RawTransacti
                         continue
                     
                     # Check if this is the start of the NEXT transaction
-                    # (either a new date+amounts line, or a new type line
-                    #  followed by a date line)
-                    if DATE_AMOUNTS_RE.match(next_line):
+                    if DATE_AMOUNTS_RE.match(next_line) or INLINE_DATE_RE.match(next_line):
                         break
                     if is_page_header(next_line):
                         i += 1
@@ -360,25 +438,19 @@ def parse_transactions_from_text(all_pages_text: list[str]) -> list[RawTransacti
                             if not wrap_line:
                                 i += 1
                                 continue
-                            # Stop if we hit a new type line or date line or page header
-                            if DATE_AMOUNTS_RE.match(wrap_line) or is_page_header(wrap_line):
+                            if DATE_AMOUNTS_RE.match(wrap_line) or INLINE_DATE_RE.match(wrap_line) or is_page_header(wrap_line):
                                 break
                             # Stop if this looks like a new transaction type line
-                            # (i.e., the NEXT line after this is a date+amounts line)
                             if i + 1 < len(lines):
                                 peek = lines[i + 1].strip()
-                                if DATE_AMOUNTS_RE.match(peek):
-                                    # This line is the type line for the next tx
+                                if DATE_AMOUNTS_RE.match(peek) or INLINE_DATE_RE.match(peek):
                                     break
-                            # Also check if this is a Time: line (shouldn't happen but safety)
                             if TIME_NOTE_RE.match(wrap_line):
                                 break
                             note_lines.append(wrap_line)
                             i += 1
                         break
                     else:
-                        # This could be a wrapped note continuation or something else
-                        # If we haven't seen Time yet, it might be a continuation of type line
                         note_lines.append(next_line)
                         i += 1
                 
@@ -390,7 +462,7 @@ def parse_transactions_from_text(all_pages_text: list[str]) -> list[RawTransacti
                     pending_type_line if 'pending_type_line' in dir() else ""
                 )
                 
-                # Build raw description from type line + date + time + note
+                # Build raw description
                 raw_desc = pending_type_line + '\n' if 'pending_type_line' in dir() and pending_type_line else ''
                 raw_desc += f'{tx_date} {debit_raw} SAR {credit_raw} SAR {balance_raw} SAR'
                 if time_val:
