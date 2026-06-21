@@ -322,7 +322,7 @@ function CreditCards() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-purple-600/20 rounded-lg">
-                        <CreditCard className="text-purple-400" size={24} />
+                        <CreditCardIcon className="text-purple-400" size={24} />
                     </div>
                     <div>
                         <h1 className="text-2xl md:text-3xl font-bold text-white">Credit Cards</h1>
