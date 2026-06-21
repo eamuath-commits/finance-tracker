@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../utils/api';
-import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, ArrowLeft, ArrowUpRight, ArrowDownLeft, ChevronRight, ChevronDown, RefreshCw, Filter, Wallet, Calendar, Search, X, Download, Edit3, Check, MoreVertical, Eye, ShieldCheck, Link2, GitBranch, BarChart3, TrendingUp, TrendingDown, LayoutGrid, List } from 'lucide-react';
+import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, ArrowLeft, ArrowUpRight, ArrowDownLeft, ChevronRight, ChevronDown, RefreshCw, Filter, Wallet, Calendar, Search, X, Download, Edit3, Check, MoreVertical, Eye, ShieldCheck, Link2, GitBranch, BarChart3, TrendingUp, TrendingDown, LayoutGrid, List, FileSearch, MessageSquare } from 'lucide-react';
 
 const Statements = () => {
     const [statements, setStatements] = useState([]);
@@ -60,6 +60,13 @@ const Statements = () => {
     // Reconciliation timeline state
     const [timelineData, setTimelineData] = useState(null);
     const [showTimeline, setShowTimeline] = useState(false);
+    // PDF Preview state
+    const [showPdfPreview, setShowPdfPreview] = useState(false);
+    const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
+    const [loadingPdf, setLoadingPdf] = useState(false);
+    // Per-transaction notes
+    const [editingNoteId, setEditingNoteId] = useState(null);
+    const [noteValue, setNoteValue] = useState('');
 
     const fetchStatements = useCallback(async () => {
         try {
@@ -670,6 +677,18 @@ const Statements = () => {
                         <RefreshCw size={14} className={loadingDetail ? 'animate-spin' : ''} />
                         Re-parse
                     </button>
+                    <button
+                        onClick={togglePdfPreview}
+                        disabled={loadingPdf}
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            showPdfPreview
+                                ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30'
+                                : 'bg-slate-700 hover:bg-slate-600 text-gray-300'
+                        } disabled:opacity-50`}
+                    >
+                        {loadingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileSearch size={14} />}
+                        {showPdfPreview ? 'Hide PDF' : 'View PDF'}
+                    </button>
                     {parsedTransactions.length > 0 && statementDetail?.status === 'draft' && (
                         <div className="flex items-center gap-2">
                             <button
@@ -1030,6 +1049,46 @@ const Statements = () => {
                     </div>
                 )}
 
+                {/* PDF Preview Panel */}
+                {showPdfPreview && (
+                    <div className="bg-slate-900/80 rounded-xl border border-purple-500/20 overflow-hidden">
+                        <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <FileSearch size={14} className="text-purple-400" />
+                                <span className="text-sm text-white font-medium">PDF Preview</span>
+                                <span className="text-xs text-gray-500">{statementDetail?.original_filename}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => downloadPdf(selectedStatement)}
+                                    className="text-xs text-gray-400 hover:text-blue-400 transition-colors flex items-center gap-1"
+                                >
+                                    <Download size={12} />Download
+                                </button>
+                                <button onClick={() => setShowPdfPreview(false)} className="text-gray-500 hover:text-gray-300">
+                                    <X size={14} />
+                                </button>
+                            </div>
+                        </div>
+                        {pdfBlobUrl ? (
+                            <iframe
+                                src={pdfBlobUrl}
+                                className="w-full border-0"
+                                style={{ height: '600px' }}
+                                title="Statement PDF Preview"
+                            />
+                        ) : loadingPdf ? (
+                            <div className="flex items-center justify-center py-20">
+                                <Loader2 size={24} className="text-purple-400 animate-spin" />
+                            </div>
+                        ) : (
+                            <div className="text-center py-12 text-gray-500">
+                                <p>Failed to load PDF preview</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Reconciliation Timeline */}
                 {timelineData && timelineData.timeline.length > 0 && (
                     <div className="bg-slate-900/80 rounded-xl border border-slate-800 overflow-hidden">
@@ -1352,6 +1411,7 @@ const Statements = () => {
                                         <th className="px-4 py-3 text-right">Bank Bal</th>
                                         <th className="px-4 py-3 text-right">System Bal</th>
                                         {matchSummary && matchSummary.matched > 0 && <th className="px-3 py-3 text-center w-20">Match</th>}
+                                        {committedTxs.length > 0 && <th className="px-3 py-3 w-28"><div className="flex items-center gap-1"><MessageSquare size={11} />Notes</div></th>}
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1434,6 +1494,38 @@ const Statements = () => {
                                                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                                                             New
                                                         </span>
+                                                    )}
+                                                </td>
+                                            )}
+                                            {committedTxs.length > 0 && (
+                                                <td className="px-3 py-2.5">
+                                                    {dbTx ? (
+                                                        editingNoteId === dbTx.id ? (
+                                                            <div className="flex items-center gap-1">
+                                                                <input
+                                                                    autoFocus
+                                                                    className="bg-slate-800 border border-blue-500 rounded px-1.5 py-0.5 text-[10px] text-white w-20 focus:outline-none"
+                                                                    value={noteValue}
+                                                                    onChange={e => setNoteValue(e.target.value)}
+                                                                    placeholder="Note..."
+                                                                    onKeyDown={e => {
+                                                                        if (e.key === 'Enter') saveTransactionNote(dbTx.id, noteValue);
+                                                                        if (e.key === 'Escape') setEditingNoteId(null);
+                                                                    }}
+                                                                    onBlur={() => saveTransactionNote(dbTx.id, noteValue)}
+                                                                />
+                                                            </div>
+                                                        ) : (
+                                                            <span
+                                                                className="text-[10px] text-gray-500 cursor-pointer hover:text-gray-300 transition block truncate max-w-[100px]"
+                                                                title={dbTx.notes || 'Click to add note'}
+                                                                onClick={() => { setEditingNoteId(dbTx.id); setNoteValue(dbTx.notes || ''); }}
+                                                            >
+                                                                {dbTx.notes || <span className="text-gray-700 italic">+</span>}
+                                                            </span>
+                                                        )
+                                                    ) : (
+                                                        <span className="text-[10px] text-gray-700">—</span>
                                                     )}
                                                 </td>
                                             )}
@@ -1570,6 +1662,42 @@ const Statements = () => {
 
     const downloadPdf = (id) => {
         window.open(`/api/statements/${id}/pdf`, '_blank');
+    };
+
+    // Fetch PDF blob for preview
+    const loadPdfPreview = async (stmtId) => {
+        if (pdfBlobUrl) {
+            URL.revokeObjectURL(pdfBlobUrl);
+            setPdfBlobUrl(null);
+        }
+        setLoadingPdf(true);
+        try {
+            const res = await api.get(`/api/statements/${stmtId}/pdf`, { responseType: 'blob' });
+            const url = URL.createObjectURL(res.data);
+            setPdfBlobUrl(url);
+        } catch (err) {
+            console.error('PDF preview failed:', err);
+        } finally {
+            setLoadingPdf(false);
+        }
+    };
+
+    const togglePdfPreview = () => {
+        if (!showPdfPreview && !pdfBlobUrl && selectedStatement) {
+            loadPdfPreview(selectedStatement);
+        }
+        setShowPdfPreview(!showPdfPreview);
+    };
+
+    // Update transaction notes
+    const saveTransactionNote = async (txId, note) => {
+        try {
+            await api.patch(`/api/statements/transaction/${txId}/notes`, { notes: note || null });
+            setCommittedTxs(prev => prev.map(t => t.id === txId ? { ...t, notes: note || null } : t));
+        } catch (err) {
+            console.error('Failed to save note:', err);
+        }
+        setEditingNoteId(null);
     };
 
     const getStatusConfig = (status) => {

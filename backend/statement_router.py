@@ -1001,7 +1001,7 @@ def get_statement_transactions(
             models.Transaction.statement_id == statement_id,
         ).order_by(models.Transaction.timestamp.asc()).all()
         committed_txs = [
-            {"id": tx.id, "status": tx.status, "amount": tx.amount, "merchant": tx.merchant}
+            {"id": tx.id, "status": tx.status, "amount": tx.amount, "merchant": tx.merchant, "notes": tx.notes}
             for tx in db_txs
         ]
     
@@ -1013,6 +1013,32 @@ def get_statement_transactions(
         "committed_transactions": committed_txs,
         "match_summary": match_summary,
     }
+
+
+class TransactionNoteUpdate(BaseModel):
+    notes: Optional[str] = None
+
+
+@router.patch("/transaction/{transaction_id}/notes")
+def update_transaction_notes(
+    transaction_id: str,
+    body: TransactionNoteUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Update notes for a committed transaction."""
+    tx = db.query(models.Transaction).filter(
+        models.Transaction.id == transaction_id,
+        models.Transaction.user_id == current_user.id,
+    ).first()
+    
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    tx.notes = body.notes
+    db.commit()
+    
+    return {"id": tx.id, "notes": tx.notes}
 
 
 @router.get("/{statement_id}/validate")
