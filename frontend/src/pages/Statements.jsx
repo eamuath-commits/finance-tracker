@@ -292,6 +292,66 @@ const Statements = () => {
         });
     };
 
+    const handleCommitAndApprove = async () => {
+        if (!selectedStatement) return;
+        const matchedRows = parsedTransactions.filter(tx => tx.match_status === 'matched');
+        const newCount = parsedTransactions.filter(tx => tx.match_status !== 'matched').length;
+        const matchedCount = matchedRows.length;
+        const acctLabel = statementDetail?.account_number ? `****${statementDetail.account_number.slice(-4)}` : 'linked account';
+        
+        const matchInfo = matchedCount > 0 
+            ? `\n\n${matchedCount} duplicate${matchedCount !== 1 ? 's' : ''} (already via SMS) will be skipped.`
+            : '';
+        
+        setConfirmDialog({
+            open: true,
+            title: 'Commit & Approve',
+            message: `This will commit ${newCount} new transactions and immediately approve them for account ${acctLabel}.${matchInfo}\n\nThe account balance will be updated. This cannot be undone.`,
+            variant: 'primary',
+            onConfirm: async () => {
+                setConfirmDialog(prev => ({ ...prev, open: false }));
+                setCommitting(true);
+                setCommitResult(null);
+                setError(null);
+                try {
+                    // Step 1: Commit
+                    const excludeIndices = matchedRows.map(tx => tx.row_index);
+                    const commitRes = await api.post(`/api/statements/${selectedStatement}/commit`, {
+                        exclude_row_indices: excludeIndices.length > 0 ? excludeIndices : undefined
+                    });
+                    
+                    // Step 2: Approve all
+                    const approveRes = await api.post(`/api/statements/${selectedStatement}/approve`, {});
+                    setApproveResult(approveRes.data);
+                    
+                    // Refresh everything
+                    const [detailRes, txRes] = await Promise.all([
+                        api.get(`/api/statements/${selectedStatement}`),
+                        api.get(`/api/statements/${selectedStatement}/transactions`),
+                    ]);
+                    setStatementDetail(detailRes.data);
+                    setParsedTransactions(txRes.data.transactions || []);
+                    setMatchSummary(txRes.data.match_summary || null);
+                    const cTxs = txRes.data.committed_transactions || [];
+                    setCommittedTxs(cTxs);
+                    setSelectedTxIds(new Set(cTxs.filter(t => t.status === 'draft').map(t => t.id)));
+                    // Refresh timeline
+                    if (detailRes.data.account_id) {
+                        try {
+                            const tlRes = await api.get(`/api/statements/reconciliation/${detailRes.data.account_id}`);
+                            setTimelineData(tlRes.data);
+                        } catch (e) { /* ignore */ }
+                    }
+                    fetchStatements();
+                } catch (err) {
+                    setError(err.response?.data?.detail || 'Commit & Approve failed');
+                } finally {
+                    setCommitting(false);
+                }
+            }
+        });
+    };
+
     const handleValidate = async () => {
         if (!selectedStatement) return;
         setValidating(true);
@@ -543,17 +603,30 @@ const Statements = () => {
                         Re-parse
                     </button>
                     {parsedTransactions.length > 0 && statementDetail?.status === 'draft' && (
-                        <button
-                            onClick={handleCommitToLedger}
-                            disabled={committing || loadingDetail}
-                            className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors disabled:opacity-50 shadow-lg shadow-emerald-600/20"
-                        >
-                            {committing ? (
-                                <><Loader2 size={14} className="animate-spin" />Committing...</>
-                            ) : (
-                                <><CheckCircle2 size={14} />Commit {matchSummary && matchSummary.matched > 0 ? `${matchSummary.new} New` : ''} to Ledger</>
-                            )}
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={handleCommitToLedger}
+                                disabled={committing || loadingDetail}
+                                className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors disabled:opacity-50 shadow-lg shadow-emerald-600/20"
+                            >
+                                {committing ? (
+                                    <><Loader2 size={14} className="animate-spin" />Committing...</>
+                                ) : (
+                                    <><CheckCircle2 size={14} />Commit {matchSummary && matchSummary.matched > 0 ? `${matchSummary.new} New` : ''} to Ledger</>
+                                )}
+                            </button>
+                            <button
+                                onClick={handleCommitAndApprove}
+                                disabled={committing || loadingDetail}
+                                className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-500 hover:to-blue-500 text-white text-sm font-medium transition-all disabled:opacity-50 shadow-lg shadow-blue-600/20"
+                            >
+                                {committing ? (
+                                    <><Loader2 size={14} className="animate-spin" />Processing...</>
+                                ) : (
+                                    <><ShieldCheck size={14} />Commit & Approve</>
+                                )}
+                            </button>
+                        </div>
                     )}
                     {(statementDetail?.status === 'reviewed' || (statementDetail?.status === 'approved' && committedTxs.some(t => t.status === 'draft'))) && selectedTxIds.size > 0 && (
                         <button
@@ -580,21 +653,21 @@ const Statements = () => {
 
                 {/* Commit Result Banner */}
                 {commitResult && (
-                    <div className={`rounded-xl border p-4 ${commitResult.duplicates_flagged > 0 ? 'bg-amber-500/5 border-amber-500/20' : 'bg-emerald-500/5 border-emerald-500/20'}`}>
+                    <div className={`rounded-xl border p-4 ${commitResult.excluded > 0 ? 'bg-amber-500/5 border-amber-500/20' : 'bg-emerald-500/5 border-emerald-500/20'}`}>
                         <div className="flex items-start gap-3">
-                            {commitResult.duplicates_flagged > 0 ? (
+                            {commitResult.excluded > 0 ? (
                                 <AlertTriangle size={18} className="text-amber-400 mt-0.5" />
                             ) : (
                                 <CheckCircle2 size={18} className="text-emerald-400 mt-0.5" />
                             )}
                             <div className="flex-1">
-                                <p className={`text-sm font-medium ${commitResult.duplicates_flagged > 0 ? 'text-amber-300' : 'text-emerald-300'}`}>
+                                <p className={`text-sm font-medium ${commitResult.excluded > 0 ? 'text-amber-300' : 'text-emerald-300'}`}>
                                     Committed {commitResult.created} draft transactions to the ledger
                                 </p>
                                 <div className="flex gap-4 mt-1 text-xs text-gray-400">
                                     <span>{commitResult.created} created</span>
-                                    {commitResult.duplicates_flagged > 0 && (
-                                        <span className="text-amber-400">{commitResult.duplicates_flagged} potential duplicates flagged</span>
+                                    {commitResult.excluded > 0 && (
+                                        <span className="text-blue-400">{commitResult.excluded} duplicates skipped</span>
                                     )}
                                     {commitResult.skipped > 0 && (
                                         <span>{commitResult.skipped} skipped (zero amount)</span>
