@@ -110,7 +110,7 @@ const TableRow = ({ obl, getMonthStatus, monthOffset, monthNames, openPaymentMod
             </td>
 
             {/* Column 2: Month -2 */}
-            <td className="px-2 py-2.5 text-center">
+            <td className="px-2 py-2.5 text-center hidden sm:table-cell">
                 <MonthStatusCell status={month1} />
             </td>
 
@@ -194,7 +194,7 @@ const CategoryTable = ({ category, obligations, monthNames, getMonthStatus, mont
     return (
         <div className="bg-slate-900 border border-slate-700 rounded-lg overflow-hidden shadow-lg mb-4">
             {/* Category Header */}
-            <div className="bg-slate-800 px-4 py-2.5 border-b border-slate-700 flex items-center justify-between">
+            <div className="bg-slate-800 px-3 md:px-4 py-2.5 border-b border-slate-700 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     {CATEGORY_ICONS[category] || <Box size={16} />}
                     <h3 className="text-white font-bold text-xs uppercase tracking-wider">{category}</h3>
@@ -203,14 +203,15 @@ const CategoryTable = ({ category, obligations, monthNames, getMonthStatus, mont
             </div>
 
             {/* Table */}
-            <table className="w-full text-left border-collapse table-fixed">
+            <div className="overflow-x-auto mobile-scroll">
+            <table className="w-full text-left border-collapse">
                 <thead className="bg-slate-800/50 text-[9px] uppercase font-bold text-slate-500">
                     <tr>
-                        <th className="px-4 py-2 w-[28%]">Obligation</th>
-                        <th className="px-2 py-2 text-center w-[14%]">{monthNames[0]}</th>
-                        <th className="px-2 py-2 text-center w-[14%]">{monthNames[1]}</th>
-                        <th className="px-2 py-2 text-center w-[14%]">{monthNames[2]} (Now)</th>
-                        <th className="px-3 py-2 text-right w-[30%]">Actions</th>
+                        <th className="px-3 md:px-4 py-2 min-w-[120px]">Obligation</th>
+                        <th className="px-2 py-2 text-center hidden sm:table-cell">‌{monthNames[0]}</th>
+                        <th className="px-2 py-2 text-center">{monthNames[1]}</th>
+                        <th className="px-2 py-2 text-center">{monthNames[2]} (Now)</th>
+                        <th className="px-3 py-2 text-right min-w-[100px]">Actions</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
@@ -230,6 +231,7 @@ const CategoryTable = ({ category, obligations, monthNames, getMonthStatus, mont
                     ))}
                 </tbody>
             </table>
+            </div>
         </div>
     );
 };
@@ -392,7 +394,7 @@ const ObligationsTable = ({ obligations, getMonthStatus, monthOffset, openPaymen
                     </div>
 
                     {/* Stats */}
-                    <div className="flex items-center gap-6">
+                    <div className="flex flex-wrap items-center gap-3 md:gap-6">
                         <div className="text-center">
                             <p className="text-[10px] text-slate-500 uppercase">Budget</p>
                             <p className="text-lg font-bold text-white font-mono">{formatCurrency(totalBudget)}</p>

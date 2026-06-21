@@ -570,7 +570,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
     return (
         <div className="animate-fade-in-up space-y-4">
             {/* Summary Cards — matches Manager tab gradient style */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="bg-gradient-to-br from-blue-900/30 to-slate-900/90 backdrop-blur-sm border border-blue-500/20 rounded-xl p-4 shadow-lg">
                     <p className="text-[10px] text-blue-400 uppercase tracking-wider font-semibold mb-1">{totalLabel}</p>
                     <p className="text-2xl font-bold text-white font-mono">{formatCurrency(totalDisplay)}</p>
@@ -591,8 +591,8 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
             </div>
 
             {/* Toolbar — matches Manager tab */}
-            <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2 flex-wrap">
                     <div className="relative">
                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                         <input
@@ -659,15 +659,15 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                 />
 
                                 {!isCollapsed && (
-                                    <div className="animate-fade-in">
-                                        <table className="w-full text-left table-fixed">
+                                        <div className="overflow-x-auto mobile-scroll">
+                                        <table className="w-full text-left">
                                             <thead className="bg-slate-800/30">
                                                 <tr className="text-[8px] uppercase font-bold text-slate-500">
-                                                    <th className="px-4 py-1.5 w-[30%]">Name</th>
-                                                    <th className="px-3 py-1.5 text-center w-[10%]">Status</th>
-                                                    <th className="px-3 py-1.5 text-right w-[18%]">Amount</th>
-                                                    <th className="px-3 py-1.5 w-[25%]">Transaction</th>
-                                                    <th className="px-3 py-1.5 text-right w-[17%]">Actions</th>
+                                                    <th className="px-3 md:px-4 py-1.5 min-w-[100px]">Name</th>
+                                                    <th className="px-3 py-1.5 text-center">Status</th>
+                                                    <th className="px-3 py-1.5 text-right">Amount</th>
+                                                    <th className="px-3 py-1.5 hidden md:table-cell">Transaction</th>
+                                                    <th className="px-3 py-1.5 text-right">Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -715,7 +715,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                             </td>
 
                                                             {/* Transaction */}
-                                                            <td className="px-3 py-2">
+                                                            <td className="px-3 py-2 hidden md:table-cell">
                                                                 {isPlanned ? (
                                                                     <div className="relative" ref={payMenuId === `${item.id}-${idx}` ? payMenuRef : null}>
                                                                         <button
@@ -818,7 +818,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                 })}
                                             </tbody>
                                         </table>
-                                    </div>
+                                        </div>
                                 )}
                             </CategorySectionWrapper>
                         );

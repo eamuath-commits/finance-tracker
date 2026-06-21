@@ -144,7 +144,7 @@ const UserManagement = () => {
             {loading ? (
                 <div className="text-center py-12 text-slate-400">Loading users...</div>
             ) : (
-                <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden">
+                <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-x-auto mobile-scroll">
                     <table className="w-full">
                         <thead>
                             <tr className="border-b border-slate-800/50">

@@ -389,7 +389,7 @@ const Distributions = ({ accounts }) => {
     return (
         <div className="animate-fade-in-up space-y-4">
             {/* Top Stats & Filters Row */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4">
                 {/* Total Summary Card */}
                 <div className="bg-gradient-to-br from-purple-900/50 to-slate-900 border border-purple-800/30 p-4 rounded-xl flex flex-col justify-center relative">
                     <p className="text-purple-300 text-xs uppercase font-bold tracking-wider mb-1">Total Transferred</p>
@@ -407,7 +407,7 @@ const Distributions = ({ accounts }) => {
                 </div>
 
                 {/* Filters Area */}
-                <div className="md:col-span-3 bg-slate-800/50 border border-slate-700/50 p-4 rounded-xl flex flex-col justify-between">
+                <div className="md:col-span-3 bg-slate-800/50 border border-slate-700/50 p-3 md:p-4 rounded-xl flex flex-col justify-between">
                     <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2 text-slate-400 text-xs uppercase font-bold">
                             <Filter size={14} /> Filter Transfers
@@ -499,7 +499,7 @@ const Distributions = ({ accounts }) => {
                         return (
                             <div key={group.target_account_id} className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden shadow-lg">
                                 {/* Envelope Header */}
-                                <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900/60 border-b border-slate-700/30">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-3 md:px-4 py-2.5 bg-slate-900/60 border-b border-slate-700/30 gap-2">
                                     <div className="flex items-center gap-2">
                                         <ArrowUpRight size={14} className={allDone ? "text-emerald-400" : "text-slate-500"} />
                                         <span className="text-white font-semibold text-sm">{group.target_account_name}</span>
@@ -507,7 +507,7 @@ const Distributions = ({ accounts }) => {
                                             ({totalItems} item{totalItems > 1 ? 's' : ''})
                                         </span>
                                     </div>
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                         <span className="text-[10px] text-slate-400 font-mono">
                                             Total: <span className="text-purple-400 font-semibold">{formatCurrency(groupTotal + plannedTotal)}</span>
                                         </span>
@@ -539,7 +539,7 @@ const Distributions = ({ accounts }) => {
                                     {group.items.map(item => {
                                         const isLinked = item.transaction_id || (item.linked_transactions && item.linked_transactions.length > 0);
                                         return (
-                                            <div key={item.id} className={`px-4 py-3 flex items-center justify-between gap-4 ${isLinked ? 'bg-emerald-900/5' : 'hover:bg-slate-700/20'} transition`}>
+                                            <div key={item.id} className={`px-3 md:px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4 ${isLinked ? 'bg-emerald-900/5' : 'hover:bg-slate-700/20'} transition`}>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-emerald-400 font-mono font-medium text-sm">{formatCurrency(item.amount)}</span>
@@ -619,8 +619,8 @@ const Distributions = ({ accounts }) => {
 
                                     {/* Planned envelope summary (no distribution record yet) */}
                                     {group.plannedItems.length > 0 && (
-                                        <div className="px-4 py-3 border-l-2 border-l-amber-500/40 bg-amber-900/5">
-                                            <div className="flex items-center justify-between gap-4">
+                                        <div className="px-3 md:px-4 py-3 border-l-2 border-l-amber-500/40 bg-amber-900/5">
+                                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 mb-1.5">
                                                         <span className="text-amber-400 font-mono font-semibold text-sm">{formatCurrency(plannedTotal)}</span>
@@ -663,25 +663,25 @@ const Distributions = ({ accounts }) => {
             {/* Table View */}
             {viewMode === 'table' && (
             <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden shadow-xl">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto mobile-scroll">
                     <table className="w-full text-left text-sm">
                         <thead className="bg-slate-900/80 text-slate-400 text-xs uppercase font-bold backdrop-blur-sm">
                             <tr>
                                 <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('billing_month')}>
                                     <div className="flex items-center gap-1">Month {getSortIcon('billing_month')}</div>
                                 </th>
-                                <th className="px-4 py-4 border-b border-slate-700">
+                                <th className="px-3 md:px-4 py-3 md:py-4 border-b border-slate-700 hidden sm:table-cell">
                                     <div className="flex items-center gap-1">Obligation</div>
                                 </th>
-                                <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('target_account_name')}>
+                                <th className="px-3 md:px-4 py-3 md:py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('target_account_name')}>
                                     <div className="flex items-center gap-1">Target Account {getSortIcon('target_account_name')}</div>
                                 </th>
                                 <th className="px-4 py-4 border-b border-slate-700">Status</th>
                                 <th className="px-4 py-4 cursor-pointer hover:bg-slate-800/50 transition border-b border-slate-700" onClick={() => requestSort('amount')}>
                                     <div className="flex items-center gap-1">Amount {getSortIcon('amount')}</div>
                                 </th>
-                                <th className="px-4 py-4 border-b border-slate-700">Transaction</th>
-                                <th className="px-4 py-4 border-b border-slate-700 text-right">Actions</th>
+                                <th className="px-3 md:px-4 py-3 md:py-4 border-b border-slate-700 hidden md:table-cell">Transaction</th>
+                                <th className="px-3 md:px-4 py-3 md:py-4 border-b border-slate-700 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-700/50">
@@ -690,7 +690,7 @@ const Distributions = ({ accounts }) => {
                                     <td className="px-4 py-3 text-purple-300 font-mono text-xs">
                                         {formatMonthDisplay(item.billing_month)}
                                     </td>
-                                    <td className="px-4 py-3">
+                                    <td className="px-3 md:px-4 py-3 hidden sm:table-cell">
                                         {item.obligation_name ? (
                                             <span className="text-blue-300 text-xs font-medium">{item.obligation_name}</span>
                                         ) : (
@@ -715,7 +715,7 @@ const Distributions = ({ accounts }) => {
                                     </td>
 
                                     {/* Linked Transaction Column */}
-                                    <td className="px-4 py-3">
+                                    <td className="px-3 md:px-4 py-3 hidden md:table-cell">
                                         {item.linked_transactions && item.linked_transactions.length > 0 ? (
                                             <div className="flex flex-wrap gap-1">
                                                 {item.linked_transactions.map(tx => (
