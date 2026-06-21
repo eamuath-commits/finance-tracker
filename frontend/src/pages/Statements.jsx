@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../utils/api';
-import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, ArrowLeft, ArrowUpRight, ArrowDownLeft, ChevronRight, ChevronDown, RefreshCw, Filter, Wallet, Calendar, Search, X, Download, Edit3, Check, MoreVertical, Eye, ShieldCheck, Link2, GitBranch } from 'lucide-react';
+import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, ArrowLeft, ArrowUpRight, ArrowDownLeft, ChevronRight, ChevronDown, RefreshCw, Filter, Wallet, Calendar, Search, X, Download, Edit3, Check, MoreVertical, Eye, ShieldCheck, Link2, GitBranch, BarChart3, TrendingUp, TrendingDown, LayoutGrid, List } from 'lucide-react';
 
 const Statements = () => {
     const [statements, setStatements] = useState([]);
@@ -35,6 +35,8 @@ const Statements = () => {
     const [editValue, setEditValue] = useState('');
     const [actionMenuId, setActionMenuId] = useState(null);
     const [API_URL] = useState('/api/statements');
+    // List view mode
+    const [listViewMode, setListViewMode] = useState('table'); // 'table' | 'grouped'
     // Commit to ledger state
     const [committing, setCommitting] = useState(false);
     const [commitResult, setCommitResult] = useState(null);
@@ -471,8 +473,34 @@ const Statements = () => {
 
     const totalDebits = filteredParsedTx.reduce((sum, tx) => sum + (tx.debit_amount || 0), 0);
     const totalCredits = filteredParsedTx.reduce((sum, tx) => sum + (tx.credit_amount || 0), 0);
+    const netChange = totalCredits - totalDebits;
     const hasTxFilters = txSearch || txTypeFilter || txDateRange.start || txDateRange.end || txAmountMin || txAmountMax || txCountLimit || matchFilter !== 'all';
     const clearTxFilters = () => { setTxSearch(''); setTxTypeFilter(''); setTxDateRange({ start: '', end: '' }); setTxAmountMin(''); setTxAmountMax(''); setTxCountLimit(''); setMatchFilter('all'); };
+
+    // Top merchants by spending
+    const topMerchants = useMemo(() => {
+        const map = new Map();
+        filteredParsedTx.forEach(tx => {
+            const name = tx.merchant_or_beneficiary || 'Unknown';
+            const amount = tx.debit_amount || 0;
+            if (amount <= 0) return;
+            if (!map.has(name)) map.set(name, { name, total: 0, count: 0 });
+            const m = map.get(name);
+            m.total += amount;
+            m.count += 1;
+        });
+        return Array.from(map.values()).sort((a, b) => b.total - a.total).slice(0, 5);
+    }, [filteredParsedTx]);
+
+    // Largest single transaction
+    const largestTx = useMemo(() => {
+        if (filteredParsedTx.length === 0) return null;
+        return filteredParsedTx.reduce((max, tx) => {
+            const amt = (tx.debit_amount || 0) + (tx.credit_amount || 0);
+            const maxAmt = (max.debit_amount || 0) + (max.credit_amount || 0);
+            return amt > maxAmt ? tx : max;
+        }, filteredParsedTx[0]);
+    }, [filteredParsedTx]);
 
     // System-computed balance: independent running balance from account's pre-statement balance
     // Uses the account's balance BEFORE statement transactions as anchor (not the bank's opening_balance)
@@ -516,18 +544,58 @@ const Statements = () => {
 
     const summaryStats = useMemo(() => {
         const s = filteredStatements;
+        const totalCreditsAll = s.reduce((sum, st) => {
+            if (st.opening_balance != null && st.closing_balance != null) {
+                const diff = st.closing_balance - st.opening_balance;
+                return sum + Math.max(0, diff);
+            }
+            return sum;
+        }, 0);
+        const totalDebitsAll = s.reduce((sum, st) => {
+            if (st.opening_balance != null && st.closing_balance != null) {
+                const diff = st.opening_balance - st.closing_balance;
+                return sum + Math.max(0, diff);
+            }
+            return sum;
+        }, 0);
         return {
             totalStatements: s.length,
             totalTransactions: s.reduce((sum, st) => sum + (st.transaction_count || 0), 0),
-            totalDebits: s.reduce((sum, st) => {
-                if (st.opening_balance != null && st.closing_balance != null) {
-                    const diff = st.opening_balance - st.closing_balance;
-                    return sum + Math.max(0, diff);
-                }
-                return sum;
-            }, 0),
+            totalDebits: totalDebitsAll,
+            totalCredits: totalCreditsAll,
+            netChange: totalCreditsAll - totalDebitsAll,
         };
     }, [filteredStatements]);
+
+    // Grouped by month for archive view
+    const groupedByMonth = useMemo(() => {
+        const groups = new Map();
+        sortedFilteredStatements.forEach(s => {
+            const dateStr = s.statement_period_start || s.imported_at;
+            const d = dateStr ? new Date(dateStr) : null;
+            const key = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : 'unknown';
+            const label = d ? d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Unknown';
+            if (!groups.has(key)) groups.set(key, { key, label, statements: [] });
+            groups.get(key).statements.push(s);
+        });
+        return Array.from(groups.values()).sort((a, b) => b.key.localeCompare(a.key));
+    }, [sortedFilteredStatements]);
+
+    // Coverage months for calendar
+    const coverageMonths = useMemo(() => {
+        const months = new Set();
+        statements.forEach(s => {
+            if (!s.statement_period_start || !s.statement_period_end) return;
+            const start = new Date(s.statement_period_start);
+            const end = new Date(s.statement_period_end);
+            let cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+            while (cursor <= end) {
+                months.add(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`);
+                cursor.setMonth(cursor.getMonth() + 1);
+            }
+        });
+        return months;
+    }, [statements]);
 
     // ─────────────── DETAIL VIEW ───────────────
     if (selectedStatement) {
@@ -868,6 +936,97 @@ const Statements = () => {
                                 {hasTxFilters ? `${filteredParsedTx.length} / ${parsedTransactions.length}` : parsedTransactions.length}
                             </p>
                         </div>
+                        <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4">
+                            <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1.5">Net Change{hasTxFilters ? ' (filtered)' : ''}</p>
+                            <p className={`text-lg font-semibold ${netChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {netChange >= 0 ? '+' : ''}{formatAmount(netChange)} <span className="text-[11px] text-gray-500">SAR</span>
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Enhanced Analytics Row */}
+                {parsedTransactions.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {/* Top Merchants */}
+                        {topMerchants.length > 0 && (
+                            <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <BarChart3 size={14} className="text-purple-400" />
+                                    <span className="text-[11px] text-gray-500 uppercase tracking-wider">Top Merchants by Spending</span>
+                                </div>
+                                <div className="space-y-2">
+                                    {topMerchants.map((m, i) => {
+                                        const pct = totalDebits > 0 ? (m.total / totalDebits) * 100 : 0;
+                                        return (
+                                            <div key={i} className="flex items-center gap-3">
+                                                <span className="text-[10px] text-gray-600 w-4 text-right">{i + 1}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between mb-0.5">
+                                                        <span className="text-xs text-gray-300 truncate max-w-[180px]">{m.name}</span>
+                                                        <span className="text-xs text-red-400 font-mono">{formatAmount(m.total)}</span>
+                                                    </div>
+                                                    <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all" style={{ width: `${pct}%` }}></div>
+                                                    </div>
+                                                </div>
+                                                <span className="text-[10px] text-gray-600 w-8">{m.count}x</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Largest Transaction */}
+                        {largestTx && (
+                            <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4">
+                                <div className="flex items-center gap-2 mb-3">
+                                    {largestTx.debit_amount ? <TrendingDown size={14} className="text-red-400" /> : <TrendingUp size={14} className="text-green-400" />}
+                                    <span className="text-[11px] text-gray-500 uppercase tracking-wider">Largest Transaction</span>
+                                </div>
+                                <div className="bg-slate-800/50 rounded-lg p-3">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="text-sm text-white font-medium truncate max-w-[250px]">{largestTx.merchant_or_beneficiary || 'Unknown'}</span>
+                                        <span className={`text-lg font-bold font-mono ${largestTx.debit_amount ? 'text-red-400' : 'text-green-400'}`}>
+                                            {formatAmount(largestTx.debit_amount || largestTx.credit_amount)}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-[10px] text-gray-500">
+                                        <span>{largestTx.transaction_date}</span>
+                                        <span className={`px-1.5 py-0.5 rounded ${largestTx.debit_amount ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'}`}>
+                                            {largestTx.debit_amount ? 'Debit' : 'Credit'}
+                                        </span>
+                                        {largestTx.type_line && <span className="truncate max-w-[150px]">{largestTx.type_line}</span>}
+                                    </div>
+                                </div>
+                                {/* Quick stats */}
+                                <div className="grid grid-cols-3 gap-2 mt-3">
+                                    <div className="text-center">
+                                        <p className="text-[10px] text-gray-600">Avg Debit</p>
+                                        <p className="text-xs text-red-400 font-mono">
+                                            {formatAmount(filteredParsedTx.filter(t => t.debit_amount).length > 0
+                                                ? totalDebits / filteredParsedTx.filter(t => t.debit_amount).length
+                                                : 0)}
+                                        </p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-[10px] text-gray-600">Avg Credit</p>
+                                        <p className="text-xs text-green-400 font-mono">
+                                            {formatAmount(filteredParsedTx.filter(t => t.credit_amount).length > 0
+                                                ? totalCredits / filteredParsedTx.filter(t => t.credit_amount).length
+                                                : 0)}
+                                        </p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-[10px] text-gray-600">Debit / Credit</p>
+                                        <p className="text-xs text-gray-400">
+                                            {filteredParsedTx.filter(t => t.debit_amount).length} / {filteredParsedTx.filter(t => t.credit_amount).length}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -1513,7 +1672,7 @@ const Statements = () => {
 
             {/* Summary Stats */}
             {statements.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                     <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4">
                         <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1">Statements</p>
                         <p className="text-xl text-white font-bold">{summaryStats.totalStatements}</p>
@@ -1526,11 +1685,75 @@ const Statements = () => {
                         <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1">Accounts</p>
                         <p className="text-xl text-white font-bold">{statementAccounts.length}</p>
                     </div>
+                    <div className="bg-slate-900/80 rounded-xl border border-red-500/10 p-4">
+                        <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1">Total Debits</p>
+                        <p className="text-xl text-red-400 font-bold">{formatAmount(summaryStats.totalDebits)} <span className="text-[11px] text-gray-500">SAR</span></p>
+                    </div>
                     <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4">
                         <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1">Net Change</p>
-                        <p className={`text-xl font-bold ${summaryStats.totalDebits >= 0 ? 'text-red-400' : 'text-green-400'}`}>
-                            {formatAmount(summaryStats.totalDebits)} <span className="text-[11px] text-gray-500">SAR</span>
+                        <p className={`text-xl font-bold ${summaryStats.netChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {summaryStats.netChange >= 0 ? '+' : ''}{formatAmount(summaryStats.netChange)} <span className="text-[11px] text-gray-500">SAR</span>
                         </p>
+                    </div>
+                </div>
+            )}
+
+            {/* Coverage Calendar */}
+            {statements.length > 0 && coverageMonths.size > 0 && (
+                <div className="bg-slate-900/60 rounded-xl border border-slate-800 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Calendar size={14} className="text-blue-400" />
+                        <span className="text-[11px] text-gray-500 uppercase tracking-wider">Statement Coverage</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                        {(() => {
+                            const allMonths = [];
+                            const sorted = Array.from(coverageMonths).sort();
+                            if (sorted.length === 0) return null;
+                            const first = new Date(sorted[0] + '-01');
+                            const last = new Date(sorted[sorted.length - 1] + '-01');
+                            const cursor = new Date(first);
+                            while (cursor <= last) {
+                                const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
+                                allMonths.push({
+                                    key,
+                                    label: cursor.toLocaleDateString('en-US', { month: 'short' }),
+                                    year: cursor.getFullYear(),
+                                    covered: coverageMonths.has(key),
+                                });
+                                cursor.setMonth(cursor.getMonth() + 1);
+                            }
+                            let currentYear = null;
+                            return allMonths.map(m => {
+                                const showYear = m.year !== currentYear;
+                                currentYear = m.year;
+                                return (
+                                    <React.Fragment key={m.key}>
+                                        {showYear && <span className="text-[10px] text-gray-600 mr-1 self-center">{m.year}</span>}
+                                        <div
+                                            className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
+                                                m.covered
+                                                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                                                    : 'bg-slate-800/50 text-gray-600 border border-slate-800'
+                                            }`}
+                                            title={m.covered ? 'Statement covers this month' : 'No statement coverage'}
+                                        >
+                                            {m.label}
+                                        </div>
+                                    </React.Fragment>
+                                );
+                            });
+                        })()}
+                    </div>
+                    <div className="flex items-center gap-4 mt-2">
+                        <div className="flex items-center gap-1.5 text-[10px] text-gray-600">
+                            <div className="w-2.5 h-2.5 rounded bg-emerald-500/15 border border-emerald-500/20"></div>
+                            Covered
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[10px] text-gray-600">
+                            <div className="w-2.5 h-2.5 rounded bg-slate-800/50 border border-slate-800"></div>
+                            Gap
+                        </div>
                     </div>
                 </div>
             )}
@@ -1578,7 +1801,7 @@ const Statements = () => {
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="px-3 py-1.5 rounded-lg text-xs bg-slate-900 text-gray-300 border border-slate-800 focus:outline-none focus:border-blue-500/50 appearance-none"
+                        className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 appearance-none cursor-pointer min-w-[100px]"
                     >
                         <option value="all">All Status</option>
                         <option value="draft">Draft</option>
@@ -1586,6 +1809,22 @@ const Statements = () => {
                         <option value="approved">Approved</option>
                         <option value="rejected">Rejected</option>
                     </select>
+                    <div className="flex items-center gap-1 ml-auto">
+                        <button
+                            onClick={() => setListViewMode('table')}
+                            className={`p-1.5 rounded transition-colors ${listViewMode === 'table' ? 'bg-blue-600/20 text-blue-400' : 'text-gray-500 hover:text-gray-300'}`}
+                            title="Table view"
+                        >
+                            <List size={16} />
+                        </button>
+                        <button
+                            onClick={() => setListViewMode('grouped')}
+                            className={`p-1.5 rounded transition-colors ${listViewMode === 'grouped' ? 'bg-blue-600/20 text-blue-400' : 'text-gray-500 hover:text-gray-300'}`}
+                            title="Grouped by month"
+                        >
+                            <LayoutGrid size={16} />
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -1614,6 +1853,60 @@ const Statements = () => {
             {loading ? (
                 <div className="flex items-center justify-center py-20">
                     <Loader2 size={32} className="text-blue-400 animate-spin" />
+                </div>
+            ) : listViewMode === 'grouped' ? (
+                /* Grouped by Month View */
+                <div className="space-y-4">
+                    {groupedByMonth.map(group => (
+                        <div key={group.key} className="bg-slate-900/60 rounded-xl border border-slate-800 overflow-hidden">
+                            <div className="px-5 py-3 border-b border-slate-800 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Calendar size={14} className="text-blue-400" />
+                                    <span className="text-white font-medium text-sm">{group.label}</span>
+                                    <span className="text-xs text-gray-600">{group.statements.length} statement{group.statements.length !== 1 ? 's' : ''}</span>
+                                </div>
+                                <span className="text-xs text-gray-500">
+                                    {group.statements.reduce((s, st) => s + (st.transaction_count || 0), 0)} txs
+                                </span>
+                            </div>
+                            <div className="divide-y divide-slate-800/50">
+                                {group.statements.map(s => {
+                                    const sc = getStatusConfig(s.status);
+                                    const StatusIcon = sc.icon;
+                                    return (
+                                        <div
+                                            key={s.id}
+                                            className="px-5 py-3 hover:bg-slate-800/40 transition-colors cursor-pointer flex items-center gap-4"
+                                            onClick={() => openStatementDetail(s.id)}
+                                        >
+                                            <FileText size={16} className="text-blue-400 flex-shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs text-white font-medium truncate">{s.original_filename}</p>
+                                                <p className="text-[10px] text-gray-600">
+                                                    {s.statement_period_start ? `${formatDate(s.statement_period_start)} — ${formatDate(s.statement_period_end)}` : 'No dates'}
+                                                </p>
+                                            </div>
+                                            {(s.account_name || s.account_number) && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 text-[10px] text-gray-400 border border-slate-700">
+                                                    <Wallet size={10} className="text-blue-400" />
+                                                    {s.account_name || `****${s.account_number?.slice(-4)}`}
+                                                </span>
+                                            )}
+                                            <span className="text-xs text-white font-mono">{s.transaction_count || 0} txs</span>
+                                            {s.opening_balance != null && (
+                                                <span className="text-xs text-gray-400 font-mono">
+                                                    {formatAmount(s.opening_balance)} → {formatAmount(s.closing_balance)}
+                                                </span>
+                                            )}
+                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${sc.color}`}>
+                                                <StatusIcon size={10} />{sc.label}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ))}
                 </div>
             ) : sortedFilteredStatements.length === 0 ? (
                 <div className="text-center py-20 bg-slate-900/30 rounded-2xl border border-slate-800">
