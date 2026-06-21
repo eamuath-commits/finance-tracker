@@ -588,9 +588,14 @@ def parse_statement(
     }
 
 
+class CommitRequest(BaseModel):
+    exclude_row_indices: Optional[List[int]] = None  # Row indices to skip (matched duplicates)
+
+
 @router.post("/{statement_id}/commit")
 def commit_statement_to_ledger(
     statement_id: str,
+    body: CommitRequest = CommitRequest(),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
@@ -598,8 +603,9 @@ def commit_statement_to_ledger(
     Commit parsed statement transactions into the master Transaction ledger.
     
     Creates Transaction records with status='draft'. They will NOT affect
-    account balances until explicitly approved. Runs deduplication checks
-    against existing transactions on the same account.
+    account balances until explicitly approved.
+    
+    Accepts optional exclude_row_indices to skip matched/duplicate transactions.
     """
     statement = db.query(models.Statement).filter(
         models.Statement.id == statement_id,
@@ -647,39 +653,22 @@ def commit_statement_to_ledger(
     if not raw_transactions:
         raise HTTPException(status_code=400, detail="No transactions found in statement")
     
-    # --- Deduplication: load existing transactions for this account in the date range ---
-    # Collect date range from parsed transactions
-    tx_dates = [tx.get("transaction_date") for tx in raw_transactions if tx.get("transaction_date")]
-    existing_lookup = set()
-    if tx_dates:
-        min_date_str = min(tx_dates)
-        max_date_str = max(tx_dates)
-        try:
-            from datetime import timedelta
-            min_dt = datetime.strptime(min_date_str.replace('/', '-'), "%Y-%m-%d") - timedelta(days=1)
-            max_dt = datetime.strptime(max_date_str.replace('/', '-'), "%Y-%m-%d") + timedelta(days=1)
-            
-            existing_txs = db.query(models.Transaction).filter(
-                models.Transaction.account_id == statement.account_id,
-                models.Transaction.source != "statement",  # Only check non-statement sources
-                models.Transaction.timestamp >= min_dt,
-                models.Transaction.timestamp <= max_dt,
-            ).all()
-            
-            # Build lookup: (date_str, amount, type) → True
-            for etx in existing_txs:
-                if etx.timestamp and etx.amount:
-                    date_key = etx.timestamp.strftime("%Y/%m/%d")
-                    existing_lookup.add((date_key, round(etx.amount, 2), etx.type))
-        except Exception as e:
-            logger.warning(f"Deduplication lookup failed: {e}")
+    # Build set of excluded row indices (from frontend duplicate detection)
+    excluded_rows = set(body.exclude_row_indices or [])
     
     # --- Create Transaction records ---
     created = []
-    duplicates_flagged = 0
     skipped = 0
+    excluded_count = 0
     
     for tx in raw_transactions:
+        row_idx = tx.get("row_index", 0)
+        
+        # Skip excluded (matched) rows
+        if row_idx in excluded_rows:
+            excluded_count += 1
+            continue
+        
         tx_date_str = tx.get("transaction_date")  # YYYY/MM/DD
         tx_time_str = tx.get("transaction_time")  # HH:MM:SS
         direction = tx.get("direction", "debit")
@@ -695,11 +684,7 @@ def commit_statement_to_ledger(
             continue
         
         # Build timestamp — use row_index for ordering within the same date
-        # Bank statements process transactions in a different order than the actual time,
-        # so we use sequential seconds based on row_index to preserve the bank's processing order.
-        # The real time is preserved in notes for reference.
         timestamp = None
-        row_idx = tx.get("row_index", 0)
         if tx_date_str:
             try:
                 date_part = tx_date_str.replace('/', '-')
@@ -715,14 +700,6 @@ def commit_statement_to_ledger(
         else:
             timestamp = datetime.utcnow()
         
-        # Deduplication check
-        is_duplicate = False
-        if tx_date_str:
-            dup_key = (tx_date_str, round(amount, 2), direction)
-            if dup_key in existing_lookup:
-                is_duplicate = True
-                duplicates_flagged += 1
-        
         # Map category from type_line
         category = map_type_to_category(tx.get("type_line", ""))
         
@@ -734,8 +711,6 @@ def commit_statement_to_ledger(
             parts.append(f"Type: {tx['type_line']}")
         if tx.get("note_text"):
             parts.append(f"Note: {tx['note_text']}")
-        if is_duplicate:
-            parts.append("⚠️ POTENTIAL DUPLICATE (matches existing SMS transaction)")
         notes_text = "\n".join(parts) if parts else None
         
         new_tx = models.Transaction(
@@ -764,7 +739,6 @@ def commit_statement_to_ledger(
             "type": new_tx.type,
             "category": category,
             "timestamp": timestamp.isoformat() if timestamp else None,
-            "is_duplicate": is_duplicate,
         })
     
     # Update statement status
@@ -773,13 +747,13 @@ def commit_statement_to_ledger(
     
     logger.info(
         f"Committed statement {statement_id}: "
-        f"{len(created)} created, {duplicates_flagged} duplicates flagged, {skipped} skipped"
+        f"{len(created)} created, {excluded_count} excluded (duplicates), {skipped} skipped"
     )
     
     return {
         "statement_id": statement.id,
         "created": len(created),
-        "duplicates_flagged": duplicates_flagged,
+        "excluded": excluded_count,
         "skipped": skipped,
         "transactions": created[:20],  # Preview first 20
     }
@@ -895,6 +869,7 @@ def get_statement_transactions(
     """
     Get parsed transactions for a statement.
     If no transactions are stored yet, re-parse the PDF on the fly.
+    Includes duplicate matching against existing DB transactions.
     """
     statement = db.query(models.Statement).filter(
         models.Statement.id == statement_id,
@@ -913,6 +888,111 @@ def get_statement_transactions(
     if parsed.get("error"):
         raise HTTPException(status_code=500, detail=f"Parse failed: {parsed['error']}")
     
+    transactions = parsed.get("transactions", [])
+    
+    # --- Duplicate Matching ---
+    # When statement is linked to an account, compare parsed rows against
+    # existing non-statement transactions to detect duplicates
+    match_summary = {"total": len(transactions), "matched": 0, "new": 0}
+    
+    if statement.account_id and transactions:
+        # Collect date range from parsed transactions
+        tx_dates = [tx.get("transaction_date") for tx in transactions if tx.get("transaction_date")]
+        
+        if tx_dates:
+            try:
+                from datetime import timedelta
+                min_date_str = min(tx_dates)
+                max_date_str = max(tx_dates)
+                min_dt = datetime.strptime(min_date_str.replace('/', '-'), "%Y-%m-%d") - timedelta(days=1)
+                max_dt = datetime.strptime(max_date_str.replace('/', '-'), "%Y-%m-%d") + timedelta(days=1)
+                
+                # Query existing non-statement transactions in the date range
+                existing_txs = db.query(models.Transaction).filter(
+                    models.Transaction.account_id == statement.account_id,
+                    models.Transaction.source != "statement",
+                    models.Transaction.timestamp >= min_dt,
+                    models.Transaction.timestamp <= max_dt,
+                ).all()
+                
+                # Build lookup: (date_str, amount_cents, type) → list of existing txs
+                # Use amount_cents to avoid float comparison issues
+                from collections import defaultdict
+                existing_lookup = defaultdict(list)
+                for etx in existing_txs:
+                    if etx.timestamp and etx.amount:
+                        date_key = etx.timestamp.strftime("%Y/%m/%d")
+                        amount_cents = round(etx.amount * 100)
+                        tx_type = str(etx.type).lower() if etx.type else "debit"
+                        existing_lookup[(date_key, amount_cents, tx_type)].append({
+                            "id": etx.id,
+                            "merchant": etx.merchant,
+                            "source": etx.source,
+                        })
+                
+                # Annotate each parsed transaction with match info
+                # Track which existing txs have been claimed to avoid double-matching
+                claimed_tx_ids = set()
+                
+                for tx in transactions:
+                    tx_date = tx.get("transaction_date")
+                    direction = tx.get("direction", "debit")
+                    
+                    if direction == "credit":
+                        amount = tx.get("credit_amount") or tx.get("amount") or 0
+                    else:
+                        amount = tx.get("debit_amount") or tx.get("amount") or 0
+                    
+                    amount_cents = round(amount * 100)
+                    lookup_key = (tx_date, amount_cents, direction)
+                    
+                    candidates = existing_lookup.get(lookup_key, [])
+                    # Find first unclaimed candidate
+                    matched = None
+                    for candidate in candidates:
+                        if candidate["id"] not in claimed_tx_ids:
+                            matched = candidate
+                            claimed_tx_ids.add(candidate["id"])
+                            break
+                    
+                    if matched:
+                        tx["match_status"] = "matched"
+                        tx["matched_tx_id"] = matched["id"]
+                        tx["matched_tx_merchant"] = matched["merchant"]
+                        tx["matched_tx_source"] = matched["source"]
+                        match_summary["matched"] += 1
+                    else:
+                        tx["match_status"] = "new"
+                        tx["matched_tx_id"] = None
+                        tx["matched_tx_merchant"] = None
+                        tx["matched_tx_source"] = None
+                        match_summary["new"] += 1
+                
+            except Exception as e:
+                logger.warning(f"Duplicate matching failed: {e}")
+                # Fallback: mark all as new
+                for tx in transactions:
+                    tx["match_status"] = "new"
+                    tx["matched_tx_id"] = None
+                    tx["matched_tx_merchant"] = None
+                    tx["matched_tx_source"] = None
+                match_summary["new"] = len(transactions)
+        else:
+            for tx in transactions:
+                tx["match_status"] = "new"
+                tx["matched_tx_id"] = None
+                tx["matched_tx_merchant"] = None
+                tx["matched_tx_source"] = None
+            match_summary["new"] = len(transactions)
+    else:
+        # No account linked — can't match
+        for tx in transactions:
+            tx["match_status"] = "new"
+            tx["matched_tx_id"] = None
+            tx["matched_tx_merchant"] = None
+            tx["matched_tx_source"] = None
+        match_summary["new"] = len(transactions)
+    
     # If statement has been committed, also fetch committed DB transactions
     # to provide their IDs and statuses for the approval UI
     committed_txs = []
@@ -928,9 +1008,10 @@ def get_statement_transactions(
     return {
         "statement_id": statement.id,
         "header": parsed.get("header"),
-        "transactions": parsed.get("transactions", []),
-        "transaction_count": len(parsed.get("transactions", [])),
+        "transactions": transactions,
+        "transaction_count": len(transactions),
         "committed_transactions": committed_txs,
+        "match_summary": match_summary,
     }
 
 

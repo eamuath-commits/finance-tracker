@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../utils/api';
-import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, ArrowLeft, ArrowUpRight, ArrowDownLeft, ChevronRight, ChevronDown, RefreshCw, Filter, Wallet, Calendar, Search, X, Download, Edit3, Check, MoreVertical, Eye, ShieldCheck } from 'lucide-react';
+import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, ArrowLeft, ArrowUpRight, ArrowDownLeft, ChevronRight, ChevronDown, RefreshCw, Filter, Wallet, Calendar, Search, X, Download, Edit3, Check, MoreVertical, Eye, ShieldCheck, Link2 } from 'lucide-react';
 
 const Statements = () => {
     const [statements, setStatements] = useState([]);
@@ -52,6 +52,9 @@ const Statements = () => {
     const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null });
     // Accounts for linking
     const [accounts, setAccounts] = useState([]);
+    // Duplicate detection state
+    const [matchSummary, setMatchSummary] = useState(null);
+    const [matchFilter, setMatchFilter] = useState('all'); // 'all' | 'new' | 'matched'
 
     const fetchStatements = useCallback(async () => {
         try {
@@ -156,6 +159,9 @@ const Statements = () => {
             ]);
             setStatementDetail(detailRes.data);
             setParsedTransactions(txRes.data.transactions || []);
+            // Store match summary from duplicate detection
+            setMatchSummary(txRes.data.match_summary || null);
+            setMatchFilter('all');
             // Store committed DB transactions for selection
             const cTxs = txRes.data.committed_transactions || [];
             setCommittedTxs(cTxs);
@@ -191,13 +197,20 @@ const Statements = () => {
 
     const handleCommitToLedger = async () => {
         if (!selectedStatement) return;
-        const txCount = parsedTransactions.length;
+        const matchedRows = parsedTransactions.filter(tx => tx.match_status === 'matched');
+        const newRows = parsedTransactions.filter(tx => tx.match_status !== 'matched');
+        const newCount = newRows.length;
+        const matchedCount = matchedRows.length;
         const acctLabel = statementDetail?.account_number ? `****${statementDetail.account_number.slice(-4)}` : 'linked account';
+        
+        const matchInfo = matchedCount > 0 
+            ? `\n\n${matchedCount} duplicate transaction${matchedCount !== 1 ? 's' : ''} (already captured via SMS) will be skipped.`
+            : '';
         
         setConfirmDialog({
             open: true,
             title: 'Commit to Ledger',
-            message: `This will create ${txCount} draft transactions in the main ledger for account ${acctLabel}.\n\nDraft transactions do NOT affect your account balance until approved.`,
+            message: `This will create ${newCount} draft transactions in the main ledger for account ${acctLabel}.${matchInfo}\n\nDraft transactions do NOT affect your account balance until approved.`,
             variant: 'primary',
             onConfirm: async () => {
                 setConfirmDialog(prev => ({ ...prev, open: false }));
@@ -205,7 +218,11 @@ const Statements = () => {
                 setCommitResult(null);
                 setError(null);
                 try {
-                    const res = await api.post(`/api/statements/${selectedStatement}/commit`);
+                    // Pass matched row indices to exclude from commit
+                    const excludeIndices = matchedRows.map(tx => tx.row_index);
+                    const res = await api.post(`/api/statements/${selectedStatement}/commit`, {
+                        exclude_row_indices: excludeIndices.length > 0 ? excludeIndices : undefined
+                    });
                     setCommitResult(res.data);
                     const detailRes = await api.get(`/api/statements/${selectedStatement}`);
                     setStatementDetail(detailRes.data);
@@ -329,6 +346,13 @@ const Statements = () => {
     const filteredParsedTx = useMemo(() => {
         let result = [...parsedTransactions];
 
+        // Match status filter
+        if (matchFilter === 'new') {
+            result = result.filter(tx => tx.match_status !== 'matched');
+        } else if (matchFilter === 'matched') {
+            result = result.filter(tx => tx.match_status === 'matched');
+        }
+
         if (txSearch.trim()) {
             const q = txSearch.toLowerCase();
             result = result.filter(tx =>
@@ -368,12 +392,12 @@ const Statements = () => {
         }
 
         return result;
-    }, [parsedTransactions, txSearch, txTypeFilter, txDateRange, txAmountMin, txAmountMax, txCountLimit]);
+    }, [parsedTransactions, txSearch, txTypeFilter, txDateRange, txAmountMin, txAmountMax, txCountLimit, matchFilter]);
 
     const totalDebits = filteredParsedTx.reduce((sum, tx) => sum + (tx.debit_amount || 0), 0);
     const totalCredits = filteredParsedTx.reduce((sum, tx) => sum + (tx.credit_amount || 0), 0);
-    const hasTxFilters = txSearch || txTypeFilter || txDateRange.start || txDateRange.end || txAmountMin || txAmountMax || txCountLimit;
-    const clearTxFilters = () => { setTxSearch(''); setTxTypeFilter(''); setTxDateRange({ start: '', end: '' }); setTxAmountMin(''); setTxAmountMax(''); setTxCountLimit(''); };
+    const hasTxFilters = txSearch || txTypeFilter || txDateRange.start || txDateRange.end || txAmountMin || txAmountMax || txCountLimit || matchFilter !== 'all';
+    const clearTxFilters = () => { setTxSearch(''); setTxTypeFilter(''); setTxDateRange({ start: '', end: '' }); setTxAmountMin(''); setTxAmountMax(''); setTxCountLimit(''); setMatchFilter('all'); };
 
     // System-computed balance: independent running balance from account's pre-statement balance
     // Uses the account's balance BEFORE statement transactions as anchor (not the bank's opening_balance)
@@ -512,7 +536,7 @@ const Statements = () => {
                             {committing ? (
                                 <><Loader2 size={14} className="animate-spin" />Committing...</>
                             ) : (
-                                <><CheckCircle2 size={14} />Commit to Ledger</>
+                                <><CheckCircle2 size={14} />Commit {matchSummary && matchSummary.matched > 0 ? `${matchSummary.new} New` : ''} to Ledger</>
                             )}
                         </button>
                     )}
@@ -759,6 +783,38 @@ const Statements = () => {
                     </div>
                 )}
 
+                {/* Match Summary Banner */}
+                {matchSummary && matchSummary.matched > 0 && statementDetail?.status === 'draft' && (
+                    <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-6">
+                            <div className="flex items-center gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full bg-emerald-400"></div>
+                                <span className="text-sm text-emerald-400 font-medium">{matchSummary.new} New</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Link2 size={14} className="text-blue-400" />
+                                <span className="text-sm text-blue-400 font-medium">{matchSummary.matched} Already Captured</span>
+                                <span className="text-xs text-gray-500">(via SMS/Webhook)</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {['all', 'new', 'matched'].map(f => (
+                                <button
+                                    key={f}
+                                    onClick={() => setMatchFilter(f)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                        matchFilter === f
+                                            ? 'bg-slate-600 text-white'
+                                            : 'bg-slate-800 text-gray-400 hover:text-white hover:bg-slate-700'
+                                    }`}
+                                >
+                                    {f === 'all' ? 'All' : f === 'new' ? `New (${matchSummary.new})` : `Matched (${matchSummary.matched})`}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* Transaction Filters Bar */}
                 {parsedTransactions.length > 0 && (
                     <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg space-y-4">
@@ -896,6 +952,7 @@ const Statements = () => {
                                         <th className="px-4 py-3 text-right">Credit</th>
                                         <th className="px-4 py-3 text-right">Bank Bal</th>
                                         <th className="px-4 py-3 text-right">System Bal</th>
+                                        {matchSummary && matchSummary.matched > 0 && <th className="px-3 py-3 text-center w-20">Match</th>}
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -904,8 +961,9 @@ const Statements = () => {
                                         const dbTx = committedTxs[tx.row_index];
                                         const isDraft = dbTx?.status === 'draft';
                                         const isApproved = dbTx?.status === 'completed';
+                                        const isMatched = tx.match_status === 'matched';
                                         return (
-                                        <tr key={idx} className={`border-b border-slate-800/50 hover:bg-slate-800/40 transition-colors ${isApproved ? 'opacity-60' : ''}`}>
+                                        <tr key={idx} className={`border-b border-slate-800/50 hover:bg-slate-800/40 transition-colors ${isApproved ? 'opacity-60' : ''} ${isMatched && !isApproved ? 'opacity-50' : ''}`}>
                                             {committedTxs.some(t => t.status === 'draft') && (
                                                 <td className="px-2 py-2.5 text-center">
                                                     {isDraft && dbTx ? (
@@ -965,6 +1023,21 @@ const Statements = () => {
                                                     );
                                                 })()}
                                             </td>
+                                            {matchSummary && matchSummary.matched > 0 && (
+                                                <td className="px-3 py-2.5 text-center">
+                                                    {isMatched ? (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20" title={`Matched: ${tx.matched_tx_merchant || ''} (${tx.matched_tx_source || 'SMS'})`}>
+                                                            <Link2 size={10} />
+                                                            Captured
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                                            New
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            )}
                                         </tr>
                                         );
                                     })}
