@@ -26,6 +26,7 @@ from webhook import router as webhook_router
 from settlement_service import router as settlement_router
 from auth_router import router as auth_router
 from alrajhi_router import router as alrajhi_router
+from statement_router import router as statement_router
 from auth_middleware import AuthMiddleware
 from auth import get_current_user
 
@@ -181,6 +182,25 @@ def run_migrations(engine):
                     conn.commit()
                 # Let create_all recreate with new schema
 
+        # --- Statement PDF Import Migrations ---
+        # Add account_number to accounts (full IBAN for statement matching)
+        if 'accounts' in inspector.get_table_names():
+            a_columns = [col['name'] for col in inspector.get_columns('accounts')]
+            if 'account_number' not in a_columns:
+                print("Migrating: Adding account_number to accounts")
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE accounts ADD COLUMN account_number VARCHAR"))
+                    conn.commit()
+
+        # Add statement_id FK to transactions
+        if 'transactions' in inspector.get_table_names():
+            t_columns = [col['name'] for col in inspector.get_columns('transactions')]
+            if 'statement_id' not in t_columns:
+                print("Migrating: Adding statement_id to transactions")
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE transactions ADD COLUMN statement_id VARCHAR"))
+                    conn.commit()
+
     except Exception as e:
         print(f"Migration failed: {e}")
 
@@ -218,6 +238,9 @@ app.include_router(settlement_router)
 # Include Al Rajhi bank integration router
 app.include_router(alrajhi_router)
 
+# Include statement PDF import router
+app.include_router(statement_router)
+
 @app.get("/")
 def read_root():
     return {"message": "Finance API is running"}
@@ -248,9 +271,14 @@ def delete_account(account_id: str, db: Session = Depends(get_db), current_user:
 
 def _recalculate_account_balance(db: Session, account_id: str):
     """
-    Internal helper: recalculate account balance from first transaction baseline.
-    Replays all transactions chronologically, fixing each balance_after_transaction.
-    Returns dict with old/new balance info, or None if account not found.
+    Internal helper: recalculate account balance from all transactions.
+    
+    Processes transactions in order:
+    1. Statement transactions sorted by (statement_id, statement_row_index) — bank processing order
+    2. Non-statement transactions sorted by timestamp
+    
+    The system computes its own balance chain independently from the bank.
+    Uses integer-cent arithmetic to avoid floating-point drift.
     """
     account = db.query(models.Account).filter(models.Account.id == account_id).first()
     if not account:
@@ -258,60 +286,70 @@ def _recalculate_account_balance(db: Session, account_id: str):
     
     old_balance = account.current_balance
     
-    transactions = db.query(models.Transaction).filter(
+    # Get all transactions on this account
+    all_txs = db.query(models.Transaction).filter(
         models.Transaction.account_id == account_id
-    ).order_by(models.Transaction.timestamp.asc()).all()
+    ).all()
     
-    if not transactions:
+    if not all_txs:
         return {"old_balance": old_balance, "new_balance": old_balance, "transaction_count": 0, "corrections": 0}
     
-    first_tx = transactions[0]
+    # Separate statement vs non-statement transactions
+    stmt_txs = [tx for tx in all_txs if tx.source == "statement" and tx.statement_row_index is not None]
+    non_stmt_txs = [tx for tx in all_txs if tx not in stmt_txs]
+    
+    # Sort statement transactions by (statement_id, statement_row_index) — bank processing order
+    stmt_txs.sort(key=lambda tx: (tx.statement_id or "", tx.statement_row_index or 0))
+    
+    # Sort non-statement transactions by timestamp
+    non_stmt_txs.sort(key=lambda tx: (tx.timestamp or datetime(2000, 1, 1)))
+    
+    # Build ordered transaction list: statement transactions first, then non-statement
+    ordered_txs = stmt_txs + non_stmt_txs
+    
+    # Use first transaction's balance_after_transaction as baseline if available
+    # Otherwise start from 0
+    first_tx = ordered_txs[0]
     baseline = first_tx.balance_after_transaction
     corrections = 0
     
     if baseline is not None:
+        # Reverse-engineer the starting balance from the first tx
         if first_tx.type == "credit":
-            running = baseline - first_tx.amount
+            running_cents = round((baseline - first_tx.amount) * 100)
         else:
-            running = baseline + first_tx.amount
+            running_cents = round((baseline + first_tx.amount) * 100)
         if first_tx.fees:
-            running += first_tx.fees
-        
-        for tx in transactions:
-            if tx.type == "credit":
-                running += tx.amount
-            else:
-                running -= tx.amount
-            if tx.fees:
-                running -= tx.fees
-            expected = round(running, 2)
-            if tx.balance_after_transaction != expected:
-                corrections += 1
-            tx.balance_after_transaction = expected
+            running_cents += round(first_tx.fees * 100)
     else:
-        running = 0
-        for tx in transactions:
-            if tx.type == "credit":
-                running += tx.amount
-            else:
-                running -= tx.amount
-            if tx.fees:
-                running -= tx.fees
-            expected = round(running, 2)
-            if tx.balance_after_transaction != expected:
-                corrections += 1
-            tx.balance_after_transaction = expected
+        running_cents = 0
     
-    account.current_balance = round(running, 2)
+    # Replay all transactions in order
+    for tx in ordered_txs:
+        amount_cents = round(tx.amount * 100)
+        fee_cents = round((tx.fees or 0) * 100)
+        if tx.type == "credit":
+            running_cents += amount_cents
+        else:
+            running_cents -= amount_cents
+        running_cents -= fee_cents
+        expected = running_cents / 100
+        if tx.balance_after_transaction != expected:
+            corrections += 1
+        tx.balance_after_transaction = expected
+    
+    account.current_balance = running_cents / 100
     db.commit()
+    
+    total_txs = len(all_txs)
     
     return {
         "old_balance": round(old_balance, 2),
         "new_balance": account.current_balance,
         "baseline": baseline,
-        "baseline_tx": first_tx.merchant or "Unknown",
-        "baseline_date": first_tx.timestamp.isoformat(),
-        "transaction_count": len(transactions),
+        "baseline_tx": first_tx.merchant or "Unknown" if first_tx else "N/A",
+        "baseline_date": first_tx.timestamp.isoformat() if first_tx and first_tx.timestamp else "N/A",
+        "transaction_count": total_txs,
         "corrections": corrections
     }
 

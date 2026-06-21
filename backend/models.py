@@ -34,6 +34,7 @@ class Account(Base):
     name = Column(String, nullable=False)
     account_type = Column(Enum(AccountType), nullable=False)
     first_4_digits = Column(String, nullable=True) # Optional for verification
+    account_number = Column(String, nullable=True)  # Full IBAN or account number (from bank statements)
     bank_name = Column(String, nullable=True) # User requested mandatory for new, but keep nullable for legacy/migration safety
     bank_logo_url = Column(String, nullable=True)
     last_4_digits = Column(String, index=True) # Critical for SMS matching (unique per user via __table_args__)
@@ -210,7 +211,9 @@ class Transaction(Base):
     logo_url = Column(String, nullable=True)
     fees = Column(Float, default=0.0)
     parsed_data = Column(Text, nullable=True)  # JSON: Full AI-extracted data from SMS
-    source = Column(String, nullable=True)  # Source of transaction: 'telegram', 'webui', 'manual'
+    source = Column(String, nullable=True)  # Source of transaction: 'telegram', 'webui', 'manual', 'statement'
+    statement_id = Column(String, ForeignKey("statements.id", ondelete="SET NULL"), nullable=True)  # FK to imported statement
+    statement_row_index = Column(Integer, nullable=True)  # PDF print order index (bank processing order)
     
     # Counterparty references (only ONE should be set per transaction)
     merchant_id = Column(String, ForeignKey("merchants.id"), nullable=True)
@@ -224,6 +227,7 @@ class Transaction(Base):
     beneficiary_ref = relationship("Beneficiary", back_populates="transactions")
     biller_ref = relationship("Biller", back_populates="transactions")
     payments = relationship("Payment", back_populates="transaction")
+    statement = relationship("Statement", back_populates="transactions")
 
 class Loan(Base):
     __tablename__ = "loans"
@@ -423,6 +427,35 @@ class TransactionQueue(Base):
     transaction = relationship("Transaction", backref="queue_entry")
     account = relationship("Account")
     credit_card = relationship("CreditCard")
+
+
+class Statement(Base):
+    """Imported bank statement (PDF) with metadata and reconciliation status"""
+    __tablename__ = "statements"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)
+    account_id = Column(String, ForeignKey("accounts.id"), nullable=True)  # Resolved after parsing
+    bank_name = Column(String, nullable=True)  # e.g. "Al Rajhi"
+    original_filename = Column(String, nullable=True)
+    file_path = Column(String, nullable=True)  # Server path to stored PDF
+    statement_period_start = Column(Date, nullable=True)
+    statement_period_end = Column(Date, nullable=True)
+    opening_balance = Column(Float, nullable=True)
+    closing_balance = Column(Float, nullable=True)
+    account_number = Column(String, nullable=True)  # Full account number from statement header
+    transaction_count = Column(Integer, default=0)
+    reconciliation_status = Column(String, default="pending")  # pending / reconciled / flagged
+    reconciliation_errors = Column(Text, nullable=True)  # JSON: details of mismatches
+    status = Column(String, default="draft")  # draft / approved / rejected
+    pdf_type = Column(String, nullable=True)  # text / scanned
+    notes = Column(Text, nullable=True)  # User-added notes/tags
+    imported_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user = relationship("User", backref="statements")
+    account = relationship("Account", backref="statements")
+    transactions = relationship("Transaction", back_populates="statement")
 
 
 class UserSettings(Base):

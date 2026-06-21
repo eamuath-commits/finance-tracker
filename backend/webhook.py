@@ -150,18 +150,18 @@ async def receive_sms(
             clean_source = "".join(filter(str.isdigit, str(source_last4)))
             if len(clean_source) >= 4:
                 source_last4 = clean_source[-4:]
-                source_credit_card = crud.get_credit_card_by_last4(db, source_last4)
+                source_credit_card = crud.get_credit_card_by_last4(db, source_last4, user_id=resolved_user_id)
                 if not source_credit_card:
-                    source_account = crud.get_account_by_last_4(db, source_last4)
+                    source_account = crud.get_account_by_last_4(db, source_last4, user_id=resolved_user_id)
         
         # Fallback to card_info
         if not source_account and not source_credit_card and result.get('card_info'):
             card_digits = "".join(filter(str.isdigit, str(result.get('card_info'))))
             if len(card_digits) >= 4:
                 source_last4 = card_digits[-4:]
-                source_credit_card = crud.get_credit_card_by_last4(db, source_last4)
+                source_credit_card = crud.get_credit_card_by_last4(db, source_last4, user_id=resolved_user_id)
                 if not source_credit_card:
-                    source_account = crud.get_account_by_last_4(db, source_last4)
+                    source_account = crud.get_account_by_last_4(db, source_last4, user_id=resolved_user_id)
         
         # Resolve user_id from matched account/card owner
         if source_credit_card and hasattr(source_credit_card, 'user_id') and source_credit_card.user_id:

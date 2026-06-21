@@ -20,6 +20,7 @@ import Merchants from './pages/Merchants';
 import Audit from './pages/Audit';
 import Settings from './pages/Settings';
 import Settlement from './pages/Settlement';
+import Statements from './pages/Statements';
 import BankCallback from './pages/BankCallback';
 import UserManagement from './pages/UserManagement';
 import Profile from './pages/Profile';
@@ -64,6 +65,7 @@ function App() {
                     <Route path="categories" element={<Categories />} />
                     <Route path="audit" element={<Audit />} />
                     <Route path="settlement" element={<Settlement />} />
+                    <Route path="statements" element={<Statements />} />
                     <Route path="settings" element={<Settings />} />
                     <Route path="bank/callback" element={<BankCallback />} />
                     <Route path="users" element={<UserManagement />} />
