@@ -1747,7 +1747,8 @@ def complete_pending_transfer(transaction_id: str, source_account_id: str, db: S
 def get_pending_transactions(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Get all pending transactions that need user action"""
     pending = db.query(models.Transaction).filter(
-        models.Transaction.status == "pending_action"
+        models.Transaction.status == "pending_action",
+        models.Transaction.user_id == current_user.id
     ).order_by(models.Transaction.timestamp.desc()).all()
     return pending
 
