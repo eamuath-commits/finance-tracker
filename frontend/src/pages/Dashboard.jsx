@@ -4,7 +4,7 @@ import { Card, SectionHeader, Modal, formatCurrency, formatCurrencyText, inputCl
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, verticalListSortingStrategy, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, TrendingUp, TrendingDown, DollarSign, Receipt, Store, ArrowUpRight, ArrowDownRight, Filter } from 'lucide-react';
+import { GripVertical, TrendingUp, TrendingDown, DollarSign, Receipt, Store, ArrowUpRight, ArrowDownRight, Filter, FileText, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Legend } from 'recharts';
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#F97316'];
@@ -361,6 +361,7 @@ const Dashboard = () => {
     const [analysis, setAnalysis] = useState(null);
     const [loading, setLoading] = useState(true);
     const [selectedAccountId, setSelectedAccountId] = useState('all');
+    const [statementHealth, setStatementHealth] = useState(null);
 
     // Modal
     const [showTransactionModal, setShowTransactionModal] = useState(false);
@@ -370,7 +371,7 @@ const Dashboard = () => {
     // Widget order
     const [widgetOrder, setWidgetOrder] = useState(() => {
         const saved = localStorage.getItem('dashboard_layout_v2');
-        return saved ? JSON.parse(saved) : ['summary', 'allocation', 'trend', 'income_expenses', 'merchants_category', 'transactions'];
+        return saved ? JSON.parse(saved) : ['summary', 'allocation', 'statement_health', 'trend', 'income_expenses', 'merchants_category', 'transactions'];
     });
 
     const sensors = useSensors(
@@ -392,16 +393,18 @@ const Dashboard = () => {
     
     const fetchData = async () => {
         try {
-            const [accRes, txRes, oblRes, analysisRes] = await Promise.all([
+            const [accRes, txRes, oblRes, analysisRes, healthRes] = await Promise.all([
                 api.get(`${API_URL}/accounts/`),
                 api.get(`${API_URL}/transactions/`),
                 api.get(`${API_URL}/obligations/`),
-                api.get(`${API_URL}/analysis/allocation`)
+                api.get(`${API_URL}/analysis/allocation`),
+                api.get('/api/statements/health/summary').catch(() => ({ data: null })),
             ]);
             setAccounts(accRes.data);
             setTransactions(txRes.data);
             setObligations(oblRes.data);
             setAnalysis(analysisRes.data);
+            if (healthRes.data) setStatementHealth(healthRes.data);
         } catch (error) {
             console.error("Error fetching data", error);
         } finally {
@@ -480,6 +483,65 @@ const Dashboard = () => {
                 </div>
             </SortableWidget>
         ),
+        statement_health: statementHealth ? (
+            <SortableWidget key="statement_health" id="statement_health">
+                <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-5 backdrop-blur-sm">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Statement Health</h3>
+                        <button onClick={() => window.location.href = '/statements'} className="text-xs text-blue-400 hover:text-blue-300 transition">View All →</button>
+                    </div>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div className="bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
+                            <div className="flex items-center gap-2 mb-1">
+                                <FileText size={14} className="text-blue-400" />
+                                <span className="text-xs text-gray-400">Total</span>
+                            </div>
+                            <p className="text-xl font-bold text-white">{statementHealth.total_statements}</p>
+                        </div>
+                        <div className="bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Clock size={14} className="text-amber-400" />
+                                <span className="text-xs text-gray-400">Pending</span>
+                            </div>
+                            <p className={`text-xl font-bold ${statementHealth.unreconciled > 0 ? 'text-amber-400' : 'text-gray-500'}`}>
+                                {statementHealth.unreconciled}
+                            </p>
+                        </div>
+                        <div className="bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
+                            <div className="flex items-center gap-2 mb-1">
+                                <CheckCircle2 size={14} className="text-emerald-400" />
+                                <span className="text-xs text-gray-400">Approved</span>
+                            </div>
+                            <p className="text-xl font-bold text-emerald-400">{statementHealth.approved}</p>
+                        </div>
+                        <div className="bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Receipt size={14} className="text-purple-400" />
+                                <span className="text-xs text-gray-400">Transactions</span>
+                            </div>
+                            <p className="text-xl font-bold text-purple-400">{statementHealth.total_transactions}</p>
+                        </div>
+                    </div>
+                    {statementHealth.recent && (
+                        <div className="mt-3 p-2.5 bg-slate-700/20 rounded-lg border border-slate-700/30">
+                            <div className="flex items-center gap-2 text-xs">
+                                <FileText size={12} className="text-gray-500" />
+                                <span className="text-gray-400">Latest:</span>
+                                <span className="text-white font-medium truncate">{statementHealth.recent.filename}</span>
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                    statementHealth.recent.status === 'approved' ? 'bg-emerald-500/15 text-emerald-400' :
+                                    statementHealth.recent.status === 'reviewed' ? 'bg-blue-500/15 text-blue-400' :
+                                    'bg-amber-500/15 text-amber-400'
+                                }`}>{statementHealth.recent.status}</span>
+                            </div>
+                        </div>
+                    )}
+                    {statementHealth.covered_months > 0 && (
+                        <p className="text-xs text-gray-500 mt-2">{statementHealth.covered_months} months covered · {statementHealth.accounts_with_statements} account(s)</p>
+                    )}
+                </div>
+            </SortableWidget>
+        ) : null,
         transactions: (
             <SortableWidget key="transactions" id="transactions">
                 <RecentTransactionsWidget transactions={filteredTransactions} openTransactionModal={openTransactionModal} />
