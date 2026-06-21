@@ -1519,5 +1519,3 @@ def get_reconciliation_timeline(
         "timeline": timeline,
         "checks": checks,
     }
-    }
-
