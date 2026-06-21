@@ -1542,10 +1542,10 @@ def export_statement_csv(
     if not statement:
         raise HTTPException(status_code=404, detail="Statement not found")
     
-    if not statement.parsed_data:
-        raise HTTPException(status_code=400, detail="No parsed data available")
+    if not statement.file_path:
+        raise HTTPException(status_code=400, detail="No PDF file available")
     
-    parsed = json.loads(statement.parsed_data)
+    parsed = parse_statement_pdf(statement.file_path)
     transactions = parsed.get("transactions", [])
     
     output = io.StringIO()
@@ -1616,10 +1616,10 @@ def detect_recurring_transactions(
     if not statement:
         raise HTTPException(status_code=404, detail="Statement not found")
     
-    if not statement.parsed_data:
+    if not statement.file_path:
         return {"patterns": [], "total_recurring": 0}
     
-    parsed = json.loads(statement.parsed_data)
+    parsed = parse_statement_pdf(statement.file_path)
     transactions = parsed.get("transactions", [])
     
     groups = defaultdict(list)
