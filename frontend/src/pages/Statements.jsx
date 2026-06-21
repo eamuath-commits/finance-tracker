@@ -604,6 +604,48 @@ const Statements = () => {
         return months;
     }, [statements]);
 
+    // ─────────────── SHARED HELPERS ───────────────
+
+    const downloadPdf = (id) => {
+        window.open(`/api/statements/${id}/pdf`, '_blank');
+    };
+
+    // Fetch PDF blob for preview
+    const loadPdfPreview = async (stmtId) => {
+        if (pdfBlobUrl) {
+            URL.revokeObjectURL(pdfBlobUrl);
+            setPdfBlobUrl(null);
+        }
+        setLoadingPdf(true);
+        try {
+            const res = await api.get(`/api/statements/${stmtId}/pdf`, { responseType: 'blob' });
+            const url = URL.createObjectURL(res.data);
+            setPdfBlobUrl(url);
+        } catch (err) {
+            console.error('PDF preview failed:', err);
+        } finally {
+            setLoadingPdf(false);
+        }
+    };
+
+    const togglePdfPreview = () => {
+        if (!showPdfPreview && !pdfBlobUrl && selectedStatement) {
+            loadPdfPreview(selectedStatement);
+        }
+        setShowPdfPreview(!showPdfPreview);
+    };
+
+    // Update transaction notes
+    const saveTransactionNote = async (txId, note) => {
+        try {
+            await api.patch(`/api/statements/transaction/${txId}/notes`, { notes: note || null });
+            setCommittedTxs(prev => prev.map(t => t.id === txId ? { ...t, notes: note || null } : t));
+        } catch (err) {
+            console.error('Failed to save note:', err);
+        }
+        setEditingNoteId(null);
+    };
+
     // ─────────────── DETAIL VIEW ───────────────
     if (selectedStatement) {
 
@@ -1658,46 +1700,6 @@ const Statements = () => {
             setError(err.response?.data?.detail || 'Status update failed');
         }
         setActionMenuId(null);
-    };
-
-    const downloadPdf = (id) => {
-        window.open(`/api/statements/${id}/pdf`, '_blank');
-    };
-
-    // Fetch PDF blob for preview
-    const loadPdfPreview = async (stmtId) => {
-        if (pdfBlobUrl) {
-            URL.revokeObjectURL(pdfBlobUrl);
-            setPdfBlobUrl(null);
-        }
-        setLoadingPdf(true);
-        try {
-            const res = await api.get(`/api/statements/${stmtId}/pdf`, { responseType: 'blob' });
-            const url = URL.createObjectURL(res.data);
-            setPdfBlobUrl(url);
-        } catch (err) {
-            console.error('PDF preview failed:', err);
-        } finally {
-            setLoadingPdf(false);
-        }
-    };
-
-    const togglePdfPreview = () => {
-        if (!showPdfPreview && !pdfBlobUrl && selectedStatement) {
-            loadPdfPreview(selectedStatement);
-        }
-        setShowPdfPreview(!showPdfPreview);
-    };
-
-    // Update transaction notes
-    const saveTransactionNote = async (txId, note) => {
-        try {
-            await api.patch(`/api/statements/transaction/${txId}/notes`, { notes: note || null });
-            setCommittedTxs(prev => prev.map(t => t.id === txId ? { ...t, notes: note || null } : t));
-        } catch (err) {
-            console.error('Failed to save note:', err);
-        }
-        setEditingNoteId(null);
     };
 
     const getStatusConfig = (status) => {
