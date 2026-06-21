@@ -1519,3 +1519,179 @@ def get_reconciliation_timeline(
         "timeline": timeline,
         "checks": checks,
     }
+
+
+# ─────────────── D: EXPORT STATEMENT AS CSV ───────────────
+
+@router.get("/{statement_id}/export")
+def export_statement_csv(
+    statement_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Export statement transactions as a CSV file."""
+    import csv
+    import io
+    from fastapi.responses import StreamingResponse
+    
+    statement = db.query(models.Statement).filter(
+        models.Statement.id == statement_id,
+        models.Statement.user_id == current_user.id,
+    ).first()
+    
+    if not statement:
+        raise HTTPException(status_code=404, detail="Statement not found")
+    
+    if not statement.parsed_data:
+        raise HTTPException(status_code=400, detail="No parsed data available")
+    
+    parsed = json.loads(statement.parsed_data)
+    transactions = parsed.get("transactions", [])
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    writer.writerow([
+        "Row", "Date", "Time", "Type", "Merchant/Beneficiary", 
+        "Debit", "Credit", "Balance", "Category", "Notes", "Match Status"
+    ])
+    
+    committed_txs = {}
+    if statement.status in ("reviewed", "approved"):
+        db_txs = db.query(models.Transaction).filter(
+            models.Transaction.statement_id == statement_id,
+        ).order_by(models.Transaction.timestamp.asc()).all()
+        for tx in db_txs:
+            if tx.statement_row_index is not None:
+                committed_txs[tx.statement_row_index] = tx
+    
+    for tx in transactions:
+        row_idx = tx.get("row_index", 0)
+        db_tx = committed_txs.get(row_idx)
+        category = tx.get("category", map_type_to_category(tx.get("type_line", "")))
+        
+        writer.writerow([
+            row_idx + 1,
+            tx.get("transaction_date", ""),
+            tx.get("transaction_time", ""),
+            tx.get("type_line", ""),
+            tx.get("merchant_or_beneficiary", tx.get("note_text", "")),
+            tx.get("debit_amount", "") if tx.get("debit_amount", 0) > 0 else "",
+            tx.get("credit_amount", "") if tx.get("credit_amount", 0) > 0 else "",
+            tx.get("balance", ""),
+            category,
+            db_tx.notes if db_tx and db_tx.notes else "",
+            tx.get("match_status", ""),
+        ])
+    
+    output.seek(0)
+    
+    filename = f"statement_{statement.original_filename or statement_id}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ─────────────── E: RECURRING TRANSACTION DETECTION ───────────────
+
+@router.get("/{statement_id}/recurring")
+def detect_recurring_transactions(
+    statement_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    Detect recurring transaction patterns in a statement.
+    Groups transactions by merchant + similar amount and flags likely recurring ones.
+    """
+    from collections import defaultdict
+    
+    statement = db.query(models.Statement).filter(
+        models.Statement.id == statement_id,
+        models.Statement.user_id == current_user.id,
+    ).first()
+    
+    if not statement:
+        raise HTTPException(status_code=404, detail="Statement not found")
+    
+    if not statement.parsed_data:
+        return {"patterns": [], "total_recurring": 0}
+    
+    parsed = json.loads(statement.parsed_data)
+    transactions = parsed.get("transactions", [])
+    
+    groups = defaultdict(list)
+    for tx in transactions:
+        merchant = (tx.get("merchant_or_beneficiary") or tx.get("note_text") or "").strip()
+        if not merchant or len(merchant) < 3:
+            continue
+        
+        amount = tx.get("debit_amount", 0) or tx.get("credit_amount", 0)
+        if amount <= 0:
+            continue
+        
+        bucket_amount = round(amount / 10) * 10
+        key = f"{merchant.lower()[:30]}|{bucket_amount}"
+        groups[key].append({
+            "row_index": tx.get("row_index"),
+            "date": tx.get("transaction_date"),
+            "merchant": merchant,
+            "amount": amount,
+            "direction": tx.get("direction", "debit"),
+            "type_line": tx.get("type_line", ""),
+        })
+    
+    patterns = []
+    for key, txs in groups.items():
+        if len(txs) < 2:
+            continue
+        
+        amounts = [t["amount"] for t in txs]
+        avg_amount = sum(amounts) / len(amounts)
+        
+        dates = []
+        for t in txs:
+            try:
+                d = datetime.strptime(t["date"], "%Y-%m-%d").date() if t["date"] else None
+                if d:
+                    dates.append(d)
+            except (ValueError, TypeError):
+                pass
+        
+        dates.sort()
+        avg_interval = None
+        frequency = "unknown"
+        if len(dates) >= 2:
+            intervals = [(dates[i+1] - dates[i]).days for i in range(len(dates)-1)]
+            avg_interval = sum(intervals) / len(intervals)
+            if avg_interval <= 1:
+                frequency = "daily"
+            elif 5 <= avg_interval <= 10:
+                frequency = "weekly"
+            elif 13 <= avg_interval <= 17:
+                frequency = "biweekly"
+            elif 25 <= avg_interval <= 35:
+                frequency = "monthly"
+            else:
+                frequency = "irregular"
+        
+        patterns.append({
+            "merchant": txs[0]["merchant"],
+            "occurrences": len(txs),
+            "average_amount": round(avg_amount, 2),
+            "total_amount": round(sum(amounts), 2),
+            "direction": txs[0]["direction"],
+            "frequency": frequency,
+            "avg_interval_days": round(avg_interval, 1) if avg_interval else None,
+            "transactions": txs,
+        })
+    
+    patterns.sort(key=lambda p: p["total_amount"], reverse=True)
+    
+    return {
+        "patterns": patterns,
+        "total_recurring": sum(p["occurrences"] for p in patterns),
+        "total_patterns": len(patterns),
+    }
