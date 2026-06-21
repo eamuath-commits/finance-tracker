@@ -661,36 +661,38 @@ function Transactions() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <div>
-                    <h1 className="text-3xl font-bold text-white">Transactions</h1>
-                    <p className="text-gray-400">View and manage your financial history</p>
+                    <h1 className="text-2xl md:text-3xl font-bold text-white">Transactions</h1>
+                    <p className="text-gray-400 text-sm md:text-base">View and manage your financial history</p>
                 </div>
             </div>
 
             {/* Tabs */}
-            <div className="flex space-x-1 bg-slate-800/50 p-1 rounded-lg w-fit border border-slate-700">
-                <button
-                    onClick={() => setActiveTab('all')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'all' ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
-                >
-                    <Calendar size={16} />
-                    All Transactions
-                </button>
-                <button
-                    onClick={() => setActiveTab('inbox')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'inbox' ? 'bg-purple-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
-                >
-                    <MessageSquare size={16} />
-                    SMS Inbox
-                </button>
-                <button
-                    onClick={() => setActiveTab('ingest')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'ingest' ? 'bg-emerald-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
-                >
-                    <Upload size={16} />
-                    SMS Ingest
-                </button>
+            <div className="overflow-x-auto tab-scroll -mx-4 px-4 md:mx-0 md:px-0">
+                <div className="flex space-x-1 bg-slate-800/50 p-1 rounded-lg w-fit border border-slate-700">
+                    <button
+                        onClick={() => setActiveTab('all')}
+                        className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'all' ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        <Calendar size={16} />
+                        <span className="hidden sm:inline">All </span>Transactions
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('inbox')}
+                        className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'inbox' ? 'bg-purple-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        <MessageSquare size={16} />
+                        SMS Inbox
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('ingest')}
+                        className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'ingest' ? 'bg-emerald-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        <Upload size={16} />
+                        SMS Ingest
+                    </button>
+                </div>
             </div>
 
             {loading ? (
@@ -698,9 +700,9 @@ function Transactions() {
             ) : activeTab === "all" ? (
                 <div className="animate-fade-in">
                     {/* Action Bar */}
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-xl font-bold text-white">Transaction Log</h2>
-                        <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+                        <h2 className="text-lg md:text-xl font-bold text-white">Transaction Log</h2>
+                        <div className="flex gap-2 flex-wrap">
                             {isSelectionMode && selectedTxIds.size > 0 && (
                                 <button
                                     onClick={handleBulkDelete}
@@ -725,7 +727,7 @@ function Transactions() {
                     </div>
 
                     {/* Month Navigation */}
-                    <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700 mb-4 flex items-center justify-between">
+                    <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700 mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                             <button
                                 onClick={() => setMonthOffset(prev => (prev ?? 0) - 1)}
@@ -870,19 +872,19 @@ function Transactions() {
                     </div>
 
                     {/* Totals Summary Bar */}
-                    <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 mb-6 flex flex-wrap gap-6 items-center justify-between">
-                        <div className="flex gap-6">
+                    <div className="bg-slate-800/50 p-3 md:p-4 rounded-xl border border-slate-700 mb-6 flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-6 items-start sm:items-center justify-between">
+                        <div className="flex flex-wrap gap-3 sm:gap-6">
                             <div className="flex items-center gap-2">
-                                <span className="text-gray-400 text-sm">Credit:</span>
-                                <span className="text-emerald-400 font-bold">+{formatCurrency(totals.totalCredit)}</span>
+                                <span className="text-gray-400 text-xs sm:text-sm">Credit:</span>
+                                <span className="text-emerald-400 font-bold text-sm sm:text-base">+{formatCurrency(totals.totalCredit)}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className="text-gray-400 text-sm">Debit:</span>
-                                <span className="text-red-400 font-bold">-{formatCurrency(totals.totalDebit)}</span>
+                                <span className="text-gray-400 text-xs sm:text-sm">Debit:</span>
+                                <span className="text-red-400 font-bold text-sm sm:text-base">-{formatCurrency(totals.totalDebit)}</span>
                             </div>
-                            <div className="flex items-center gap-2 border-l border-slate-600 pl-6">
-                                <span className="text-gray-400 text-sm">{totals.isActualBalance ? 'Balance:' : 'Net:'}</span>
-                                <span className={`font-bold ${totals.net >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            <div className="flex items-center gap-2 border-l border-slate-600 pl-3 sm:pl-6">
+                                <span className="text-gray-400 text-xs sm:text-sm">{totals.isActualBalance ? 'Balance:' : 'Net:'}</span>
+                                <span className={`font-bold text-sm sm:text-base ${totals.net >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                                     {totals.net >= 0 ? '+' : ''}{formatCurrency(totals.net)}
                                 </span>
                             </div>
@@ -938,7 +940,7 @@ function Transactions() {
                     )}
 
                     {/* Transaction Table */}
-                    <div className="bg-slate-800 rounded-xl shadow-lg border border-slate-700 overflow-x-auto">
+                    <div className="bg-slate-800 rounded-xl shadow-lg border border-slate-700 overflow-x-auto mobile-scroll">
                         <table className="min-w-full divide-y divide-slate-700">
                             <thead className="bg-slate-900">
                                 <tr>
@@ -959,17 +961,17 @@ function Transactions() {
                                         </th>
                                     )}
                                     {[
-                                        { key: 'date', label: 'Date', align: 'left' },
-                                        { key: null, label: 'From:', align: 'left' },
-                                        { key: null, label: 'To:', align: 'left' },
-                                        { key: 'category', label: 'Category', align: 'left' },
-                                        { key: 'amount', label: 'Amount', align: 'right' },
-                                        { key: 'balance', label: 'Balance', align: 'right' },
-                                        { key: null, label: 'Actions', align: 'right' },
+                                        { key: 'date', label: 'Date', align: 'left', hideClass: '' },
+                                        { key: null, label: 'From:', align: 'left', hideClass: '' },
+                                        { key: null, label: 'To:', align: 'left', hideClass: '' },
+                                        { key: 'category', label: 'Category', align: 'left', hideClass: 'hidden lg:table-cell' },
+                                        { key: 'amount', label: 'Amount', align: 'right', hideClass: '' },
+                                        { key: 'balance', label: 'Balance', align: 'right', hideClass: 'hidden md:table-cell' },
+                                        { key: null, label: 'Actions', align: 'right', hideClass: '' },
                                     ].map(col => (
                                         <th
                                             key={col.label}
-                                            className={`px-6 py-3 text-${col.align} text-xs font-medium text-gray-400 uppercase tracking-wider ${col.key ? 'cursor-pointer hover:text-white transition-colors group' : ''}`}
+                                            className={`px-3 md:px-6 py-3 text-${col.align} text-xs font-medium text-gray-400 uppercase tracking-wider ${col.key ? 'cursor-pointer hover:text-white transition-colors group' : ''} ${col.hideClass}`}
                                             onClick={col.key ? () => {
                                                 if (sortColumn === col.key) {
                                                     setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -1032,22 +1034,22 @@ function Transactions() {
                                                     />
                                                 </td>
                                             )}
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-sm text-gray-500">
                                                 <div className="flex items-center gap-2">
                                                     {tx.source === 'webui' ? (
-                                                        <Upload size={14} className="text-blue-500" title="Source: Web Ingest" />
+                                                        <Upload size={14} className="text-blue-500 hidden sm:block" title="Source: Web Ingest" />
                                                     ) : tx.source === 'telegram' || tx.raw_sms_content ? (
-                                                        <img src="/sms-icon.png" alt="SMS" className="w-4 h-4 object-contain" title="Source: Telegram/SMS" />
+                                                        <img src="/sms-icon.png" alt="SMS" className="w-4 h-4 object-contain hidden sm:block" title="Source: Telegram/SMS" />
                                                     ) : (
-                                                        <User size={14} className="text-slate-600" title="Source: Manual Entry" />
+                                                        <User size={14} className="text-slate-600 hidden sm:block" title="Source: Manual Entry" />
                                                     )}
                                                     <div>
                                                         {new Date(tx.timestamp).toLocaleDateString()}
-                                                        <div className="text-[10px] opacity-70">{new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                                        <div className="text-[10px] opacity-70 hidden sm:block">{new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                                            <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-sm text-white">
                                                 {/* For pending_action transfers with known destination, show the destination account */}
                                                 {tx.status === 'pending_action' && !acc && !cc ? (
                                                     <span className="text-amber-400 text-xs">⚠️ Unknown</span>
@@ -1067,7 +1069,7 @@ function Transactions() {
                                                     </div>
                                                 ) : <span className="text-gray-500">Unknown</span>}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                                            <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-sm text-white">
                                                 {/* For pending_action transfers, show source selection dropdown */}
                                                 {tx.status === 'pending_action' ? (
                                                     <div className="flex items-center gap-2">
@@ -1141,10 +1143,10 @@ function Transactions() {
                                                     </>
                                                 )}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                                            <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-sm text-gray-400 hidden lg:table-cell">
                                                 {tx.category ? <span className={`px-2 py-0.5 rounded text-xs border ${txIsCredit ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800' : 'bg-slate-700 text-blue-300 border-slate-600'}`}>{tx.category}</span> : '-'}
                                             </td>
-                                            <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${txIsCredit ? 'text-emerald-400' : 'text-red-400'}`}>
+                                            <td className={`px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-sm text-right font-bold ${txIsCredit ? 'text-emerald-400' : 'text-red-400'}`}>
                                                 {txIsCredit ? '+' : '-'} {formatCurrency(tx.amount)}
                                                 {tx.original_amount && tx.original_currency && tx.original_currency !== 'SAR' && (
                                                     <div className="text-[10px] text-gray-500 font-normal">({tx.original_amount} {tx.original_currency})</div>
@@ -1153,7 +1155,7 @@ function Transactions() {
                                                     <div className="text-[10px] text-amber-400 font-normal">+ {formatCurrency(tx.fees)} fees</div>
                                                 )}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-400 font-mono">
+                                            <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-sm text-right text-gray-400 font-mono hidden md:table-cell">
                                                 <div className="flex items-center justify-end gap-1">
                                                     {tx.balance_after_transaction !== null && tx.balance_after_transaction !== undefined
                                                         ? formatCurrency(tx.balance_after_transaction)
@@ -1181,7 +1183,7 @@ function Transactions() {
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                                            <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-sm text-right">
                                                 <div className="flex justify-end gap-2">
                                                     <button type="button" onClick={() => openTxModal(tx)} className="text-blue-400 hover:text-blue-300 p-1"><Edit3 size={16} /></button>
                                                     <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteTx(tx.id); }} className="text-red-400 hover:text-red-300 p-1"><Trash2 size={16} /></button>

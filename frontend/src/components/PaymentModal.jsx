@@ -80,7 +80,7 @@ const PaymentModal = ({ isOpen, onClose, obligation, initialDate, initialAmount,
                 {/* Date Selection */}
                 <div>
                     <label className="text-xs uppercase font-bold text-gray-500 mb-1 block">Billing Month</label>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <select
                             className={`${selectClass} text-sm w-full`}
                             value={getMonthIdx()}

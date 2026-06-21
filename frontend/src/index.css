@@ -3,8 +3,17 @@
 @tailwind utilities;
 
 body {
-  background-color: #f3f4f6;
+  background-color: #020617;
+  /* Prevent overscroll bounce on iOS Safari */
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
 }
+
+/* Safe area padding for notched devices (iPhone X+) */
+.safe-area-top { padding-top: env(safe-area-inset-top); }
+.safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
+.safe-area-left { padding-left: env(safe-area-inset-left); }
+.safe-area-right { padding-right: env(safe-area-inset-right); }
 
 /* Hide number input spinners */
 input[type=number]::-webkit-inner-spin-button,
@@ -73,5 +82,107 @@ input[type=number] {
     aspect-ratio: 1.586 / 1;
     padding-bottom: 0;
     height: auto;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   MOBILE RESPONSIVE UTILITIES
+   ═══════════════════════════════════════════ */
+
+/* Touch device: make hover-dependent elements always visible */
+@media (hover: none) and (pointer: coarse) {
+  .group-hover\:opacity-100,
+  .group:hover .group-hover\:opacity-100 {
+    opacity: 1 !important;
+  }
+  
+  /* Increase touch targets */
+  button, a, [role="button"] {
+    min-height: 36px;
+  }
+  
+  /* Prevent double-tap zoom on buttons */
+  button {
+    touch-action: manipulation;
+  }
+}
+
+/* Sidebar drawer animation */
+.sidebar-drawer {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-drawer.closed {
+  transform: translateX(-100%);
+}
+
+.sidebar-drawer.open {
+  transform: translateX(0);
+}
+
+/* Sidebar backdrop */
+.sidebar-backdrop {
+  transition: opacity 0.3s ease;
+}
+
+/* Mobile scroll container for tables */
+.mobile-scroll {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+}
+
+.mobile-scroll::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+/* Tab bar horizontal scroll */
+.tab-scroll {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.tab-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Prevent iOS Safari from zooming on input focus */
+@media screen and (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Mobile-specific animation */
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes slideOutLeft {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-slide-in {
+  animation: slideInLeft 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Mobile table: reduce cell padding */
+@media screen and (max-width: 640px) {
+  .mobile-compact-table th,
+  .mobile-compact-table td {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
   }
 }

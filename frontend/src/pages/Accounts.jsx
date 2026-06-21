@@ -572,15 +572,15 @@ const Accounts = () => {
 
     return (
         <div>
-            <header className="mb-6 flex justify-between items-end">
+            <header className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-2">
                 <div>
-                    <h1 className="text-3xl font-bold text-white">Accounts</h1>
-                    <p className="text-gray-400">Manage your bank accounts and credit cards</p>
+                    <h1 className="text-2xl md:text-3xl font-bold text-white">Accounts</h1>
+                    <p className="text-gray-400 text-sm md:text-base">Manage your bank accounts and credit cards</p>
                 </div>
             </header>
 
-            {/* Tabs */}
-            <div className="flex space-x-1 bg-slate-800/50 p-1 rounded-lg mb-8 w-fit border border-slate-700">
+            <div className="overflow-x-auto tab-scroll -mx-4 px-4 md:mx-0 md:px-0 mb-6 md:mb-8">
+                <div className="flex space-x-1 bg-slate-800/50 p-1 rounded-lg w-fit border border-slate-700">
                 <button
                     onClick={() => setSearchParams({ tab: 'overview' })}
                     className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'overview' ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
@@ -599,12 +599,13 @@ const Accounts = () => {
                 >
                     <Receipt size={16} /> Transactions
                 </button>
+                </div>
             </div>
 
             {/* --- OVERVIEW TAB --- */}
             {activeTab === 'overview' && (
                 <div className="animate-fade-in">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
                         <Card title="Total Net Worth" value={formatCurrency(totalBalance)} color="green" />
                         <Card title="Active Accounts" value={accounts.length} color="indigo" />
                         <Card title="Recent Transactions" value={transactions.length} color="blue" />
@@ -1002,7 +1003,7 @@ const Accounts = () => {
                 <Modal isOpen={true} title={editingTx ? "Edit Transaction" : "Add Transaction"} onClose={() => setShowTxModal(false)}>
                     <form onSubmit={handleSaveTx} className="space-y-4">
                         {/* Transaction Type Indicator */}
-                        <div className="grid grid-cols-3 gap-2 p-1 bg-slate-700 rounded-lg mb-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-1 bg-slate-700 rounded-lg mb-4">
                             <button
                                 type="button"
                                 onClick={() => setTxForm(f => ({ ...f, type: 'debit' }))}
@@ -1183,7 +1184,7 @@ const Accounts = () => {
                                 <option value="Credit Card">Credit Card</option>
                             </select>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <input type="text" placeholder="Last 4 Digits (Optional)" className={inputClass} value={accountForm.last_4_digits} onChange={e => setAccountForm({ ...accountForm, last_4_digits: e.target.value })} />
                                 <input type="number" step="0.01" placeholder="Current Balance" required className={inputClass} value={accountForm.current_balance} onChange={e => setAccountForm({ ...accountForm, current_balance: e.target.value })} />
                             </div>

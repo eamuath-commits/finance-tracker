@@ -135,7 +135,7 @@ const DebtStrategy = () => {
     return (
         <div className="space-y-6">
             <header className="mb-8">
-                <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
                     <TrendingDown className="text-red-400" size={32} />
                     Debt Strategy
                 </h1>
@@ -191,7 +191,7 @@ const DebtStrategy = () => {
                 {/* 2. Simulation Results */}
                 <Card className="md:col-span-2 relative overflow-hidden">
                     {simulationResult && (
-                        <div className="grid grid-cols-2 gap-8 h-full">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 h-full">
                             <div className="flex flex-col justify-center">
                                 <h2 className="text-sm text-gray-400 uppercase tracking-wider font-bold mb-1">Debt Free Date</h2>
                                 <div className="text-4xl font-bold text-white mb-1">

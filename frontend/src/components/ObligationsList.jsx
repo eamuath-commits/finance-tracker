@@ -593,7 +593,7 @@ const ObligationsList = ({
                     <div className="space-y-4">
                         <p className="text-gray-300 text-sm">Do you want to link this transaction to the obligation?</p>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="bg-slate-900/50 p-3 rounded border border-slate-700">
                                 <span className="text-xs uppercase text-slate-500 font-bold block mb-1">Obligation</span>
                                 <div className="font-bold text-white text-lg">{verifyMatch.obl.name}</div>

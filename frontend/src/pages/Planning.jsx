@@ -15,7 +15,7 @@ const Planning = () => {
     return (
         <div className="space-y-6">
             <header className="mb-2">
-                <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
                     {activeTab === 'DEBT' ? <TrendingDown className="text-red-400" size={32} /> : <PiggyBank className="text-green-400" size={32} />}
                     Financial Planning
                 </h1>

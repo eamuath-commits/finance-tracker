@@ -154,7 +154,7 @@ export default function Audit() {
                     <ClipboardCheck className="text-white" size={28} />
                 </div>
                 <div>
-                    <h1 className="text-3xl font-bold text-white">Balance Audit</h1>
+                    <h1 className="text-2xl md:text-3xl font-bold text-white">Balance Audit</h1>
                     <p className="text-gray-400">Verify system balance against your actual bank balance</p>
                 </div>
             </div>
@@ -277,7 +277,7 @@ export default function Audit() {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4 mb-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                                 <div className="bg-slate-900/50 rounded-xl p-4">
                                     <span className="text-xs text-gray-500 block mb-1">System Balance</span>
                                     <span className="text-lg font-bold text-white font-mono">{formatCurrency(auditResult.system_balance)}</span>
@@ -320,7 +320,7 @@ export default function Audit() {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-4 mb-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                                     <div className="bg-slate-900/50 rounded-xl p-4">
                                         <span className="text-xs text-gray-500 block mb-1">System</span>
                                         <span className="text-lg font-bold text-white font-mono">{formatCurrency(auditResult.system_balance)}</span>

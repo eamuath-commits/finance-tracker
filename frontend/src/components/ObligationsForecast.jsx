@@ -447,7 +447,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
     return (
         <div className="space-y-5 animate-fade-in">
             {/* ── Month Summary Cards ── */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {months.map(m => {
                     const total = columnTotals[m.key] || 0;
 

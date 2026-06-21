@@ -134,7 +134,7 @@ const CategoryPieChart = ({ transactions, onCategoryClick }) => {
     return (
         <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-5 backdrop-blur-sm h-full">
             <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-4">Spending by Category</h3>
-            <div className="h-64 flex items-center justify-center">
+            <div className="h-48 md:h-64 flex items-center justify-center">
                 {pieData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
@@ -195,7 +195,7 @@ const SpendingTrendChart = ({ transactions }) => {
     return (
         <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-5 backdrop-blur-sm">
             <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-4">30-Day Spending Trend</h3>
-            <div className="h-64">
+            <div className="h-48 md:h-64">
                 <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
@@ -240,7 +240,7 @@ const IncomeVsExpensesChart = ({ transactions }) => {
     return (
         <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-5 backdrop-blur-sm">
             <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-4">Income vs Expenses (6 Months)</h3>
-            <div className="h-64">
+            <div className="h-48 md:h-64">
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
@@ -269,7 +269,7 @@ const AllocationCard = ({ analysis }) => {
         <div className={`p-6 rounded-xl border backdrop-blur-sm ${isDanger ? 'bg-red-900/10 border-red-800/50' : 'bg-emerald-900/10 border-emerald-800/50'}`}>
             <h2 className={`text-lg font-bold mb-2 ${isDanger ? 'text-red-400' : 'text-emerald-400'}`}>Smart Analysis</h2>
             <p className="text-gray-300 font-medium">{analysis.message}</p>
-            <div className="grid grid-cols-3 gap-4 mt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mt-4">
                 <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700/50">
                     <p className="text-xs text-gray-400 uppercase">Liquid Cash</p>
                     <p className="text-lg font-bold text-white">{formatCurrency(analysis.liquid_cash)}</p>
@@ -310,21 +310,21 @@ const RecentTransactionsWidget = ({ transactions, openTransactionModal }) => (
             <tbody className="divide-y divide-slate-700/30">
                 {transactions.slice(0, 7).map(tx => (
                     <tr key={tx.id} className="hover:bg-slate-700/20 transition-colors">
-                        <td className="px-4 py-2.5 whitespace-nowrap text-sm text-white">
+                        <td className="px-3 md:px-4 py-2.5 whitespace-nowrap text-sm text-white">
                             <div className="flex items-center gap-2">
                                 {tx.merchant_info?.logo_url && (
-                                    <img src={tx.merchant_info.logo_url} alt="" className="w-5 h-5 rounded" onError={e => e.target.style.display = 'none'} />
+                                    <img src={tx.merchant_info.logo_url} alt="" className="w-5 h-5 rounded hidden sm:block" onError={e => e.target.style.display = 'none'} />
                                 )}
-                                <div className="flex flex-col">
-                                    <span className="font-medium">{tx.merchant_info?.name || tx.merchant || 'Unknown'}</span>
-                                    {tx.category && <span className="text-xs text-gray-500">{tx.category}</span>}
+                                <div className="flex flex-col min-w-0">
+                                    <span className="font-medium truncate max-w-[120px] sm:max-w-none">{tx.merchant_info?.name || tx.merchant || 'Unknown'}</span>
+                                    {tx.category && <span className="text-xs text-gray-500 hidden sm:inline">{tx.category}</span>}
                                 </div>
                             </div>
                         </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap text-xs text-gray-500">
+                        <td className="px-2 md:px-4 py-2.5 whitespace-nowrap text-xs text-gray-500 hidden sm:table-cell">
                             {new Date(tx.timestamp).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
                         </td>
-                        <td className={`px-4 py-2.5 whitespace-nowrap text-right text-sm font-medium ${tx.type === 'credit' ? 'text-emerald-400' : 'text-red-400'}`}>
+                        <td className={`px-3 md:px-4 py-2.5 whitespace-nowrap text-right text-sm font-medium ${tx.type === 'credit' ? 'text-emerald-400' : 'text-red-400'}`}>
                             {tx.type === 'credit' ? '+' : '-'}{formatCurrency(tx.amount)}
                         </td>
                         <td className="px-2 py-2.5 whitespace-nowrap text-right">
@@ -490,17 +490,17 @@ const Dashboard = () => {
     return (
         <div className="space-y-6">
             {/* Header with Account Filter */}
-            <header className="flex items-center justify-between">
+            <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
-                    <h1 className="text-3xl font-bold text-white">Overview</h1>
-                    <p className="text-gray-400">Welcome back, Muath</p>
+                    <h1 className="text-2xl md:text-3xl font-bold text-white">Overview</h1>
+                    <p className="text-gray-400 text-sm md:text-base">Welcome back, Muath</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
                     <Filter size={16} className="text-gray-400" />
                     <select
                         value={selectedAccountId}
                         onChange={e => setSelectedAccountId(e.target.value)}
-                        className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none min-w-[180px]"
+                        className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none w-full sm:min-w-[180px]"
                     >
                         <option value="all">All Accounts</option>
                         {accounts.map(acc => (

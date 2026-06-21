@@ -439,7 +439,7 @@ export default function Settlement() {
                     <FileSearch className="text-white" size={28} />
                 </div>
                 <div>
-                    <h1 className="text-3xl font-bold text-white">Statement Settlement</h1>
+                    <h1 className="text-2xl md:text-3xl font-bold text-white">Statement Settlement</h1>
                     <p className="text-gray-400">Upload a bank statement to find and log missing transactions</p>
                 </div>
             </div>
@@ -664,7 +664,7 @@ export default function Settlement() {
                     {previousReport && (
                         <div className="bg-slate-800/40 rounded-2xl p-5 border border-slate-700">
                             <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Before → After Rerun</h3>
-                            <div className="grid grid-cols-3 gap-4 text-center">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
                                 <div>
                                     <p className="text-xs text-gray-500 mb-1">Matched</p>
                                     <div className="flex items-center justify-center gap-2">
@@ -728,7 +728,7 @@ export default function Settlement() {
                         </div>
                         <div className="bg-slate-800/40 rounded-2xl p-5 border border-slate-700">
                             <p className="text-xs text-gray-500 uppercase font-medium mb-1">Total Bank Transactions</p>
-                            <p className="text-3xl font-bold text-white">{report.total_bank_transactions}</p>
+                            <p className="text-2xl md:text-3xl font-bold text-white">{report.total_bank_transactions}</p>
                         </div>
                         <div className="bg-emerald-500/10 rounded-2xl p-5 border border-emerald-500/20">
                             <p className="text-xs text-emerald-400/70 uppercase font-medium mb-1">Matched</p>
@@ -917,7 +917,7 @@ export default function Settlement() {
                                     <p className="text-gray-500 text-sm mt-1">All {loggedIds.size} missing transactions have been added to the system.</p>
                                 </div>
                             ) : (
-                                <div className="overflow-x-auto">
+                                <div className="overflow-x-auto mobile-scroll">
                                     <table className="w-full">
                                         <thead className="bg-slate-900/50 sticky top-0">
                                             <tr className="text-xs text-gray-500 uppercase">
@@ -1052,7 +1052,7 @@ export default function Settlement() {
                                     <p className="text-gray-500 text-sm mt-1">None of the bank statement transactions matched system records.</p>
                                 </div>
                             ) : (
-                                <div className="overflow-x-auto">
+                                <div className="overflow-x-auto mobile-scroll">
                                     <table className="w-full">
                                         <thead className="bg-slate-900/50 sticky top-0">
                                             <tr className="text-xs text-gray-500 uppercase">

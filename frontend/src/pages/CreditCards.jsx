@@ -319,13 +319,13 @@ function CreditCards() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex justify-between items-center">
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
-                        <CreditCardIcon className="text-white" size={28} />
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-600/20 rounded-lg">
+                        <CreditCard className="text-purple-400" size={24} />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-bold text-white">Credit Cards</h1>
+                        <h1 className="text-2xl md:text-3xl font-bold text-white">Credit Cards</h1>
                         <p className="text-gray-400">Manage your credit cards and track balances</p>
                     </div>
                 </div>
@@ -338,7 +338,7 @@ function CreditCards() {
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                 <div className="bg-gradient-to-br from-red-600/20 to-red-900/20 p-5 rounded-xl border border-red-600/30">
                     <div className="flex justify-between items-start">
                         <div>
@@ -463,7 +463,7 @@ function CreditCards() {
                             required
                         />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-1">Bank Name</label>
                             <input
@@ -486,7 +486,7 @@ function CreditCards() {
                             />
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-1">Current Balance</label>
                             <input
@@ -512,7 +512,7 @@ function CreditCards() {
                             <p className="text-xs text-gray-500 mt-0.5">Maximum credit</p>
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-1">Statement Day</label>
                             <input

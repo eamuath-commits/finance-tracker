@@ -141,13 +141,13 @@ function Merchants() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                     <h1 className="text-2xl font-bold text-white flex items-center gap-3">
                         <Store className="text-blue-400" size={28} />
                         Merchants
                     </h1>
-                    <p className="text-gray-400 mt-1">
+                    <p className="text-gray-400 mt-1 text-sm">
                         {merchants.length} merchants · {resolved} resolved · {merchants.length - resolved} unresolved
                     </p>
                 </div>
@@ -162,7 +162,7 @@ function Merchants() {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                 {[
                     { label: 'Total Merchants', value: merchants.length, color: 'blue' },
                     { label: 'With Brand Name', value: resolved, color: 'green' },
@@ -235,7 +235,7 @@ function Merchants() {
             )}
 
             {/* Table */}
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-x-auto mobile-scroll">
                 <table className="w-full">
                     <thead>
                         <tr className="border-b border-slate-700/50">
@@ -250,8 +250,8 @@ function Merchants() {
                                     {sortColumn === 'category' && <span className="text-blue-400">{sortDir === 'asc' ? '↑' : '↓'}</span>}
                                 </span>
                             </th>
-                            <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-5 py-3">Domain</th>
-                            <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-5 py-3">Logo</th>
+                            <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-3 md:px-5 py-3 hidden md:table-cell">Domain</th>
+                            <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-3 md:px-5 py-3 hidden sm:table-cell">Logo</th>
                             <th
                                 className="text-center text-xs font-medium text-gray-400 uppercase tracking-wider px-5 py-3 cursor-pointer hover:text-white transition-colors"
                                 onClick={() => handleSort('transactions')}
@@ -295,7 +295,7 @@ function Merchants() {
                                 <td className="px-5 py-3">
                                     <span className="text-gray-300 text-sm">{m.category || '—'}</span>
                                 </td>
-                                <td className="px-5 py-3">
+                                <td className="px-3 md:px-5 py-3 hidden md:table-cell">
                                     {m.brand_domain ? (
                                         <a href={`https://${m.brand_domain}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 text-sm hover:underline flex items-center gap-1">
                                             {m.brand_domain} <ExternalLink size={12} />
@@ -304,7 +304,7 @@ function Merchants() {
                                         <span className="text-gray-500 text-sm">—</span>
                                     )}
                                 </td>
-                                <td className="px-5 py-3">
+                                <td className="px-3 md:px-5 py-3 hidden sm:table-cell">
                                     {m.logo_url ? (
                                         <span className="text-green-400 text-xs bg-green-400/10 px-2 py-0.5 rounded-full">✓ Set</span>
                                     ) : (

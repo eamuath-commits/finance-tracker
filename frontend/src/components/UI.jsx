@@ -31,7 +31,7 @@ export const Card = ({ title, value, subtext, color = "blue", children, classNam
     // If children are provided, it's a layout card
     if (children) {
         return (
-            <div className={`bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700 ${className}`}>
+            <div className={`bg-slate-800 p-4 md:p-6 rounded-xl shadow-lg border border-slate-700 ${className}`}>
                 {title && <h3 className="text-gray-400 text-sm font-medium uppercase mb-4">{title}</h3>}
                 {children}
             </div>
@@ -40,16 +40,16 @@ export const Card = ({ title, value, subtext, color = "blue", children, classNam
 
     // Otherwise, it's a Stat Card
     return (
-        <div className={`bg-slate-800 p-6 rounded-xl shadow-lg border-l-4 border-${color}-500 ${className}`}>
+        <div className={`bg-slate-800 p-4 md:p-6 rounded-xl shadow-lg border-l-4 border-${color}-500 ${className}`}>
             <h3 className="text-gray-400 text-sm font-medium uppercase">{title}</h3>
-            <p className="text-2xl font-bold mt-2 text-white">{value}</p>
+            <p className="text-xl md:text-2xl font-bold mt-2 text-white">{value}</p>
             {subtext && <p className="text-xs text-gray-500 mt-1">{subtext}</p>}
         </div>
     );
 };
 
 export const SectionHeader = ({ title, onAdd }) => (
-    <div className="flex justify-between items-center mt-8 mb-4">
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mt-6 md:mt-8 mb-4">
         <h2 className="text-xl font-semibold text-gray-100">{title}</h2>
         {onAdd && (
             <button onClick={onAdd} className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg transition shadow-md">
@@ -85,11 +85,14 @@ export const Modal = ({ isOpen, title, children, onClose, size = "md" }) => {
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 backdrop-blur-sm">
-            <div className={`bg-slate-800 rounded-lg p-6 w-full ${sizeClasses[size] || sizeClasses.md} border border-slate-700 shadow-2xl max-h-[90vh] overflow-auto`}>
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-end sm:items-center justify-center z-50 backdrop-blur-sm p-0 sm:p-4"
+             style={{ WebkitBackdropFilter: 'blur(4px)' }}>
+            <div className={`bg-slate-800 rounded-t-2xl sm:rounded-lg p-4 sm:p-6 w-full ${sizeClasses[size] || sizeClasses.md} border border-slate-700 shadow-2xl max-h-[90vh] sm:max-h-[85vh] overflow-auto`}>
                 <div className="flex justify-between items-center mb-4">
+                    {/* Mobile drag indicator */}
+                    <div className="absolute top-2 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-slate-600 sm:hidden" />
                     <h3 className="text-lg font-bold text-white">{title}</h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">&times;</button>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl p-1">&times;</button>
                 </div>
                 {children}
             </div>

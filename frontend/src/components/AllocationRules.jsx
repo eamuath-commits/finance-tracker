@@ -117,7 +117,7 @@ const AllocationRules = ({ accounts }) => {
     return (
         <div className="space-y-5 animate-fade-in">
             {/* Stats Bar */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="bg-gradient-to-br from-blue-900/30 to-slate-900/90 border border-blue-500/20 rounded-xl p-4 shadow-lg">
                     <p className="text-[10px] text-blue-400 uppercase tracking-wider font-semibold mb-1">Total Obligations</p>
                     <p className="text-2xl font-bold text-white font-mono">{totalCount}</p>

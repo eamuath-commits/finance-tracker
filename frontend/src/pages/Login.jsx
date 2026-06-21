@@ -56,7 +56,7 @@ const Login = () => {
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                         </svg>
                     </div>
-                    <h1 className="text-3xl font-bold text-white tracking-tight">Finance Tracker</h1>
+                    <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Finance Tracker</h1>
                     <p className="text-slate-400 mt-2">Sign in to your account</p>
                 </div>
 

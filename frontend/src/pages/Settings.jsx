@@ -154,7 +154,7 @@ const Settings = () => {
         <div className="max-w-2xl mx-auto">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
                     <SettingsIcon size={28} className="text-blue-400" />
                     Settings
                 </h1>
@@ -214,7 +214,7 @@ const Settings = () => {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div className="bg-slate-800/50 rounded-lg px-3 py-2">
                                         <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Linked Since</p>
                                         <p className="text-slate-300 text-xs font-mono mt-0.5">{formatDate(bankStatus.linked_at)}</p>
@@ -264,7 +264,7 @@ const Settings = () => {
                             {syncResult && (
                                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
                                     <p className="text-blue-300 text-sm font-semibold mb-2">Last Sync Results</p>
-                                    <div className="grid grid-cols-3 gap-2 text-center">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center">
                                         <div>
                                             <p className="text-lg font-bold text-white">{syncResult.accounts_found}</p>
                                             <p className="text-[10px] text-slate-400">Accounts</p>

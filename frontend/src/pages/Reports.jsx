@@ -67,12 +67,12 @@ const Reports = () => {
 
     return (
         <div>
-            <header className="mb-8">
-                <h1 className="text-3xl font-bold text-white">Financial Reports</h1>
-                <p className="text-gray-400">Analyze your spending patterns and trends.</p>
+            <header className="mb-6 md:mb-8">
+                <h1 className="text-2xl md:text-3xl font-bold text-white">Financial Reports</h1>
+                <p className="text-gray-400 text-sm md:text-base">Analyze your spending patterns and trends.</p>
             </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
                 <Card title="Total Tracked Spending" value={formatCurrency(totalSpent)} color="blue" />
                 <Card title="Average Transaction" value={formatCurrency(totalSpent / (transactions.length || 1))} color="indigo" />
                 <Card title="Total Transactions" value={transactions.length} color="purple" />
@@ -81,9 +81,9 @@ const Reports = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
 
                 {/* Monthly Trend Chart */}
-                <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
-                    <h3 className="text-xl font-bold text-white mb-6">Monthly Spending Trend</h3>
-                    <div className="h-64">
+                <div className="bg-slate-800 p-4 md:p-6 rounded-xl border border-slate-700 shadow-lg">
+                    <h3 className="text-lg md:text-xl font-bold text-white mb-4 md:mb-6">Monthly Spending Trend</h3>
+                    <div className="h-48 md:h-64">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={monthlyData}>
                                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
@@ -100,9 +100,9 @@ const Reports = () => {
                 </div>
 
                 {/* Category Pie Chart */}
-                <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
-                    <h3 className="text-xl font-bold text-white mb-6">Spending by Category</h3>
-                    <div className="h-64 flex justify-center items-center">
+                <div className="bg-slate-800 p-4 md:p-6 rounded-xl border border-slate-700 shadow-lg">
+                    <h3 className="text-lg md:text-xl font-bold text-white mb-4 md:mb-6">Spending by Category</h3>
+                    <div className="h-48 md:h-64 flex justify-center items-center">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie
@@ -132,7 +132,7 @@ const Reports = () => {
             </div>
 
             <SectionHeader title="Category Breakdown Details" />
-            <div className="bg-slate-800 rounded-xl shadow-lg border border-slate-700 overflow-hidden mb-8">
+            <div className="bg-slate-800 rounded-xl shadow-lg border border-slate-700 overflow-x-auto mobile-scroll mb-8">
                 <table className="min-w-full divide-y divide-slate-700">
                     <thead className="bg-slate-900">
                         <tr>

@@ -378,7 +378,7 @@ const Obligations = () => {
             {/* --- MAIN HEADER & TAB SWITCHER --- */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
                 <div>
-                    <h1 className="text-3xl font-bold text-white">Monthly Obligations</h1>
+                    <h1 className="text-2xl md:text-3xl font-bold text-white">Monthly Obligations</h1>
                     <p className="text-gray-400">Track and manage your recurring commitments</p>
                 </div>
 
@@ -415,7 +415,7 @@ const Obligations = () => {
             {activeTab === 'obligations' && (
                 <div className="animate-fade-in">
                     {/* Sub-Navigation (2 Views) */}
-                    <div className="flex justify-between items-center mb-6 bg-slate-800/50 p-2 rounded-xl border border-slate-700">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 bg-slate-800/50 p-2 rounded-xl border border-slate-700">
                         <div className="flex gap-2">
                             <button onClick={() => setViewMode('manager')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${viewMode === 'manager' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-gray-400 hover:text-white hover:bg-slate-700/50'}`}>
                                 <LayoutGrid size={16} /> Manager
@@ -429,7 +429,7 @@ const Obligations = () => {
                         </div>
 
                         {/* Shared Controls: Category Filter + Month Nav */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                             {/* Category Filter (universal across all views) */}
                             <select
                                 className="bg-slate-800 text-xs text-gray-300 border border-slate-600 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 mr-1"
@@ -516,7 +516,7 @@ const Obligations = () => {
             {showObligationModal && (
                 <Modal isOpen={true} title={editingId ? "Edit Obligation" : "Add Obligation"} onClose={() => setShowObligationModal(false)}>
                     <form onSubmit={handleSaveObligation} className="space-y-4">
-                        <div className="flex gap-4">
+                        <div className="flex flex-col sm:flex-row gap-4">
                             <input type="text" placeholder="Provider (e.g. STC)" className={`${inputClass} flex-1`} value={obligationForm.provider || ''} onChange={e => setObligationForm({ ...obligationForm, provider: e.target.value })} />
                             <input type="text" placeholder="Name (e.g. Internet)" required className={`${inputClass} flex-1`} value={obligationForm.name} onChange={e => setObligationForm({ ...obligationForm, name: e.target.value })} />
                         </div>
