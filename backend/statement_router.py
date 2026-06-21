@@ -1185,3 +1185,205 @@ def validate_statement(
         "row_errors": row_errors[:20],  # Cap at 20 for response size
         "row_error_count": len(row_errors),
     }
+
+
+@router.get("/reconciliation/{account_id}")
+def get_reconciliation_timeline(
+    account_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    Build a reconciliation timeline for an account showing all statements,
+    gaps between them, and balance continuity checks.
+    """
+    # Verify account belongs to user
+    account = db.query(models.Account).filter(
+        models.Account.id == account_id,
+        models.Account.user_id == current_user.id,
+    ).first()
+    
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    # Get all statements for this account, ordered by period start
+    statements = db.query(models.Statement).filter(
+        models.Statement.account_id == account_id,
+        models.Statement.user_id == current_user.id,
+    ).order_by(models.Statement.statement_period_start.asc()).all()
+    
+    if not statements:
+        return {
+            "account_id": account_id,
+            "account_name": f"{account.name} ****{account.last_4_digits}",
+            "current_balance": account.current_balance,
+            "timeline": [],
+            "checks": [],
+        }
+    
+    from datetime import timedelta
+    from sqlalchemy import func
+    
+    timeline = []
+    checks = []
+    
+    for i, stmt in enumerate(statements):
+        # Add statement block
+        # Count committed transactions for this statement
+        stmt_tx_count = db.query(models.Transaction).filter(
+            models.Transaction.statement_id == stmt.id,
+        ).count()
+        
+        timeline.append({
+            "type": "statement",
+            "statement_id": stmt.id,
+            "filename": stmt.original_filename,
+            "period_start": stmt.statement_period_start.isoformat() if stmt.statement_period_start else None,
+            "period_end": stmt.statement_period_end.isoformat() if stmt.statement_period_end else None,
+            "opening_balance": stmt.opening_balance,
+            "closing_balance": stmt.closing_balance,
+            "transaction_count": stmt_tx_count or stmt.transaction_count,
+            "status": stmt.status,
+        })
+        
+        # Check balance continuity with previous statement
+        if i > 0:
+            prev = statements[i - 1]
+            if prev.closing_balance is not None and stmt.opening_balance is not None:
+                prev_close_cents = round(prev.closing_balance * 100)
+                this_open_cents = round(stmt.opening_balance * 100)
+                is_match = prev_close_cents == this_open_cents
+                
+                # Also check if SMS transactions in the gap explain the difference
+                gap_start = prev.statement_period_end + timedelta(days=1) if prev.statement_period_end else None
+                gap_end = stmt.statement_period_start - timedelta(days=1) if stmt.statement_period_start else None
+                
+                gap_net_cents = 0
+                gap_sms_count = 0
+                if gap_start and gap_end and gap_start <= gap_end:
+                    gap_credits = db.query(func.coalesce(func.sum(models.Transaction.amount), 0)).filter(
+                        models.Transaction.account_id == account_id,
+                        models.Transaction.source != "statement",
+                        models.Transaction.type == "credit",
+                        models.Transaction.timestamp >= datetime.combine(gap_start, datetime.min.time()),
+                        models.Transaction.timestamp <= datetime.combine(gap_end, datetime.max.time()),
+                    ).scalar()
+                    gap_debits = db.query(func.coalesce(func.sum(models.Transaction.amount), 0)).filter(
+                        models.Transaction.account_id == account_id,
+                        models.Transaction.source != "statement",
+                        models.Transaction.type == "debit",
+                        models.Transaction.timestamp >= datetime.combine(gap_start, datetime.min.time()),
+                        models.Transaction.timestamp <= datetime.combine(gap_end, datetime.max.time()),
+                    ).scalar()
+                    gap_sms_count = db.query(models.Transaction).filter(
+                        models.Transaction.account_id == account_id,
+                        models.Transaction.source != "statement",
+                        models.Transaction.timestamp >= datetime.combine(gap_start, datetime.min.time()),
+                        models.Transaction.timestamp <= datetime.combine(gap_end, datetime.max.time()),
+                    ).count()
+                    gap_net_cents = round(gap_credits * 100) - round(gap_debits * 100)
+                
+                # Check if prev_close + gap_net == this_open
+                adjusted_close_cents = prev_close_cents + gap_net_cents
+                is_match_with_gap = adjusted_close_cents == this_open_cents
+                
+                checks.append({
+                    "type": "balance_continuity",
+                    "from_statement_id": prev.id,
+                    "to_statement_id": stmt.id,
+                    "from_closing": prev.closing_balance,
+                    "to_opening": stmt.opening_balance,
+                    "gap_sms_count": gap_sms_count,
+                    "gap_net_amount": gap_net_cents / 100,
+                    "expected_opening": adjusted_close_cents / 100,
+                    "pass": is_match or is_match_with_gap,
+                    "direct_match": is_match,
+                    "discrepancy": round((this_open_cents - adjusted_close_cents) / 100, 2),
+                })
+        
+        # Add gap block between this statement and the next
+        if i < len(statements) - 1:
+            next_stmt = statements[i + 1]
+            gap_start = stmt.statement_period_end + timedelta(days=1) if stmt.statement_period_end else None
+            gap_end = next_stmt.statement_period_start - timedelta(days=1) if next_stmt.statement_period_start else None
+            
+            if gap_start and gap_end and gap_start <= gap_end:
+                # Count SMS transactions in the gap
+                gap_tx_count = db.query(models.Transaction).filter(
+                    models.Transaction.account_id == account_id,
+                    models.Transaction.source != "statement",
+                    models.Transaction.timestamp >= datetime.combine(gap_start, datetime.min.time()),
+                    models.Transaction.timestamp <= datetime.combine(gap_end, datetime.max.time()),
+                ).count()
+                
+                gap_credits = db.query(func.coalesce(func.sum(models.Transaction.amount), 0)).filter(
+                    models.Transaction.account_id == account_id,
+                    models.Transaction.source != "statement",
+                    models.Transaction.type == "credit",
+                    models.Transaction.timestamp >= datetime.combine(gap_start, datetime.min.time()),
+                    models.Transaction.timestamp <= datetime.combine(gap_end, datetime.max.time()),
+                ).scalar()
+                gap_debits = db.query(func.coalesce(func.sum(models.Transaction.amount), 0)).filter(
+                    models.Transaction.account_id == account_id,
+                    models.Transaction.source != "statement",
+                    models.Transaction.type == "debit",
+                    models.Transaction.timestamp >= datetime.combine(gap_start, datetime.min.time()),
+                    models.Transaction.timestamp <= datetime.combine(gap_end, datetime.max.time()),
+                ).scalar()
+                
+                timeline.append({
+                    "type": "gap",
+                    "gap_start": gap_start.isoformat(),
+                    "gap_end": gap_end.isoformat(),
+                    "gap_days": (gap_end - gap_start).days + 1,
+                    "sms_transaction_count": gap_tx_count,
+                    "sms_credits": round(float(gap_credits), 2),
+                    "sms_debits": round(float(gap_debits), 2),
+                    "sms_net_amount": round(float(gap_credits) - float(gap_debits), 2),
+                })
+    
+    # Add trailing gap (after last statement to today)
+    last_stmt = statements[-1]
+    if last_stmt.statement_period_end:
+        trailing_start = last_stmt.statement_period_end + timedelta(days=1)
+        today = date.today()
+        
+        if trailing_start <= today:
+            trailing_tx_count = db.query(models.Transaction).filter(
+                models.Transaction.account_id == account_id,
+                models.Transaction.source != "statement",
+                models.Transaction.timestamp >= datetime.combine(trailing_start, datetime.min.time()),
+            ).count()
+            
+            trailing_credits = db.query(func.coalesce(func.sum(models.Transaction.amount), 0)).filter(
+                models.Transaction.account_id == account_id,
+                models.Transaction.source != "statement",
+                models.Transaction.type == "credit",
+                models.Transaction.timestamp >= datetime.combine(trailing_start, datetime.min.time()),
+            ).scalar()
+            trailing_debits = db.query(func.coalesce(func.sum(models.Transaction.amount), 0)).filter(
+                models.Transaction.account_id == account_id,
+                models.Transaction.source != "statement",
+                models.Transaction.type == "debit",
+                models.Transaction.timestamp >= datetime.combine(trailing_start, datetime.min.time()),
+            ).scalar()
+            
+            timeline.append({
+                "type": "gap",
+                "gap_start": trailing_start.isoformat(),
+                "gap_end": today.isoformat(),
+                "gap_days": (today - trailing_start).days + 1,
+                "sms_transaction_count": trailing_tx_count,
+                "sms_credits": round(float(trailing_credits), 2),
+                "sms_debits": round(float(trailing_debits), 2),
+                "sms_net_amount": round(float(trailing_credits) - float(trailing_debits), 2),
+            })
+    
+    return {
+        "account_id": account_id,
+        "account_name": f"{account.name} ****{account.last_4_digits}",
+        "current_balance": account.current_balance,
+        "statement_count": len(statements),
+        "timeline": timeline,
+        "checks": checks,
+    }

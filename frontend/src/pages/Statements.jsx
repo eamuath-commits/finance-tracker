@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../utils/api';
-import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, ArrowLeft, ArrowUpRight, ArrowDownLeft, ChevronRight, ChevronDown, RefreshCw, Filter, Wallet, Calendar, Search, X, Download, Edit3, Check, MoreVertical, Eye, ShieldCheck, Link2 } from 'lucide-react';
+import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, ArrowLeft, ArrowUpRight, ArrowDownLeft, ChevronRight, ChevronDown, RefreshCw, Filter, Wallet, Calendar, Search, X, Download, Edit3, Check, MoreVertical, Eye, ShieldCheck, Link2, GitBranch } from 'lucide-react';
 
 const Statements = () => {
     const [statements, setStatements] = useState([]);
@@ -55,6 +55,9 @@ const Statements = () => {
     // Duplicate detection state
     const [matchSummary, setMatchSummary] = useState(null);
     const [matchFilter, setMatchFilter] = useState('all'); // 'all' | 'new' | 'matched'
+    // Reconciliation timeline state
+    const [timelineData, setTimelineData] = useState(null);
+    const [showTimeline, setShowTimeline] = useState(false);
 
     const fetchStatements = useCallback(async () => {
         try {
@@ -167,6 +170,18 @@ const Statements = () => {
             setCommittedTxs(cTxs);
             // Auto-select all draft transactions
             setSelectedTxIds(new Set(cTxs.filter(t => t.status === 'draft').map(t => t.id)));
+            // Fetch reconciliation timeline if statement is linked to an account
+            if (detailRes.data.account_id) {
+                try {
+                    const tlRes = await api.get(`/api/statements/reconciliation/${detailRes.data.account_id}`);
+                    setTimelineData(tlRes.data);
+                } catch (e) {
+                    console.warn('Timeline fetch failed:', e);
+                    setTimelineData(null);
+                }
+            } else {
+                setTimelineData(null);
+            }
         } catch (err) {
             setError('Failed to load statement details');
         } finally {
@@ -780,6 +795,158 @@ const Statements = () => {
                                 {hasTxFilters ? `${filteredParsedTx.length} / ${parsedTransactions.length}` : parsedTransactions.length}
                             </p>
                         </div>
+                    </div>
+                )}
+
+                {/* Reconciliation Timeline */}
+                {timelineData && timelineData.timeline.length > 0 && (
+                    <div className="bg-slate-900/80 rounded-xl border border-slate-800 overflow-hidden">
+                        <button
+                            onClick={() => setShowTimeline(!showTimeline)}
+                            className="w-full px-5 py-3 flex items-center justify-between hover:bg-slate-800/50 transition-colors"
+                        >
+                            <div className="flex items-center gap-2">
+                                <GitBranch size={16} className="text-purple-400" />
+                                <span className="text-white font-medium text-sm">Account Timeline</span>
+                                <span className="text-xs text-gray-500">{timelineData.account_name}</span>
+                                <span className="text-xs text-gray-600">•</span>
+                                <span className="text-xs text-gray-500">{timelineData.statement_count} statement{timelineData.statement_count !== 1 ? 's' : ''}</span>
+                                {timelineData.checks.length > 0 && (
+                                    <span className={`text-xs px-2 py-0.5 rounded-full ${timelineData.checks.every(c => c.pass) ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                                        {timelineData.checks.every(c => c.pass) ? '✅ All Checks Pass' : `⚠️ ${timelineData.checks.filter(c => !c.pass).length} Issue${timelineData.checks.filter(c => !c.pass).length !== 1 ? 's' : ''}`}
+                                    </span>
+                                )}
+                            </div>
+                            <ChevronDown size={16} className={`text-gray-400 transition-transform ${showTimeline ? 'rotate-180' : ''}`} />
+                        </button>
+                        {showTimeline && (
+                            <div className="px-5 pb-5">
+                                {/* Horizontal timeline */}
+                                <div className="flex items-stretch gap-0 overflow-x-auto pb-3 pt-2">
+                                    {timelineData.timeline.map((block, idx) => {
+                                        const isCurrent = block.type === 'statement' && block.statement_id === selectedStatement;
+                                        if (block.type === 'statement') {
+                                            const periodLabel = block.period_start && block.period_end
+                                                ? `${new Date(block.period_start).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })} — ${new Date(block.period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                                                : 'No dates';
+                                            const statusColor = block.status === 'approved'
+                                                ? 'border-emerald-500/40 bg-emerald-500/5'
+                                                : block.status === 'reviewed'
+                                                    ? 'border-blue-500/40 bg-blue-500/5'
+                                                    : 'border-slate-700 bg-slate-800/50';
+                                            return (
+                                                <React.Fragment key={idx}>
+                                                    <div
+                                                        className={`flex-shrink-0 rounded-xl border-2 p-4 min-w-[180px] cursor-pointer transition-all hover:bg-slate-700/30 ${
+                                                            isCurrent ? 'border-purple-500/60 bg-purple-500/10 ring-1 ring-purple-500/30' : statusColor
+                                                        }`}
+                                                        onClick={() => { if (!isCurrent) openStatementDetail(block.statement_id); }}
+                                                    >
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <FileText size={14} className={isCurrent ? 'text-purple-400' : 'text-gray-400'} />
+                                                            <span className={`text-xs font-medium ${isCurrent ? 'text-purple-300' : 'text-gray-300'}`}>Statement</span>
+                                                            {isCurrent && <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">Current</span>}
+                                                        </div>
+                                                        <p className="text-xs text-gray-400 mb-1">{periodLabel}</p>
+                                                        <div className="flex justify-between items-baseline">
+                                                            <span className="text-sm font-mono text-white">{formatAmount(block.opening_balance)}</span>
+                                                            <span className="text-[10px] text-gray-500">→</span>
+                                                            <span className="text-sm font-mono text-white">{formatAmount(block.closing_balance)}</span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between mt-2">
+                                                            <span className="text-[10px] text-gray-500">{block.transaction_count} txs</span>
+                                                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                                                block.status === 'approved' ? 'bg-emerald-500/10 text-emerald-400'
+                                                                : block.status === 'reviewed' ? 'bg-blue-500/10 text-blue-400'
+                                                                : 'bg-slate-700 text-gray-400'
+                                                            }`}>{block.status}</span>
+                                                        </div>
+                                                    </div>
+                                                    {/* Continuity arrow between statements */}
+                                                    {idx < timelineData.timeline.length - 1 && (
+                                                        <div className="flex items-center flex-shrink-0 px-1">
+                                                            {(() => {
+                                                                const nextBlock = timelineData.timeline[idx + 1];
+                                                                // Find continuity check for this pair
+                                                                const check = nextBlock?.type === 'statement'
+                                                                    ? timelineData.checks.find(c => c.from_statement_id === block.statement_id && c.to_statement_id === nextBlock.statement_id)
+                                                                    : null;
+                                                                return (
+                                                                    <div className="flex flex-col items-center gap-0.5">
+                                                                        <div className={`w-8 h-0.5 ${check ? (check.pass ? 'bg-emerald-500/50' : 'bg-amber-500/50') : 'bg-slate-700'}`}></div>
+                                                                        {check && (
+                                                                            <span className={`text-[9px] ${check.pass ? 'text-emerald-500' : 'text-amber-400'}`}>
+                                                                                {check.pass ? '✓' : `Δ ${check.discrepancy}`}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    )}
+                                                </React.Fragment>
+                                            );
+                                        } else {
+                                            // Gap block
+                                            return (
+                                                <React.Fragment key={idx}>
+                                                    <div className="flex items-center flex-shrink-0 px-1">
+                                                        <div className="w-6 h-0.5 bg-slate-700 border-dashed"></div>
+                                                    </div>
+                                                    <div className="flex-shrink-0 rounded-xl border border-dashed border-slate-700 bg-slate-800/30 p-3 min-w-[140px]">
+                                                        <div className="flex items-center gap-1.5 mb-1.5">
+                                                            <Clock size={12} className="text-gray-500" />
+                                                            <span className="text-[10px] text-gray-500 font-medium">Gap</span>
+                                                            <span className="text-[10px] text-gray-600">{block.gap_days}d</span>
+                                                        </div>
+                                                        {block.sms_transaction_count > 0 ? (
+                                                            <>
+                                                                <p className="text-xs text-gray-400">{block.sms_transaction_count} SMS tx{block.sms_transaction_count !== 1 ? 's' : ''}</p>
+                                                                <p className={`text-xs font-mono mt-0.5 ${block.sms_net_amount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                                    {block.sms_net_amount >= 0 ? '+' : ''}{formatAmount(block.sms_net_amount)}
+                                                                </p>
+                                                            </>
+                                                        ) : (
+                                                            <p className="text-[10px] text-gray-600">No transactions</p>
+                                                        )}
+                                                    </div>
+                                                    {idx < timelineData.timeline.length - 1 && (
+                                                        <div className="flex items-center flex-shrink-0 px-1">
+                                                            <div className="w-6 h-0.5 bg-slate-700"></div>
+                                                        </div>
+                                                    )}
+                                                </React.Fragment>
+                                            );
+                                        }
+                                    })}
+                                </div>
+
+                                {/* Continuity checks detail */}
+                                {timelineData.checks.length > 0 && (
+                                    <div className="mt-3 pt-3 border-t border-slate-800">
+                                        <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-2">Balance Continuity Checks</p>
+                                        <div className="space-y-1.5">
+                                            {timelineData.checks.map((check, i) => (
+                                                <div key={i} className={`flex items-center gap-3 text-xs px-3 py-2 rounded-lg ${check.pass ? 'bg-emerald-500/5' : 'bg-amber-500/5'}`}>
+                                                    <span className={check.pass ? 'text-emerald-400' : 'text-amber-400'}>{check.pass ? '✅' : '⚠️'}</span>
+                                                    <span className="text-gray-400">
+                                                        Closing {formatAmount(check.from_closing)}
+                                                        {check.gap_sms_count > 0 && (
+                                                            <span className="text-gray-500"> + {check.gap_sms_count} SMS txs ({check.gap_net_amount >= 0 ? '+' : ''}{formatAmount(check.gap_net_amount)})</span>
+                                                        )}
+                                                        {' → '}
+                                                        Opening {formatAmount(check.to_opening)}
+                                                    </span>
+                                                    {!check.pass && (
+                                                        <span className="text-amber-400 font-medium">Δ {formatAmount(check.discrepancy)} SAR</span>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 
