@@ -834,7 +834,7 @@ def commit_statement_to_ledger(
             source="statement",
             statement_id=statement.id,
             statement_row_index=tx.get("row_index"),
-            status="draft",
+            status="completed",
             fees=0.0,
         )
         db.add(new_tx)
@@ -847,13 +847,31 @@ def commit_statement_to_ledger(
             "timestamp": timestamp.isoformat() if timestamp else None,
         })
     
-    # Update statement status
-    statement.status = "reviewed"
+    # Auto-approve: mark statement as approved
+    statement.status = "approved"
+    db.flush()
+    
+    # Recalculate account balance
+    old_balance = None
+    new_balance = None
+    if statement.account_id:
+        account = db.query(models.Account).filter(
+            models.Account.id == statement.account_id
+        ).first()
+        if account:
+            old_balance = round(account.current_balance or 0, 2)
+        
+        from main import _recalculate_account_balance
+        result = _recalculate_account_balance(db, statement.account_id)
+        if result:
+            new_balance = result.get("new_balance")
+    
     db.commit()
     
     logger.info(
         f"Committed statement {statement_id}: "
-        f"{len(created)} created, {excluded_count} excluded (duplicates), {skipped} skipped"
+        f"{len(created)} created, {excluded_count} excluded (duplicates), {skipped} skipped, "
+        f"balance {old_balance} → {new_balance}"
     )
     
     return {
@@ -861,7 +879,10 @@ def commit_statement_to_ledger(
         "created": len(created),
         "excluded": excluded_count,
         "skipped": skipped,
+        "old_balance": old_balance,
+        "new_balance": new_balance,
         "transactions": created[:20],  # Preview first 20
+        "message": f"{len(created)} transactions committed and approved. Balance updated.",
     }
 
 
