@@ -789,18 +789,29 @@ def commit_statement_to_ledger(
             skipped += 1
             continue
         
-        # Build timestamp — use row_index for ordering within the same date
+        # Build timestamp — prefer actual time from PDF, fall back to row_index for ordering
         timestamp = None
         if tx_date_str:
             try:
                 date_part = tx_date_str.replace('/', '-')
-                # Use row_index as seconds within the day to preserve bank order
-                hour = (row_idx // 3600) % 24
-                minute = (row_idx % 3600) // 60
-                second = row_idx % 60
-                timestamp = datetime.strptime(date_part, "%Y-%m-%d").replace(
-                    hour=hour, minute=minute, second=second
-                )
+                if tx_time_str:
+                    # Use actual time from the statement PDF
+                    try:
+                        timestamp = datetime.strptime(f"{date_part} {tx_time_str}", "%Y-%m-%d %H:%M:%S")
+                    except ValueError:
+                        try:
+                            timestamp = datetime.strptime(f"{date_part} {tx_time_str}", "%Y-%m-%d %H:%M")
+                        except ValueError:
+                            timestamp = None
+                
+                if not timestamp:
+                    # Fallback: use row_index for ordering within the same date
+                    hour = (row_idx // 3600) % 24
+                    minute = (row_idx % 3600) // 60
+                    second = row_idx % 60
+                    timestamp = datetime.strptime(date_part, "%Y-%m-%d").replace(
+                        hour=hour, minute=minute, second=second
+                    )
             except ValueError:
                 timestamp = datetime.utcnow()
         else:
