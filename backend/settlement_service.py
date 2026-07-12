@@ -25,6 +25,7 @@ import models
 import schemas
 import crud
 from database import get_db
+from auth import get_current_user
 
 logger = logging.getLogger("settlement")
 
@@ -1234,7 +1235,8 @@ def match_transactions(
 async def upload_and_reconcile(
     file: UploadFile = File(...),
     account_id: str = Form(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     """
     Upload a bank statement file and reconcile against system transactions.
@@ -1249,7 +1251,10 @@ async def upload_and_reconcile(
     if is_all_accounts:
         account_name = "All Accounts"
     else:
-        account = db.query(models.Account).filter(models.Account.id == account_id).first()
+        account = db.query(models.Account).filter(
+            models.Account.id == account_id,
+            models.Account.user_id == current_user.id,
+        ).first()
         if not account:
             raise HTTPException(status_code=404, detail="Account not found")
         account_name = account.name
@@ -1299,8 +1304,9 @@ async def upload_and_reconcile(
     search_start = min_date - timedelta(days=7)
     search_end = max_date + timedelta(days=7)
 
-    # Query system transactions within the date range
+    # Query system transactions within the date range, scoped to the caller.
     tx_query = db.query(models.Transaction).filter(
+        models.Transaction.user_id == current_user.id,
         models.Transaction.timestamp >= search_start,
         models.Transaction.timestamp <= search_end
     )
@@ -1338,11 +1344,15 @@ async def upload_and_reconcile(
 @router.post("/log-transaction")
 def log_missing_transaction(
     req: LogTransactionRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     """Log a single missing transaction into the system."""
-    # Validate account
-    account = db.query(models.Account).filter(models.Account.id == req.account_id).first()
+    # Validate account is owned by the caller
+    account = db.query(models.Account).filter(
+        models.Account.id == req.account_id,
+        models.Account.user_id == current_user.id,
+    ).first()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
@@ -1362,6 +1372,7 @@ def log_missing_transaction(
         status="completed",
         timestamp=timestamp,
         source="settlement",
+        user_id=current_user.id,
         notes=req.notes or f"Logged from bank statement settlement"
     )
 
@@ -1383,11 +1394,15 @@ def log_missing_transaction(
 @router.post("/log-batch")
 def log_batch_transactions(
     req: LogBatchRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     """Batch log multiple missing transactions into the system."""
-    # Validate account
-    account = db.query(models.Account).filter(models.Account.id == req.account_id).first()
+    # Validate account is owned by the caller
+    account = db.query(models.Account).filter(
+        models.Account.id == req.account_id,
+        models.Account.user_id == current_user.id,
+    ).first()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
@@ -1410,6 +1425,7 @@ def log_batch_transactions(
                 status="completed",
                 timestamp=timestamp,
                 source="settlement",
+                user_id=current_user.id,
                 notes=tx_req.notes or "Logged from bank statement settlement"
             )
 
@@ -1528,14 +1544,18 @@ class ConfirmSmsIngestRequest(BaseModel):
 @router.post("/confirm-sms-ingest")
 def confirm_sms_ingest(
     req: ConfirmSmsIngestRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     """
     Confirm and log a previewed SMS transaction into the system.
     This saves the transaction after the user has reviewed the AI-parsed preview.
     """
-    # Validate account
-    account = db.query(models.Account).filter(models.Account.id == req.account_id).first()
+    # Validate account is owned by the caller
+    account = db.query(models.Account).filter(
+        models.Account.id == req.account_id,
+        models.Account.user_id == current_user.id,
+    ).first()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
@@ -1560,6 +1580,7 @@ def confirm_sms_ingest(
         status="completed",
         timestamp=tx_timestamp,
         source="settlement_rerun",
+        user_id=current_user.id,
         notes=f"Re-ingested from settlement service"
     )
 

@@ -1002,12 +1002,10 @@ def get_obligation_matches(obligation_id: str, db: Session = Depends(get_db), cu
     return matches
 
 @app.post("/obligations/{obligation_id}/pay", response_model=schemas.Payment)
-def pay_obligation(obligation_id: str, payment: schemas.PaymentCreate, db: Session = Depends(get_db)):
-    # Verify obligation exists
-    obligation = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
-    if not obligation:
-        raise HTTPException(status_code=404, detail="Obligation not found")
-    
+def pay_obligation(obligation_id: str, payment: schemas.PaymentCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # Verify obligation exists and is owned by the caller
+    _require_owned(db, models.MonthlyObligation, obligation_id, current_user)
+
     try:
         return crud.create_payment(db=db, obligation_id=obligation_id, payment=payment)
     except ValueError as e:
@@ -2989,7 +2987,8 @@ def confirm_audit(request: schemas.AuditConfirmRequest, db: Session = Depends(ge
 
 @app.get("/audit/history/{account_id}", response_model=List[schemas.Audit])
 def get_audit_history(account_id: str, limit: int = 20, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    """Get audit history for an account."""
+    """Get audit history for an account owned by the caller."""
+    _require_owned(db, models.Account, account_id, current_user)
     return crud.get_audit_history(db, account_id, limit)
 
 
