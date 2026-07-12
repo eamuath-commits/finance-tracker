@@ -255,6 +255,21 @@ app.include_router(statement_router)
 def read_root():
     return {"message": "Finance API is running"}
 
+
+def _require_owned(db: Session, model, obj_id: str, current_user: models.User):
+    """
+    Fetch a record by id and verify it belongs to current_user.
+
+    Returns the object, or raises 404 if it does not exist OR is owned by
+    another user (404 rather than 403 so we don't disclose existence).
+    This is the object-level authorization gate for by-id endpoints.
+    """
+    obj = db.query(model).filter(model.id == obj_id).first()
+    if obj is None or getattr(obj, "user_id", None) != current_user.id:
+        raise HTTPException(status_code=404, detail=f"{model.__name__} not found")
+    return obj
+
+
 # --- Account Endpoints ---
 @app.post("/accounts/", response_model=schemas.Account)
 def create_account(account: schemas.AccountCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -267,6 +282,7 @@ def read_accounts(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
 
 @app.put("/accounts/{account_id}", response_model=schemas.Account)
 def update_account(account_id: str, account_update: schemas.AccountUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    _require_owned(db, models.Account, account_id, current_user)
     updated_account = crud.update_account(db, account_id, account_update)
     if not updated_account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -274,6 +290,7 @@ def update_account(account_id: str, account_update: schemas.AccountUpdate, db: S
 
 @app.delete("/accounts/{account_id}")
 def delete_account(account_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    _require_owned(db, models.Account, account_id, current_user)
     deleted_account = crud.delete_account(db, account_id)
     if not deleted_account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -417,13 +434,11 @@ def read_credit_cards(skip: int = 0, limit: int = 100, db: Session = Depends(get
 
 @app.get("/credit-cards/{card_id}", response_model=schemas.CreditCard)
 def read_credit_card(card_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    card = crud.get_credit_card(db, card_id)
-    if not card:
-        raise HTTPException(status_code=404, detail="Credit card not found")
-    return card
+    return _require_owned(db, models.CreditCard, card_id, current_user)
 
 @app.put("/credit-cards/{card_id}", response_model=schemas.CreditCard)
 def update_credit_card(card_id: str, card_update: schemas.CreditCardUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    _require_owned(db, models.CreditCard, card_id, current_user)
     updated_card = crud.update_credit_card(db, card_id, card_update)
     if not updated_card:
         raise HTTPException(status_code=404, detail="Credit card not found")
@@ -431,6 +446,7 @@ def update_credit_card(card_id: str, card_update: schemas.CreditCardUpdate, db: 
 
 @app.delete("/credit-cards/{card_id}")
 def delete_credit_card(card_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    _require_owned(db, models.CreditCard, card_id, current_user)
     deleted = crud.delete_credit_card(db, card_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Credit card not found")
@@ -439,9 +455,7 @@ def delete_credit_card(card_id: str, db: Session = Depends(get_db), current_user
 @app.get("/credit-cards/{card_id}/transactions", response_model=List[schemas.Transaction])
 def get_credit_card_transactions(card_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Get all transactions for a specific credit card"""
-    card = crud.get_credit_card(db, card_id)
-    if not card:
-        raise HTTPException(status_code=404, detail="Credit card not found")
+    _require_owned(db, models.CreditCard, card_id, current_user)
     transactions = db.query(models.Transaction).filter(
         models.Transaction.credit_card_id == card_id
     ).order_by(models.Transaction.timestamp.desc()).all()
@@ -450,10 +464,8 @@ def get_credit_card_transactions(card_id: str, db: Session = Depends(get_db), cu
 @app.post("/credit-cards/{card_id}/payment")
 def record_credit_card_payment(card_id: str, amount: float, from_account_id: Optional[str] = None, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Record a payment to a credit card (reduces balance)"""
-    card = crud.get_credit_card(db, card_id)
-    if not card:
-        raise HTTPException(status_code=404, detail="Credit card not found")
-    
+    card = _require_owned(db, models.CreditCard, card_id, current_user)
+
     # Create the credit transaction on the card (payment = credit)
     from datetime import datetime
     tx_data = schemas.TransactionCreate(
@@ -469,7 +481,10 @@ def record_credit_card_payment(card_id: str, amount: float, from_account_id: Opt
     
     # If paying from an account, create a corresponding debit there
     if from_account_id:
-        account = db.query(models.Account).filter(models.Account.id == from_account_id).first()
+        account = db.query(models.Account).filter(
+            models.Account.id == from_account_id,
+            models.Account.user_id == current_user.id,
+        ).first()
         if account:
             debit_tx = schemas.TransactionCreate(
                 account_id=from_account_id,
@@ -486,14 +501,16 @@ def record_credit_card_payment(card_id: str, amount: float, from_account_id: Opt
 
 @app.post("/accounts/{account_id}/aliases", response_model=schemas.AccountAlias)
 def create_alias(account_id: str, alias: schemas.AccountAliasCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    # Verify account exists
-    account = db.query(models.Account).filter(models.Account.id == account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
+    # Verify account exists and is owned by the caller
+    _require_owned(db, models.Account, account_id, current_user)
     return crud.create_account_alias(db, account_id, alias)
 
 @app.delete("/aliases/{alias_id}")
 def delete_alias(alias_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # Verify the alias's parent account belongs to the caller before deleting.
+    alias = db.query(models.AccountAlias).filter(models.AccountAlias.id == alias_id).first()
+    if alias is not None:
+        _require_owned(db, models.Account, alias.account_id, current_user)
     deleted = crud.delete_account_alias(db, alias_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Alias not found")
@@ -516,6 +533,7 @@ def reorder_loans(payload: schemas.ReorderSchema, db: Session = Depends(get_db),
 
 @app.put("/loans/{loan_id}", response_model=schemas.Loan)
 def update_loan(loan_id: str, loan_update: schemas.LoanUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    _require_owned(db, models.Loan, loan_id, current_user)
     updated_loan = crud.update_loan(db, loan_id, loan_update)
     if not updated_loan:
         raise HTTPException(status_code=404, detail="Loan not found")
@@ -525,6 +543,7 @@ def update_loan(loan_id: str, loan_update: schemas.LoanUpdate, db: Session = Dep
 
 @app.delete("/loans/{loan_id}", response_model=schemas.Loan)
 def delete_loan(loan_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    _require_owned(db, models.Loan, loan_id, current_user)
     deleted = crud.delete_loan(db, loan_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Loan not found")
@@ -546,6 +565,7 @@ def reorder_obligations(payload: schemas.ReorderSchema, db: Session = Depends(ge
 
 @app.put("/obligations/{obligation_id}", response_model=schemas.Obligation)
 def update_obligation(obligation_id: str, obligation_update: schemas.ObligationUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    _require_owned(db, models.MonthlyObligation, obligation_id, current_user)
     updated_obj = crud.update_obligation(db, obligation_id, obligation_update)
     if not updated_obj:
         raise HTTPException(status_code=404, detail="Obligation not found")
@@ -553,6 +573,7 @@ def update_obligation(obligation_id: str, obligation_update: schemas.ObligationU
 
 @app.delete("/obligations/{obligation_id}", response_model=schemas.Obligation)
 def delete_obligation(obligation_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    _require_owned(db, models.MonthlyObligation, obligation_id, current_user)
     deleted_obj = crud.delete_obligation(db, obligation_id)
     if not deleted_obj:
         raise HTTPException(status_code=404, detail="Obligation not found")
@@ -1534,7 +1555,8 @@ def list_billers(db: Session = Depends(get_db)):
     return crud.get_billers(db)
 
 @app.put("/transactions/{transaction_id}", response_model=schemas.Transaction)
-def update_transaction(transaction_id: str, transaction_update: schemas.TransactionUpdate, db: Session = Depends(get_db)):
+def update_transaction(transaction_id: str, transaction_update: schemas.TransactionUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    _require_owned(db, models.Transaction, transaction_id, current_user)
     updated_tx = crud.update_transaction(db, transaction_id, transaction_update)
     if not updated_tx:
         raise HTTPException(status_code=404, detail="Transaction not found")
@@ -1542,13 +1564,19 @@ def update_transaction(transaction_id: str, transaction_update: schemas.Transact
 
 @app.post("/transactions/", response_model=schemas.Transaction)
 def create_transaction(transaction: schemas.TransactionCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    # Verify account or credit card exists
+    # Verify the target account or credit card exists AND belongs to this user
     if transaction.account_id:
-        account = db.query(models.Account).filter(models.Account.id == transaction.account_id).first()
+        account = db.query(models.Account).filter(
+            models.Account.id == transaction.account_id,
+            models.Account.user_id == current_user.id,
+        ).first()
         if not account:
             raise HTTPException(status_code=404, detail="Account not found")
     elif transaction.credit_card_id:
-        cc = db.query(models.CreditCard).filter(models.CreditCard.id == transaction.credit_card_id).first()
+        cc = db.query(models.CreditCard).filter(
+            models.CreditCard.id == transaction.credit_card_id,
+            models.CreditCard.user_id == current_user.id,
+        ).first()
         if not cc:
             raise HTTPException(status_code=404, detail="Credit card not found")
     else:
@@ -1557,21 +1585,20 @@ def create_transaction(transaction: schemas.TransactionCreate, db: Session = Dep
     return crud.create_transaction(db=db, transaction=transaction)
 
 @app.delete("/transactions/{transaction_id}")
-def delete_transaction(transaction_id: str, db: Session = Depends(get_db)):
+def delete_transaction(transaction_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    _require_owned(db, models.Transaction, transaction_id, current_user)
     deleted = crud.delete_transaction(db, transaction_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Transaction not found")
     return {"message": "Transaction deleted"}
 
 @app.put("/transactions/{transaction_id}/resolve-discrepancy")
-def resolve_discrepancy(transaction_id: str, body: dict, db: Session = Depends(get_db)):
+def resolve_discrepancy(transaction_id: str, body: dict, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Resolve a balance discrepancy on a CC transaction."""
     import json as _json
     from datetime import datetime as _dt
-    
-    tx = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
-    if not tx:
-        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    tx = _require_owned(db, models.Transaction, transaction_id, current_user)
     
     if not tx.parsed_data:
         raise HTTPException(status_code=400, detail="No parsed data on transaction")
@@ -1640,23 +1667,32 @@ def resolve_discrepancy(transaction_id: str, body: dict, db: Session = Depends(g
 def bulk_delete_transactions(payload: schemas.BulkDeleteRequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     deleted_count = 0
     for tx_id in payload.ids:
+        # Only delete transactions the caller owns; silently skip others.
+        owned = db.query(models.Transaction).filter(
+            models.Transaction.id == tx_id,
+            models.Transaction.user_id == current_user.id,
+        ).first()
+        if not owned:
+            continue
         crud.delete_transaction(db, tx_id)
         deleted_count += 1
     return {"message": f"Deleted {deleted_count} transactions"}
 
 @app.post("/transactions/{transaction_id}/complete-transfer")
-def complete_pending_transfer(transaction_id: str, source_account_id: str, db: Session = Depends(get_db)):
+def complete_pending_transfer(transaction_id: str, source_account_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """
     Complete a pending internal transfer by specifying the source account.
     This will:
     1. Mark the credit transaction as completed
     2. Create a corresponding debit transaction on the source account
     """
-    # Get the pending transaction
-    pending_tx = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
-    if not pending_tx:
-        raise HTTPException(status_code=404, detail="Transaction not found")
-    
+    # Get the pending transaction (must belong to the caller)
+    pending_tx = _require_owned(db, models.Transaction, transaction_id, current_user)
+
+    # Validate a real (non-"external") source account is owned by the caller
+    if source_account_id != "external":
+        _require_owned(db, models.Account, source_account_id, current_user)
+
     if pending_tx.status != "pending_action":
         raise HTTPException(status_code=400, detail="Transaction is not pending")
     
@@ -2574,24 +2610,33 @@ def assign_account_to_pending_tx(
     if tx.status != "pending_action":
         raise HTTPException(status_code=400, detail="Transaction is not pending action")
     
-    # Assign account or credit card
+    # Assign account or credit card. The destination must belong to the caller,
+    # and the transaction becomes owned by them once assigned.
     if account_id:
-        account = crud.get_account(db, account_id)
+        account = db.query(models.Account).filter(
+            models.Account.id == account_id,
+            models.Account.user_id == current_user.id,
+        ).first()
         if not account:
             raise HTTPException(status_code=404, detail="Account not found")
-        
+
         tx.account_id = account_id
+        tx.user_id = current_user.id
         tx.status = "completed"
-        
+
         # Update account balance via queue processor
         queue_processor.apply_balance_update(db, tx)
-        
+
     elif credit_card_id:
-        cc = crud.get_credit_card(db, credit_card_id)
+        cc = db.query(models.CreditCard).filter(
+            models.CreditCard.id == credit_card_id,
+            models.CreditCard.user_id == current_user.id,
+        ).first()
         if not cc:
             raise HTTPException(status_code=404, detail="Credit card not found")
-        
+
         tx.credit_card_id = credit_card_id
+        tx.user_id = current_user.id
         tx.status = "completed"
         
         # Update credit card balance via queue processor
