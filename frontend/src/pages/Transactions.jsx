@@ -583,6 +583,12 @@ function Transactions() {
     };
 
     const exportToPDF = () => {
+        // Escape any value interpolated into the report HTML. Merchant/category
+        // originate from bank SMS/statement ingestion (attacker-influenced), so
+        // unescaped interpolation into document.write() is an XSS vector.
+        const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => (
+            { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+        ));
         // Create printable HTML that browser can print to PDF
         const printWindow = window.open('', '_blank');
         let html = `
@@ -626,12 +632,12 @@ function Transactions() {
             html += `
                 <tr>
                     <td>${format(new Date(tx.timestamp), 'yyyy-MM-dd')}</td>
-                    <td>${tx.merchant || '-'}</td>
+                    <td>${esc(tx.merchant || '-')}</td>
                     <td class="${tx.type === 'credit' ? 'credit' : 'debit'}">
                         ${tx.type === 'credit' ? '+' : '-'}${tx.amount?.toFixed(2) || '0.00'}
                     </td>
-                    <td>${tx.category || '-'}</td>
-                    <td>${accName}</td>
+                    <td>${esc(tx.category || '-')}</td>
+                    <td>${esc(accName)}</td>
                     <td>${tx.balance_after_transaction?.toFixed(2) || '-'}</td>
                 </tr>
             `;
@@ -1085,10 +1091,10 @@ function Transactions() {
                                                                 try {
                                                                     if (acc) {
                                                                         // Has destination already — use complete-transfer
-                                                                        await fetch(`${API_URL}/transactions/${tx.id}/complete-transfer?source_account_id=${accountId}`, { method: 'POST' });
+                                                                        await api.post(`${API_URL}/transactions/${tx.id}/complete-transfer?source_account_id=${accountId}`);
                                                                     } else {
                                                                         // No account at all — assign via the sms assign endpoint
-                                                                        await fetch(`${API_URL}/api/sms/assign-account?transaction_id=${tx.id}&account_id=${accountId}`, { method: 'POST' });
+                                                                        await api.post(`${API_URL}/api/sms/assign-account?transaction_id=${tx.id}&account_id=${accountId}`);
                                                                     }
                                                                     fetchData();
                                                                 } catch (err) {

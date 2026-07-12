@@ -15,8 +15,16 @@ export const exportToCSV = (data, filename = 'export.csv', headers = null) => {
                 let val = row[fieldName];
                 if (val === null || val === undefined) val = '';
 
+                let stringVal = String(val);
+
+                // Neutralize CSV formula injection: a leading =, +, -, @, or
+                // control char makes Excel/Sheets execute the cell as a formula.
+                // Merchant/category come from bank SMS, so treat them as hostile.
+                if (/^[=+\-@\t\r]/.test(stringVal)) {
+                    stringVal = "'" + stringVal;
+                }
+
                 // Escape quotes and wrap in quotes if necessary
-                const stringVal = String(val);
                 if (stringVal.includes(',') || stringVal.includes('"') || stringVal.includes('\n')) {
                     return `"${stringVal.replace(/"/g, '""')}"`;
                 }

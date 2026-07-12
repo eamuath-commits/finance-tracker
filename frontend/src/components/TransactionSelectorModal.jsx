@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Input } from './UI';
 import { Search, X, Check, Link, Calendar, DollarSign, Filter, MessageSquare } from 'lucide-react';
-
-const API_BASE = import.meta.env.VITE_API_URL || "http://" + window.location.hostname + ":8000";
+import api from '../utils/api';
 
 /**
  * TransactionSelectorModal - Modal for selecting and linking transactions
@@ -42,9 +41,8 @@ export default function TransactionSelectorModal({
     // Fetch accounts for filter dropdown
     useEffect(() => {
         if (isOpen) {
-            fetch(`${API_BASE}/accounts`)
-                .then(res => res.json())
-                .then(setAccounts)
+            api.get('/accounts/')
+                .then(res => setAccounts(res.data))
                 .catch(console.error);
         }
     }, [isOpen]);
@@ -66,9 +64,8 @@ export default function TransactionSelectorModal({
                 if (filters.type) params.set('type', filters.type);
                 params.set('limit', '50');
 
-                const res = await fetch(`${API_BASE}/transactions/search?${params}`);
-                const data = await res.json();
-                setTransactions(data);
+                const res = await api.get(`/transactions/search?${params}`);
+                setTransactions(res.data);
             } catch (err) {
                 console.error('Failed to fetch transactions:', err);
             } finally {
