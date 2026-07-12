@@ -3,15 +3,35 @@ __pycache__/
 *.py[cod]
 *$py.class
 venv/
+.venv/
+
+# Secrets / environment
 .env
-.venv
+*.env
+!*.env.example
+config/*.env
+!config/*.env.example
 
 # Node
 node_modules/
 dist/
+
+# OS
 .DS_Store
 
 # IDE
 .vscode/
 .idea/
-.env
+
+# Databases (SQLite dev/test artifacts)
+*.db
+*.sqlite
+*.sqlite3
+
+# Backups & DB dumps
+backups/
+*.sql
+*.dump
+
+# Logs
+*.log

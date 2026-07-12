@@ -83,12 +83,12 @@ rate_limiter = RateLimiter()
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """FastAPI middleware for rate limiting."""
     
-    # CORS headers to include in rate-limited responses
+    # CORS headers to include in rate-limited (429) responses so the browser
+    # can read the error. Origin is reflected per-request in dispatch(); a
+    # static "*" together with Allow-Credentials is an invalid, unsafe combo.
     CORS_HEADERS = {
-        "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
         "Access-Control-Allow-Headers": "*",
-        "Access-Control-Allow-Credentials": "true",
     }
     
     async def dispatch(self, request: Request, call_next):
@@ -114,13 +114,19 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         
         if not allowed:
             logger.warning(f"Rate limit exceeded for {client_ip}: {count}/{limit} on {path}")
-            # Include CORS headers in 429 response so browser can read it
+            # Include CORS headers in 429 response so browser can read it.
+            # Reflect the request Origin (valid alongside credentials, unlike "*").
             headers = {
                 "Retry-After": str(WINDOW_SIZE),
                 "X-RateLimit-Limit": str(limit),
                 "X-RateLimit-Remaining": "0",
                 **self.CORS_HEADERS
             }
+            origin = request.headers.get("Origin")
+            if origin:
+                headers["Access-Control-Allow-Origin"] = origin
+                headers["Access-Control-Allow-Credentials"] = "true"
+                headers["Vary"] = "Origin"
             return JSONResponse(
                 status_code=429,
                 content={

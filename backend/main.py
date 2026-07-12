@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text, inspect, func
 from typing import List, Optional
 from datetime import datetime
+import os
 import re
 import logging
 
@@ -212,9 +213,18 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Personal Finance Manager")
 
+# Allowed origins for CORS. Comma-separated list in CORS_ORIGINS, or the
+# single FRONTEND_URL, falling back to local dev hosts. A wildcard "*" is
+# incompatible with allow_credentials=True and would be silently unsafe.
+_cors_env = os.getenv("CORS_ORIGINS") or os.getenv("FRONTEND_URL", "")
+CORS_ORIGINS = [o.strip() for o in _cors_env.split(",") if o.strip()] or [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

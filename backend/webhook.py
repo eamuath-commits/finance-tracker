@@ -40,15 +40,19 @@ class SMSWebhookResponse(BaseModel):
 
 
 def verify_secret(x_webhook_secret: str = Header(default="")):
-    """Verify the webhook secret header."""
+    """Verify the webhook secret header. Fails closed if no secret is configured."""
     if not WEBHOOK_SECRET:
-        logger.warning("WEBHOOK_SECRET not configured - webhook is OPEN (dev mode)")
-        return True
-    
-    if x_webhook_secret != WEBHOOK_SECRET:
-        logger.warning(f"Invalid webhook secret attempted")
+        # Fail closed: an unconfigured secret must not leave the webhook open,
+        # since it can inject transactions into the ledger.
+        logger.error("WEBHOOK_SECRET not configured - rejecting webhook request")
+        raise HTTPException(status_code=503, detail="Webhook not configured")
+
+    # Constant-time comparison to avoid leaking the secret via timing.
+    import hmac
+    if not hmac.compare_digest(x_webhook_secret, WEBHOOK_SECRET):
+        logger.warning("Invalid webhook secret attempted")
         raise HTTPException(status_code=401, detail="Invalid webhook secret")
-    
+
     return True
 
 

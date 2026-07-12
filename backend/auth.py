@@ -9,9 +9,14 @@ from sqlalchemy.orm import Session
 import database
 import models
 
-# Secret keys for signing JWT tokens
-# In production, this MUST be a secure, random environment variable
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "3ca8d601b0f55cfce97d812d4d38c644be2580a6b98ea6f890cf2ea0c7a5f5c9ab")
+# Secret key for signing JWT tokens. MUST be provided via environment.
+# No fallback: a hardcoded default would let anyone with repo access forge tokens.
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "JWT_SECRET_KEY environment variable is not set. "
+        "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days token expiration
 
