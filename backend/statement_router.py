@@ -1118,6 +1118,150 @@ def approve_statement_transactions(
     }
 
 
+@router.post("/{statement_id}/post")
+def post_statement_to_ledger(
+    statement_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    Post a statement authoritatively to the ledger (Phase 2 of the redesign).
+
+    Model: the statement is the single source of truth for its account+period.
+    No fuzzy matching, no draft/approve two-step. Each persisted statement line
+    becomes one completed transaction (fee lines fold into the preceding
+    transaction's `fees`). Idempotent: re-posting first removes this statement's
+    own previously-posted transactions, so it never duplicates.
+
+    Correctness oracle: after posting, the recalculated account balance must
+    equal the statement's closing balance (returned as balance_matches_statement).
+    """
+    statement = db.query(models.Statement).filter(
+        models.Statement.id == statement_id,
+        models.Statement.user_id == current_user.id,
+    ).first()
+    if not statement:
+        raise HTTPException(status_code=404, detail="Statement not found")
+    if not statement.account_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Statement must be linked to an account before posting.",
+        )
+
+    # Ensure lines are persisted (backfill for older statements)
+    lines = db.query(models.StatementLine).filter(
+        models.StatementLine.statement_id == statement_id
+    ).order_by(models.StatementLine.row_index.asc()).all()
+    if not lines:
+        if not statement.file_path or not os.path.exists(statement.file_path):
+            raise HTTPException(status_code=404, detail="PDF file not found; cannot parse lines")
+        _store_statement_lines(statement, db)
+        lines = db.query(models.StatementLine).filter(
+            models.StatementLine.statement_id == statement_id
+        ).order_by(models.StatementLine.row_index.asc()).all()
+    if not lines:
+        raise HTTPException(status_code=400, detail="No parsed lines found in statement")
+
+    # Idempotency: remove this statement's own previously-posted transactions
+    db.query(models.Transaction).filter(
+        models.Transaction.statement_id == statement_id
+    ).delete(synchronize_session=False)
+
+    created = 0
+    folded_fees = 0
+    last_tx = None  # for fee folding
+    for ln in lines:
+        # Fold fee rows into the preceding transaction's `fees`
+        if ln.is_fee and last_tx is not None:
+            last_tx.fees = round((last_tx.fees or 0.0) + (ln.amount or 0.0), 2)
+            ln.match_status = "posted"
+            ln.posted_transaction_id = last_tx.id
+            folded_fees += 1
+            continue
+
+        # Build timestamp from statement date + time
+        ts = None
+        if ln.txn_date:
+            if ln.txn_time:
+                try:
+                    ts = datetime.combine(ln.txn_date, datetime.strptime(ln.txn_time, "%H:%M:%S").time())
+                except ValueError:
+                    ts = datetime.combine(ln.txn_date, datetime.min.time())
+            else:
+                ts = datetime.combine(ln.txn_date, datetime.min.time())
+        else:
+            ts = datetime.utcnow()
+
+        note_bits = []
+        if ln.counterparty_name:
+            note_bits.append(f"Counterparty: {ln.counterparty_name}")
+        if ln.counterparty_account:
+            note_bits.append(f"Acct: {ln.counterparty_account}")
+        if ln.reference:
+            note_bits.append(f"Ref: {ln.reference}")
+        if ln.type_line:
+            note_bits.append(ln.type_line)
+
+        tx = models.Transaction(
+            id=str(uuid.uuid4()),
+            user_id=current_user.id,
+            account_id=statement.account_id,
+            amount=round(ln.amount or 0.0, 2),
+            merchant=ln.counterparty_name or ln.type_line,
+            type=ln.direction,
+            timestamp=ts,
+            balance_after_transaction=ln.balance,
+            category=ln.category,
+            notes="\n".join(note_bits) if note_bits else None,
+            source="statement",
+            statement_id=statement.id,
+            statement_row_index=ln.row_index,
+            status="completed",
+            fees=0.0,
+        )
+        db.add(tx)
+        db.flush()  # assign tx.id
+        ln.match_status = "posted"
+        ln.posted_transaction_id = tx.id
+        last_tx = tx
+        created += 1
+
+    statement.status = "posted"
+    statement.reconciliation_status = "reconciled"
+    db.flush()
+
+    # Recalculate balance and compare against the statement's closing balance
+    from main import _recalculate_account_balance
+    recalc = _recalculate_account_balance(db, statement.account_id)
+    new_balance = recalc.get("new_balance") if recalc else None
+    db.commit()
+
+    balance_matches = (
+        new_balance is not None
+        and statement.closing_balance is not None
+        and round(new_balance, 2) == round(statement.closing_balance, 2)
+    )
+
+    logger.info(
+        f"Posted statement {statement_id}: {created} transactions, {folded_fees} fees folded, "
+        f"balance={new_balance} vs closing={statement.closing_balance} match={balance_matches}"
+    )
+    return {
+        "statement_id": statement.id,
+        "posted": created,
+        "fees_folded": folded_fees,
+        "account_id": statement.account_id,
+        "new_balance": new_balance,
+        "statement_closing_balance": statement.closing_balance,
+        "balance_matches_statement": balance_matches,
+        "status": statement.status,
+        "message": (
+            f"{created} transactions posted from statement."
+            + ("" if balance_matches else " WARNING: balance does not match statement closing — review.")
+        ),
+    }
+
+
 @router.get("/{statement_id}/transactions")
 def get_statement_transactions(
     statement_id: str,
