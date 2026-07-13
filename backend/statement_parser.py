@@ -558,3 +558,137 @@ def parse_statement_pdf(file_path: str) -> dict:
         logger.error(f"Failed to parse statement PDF: {e}", exc_info=True)
         return {"header": None, "transactions": [], "page_count": 0,
                 "error": str(e)}
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Table-based extractor (Phase 1 of the statement redesign).
+#
+# pdfplumber.extract_tables() returns the Al Rajhi transaction grid as clean
+# rows — [Date, Details, Debit, Credit, Balance] — including multi-line cells,
+# which the line-regex parser above has to reassemble heuristically. This
+# extractor is more robust and also pulls the counterparty account/name,
+# reference, and fee flag that the reconciler needs, and validates the
+# running-balance chain in integer cents.
+# ─────────────────────────────────────────────────────────────────────
+
+_TIME_RE = re.compile(r'Time:(\d{1,2}:\d{2}:\d{2})')
+_ACCT_RE = re.compile(r'(FRACCT|TOACCT)/(\d+)(?:(?:FR|TO))?([^/\d-]+)?')
+_IPS_RE = re.compile(r'([A-Z0-9]{10,})\/([A-Z][A-Za-z .]+)')
+_DATE_CELL_RE = re.compile(r'^\d{4}/\d{2}/\d{2}$')
+
+
+def _cents(value: float) -> int:
+    """Convert a currency float to integer cents to avoid float drift."""
+    return int(round((value or 0.0) * 100))
+
+
+def extract_statement_rows(file_path: str) -> dict:
+    """
+    Extract normalized statement rows using table detection.
+
+    Returns {
+        "header": {opening_balance, closing_balance, account_number,
+                   num_deposits, num_withdrawals, ...},
+        "rows": [ {row_index, txn_date (YYYY-MM-DD), txn_time (HH:MM:SS|None),
+                   type_line, note, debit, credit, balance, direction,
+                   amount, counterparty_account, counterparty_name,
+                   reference, is_fee, category}, ... ],
+        "chain_valid": bool,       # running balance closes to closing_balance
+        "chain_mismatches": int,
+        "error": str | None,
+    }
+    """
+    try:
+        import pdfplumber
+    except ImportError:
+        return {"header": None, "rows": [], "chain_valid": False,
+                "chain_mismatches": 0, "error": "pdfplumber not installed"}
+
+    try:
+        from statement_category_mapper import map_type_to_category
+    except Exception:
+        def map_type_to_category(_):  # graceful fallback
+            return "Other"
+
+    try:
+        with pdfplumber.open(file_path) as pdf:
+            if len(pdf.pages) == 0:
+                return {"header": None, "rows": [], "chain_valid": False,
+                        "chain_mismatches": 0, "error": "PDF has no pages"}
+
+            header = asdict(parse_header(normalize_arabic(pdf.pages[0].extract_text() or "")))
+
+            rows = []
+            idx = 0
+            for page in pdf.pages:
+                for table in (page.extract_tables() or []):
+                    for cells in table:
+                        if not cells or len(cells) < 5:
+                            continue
+                        date = (cells[0] or "").strip()
+                        if not _DATE_CELL_RE.match(date):
+                            continue
+
+                        details = cells[1] or ""
+                        first_line = details.split('\n')[0].strip()
+                        tm = _TIME_RE.search(details)
+                        note = (details.split('**Note:')[-1].replace('\n', ' ').strip()
+                                if '**Note:' in details else "")
+
+                        debit = parse_amount(cells[2]) or 0.0
+                        credit = parse_amount(cells[3]) or 0.0
+                        balance = parse_amount(cells[4]) or 0.0
+
+                        counterparty_account = counterparty_name = reference = None
+                        am = _ACCT_RE.search(details)
+                        if am:
+                            counterparty_account = am.group(2)
+                            if am.group(3):
+                                counterparty_name = normalize_arabic(am.group(3).strip()) or None
+                        im = _IPS_RE.search(details.replace('\n', ' '))
+                        if im:
+                            reference = im.group(1)
+                            counterparty_name = counterparty_name or im.group(2).strip()
+
+                        rows.append({
+                            "row_index": idx,
+                            "txn_date": date.replace('/', '-'),
+                            "txn_time": tm.group(1) if tm else None,
+                            "type_line": first_line,
+                            "note": note,
+                            "debit": round(debit, 2),
+                            "credit": round(credit, 2),
+                            "balance": round(balance, 2),
+                            "direction": "credit" if credit > 0 else "debit",
+                            "amount": round(credit if credit > 0 else debit, 2),
+                            "counterparty_account": counterparty_account,
+                            "counterparty_name": counterparty_name,
+                            "reference": reference,
+                            "is_fee": "charge" in first_line.lower(),
+                            "category": map_type_to_category(first_line),
+                        })
+                        idx += 1
+
+            # Validate the running-balance chain in integer cents.
+            chain_mismatches = 0
+            opening = parse_amount(header.get("opening_balance")) if isinstance(header.get("opening_balance"), str) else header.get("opening_balance")
+            running = _cents(opening if opening is not None else 0.0)
+            for r in rows:
+                running += _cents(r["amount"]) if r["direction"] == "credit" else -_cents(r["amount"])
+                if running != _cents(r["balance"]):
+                    chain_mismatches += 1
+            closing = header.get("closing_balance")
+            chain_valid = (chain_mismatches == 0 and closing is not None
+                           and running == _cents(closing))
+
+            logger.info(
+                f"extract_statement_rows: {len(rows)} rows, "
+                f"chain_valid={chain_valid}, mismatches={chain_mismatches}"
+            )
+            return {"header": header, "rows": rows, "chain_valid": chain_valid,
+                    "chain_mismatches": chain_mismatches, "error": None}
+
+    except Exception as e:
+        logger.error(f"extract_statement_rows failed: {e}", exc_info=True)
+        return {"header": None, "rows": [], "chain_valid": False,
+                "chain_mismatches": 0, "error": str(e)}

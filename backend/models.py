@@ -458,6 +458,53 @@ class Statement(Base):
     transactions = relationship("Transaction", back_populates="statement")
 
 
+class StatementLine(Base):
+    """
+    A single parsed row from a bank statement PDF (persisted once at parse time).
+
+    This is the source of truth the reconciler works against, so the PDF is
+    parsed once instead of re-parsed on every request. A line is matched against
+    an existing ledger transaction (matched_transaction_id) or posted as a new
+    one (posted_transaction_id) during reconciliation.
+    """
+    __tablename__ = "statement_lines"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    statement_id = Column(String, ForeignKey("statements.id"), nullable=False, index=True)
+    row_index = Column(Integer, nullable=False)  # print order within the statement
+
+    # Parsed values
+    txn_date = Column(Date, nullable=True)
+    txn_time = Column(String, nullable=True)      # HH:MM:SS from the PDF
+    type_line = Column(String, nullable=True)     # e.g. "Internal Transfer between Accounts"
+    note = Column(Text, nullable=True)
+    debit = Column(Float, default=0.0)
+    credit = Column(Float, default=0.0)
+    balance = Column(Float, nullable=True)        # running balance printed on the row
+    direction = Column(String, nullable=True)     # 'debit' | 'credit'
+    amount = Column(Float, default=0.0)           # the non-zero side
+    category = Column(String, nullable=True)
+
+    # Reconciliation signals extracted from the note
+    counterparty_account = Column(String, nullable=True)
+    counterparty_name = Column(String, nullable=True)
+    reference = Column(String, nullable=True)
+    is_fee = Column(Boolean, default=False)       # e.g. "... Transaction Charges"
+
+    # Reconciliation state (populated in later phases)
+    match_status = Column(String, default="pending")  # pending|matched|new|excluded|posted
+    matched_transaction_id = Column(String, ForeignKey("transactions.id"), nullable=True)
+    posted_transaction_id = Column(String, ForeignKey("transactions.id"), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    statement = relationship("Statement", backref="lines")
+
+    __table_args__ = (
+        UniqueConstraint("statement_id", "row_index", name="uq_statement_line_row"),
+    )
+
+
 class UserSettings(Base):
     """App-wide settings stored as key-value pairs"""
     __tablename__ = "user_settings"

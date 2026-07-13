@@ -27,7 +27,7 @@ from database import get_db
 import models
 import schemas
 from auth import get_current_user
-from statement_parser import parse_statement_pdf
+from statement_parser import parse_statement_pdf, extract_statement_rows
 from statement_category_mapper import map_type_to_category
 
 logger = logging.getLogger("statement_router")
@@ -206,7 +206,7 @@ def _parse_and_store(statement: models.Statement, db: Session, user_id: str = No
                 pass
     
     statement.transaction_count = len(result.get("transactions", []))
-    
+
     # Auto-resolve account_id from account_number's last 4 digits
     resolve_user_id = user_id or statement.user_id
     if header and header.get("account_number") and not statement.account_id and resolve_user_id:
@@ -218,10 +218,73 @@ def _parse_and_store(statement: models.Statement, db: Session, user_id: str = No
         if matching_account:
             statement.account_id = matching_account.id
             logger.info(f"Auto-resolved account: {matching_account.name} (last4={last4})")
-    
+
     db.commit()
-    
+
+    # Persist parsed line items (Phase 1: parse once, store; reconciler reads these)
+    _store_statement_lines(statement, db)
+
     return result
+
+
+def _store_statement_lines(statement: models.Statement, db: Session) -> dict:
+    """
+    Parse the statement PDF with the table extractor and (re)persist its rows
+    as StatementLine records. Idempotent: existing lines for the statement are
+    replaced. Returns the extractor result (header, rows, chain validity).
+    """
+    from datetime import date as _date
+
+    extracted = extract_statement_rows(statement.file_path)
+    if extracted.get("error"):
+        logger.warning(f"Line extraction failed for {statement.id}: {extracted['error']}")
+        return extracted
+
+    # Replace any existing lines for this statement (idempotent re-parse)
+    db.query(models.StatementLine).filter(
+        models.StatementLine.statement_id == statement.id
+    ).delete(synchronize_session=False)
+
+    for row in extracted.get("rows", []):
+        parsed_date = None
+        if row.get("txn_date"):
+            try:
+                parsed_date = _date.fromisoformat(row["txn_date"])
+            except ValueError:
+                parsed_date = None
+        db.add(models.StatementLine(
+            statement_id=statement.id,
+            row_index=row["row_index"],
+            txn_date=parsed_date,
+            txn_time=row.get("txn_time"),
+            type_line=row.get("type_line"),
+            note=row.get("note"),
+            debit=row.get("debit", 0.0),
+            credit=row.get("credit", 0.0),
+            balance=row.get("balance"),
+            direction=row.get("direction"),
+            amount=row.get("amount", 0.0),
+            category=row.get("category"),
+            counterparty_account=row.get("counterparty_account"),
+            counterparty_name=row.get("counterparty_name"),
+            reference=row.get("reference"),
+            is_fee=bool(row.get("is_fee")),
+            match_status="pending",
+        ))
+
+    # Record chain validity on the statement's reconciliation fields
+    statement.transaction_count = len(extracted.get("rows", []))
+    if extracted.get("chain_valid"):
+        statement.reconciliation_status = "chain_ok"
+    else:
+        statement.reconciliation_status = "chain_mismatch"
+
+    db.commit()
+    logger.info(
+        f"Stored {len(extracted.get('rows', []))} statement lines for {statement.id} "
+        f"(chain_valid={extracted.get('chain_valid')})"
+    )
+    return extracted
 
 
 @router.get("/")
@@ -691,6 +754,63 @@ def parse_statement(
         "transactions": parsed.get("transactions", []),
         "transaction_count": len(parsed.get("transactions", [])),
         "page_count": parsed.get("page_count", 0),
+    }
+
+
+@router.get("/{statement_id}/lines")
+def get_statement_lines(
+    statement_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    Return the persisted parsed line items for a statement (from statement_lines),
+    without re-parsing the PDF. Backfills lines on first access for statements
+    imported before line persistence existed.
+    """
+    statement = db.query(models.Statement).filter(
+        models.Statement.id == statement_id,
+        models.Statement.user_id == current_user.id,
+    ).first()
+    if not statement:
+        raise HTTPException(status_code=404, detail="Statement not found")
+
+    lines = db.query(models.StatementLine).filter(
+        models.StatementLine.statement_id == statement_id
+    ).order_by(models.StatementLine.row_index.asc()).all()
+
+    # Backfill for statements parsed before line persistence
+    if not lines and statement.file_path and os.path.exists(statement.file_path):
+        _store_statement_lines(statement, db)
+        lines = db.query(models.StatementLine).filter(
+            models.StatementLine.statement_id == statement_id
+        ).order_by(models.StatementLine.row_index.asc()).all()
+
+    return {
+        "statement_id": statement.id,
+        "reconciliation_status": statement.reconciliation_status,
+        "count": len(lines),
+        "lines": [
+            {
+                "id": ln.id,
+                "row_index": ln.row_index,
+                "txn_date": ln.txn_date.isoformat() if ln.txn_date else None,
+                "txn_time": ln.txn_time,
+                "type_line": ln.type_line,
+                "direction": ln.direction,
+                "amount": ln.amount,
+                "balance": ln.balance,
+                "category": ln.category,
+                "counterparty_account": ln.counterparty_account,
+                "counterparty_name": ln.counterparty_name,
+                "reference": ln.reference,
+                "is_fee": ln.is_fee,
+                "match_status": ln.match_status,
+                "matched_transaction_id": ln.matched_transaction_id,
+                "posted_transaction_id": ln.posted_transaction_id,
+            }
+            for ln in lines
+        ],
     }
 
 
