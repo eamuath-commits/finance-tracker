@@ -1302,6 +1302,11 @@ def delete_message(db: Session, message_id: str):
 
 def create_payment(db: Session, obligation_id: str, payment: schemas.PaymentCreate):
 
+    # Derive owner from the obligation so payments inherit ownership (payments
+    # have no reliable user_id of their own; the obligation is authoritative).
+    _obl = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
+    _owner = _obl.user_id if _obl else None
+
     # Check for duplicate billing_month
     if payment.billing_month:
         existing = db.query(models.Payment).filter(
@@ -1336,7 +1341,9 @@ def create_payment(db: Session, obligation_id: str, payment: schemas.PaymentCrea
             existing.note = payment.note
             existing.status = status_enum
             existing.transaction_id = payment.transaction_id
-            
+            if existing.user_id is None:
+                existing.user_id = _owner
+
             db.commit()
             db.refresh(existing)
             return existing
@@ -1366,7 +1373,8 @@ def create_payment(db: Session, obligation_id: str, payment: schemas.PaymentCrea
         billing_month=payment.billing_month,
         note=payment.note,
         status=status_enum,
-        transaction_id=payment.transaction_id
+        transaction_id=payment.transaction_id,
+        user_id=_owner
     )
     db.add(db_payment)
     
@@ -2047,7 +2055,7 @@ def get_audit_history(db: Session, account_id: str, limit: int = 20):
 
 # --- Distribution CRUD ---
 
-def create_distribution(db: Session, distribution: schemas.DistributionCreate):
+def create_distribution(db: Session, distribution: schemas.DistributionCreate, user_id: str = None):
     """Create a distribution record."""
     db_distribution = models.Distribution(
         source_account_id=distribution.source_account_id,
@@ -2056,7 +2064,8 @@ def create_distribution(db: Session, distribution: schemas.DistributionCreate):
         amount=distribution.amount,
         billing_month=distribution.billing_month,
         note=distribution.note,
-        transaction_id=distribution.transaction_id
+        transaction_id=distribution.transaction_id,
+        user_id=user_id
     )
     db.add(db_distribution)
     db.commit()

@@ -276,6 +276,38 @@ def _require_owned(db: Session, model, obj_id: str, current_user: models.User):
     return obj
 
 
+def _require_owned_payment(db, payment_id, current_user):
+    """
+    Object-level ownership gate for a Payment.
+
+    Payments carry no reliable user_id of their own, so ownership is derived
+    from the parent obligation (which is reliably owned). Raises 404 if the
+    payment does not exist or its obligation belongs to another user.
+    """
+    p = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
+    if p is None:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    if p.obligation_id:
+        _require_owned(db, models.MonthlyObligation, p.obligation_id, current_user)
+    return p
+
+
+def _require_owned_distribution(db, distribution_id, current_user):
+    """
+    Object-level ownership gate for a Distribution.
+
+    Distributions carry no reliable user_id of their own, so ownership is
+    derived from the source Account (which is reliably owned). Raises 404 if
+    the distribution does not exist or its source account belongs to another
+    user.
+    """
+    d = crud.get_distribution(db, distribution_id)
+    if d is None:
+        raise HTTPException(status_code=404, detail="Distribution not found")
+    _require_owned(db, models.Account, d.source_account_id, current_user)
+    return d
+
+
 # --- Account Endpoints ---
 @app.post("/accounts/", response_model=schemas.Account)
 def create_account(account: schemas.AccountCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -818,21 +850,29 @@ def get_all_obligation_matches(db: Session = Depends(get_db), current_user: mode
     ).all()
     paid_obl_ids = {p.obligation_id for p in current_payments}
 
-    # Get all linked transaction IDs to exclude
+    # Get all linked transaction IDs to exclude (scoped to this user's transactions)
     linked_tx_ids = set(
-        tid for (tid,) in db.query(models.Payment.transaction_id).filter(
-            models.Payment.transaction_id.isnot(None)
+        tid for (tid,) in db.query(models.Payment.transaction_id).join(
+            models.Transaction, models.Payment.transaction_id == models.Transaction.id
+        ).filter(
+            models.Payment.transaction_id.isnot(None),
+            models.Transaction.user_id == current_user.id
         ).all()
     )
     # Also exclude junction-table linked txs
     linked_junction_ids = set(
-        tid for (tid,) in db.query(models.PaymentTransaction.transaction_id).all()
+        tid for (tid,) in db.query(models.PaymentTransaction.transaction_id).join(
+            models.Transaction, models.PaymentTransaction.transaction_id == models.Transaction.id
+        ).filter(
+            models.Transaction.user_id == current_user.id
+        ).all()
     )
     all_excluded = linked_tx_ids | linked_junction_ids
 
     # Get candidate transactions (debit, this month)
     search_start = datetime(now.year, now.month, 1)
     candidates = db.query(models.Transaction).filter(
+        models.Transaction.user_id == current_user.id,
         models.Transaction.timestamp >= search_start,
         models.Transaction.type == 'debit'
     ).all()
@@ -925,10 +965,8 @@ def get_all_obligation_matches(db: Session = Depends(get_db), current_user: mode
 
 @app.get("/obligations/{obligation_id}/matches", response_model=List[schemas.Transaction])
 def get_obligation_matches(obligation_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    # 1. Get Obligation
-    obligation = crud.get_obligation(db, obligation_id)
-    if not obligation:
-        raise HTTPException(status_code=404, detail="Obligation not found")
+    # 1. Get Obligation (ownership-scoped)
+    obligation = _require_owned(db, models.MonthlyObligation, obligation_id, current_user)
 
     # 2. Get Search Date Range (Current Month)
     today = datetime.now()
@@ -939,19 +977,27 @@ def get_obligation_matches(obligation_id: str, db: Session = Depends(get_db), cu
     keyword = obligation.name.split(" ")[0].lower() # e.g. "Stc" from "STC Internet"
     
     # 4. Search Candidates
-    # Criteria: Debit type, timestamp >= search_start
+    # Criteria: Debit type, timestamp >= search_start, owned by caller
     query = db.query(models.Transaction).filter(
+        models.Transaction.user_id == current_user.id,
         models.Transaction.timestamp >= search_start,
         models.Transaction.type == 'debit'
     )
-    
+
     candidates = query.all()
-    
+
     # 5. Filter Candidates (Python side for flexibility)
     matches = []
-    
-    # Get all linked Transaction IDs to exclude
-    linked_tx_ids = [p.transaction_id for p in db.query(models.Payment).filter(models.Payment.transaction_id != None).all()]
+
+    # Get all linked Transaction IDs to exclude (scoped to this user's transactions)
+    linked_tx_ids = [
+        tid for (tid,) in db.query(models.Payment.transaction_id).join(
+            models.Transaction, models.Payment.transaction_id == models.Transaction.id
+        ).filter(
+            models.Payment.transaction_id != None,
+            models.Transaction.user_id == current_user.id
+        ).all()
+    ]
     
     for tx in candidates:
         if tx.id in linked_tx_ids:
@@ -1023,7 +1069,8 @@ def pay_obligation(obligation_id: str, payment: schemas.PaymentCreate, db: Sessi
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/obligations/{obligation_id}/payments")
-def read_obligation_payments(obligation_id: str, db: Session = Depends(get_db)):
+def read_obligation_payments(obligation_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    _require_owned(db, models.MonthlyObligation, obligation_id, current_user)
     payments = crud.get_payments(db, obligation_id)
     result = []
     for p in payments:
@@ -1079,18 +1126,21 @@ def read_obligation_payments(obligation_id: str, db: Session = Depends(get_db)):
     return result
 
 @app.get("/obligations/{obligation_id}/history", response_model=List[schemas.Payment]) # Keep deprecated endpoint for safety temporarily?
-def read_obligation_history_legacy(obligation_id: str, db: Session = Depends(get_db)):
+def read_obligation_history_legacy(obligation_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    _require_owned(db, models.MonthlyObligation, obligation_id, current_user)
     return crud.get_payments(db, obligation_id)
 
 @app.delete("/obligations/history/{payment_id}") # Backward compat URL for frontend
-def delete_payment(payment_id: int, db: Session = Depends(get_db)):
+def delete_payment(payment_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    _require_owned_payment(db, payment_id, current_user)
     killed = crud.delete_payment(db, payment_id)
     if not killed:
         raise HTTPException(status_code=404, detail="Payment entry not found")
     return {"message": "Payment deleted"}
 
 @app.put("/obligations/history/{payment_id}", response_model=schemas.Payment) # Backward compat URL
-def update_payment(payment_id: int, payment_update: schemas.PaymentUpdate, db: Session = Depends(get_db)):
+def update_payment(payment_id: int, payment_update: schemas.PaymentUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    _require_owned_payment(db, payment_id, current_user)
     updated = crud.update_payment(db, payment_id, payment_update)
     if not updated:
         raise HTTPException(status_code=404, detail="Payment entry not found")
@@ -1098,7 +1148,7 @@ def update_payment(payment_id: int, payment_update: schemas.PaymentUpdate, db: S
 
 # --- Auto-Match Obligations to Transactions ---
 @app.post("/obligations/auto-match")
-def auto_match_obligations(db: Session = Depends(get_db)):
+def auto_match_obligations(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """
     Batch process: Scan unpaid obligations for the current and previous month.
     For each, find a debit transaction with 100% amount match within ±5 days of due_day.
@@ -1119,7 +1169,9 @@ def auto_match_obligations(db: Session = Depends(get_db)):
         m = ((now.month - 1 + offset) % 12) + 1
         target_months.append((y, m, f"{y}-{str(m).zfill(2)}"))
 
-    obligations = db.query(models.MonthlyObligation).all()
+    obligations = db.query(models.MonthlyObligation).filter(
+        models.MonthlyObligation.user_id == current_user.id
+    ).all()
 
     # Get ALL existing paid payments for the target months to check what's already done
     from sqlalchemy import or_
@@ -1192,6 +1244,7 @@ def auto_match_obligations(db: Session = Depends(get_db)):
 
             # Find exact-match debit transactions in the window
             candidates = db.query(models.Transaction).filter(
+                models.Transaction.user_id == current_user.id,
                 models.Transaction.timestamp >= start_date,
                 models.Transaction.timestamp <= end_date,
                 models.Transaction.type == "debit",
@@ -1216,6 +1269,7 @@ def auto_match_obligations(db: Session = Depends(get_db)):
             billing_month_str = f"{bm_prefix}-01"
             new_payment = models.Payment(
                 obligation_id=obl.id,
+                user_id=current_user.id,
                 amount=expected_amount,
                 payment_date=matched_tx.timestamp.date() if matched_tx.timestamp else now.date(),
                 billing_month=billing_month_str,
@@ -1261,7 +1315,7 @@ def auto_match_obligations(db: Session = Depends(get_db)):
 
 # --- Payment-Transaction Linking Endpoints ---
 @app.get("/payments/{payment_id}/suggested-transactions")
-def get_suggested_transactions(payment_id: int, db: Session = Depends(get_db)):
+def get_suggested_transactions(payment_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """
     Suggest transactions that might match this payment.
     Matching criteria:
@@ -1269,11 +1323,9 @@ def get_suggested_transactions(payment_id: int, db: Session = Depends(get_db)):
     - Amount within 10% tolerance
     - Merchant name contains obligation/provider name
     """
-    # Get the payment
-    payment = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
-    
+    # Get the payment (ownership-scoped via its obligation)
+    payment = _require_owned_payment(db, payment_id, current_user)
+
     # Get the related obligation
     obligation = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == payment.obligation_id).first()
     if not obligation:
@@ -1307,8 +1359,9 @@ def get_suggested_transactions(payment_id: int, db: Session = Depends(get_db)):
     start_date = target_date - timedelta(days=15)
     end_date = target_date + timedelta(days=15)
     
-    # Query transactions in date range
+    # Query transactions in date range (scoped to caller's transactions)
     transactions = db.query(models.Transaction).filter(
+        models.Transaction.user_id == current_user.id,
         models.Transaction.timestamp >= start_date,
         models.Transaction.timestamp <= end_date,
         models.Transaction.type == "debit"  # Payments are typically debits
@@ -1372,15 +1425,16 @@ def get_suggested_transactions(payment_id: int, db: Session = Depends(get_db)):
     return suggestions[:10]  # Return top 10 suggestions
 
 @app.post("/payments/{payment_id}/link-transaction")
-def link_payment_to_transaction(payment_id: int, transaction_id: str, db: Session = Depends(get_db)):
+def link_payment_to_transaction(payment_id: int, transaction_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Link a payment to a transaction and mark it as paid."""
-    # Get the payment
-    payment = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
-    
-    # Verify transaction exists
-    transaction = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
+    # Get the payment (ownership-scoped via its obligation)
+    payment = _require_owned_payment(db, payment_id, current_user)
+
+    # Verify transaction exists and belongs to the caller
+    transaction = db.query(models.Transaction).filter(
+        models.Transaction.id == transaction_id,
+        models.Transaction.user_id == current_user.id
+    ).first()
     if not transaction:
         raise HTTPException(status_code=404, detail="Transaction not found")
     
@@ -1403,12 +1457,10 @@ def link_payment_to_transaction(payment_id: int, transaction_id: str, db: Sessio
     }
 
 @app.delete("/payments/{payment_id}/unlink-transaction")
-def unlink_payment_transaction(payment_id: int, db: Session = Depends(get_db)):
+def unlink_payment_transaction(payment_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Remove the link between a payment and its transaction."""
-    payment = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
-    
+    payment = _require_owned_payment(db, payment_id, current_user)
+
     payment.transaction_id = None
     db.commit()
     
@@ -2973,8 +3025,8 @@ def get_audit_history(account_id: str, limit: int = 20, db: Session = Depends(ge
 @app.post("/distributions", response_model=schemas.Distribution)
 def create_distribution(distribution: schemas.DistributionCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Create a distribution record."""
-    db_distribution = crud.create_distribution(db, distribution)
-    
+    db_distribution = crud.create_distribution(db, distribution, user_id=current_user.id)
+
     # Enrich with account names
     source = crud.get_account(db, db_distribution.source_account_id)
     target = crud.get_account(db, db_distribution.target_account_id)
@@ -2990,11 +3042,24 @@ def create_distribution(distribution: schemas.DistributionCreate, db: Session = 
 def get_distributions(
     billing_month: str = None,
     source_account_id: str = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
 ):
     """Get distributions, optionally filtered by month or source account."""
     distributions = crud.get_distributions(db, billing_month, source_account_id)
-    
+
+    # Scope to the caller: only distributions whose source OR target account
+    # belongs to the current user (distributions carry no reliable user_id).
+    owned_account_ids = {
+        aid for (aid,) in db.query(models.Account.id).filter(
+            models.Account.user_id == current_user.id
+        ).all()
+    }
+    distributions = [
+        d for d in distributions
+        if d.source_account_id in owned_account_ids or d.target_account_id in owned_account_ids
+    ]
+
     # Enrich with account names, obligation names, and linked transactions
     result = []
     obl_cache = {}
@@ -3042,12 +3107,10 @@ def get_distributions(
     return result
 
 @app.get("/distributions/{distribution_id}", response_model=schemas.Distribution)
-def get_distribution(distribution_id: str, db: Session = Depends(get_db)):
+def get_distribution(distribution_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Get a single distribution by ID."""
-    d = crud.get_distribution(db, distribution_id)
-    if not d:
-        raise HTTPException(status_code=404, detail="Distribution not found")
-    
+    d = _require_owned_distribution(db, distribution_id, current_user)
+
     source = crud.get_account(db, d.source_account_id)
     target = crud.get_account(db, d.target_account_id)
     linked_tx = crud.get_transaction(db, d.transaction_id) if d.transaction_id else None
@@ -3065,22 +3128,34 @@ def get_distribution(distribution_id: str, db: Session = Depends(get_db)):
     }
 
 @app.get("/distributions/{distribution_id}/matches", response_model=List[schemas.Transaction])
-def get_distribution_matches(distribution_id: str, db: Session = Depends(get_db)):
+def get_distribution_matches(distribution_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Find matching transactions for a distribution."""
+    _require_owned_distribution(db, distribution_id, current_user)
     matches = crud.get_distribution_matches(db, distribution_id)
+    # Scope matches to the caller's own transactions where possible.
+    matches = [m for m in matches if getattr(m, "user_id", None) in (None, current_user.id)]
     return matches
 
 @app.post("/distributions/{distribution_id}/link")
-def link_distribution(distribution_id: str, transaction_id: str, db: Session = Depends(get_db)):
+def link_distribution(distribution_id: str, transaction_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Link a distribution to a transaction."""
+    _require_owned_distribution(db, distribution_id, current_user)
+    # Verify the transaction belongs to the caller before linking.
+    tx = db.query(models.Transaction).filter(
+        models.Transaction.id == transaction_id,
+        models.Transaction.user_id == current_user.id
+    ).first()
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
     result = crud.link_distribution_to_transaction(db, distribution_id, transaction_id)
     if not result:
         raise HTTPException(status_code=404, detail="Distribution not found")
     return {"status": "linked", "distribution_id": distribution_id, "transaction_id": transaction_id}
 
 @app.put("/distributions/{distribution_id}", response_model=schemas.Distribution)
-def update_distribution(distribution_id: str, update: schemas.DistributionUpdate, db: Session = Depends(get_db)):
+def update_distribution(distribution_id: str, update: schemas.DistributionUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Update a distribution."""
+    _require_owned_distribution(db, distribution_id, current_user)
     result = crud.update_distribution(db, distribution_id, update)
     if not result:
         raise HTTPException(status_code=404, detail="Distribution not found")
@@ -3098,8 +3173,9 @@ def update_distribution(distribution_id: str, update: schemas.DistributionUpdate
     }
 
 @app.delete("/distributions/{distribution_id}")
-def delete_distribution(distribution_id: str, db: Session = Depends(get_db)):
+def delete_distribution(distribution_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Delete a distribution."""
+    _require_owned_distribution(db, distribution_id, current_user)
     success = crud.delete_distribution(db, distribution_id)
     if not success:
         raise HTTPException(status_code=404, detail="Distribution not found")
@@ -3109,8 +3185,9 @@ def delete_distribution(distribution_id: str, db: Session = Depends(get_db)):
 # --- Transaction Linking Endpoints ---
 
 @app.get("/payments/{payment_id}/transactions")
-def get_payment_linked_transactions(payment_id: int, db: Session = Depends(get_db)):
+def get_payment_linked_transactions(payment_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Get all transactions linked to a payment."""
+    _require_owned_payment(db, payment_id, current_user)
     links = db.query(models.PaymentTransaction).filter(
         models.PaymentTransaction.payment_id == payment_id
     ).all()
@@ -3131,20 +3208,27 @@ def get_payment_linked_transactions(payment_id: int, db: Session = Depends(get_d
 def link_transactions_to_payment(
     payment_id: int,
     request: schemas.LinkTransactionsRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
 ):
     """Link multiple transactions to a payment."""
-    payment = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
-    
+    _require_owned_payment(db, payment_id, current_user)
+
     linked = []
     for tx_id in request.transaction_ids:
+        # Verify each transaction belongs to the caller before linking.
+        tx = db.query(models.Transaction).filter(
+            models.Transaction.id == tx_id,
+            models.Transaction.user_id == current_user.id
+        ).first()
+        if not tx:
+            raise HTTPException(status_code=404, detail="Transaction not found")
+
         existing = db.query(models.PaymentTransaction).filter(
             models.PaymentTransaction.payment_id == payment_id,
             models.PaymentTransaction.transaction_id == tx_id
         ).first()
-        
+
         if not existing:
             link = models.PaymentTransaction(payment_id=payment_id, transaction_id=tx_id, link_source=request.link_source)
             db.add(link)
@@ -3155,8 +3239,9 @@ def link_transactions_to_payment(
 
 
 @app.delete("/payments/{payment_id}/transactions/{transaction_id}")
-def unlink_transaction_from_payment(payment_id: int, transaction_id: str, db: Session = Depends(get_db)):
+def unlink_transaction_from_payment(payment_id: int, transaction_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Unlink a transaction from a payment."""
+    _require_owned_payment(db, payment_id, current_user)
     link = db.query(models.PaymentTransaction).filter(
         models.PaymentTransaction.payment_id == payment_id,
         models.PaymentTransaction.transaction_id == transaction_id
@@ -3177,8 +3262,9 @@ def unlink_transaction_from_payment(payment_id: int, transaction_id: str, db: Se
 
 
 @app.get("/distributions/{distribution_id}/transactions")
-def get_distribution_linked_transactions(distribution_id: str, db: Session = Depends(get_db)):
+def get_distribution_linked_transactions(distribution_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Get all transactions linked to a distribution."""
+    _require_owned_distribution(db, distribution_id, current_user)
     links = db.query(models.DistributionTransaction).filter(
         models.DistributionTransaction.distribution_id == distribution_id
     ).all()
@@ -3199,20 +3285,27 @@ def get_distribution_linked_transactions(distribution_id: str, db: Session = Dep
 def link_transactions_to_distribution(
     distribution_id: str,
     request: schemas.LinkTransactionsRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
 ):
     """Link multiple transactions to a distribution."""
-    dist = db.query(models.Distribution).filter(models.Distribution.id == distribution_id).first()
-    if not dist:
-        raise HTTPException(status_code=404, detail="Distribution not found")
-    
+    _require_owned_distribution(db, distribution_id, current_user)
+
     linked = []
     for tx_id in request.transaction_ids:
+        # Verify each transaction belongs to the caller before linking.
+        tx = db.query(models.Transaction).filter(
+            models.Transaction.id == tx_id,
+            models.Transaction.user_id == current_user.id
+        ).first()
+        if not tx:
+            raise HTTPException(status_code=404, detail="Transaction not found")
+
         existing = db.query(models.DistributionTransaction).filter(
             models.DistributionTransaction.distribution_id == distribution_id,
             models.DistributionTransaction.transaction_id == tx_id
         ).first()
-        
+
         if not existing:
             link = models.DistributionTransaction(distribution_id=distribution_id, transaction_id=tx_id)
             db.add(link)
@@ -3223,8 +3316,9 @@ def link_transactions_to_distribution(
 
 
 @app.delete("/distributions/{distribution_id}/transactions/{transaction_id}")
-def unlink_transaction_from_distribution(distribution_id: str, transaction_id: str, db: Session = Depends(get_db)):
+def unlink_transaction_from_distribution(distribution_id: str, transaction_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Unlink a transaction from a distribution."""
+    _require_owned_distribution(db, distribution_id, current_user)
     link = db.query(models.DistributionTransaction).filter(
         models.DistributionTransaction.distribution_id == distribution_id,
         models.DistributionTransaction.transaction_id == transaction_id
