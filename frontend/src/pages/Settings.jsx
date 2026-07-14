@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import api, { API_URL } from '../utils/api';
 import { Settings as SettingsIcon, Save, Calendar, Tag, CheckCircle, Loader2, Building2, Link2, Unlink, RefreshCw, Shield, Clock, AlertCircle, ExternalLink } from 'lucide-react';
+import { useConfirm } from '../components/ConfirmProvider';
 
 
 const Settings = () => {
+    const confirm = useConfirm();
     const [periodStartDay, setPeriodStartDay] = useState('1');
     const [periodLabel, setPeriodLabel] = useState('');
     const [saving, setSaving] = useState(false);
@@ -113,7 +115,7 @@ const Settings = () => {
     };
 
     const handleDisconnect = async () => {
-        if (!confirm('Are you sure you want to disconnect your Al Rajhi account? This will revoke access.')) return;
+        if (!(await confirm({ title: 'Disconnect Bank', message: 'Are you sure you want to disconnect your Al Rajhi account? This will revoke access.', variant: 'danger', confirmText: 'Disconnect' }))) return;
         setDisconnecting(true);
         setBankError('');
         try {

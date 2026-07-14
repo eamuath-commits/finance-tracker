@@ -268,7 +268,11 @@ const SMSIngestTab = ({ accounts = [], creditCards = [], onTransactionCreated })
             try {
                 await api.delete(`${API_URL}/transactions/${transactionId}`);
             } catch (err) {
-                console.log("Transaction may not exist:", err.message);
+                // Do NOT mark the item ignored if the delete failed — the
+                // transaction still exists in the DB and would be orphaned.
+                console.error("Failed to delete transaction:", err);
+                alert(err.response?.data?.detail || 'Failed to delete transaction');
+                return;
             }
         }
 

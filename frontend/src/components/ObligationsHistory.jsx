@@ -6,9 +6,11 @@ import TransactionSelectorModal from '../components/TransactionSelectorModal';
 import { CATEGORY_ICONS, CATEGORY_COLORS, CategoryHeader, CategorySectionWrapper } from './categoryStyles';
 import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Eye, List, LayoutGrid, PlusCircle, ArrowUpRight, Clock, DollarSign, MessageSquare, Box } from 'lucide-react';
 import { exportToCSV } from '../utils/csvExport';
+import { useConfirm } from './ConfirmProvider';
 
 
 const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDelete, onRefresh, forecast }) => {
+    const confirm = useConfirm();
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: 'billing_month', direction: 'desc' });
     const [viewMode, setViewMode] = useState('envelope'); // 'envelope' or 'table'
@@ -319,19 +321,20 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
     };
 
     const handleUnlinkTransaction = async (paymentId) => {
-        if (!confirm("Remove the link to this transaction?")) return;
+        if (!(await confirm({ title: 'Unlink Transaction', message: 'Remove the link to this transaction?', variant: 'danger', confirmText: 'Remove' }))) return;
 
         try {
             await api.delete(`${API_URL}/payments/${paymentId}/unlink-transaction`);
             if (onRefresh) onRefresh();
         } catch (err) {
             console.error("Error unlinking:", err);
+            alert(err.response?.data?.detail || 'Failed to unlink transaction');
         }
     };
 
     // Unlink a single transaction from a payment (for multi-link junction table)
     const handleUnlinkSingleTransaction = async (paymentId, transactionId) => {
-        if (!confirm("Remove the link to this transaction?")) return;
+        if (!(await confirm({ title: 'Unlink Transaction', message: 'Remove the link to this transaction?', variant: 'danger', confirmText: 'Remove' }))) return;
 
         try {
             await api.delete(`${API_URL}/payments/${paymentId}/transactions/${transactionId}`);

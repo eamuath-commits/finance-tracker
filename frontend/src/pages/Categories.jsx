@@ -3,11 +3,13 @@ import api, { API_URL } from '../utils/api';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Plus, Edit2, Trash2, Search } from 'lucide-react';
 import { inputClass } from '../components/UI';
+import { useConfirm } from '../components/ConfirmProvider';
 
 const Categories = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
     const activeTab = searchParams.get('tab') || 'OBLIGATION';
+    const confirm = useConfirm();
 
     const setActiveTab = (tab) => {
         setSearchParams({ tab });
@@ -51,7 +53,7 @@ const Categories = () => {
         const existing = categories.find(c => c.name.toLowerCase() === newCategoryName.trim().toLowerCase());
         if (existing) {
             const typeLabel = existing.type === 'BOTH' ? 'Shared' : existing.type === 'OBLIGATION' ? 'Obligation' : 'Transaction';
-            if (confirm(`"${existing.name}" already exists as a ${typeLabel} category. Would you like to change it to Shared (visible in both tabs)?`)) {
+            if (await confirm({ title: 'Category Exists', message: `"${existing.name}" already exists as a ${typeLabel} category. Would you like to change it to Shared (visible in both tabs)?`, variant: 'warning', confirmText: 'Make Shared' })) {
                 await handleUpdateCategory(existing.id, { type: 'BOTH' });
             }
             return;
@@ -80,7 +82,7 @@ const Categories = () => {
     };
 
     const handleDeleteCategory = async (id) => {
-        if (!confirm("Delete this category? Associated items will become Uncategorized.")) return;
+        if (!(await confirm({ title: 'Delete Category', message: 'Delete this category? Associated items will become Uncategorized.', variant: 'danger', confirmText: 'Delete' }))) return;
         try {
             await api.delete(`${API_URL}/categories/${id}`);
             fetchCategories();

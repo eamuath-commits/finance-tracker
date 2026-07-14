@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { CATEGORY_ICONS, CATEGORY_COLORS } from './categoryStyles';
 import { exportToCSV } from '../utils/csvExport';
+import { useConfirm } from './ConfirmProvider';
 
 
 const TREND_ICONS = {
@@ -125,6 +126,7 @@ const EditPopover = ({ obl, monthData, billingDate, onSave, onClose, onDelete })
 };
 
 const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, monthOffset = 0, periodStartDay = 1, handleQuickPay, onRefresh }) => {
+    const confirm = useConfirm();
     const [forecast, setForecast] = useState(null);
     const [loading, setLoading] = useState(true);
     const [expandedCats, setExpandedCats] = useState(new Set());
@@ -305,6 +307,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                     if (onRefresh) onRefresh();
                 } catch (err) {
                     console.error('Error deleting payment:', err);
+                    alert(err.response?.data?.detail || 'Failed to delete payment');
                 }
             }
             return;
@@ -316,7 +319,7 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
 
     // Handle delete payment from forecast
     const handleDeletePayment = async (paymentId) => {
-        if (!confirm('Delete this payment entry?')) return;
+        if (!(await confirm({ title: 'Delete Payment', message: 'Delete this payment entry?', variant: 'danger', confirmText: 'Delete' }))) return;
         try {
             await api.delete(`${API_URL}/obligations/history/${paymentId}`);
             if (onRefresh) onRefresh();

@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { Search, Edit3, Trash2, Plus, User, Calendar, Filter, X, MessageSquare, Upload, ChevronLeft, ChevronRight } from "lucide-react";
 import { Modal, formatCurrency, inputClass, selectClass } from "../components/UI";
 import SMSIngestTab from "../components/SMSIngestTab";
+import { useConfirm } from "../components/ConfirmProvider";
 
 
 // Categories list
@@ -21,6 +22,7 @@ function Transactions() {
     const setActiveTab = (tab) => {
         setSearchParams({ tab });
     };
+    const confirm = useConfirm();
     const [transactions, setTransactions] = useState([]);
     const [pendingTransactions, setPendingTransactions] = useState([]);
     const [accounts, setAccounts] = useState([]);
@@ -302,6 +304,7 @@ function Transactions() {
                     setTransactions(prev => prev.filter(t => t.id !== id));
                 } catch (e) {
                     console.error("Delete failed:", e);
+                    alert(e.response?.data?.detail || 'Delete failed');
                 }
                 setConfirmModal({ open: false, message: '', onConfirm: null });
             }
@@ -309,12 +312,13 @@ function Transactions() {
     };
 
     const handleDeleteMsg = async (id) => {
-        if (!window.confirm("Are you sure?")) return;
+        if (!(await confirm({ title: 'Delete Message', message: 'Are you sure?', variant: 'danger', confirmText: 'Delete' }))) return;
         try {
             await api.post(`${API_URL}/messages/bulk-delete`, { ids: [id] });
             setInboxMessages(inboxMessages.filter(m => m.id !== id));
         } catch (e) {
             console.error("Delete failed:", e);
+            alert(e.response?.data?.detail || 'Delete failed');
         }
     };
 
@@ -477,6 +481,7 @@ function Transactions() {
                     fetchData();
                 } catch (e) {
                     console.error("Bulk delete failed", e);
+                    alert(e.response?.data?.detail || 'Delete failed');
                 }
                 setConfirmModal({ open: false, message: '', onConfirm: null });
             }

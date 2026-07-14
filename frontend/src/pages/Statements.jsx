@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import api, { API_URL } from '../utils/api';
 import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, ArrowLeft, ArrowUpRight, ArrowDownLeft, ChevronRight, ChevronDown, RefreshCw, Filter, Wallet, Calendar, Search, X, Download, Edit3, Check, MoreVertical, Eye, ShieldCheck, Link2, GitBranch, BarChart3, TrendingUp, TrendingDown, LayoutGrid, List, FileSearch, MessageSquare, Repeat, Tag, FileSpreadsheet } from 'lucide-react';
+import { useConfirm } from '../components/ConfirmProvider';
 
 const Statements = () => {
+    const confirm = useConfirm();
     const [statements, setStatements] = useState([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
@@ -1668,7 +1670,7 @@ const Statements = () => {
     };
 
     const handleBulkDelete = async () => {
-        if (!window.confirm(`Delete ${selectedIds.size} statement(s)?`)) return;
+        if (!(await confirm({ title: 'Delete Statements', message: `Delete ${selectedIds.size} statement(s)?`, variant: 'danger', confirmText: 'Delete' }))) return;
         try {
             await api.post('/api/statements/bulk-delete', { ids: Array.from(selectedIds) });
             setSelectedIds(new Set());

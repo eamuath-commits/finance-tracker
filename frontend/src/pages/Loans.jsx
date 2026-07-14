@@ -5,6 +5,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Trash2 } from 'lucide-react';
+import { useConfirm } from '../components/ConfirmProvider';
 
 const SortableLoanItem = ({ loan, openLoanModal, deleteLoan }) => {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: loan.id });
@@ -184,6 +185,7 @@ const SortableLoanItem = ({ loan, openLoanModal, deleteLoan }) => {
 };
 
 const Loans = () => {
+    const confirm = useConfirm();
     const [loans, setLoans] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showLoanModal, setShowLoanModal] = useState(false);
@@ -261,7 +263,7 @@ const Loans = () => {
         }
 
         if (!targetId) return;
-        if (!confirm("Are you sure you want to delete this loan?")) return;
+        if (!(await confirm({ title: 'Delete Loan', message: 'Are you sure you want to delete this loan?', variant: 'danger', confirmText: 'Delete' }))) return;
         try {
             await api.delete(`${API_URL}/loans/${targetId}`);
             setShowLoanModal(false);

@@ -12,7 +12,9 @@ import {
     AlertCircle
 } from 'lucide-react';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Use the shared API base (host-relative), not a hardcoded localhost fallback
+// that breaks when the app is opened from any other host.
+const API = API_URL;
 
 const formatCurrency = (amount) => {
     if (amount === null || amount === undefined) return '—';

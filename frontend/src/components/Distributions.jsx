@@ -336,6 +336,7 @@ const Distributions = ({ accounts }) => {
                     fetchTransfers();
                 } catch (err) {
                     console.error("Error unlinking:", err);
+                    alert(err.response?.data?.detail || 'Failed to unlink transaction');
                 }
                 setConfirmDialog({ open: false, title: '', message: '', onConfirm: null });
             }

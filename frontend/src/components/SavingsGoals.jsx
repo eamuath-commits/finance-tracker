@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import api, { API_URL } from '../utils/api';
 import { formatCurrency, Card } from '../components/UI';
 import { Target, Plus, Trash2 } from 'lucide-react';
+import { useConfirm } from './ConfirmProvider';
 
 
 const SavingsGoals = () => {
+    const confirm = useConfirm();
     const [goals, setGoals] = useState([]);
     const [isAdding, setIsAdding] = useState(false);
     const [newGoal, setNewGoal] = useState({
@@ -151,12 +153,13 @@ const SavingsGoals = () => {
     }
 
     const handleDelete = async (id) => {
-        if (!confirm("Delete this goal?")) return;
+        if (!(await confirm({ title: 'Delete Goal', message: 'Delete this goal?', variant: 'danger', confirmText: 'Delete' }))) return;
         try {
             await api.delete(`${API_URL}/goals/${id}`);
             fetchGoals();
         } catch (error) {
             console.error("Error deleting goal", error);
+            alert(error.response?.data?.detail || 'Failed to delete goal');
         }
     };
 

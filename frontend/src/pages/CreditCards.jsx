@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { CreditCard as CreditCardIcon, Plus, Edit3, Trash2, DollarSign, TrendingUp, Calendar, Percent, ChevronDown, ChevronUp } from "lucide-react";
 import { Modal, formatCurrency, formatCurrencyText, inputClass, selectClass } from "../components/UI";
+import { useConfirm } from '../components/ConfirmProvider';
 
 
 // Get bank-specific card background image for credit cards
@@ -159,6 +160,7 @@ const CreditCardVisual = ({ card, onEdit, onPayment, onDelete, onClick }) => {
 
 function CreditCards() {
     const navigate = useNavigate();
+    const confirm = useConfirm();
     const [creditCards, setCreditCards] = useState([]);
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -241,7 +243,7 @@ function CreditCards() {
     };
 
     const handleDelete = async (cardId) => {
-        if (!confirm("Delete this credit card? All associated transactions will be orphaned.")) return;
+        if (!(await confirm({ title: 'Delete Credit Card', message: 'Delete this credit card? All associated transactions will be orphaned.', variant: 'danger', confirmText: 'Delete' }))) return;
         try {
             await api.delete(`${API_URL}/credit-cards/${cardId}`);
             fetchData();

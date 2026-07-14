@@ -3,6 +3,7 @@ import api, { API_URL } from '../utils/api';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Wallet, PiggyBank, CreditCard, LayoutGrid, List, Receipt, CreditCard as ChipIcon, Edit3, Trash2, Plus, Search, Filter, MessageSquareText, User, Upload, RefreshCw } from 'lucide-react';
 import { Card, SectionHeader, Modal, formatCurrency, inputClass, selectClass } from '../components/UI';
+import { useConfirm } from '../components/ConfirmProvider';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, rectSortingStrategy, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -281,6 +282,7 @@ const OverviewAccountRow = ({ acc, allTransactions }) => {
 const Accounts = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
+    const confirm = useConfirm();
 
     // Initialize activeTab: Strictly from URL to ensure History works
     const activeTab = searchParams.get('tab') || 'overview';
@@ -502,16 +504,16 @@ const Accounts = () => {
     };
 
     const handleDeleteTx = async (id) => {
-        if (confirm('Are you sure you want to delete this transaction?')) {
-            try {
-                await api.delete(`${API_URL}/transactions/${id}`);
-                fetchData();
-            } catch (err) { alert('Error deleting transaction'); }
-        }
+        if (!(await confirm({ title: 'Delete Transaction', message: 'Are you sure you want to delete this transaction?', variant: 'danger', confirmText: 'Delete' }))) return;
+        try {
+            await api.delete(`${API_URL}/transactions/${id}`);
+            fetchData();
+        } catch (err) { alert('Error deleting transaction'); }
     };
 
     const handleDeleteAccount = async () => {
-        if (!editingId || !confirm('Are you sure you want to delete this account? This action cannot be undone.')) return;
+        if (!editingId) return;
+        if (!(await confirm({ title: 'Delete Account', message: 'Are you sure you want to delete this account? This action cannot be undone.', variant: 'danger', confirmText: 'Delete' }))) return;
         try {
             await api.delete(`${API_URL}/accounts/${editingId}`);
             setShowAccountModal(false);
@@ -737,7 +739,7 @@ const Accounts = () => {
                                             <div className="flex items-center justify-center gap-1">
                                                 <button
                                                     onClick={async () => {
-                                                        if (!confirm(`Recalculate ${acc.name} balance from transactions?`)) return;
+                                                        if (!(await confirm({ title: 'Recalculate Balance', message: `Recalculate ${acc.name} balance from transactions?`, variant: 'warning', confirmText: 'Recalculate' }))) return;
                                                         try {
                                                             const res = await api.post(`${API_URL}/accounts/${acc.id}/recalculate-balance`);
                                                             const d = res.data;
@@ -781,7 +783,7 @@ const Accounts = () => {
                             {isSelectionMode && selectedTxIds.size > 0 && (
                                 <button
                                     onClick={async () => {
-                                        if (!window.confirm(`Delete ${selectedTxIds.size} transaction(s)?`)) return;
+                                        if (!(await confirm({ title: 'Delete Transactions', message: `Delete ${selectedTxIds.size} transaction(s)?`, variant: 'danger', confirmText: 'Delete' }))) return;
                                         try {
                                             await api.post(`${API_URL}/transactions/bulk-delete`, { ids: Array.from(selectedTxIds) });
                                             setSelectedTxIds(new Set());
@@ -1282,7 +1284,7 @@ const Accounts = () => {
                                         <span>{alias.alias_name} (x{alias.last_4_digits})</span>
                                         <button
                                             onClick={async () => {
-                                                if (!confirm('Delete this alias?')) return;
+                                                if (!(await confirm({ title: 'Delete Alias', message: 'Delete this alias?', variant: 'danger', confirmText: 'Delete' }))) return;
                                                 try {
                                                     await api.delete(`${API_URL}/aliases/${alias.id}`);
                                                     // Refresh list locally

@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api, { authUtils } from '../utils/api';
 import { Users, Shield, ShieldOff, KeyRound, Trash2, UserPlus, X, Eye, EyeOff } from 'lucide-react';
+import { useConfirm } from '../components/ConfirmProvider';
 
 const UserManagement = () => {
+    const confirm = useConfirm();
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -65,7 +67,7 @@ const UserManagement = () => {
 
     const handleDeleteUser = async (user) => {
         clearMessages();
-        if (!window.confirm(`Are you sure you want to delete '${user.username}'? This action cannot be undone.`)) return;
+        if (!(await confirm({ title: 'Delete User', message: `Are you sure you want to delete '${user.username}'? This action cannot be undone.`, variant: 'danger', confirmText: 'Delete' }))) return;
         try {
             await api.delete(`/auth/users/${user.id}`);
             setSuccess(`User '${user.username}' deleted`);

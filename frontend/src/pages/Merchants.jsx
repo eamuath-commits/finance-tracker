@@ -83,6 +83,7 @@ function Merchants() {
                     fetchMerchants();
                 } catch (e) {
                     console.error("Delete failed:", e);
+                    alert(e.response?.data?.detail || 'Delete failed');
                 }
                 setConfirmModal({ open: false, message: '', onConfirm: null });
             }
