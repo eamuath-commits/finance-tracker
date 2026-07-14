@@ -858,9 +858,16 @@ def update_obligation(db: Session, obligation_id: str, obligation_update: schema
     return db_obj
 
 def delete_obligation(db: Session, obligation_id: str):
-    # Delete associated payments first to prevent Foreign Key errors
-    db.query(models.Payment).filter(models.Payment.obligation_id == obligation_id).delete()
-    
+    # Clear referencing rows first to avoid FK constraint errors on delete.
+    db.query(models.Payment).filter(
+        models.Payment.obligation_id == obligation_id
+    ).delete(synchronize_session=False)
+    # Distributions reference the obligation (distributions.obligation_id, NO ACTION);
+    # unlink them (keep the distribution record) rather than delete the plan history.
+    db.query(models.Distribution).filter(
+        models.Distribution.obligation_id == obligation_id
+    ).update({"obligation_id": None}, synchronize_session=False)
+
     db_obj = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
     if db_obj:
         db.delete(db_obj)
