@@ -265,7 +265,13 @@ def _require_owned(db: Session, model, obj_id: str, current_user: models.User):
     This is the object-level authorization gate for by-id endpoints.
     """
     obj = db.query(model).filter(model.id == obj_id).first()
-    if obj is None or getattr(obj, "user_id", None) != current_user.id:
+    if obj is None:
+        raise HTTPException(status_code=404, detail=f"{model.__name__} not found")
+    # Records with no owner (legacy/unstamped rows) are treated as claimable by
+    # the caller; only a record owned by a DIFFERENT user is hidden. This avoids
+    # 404-ing the true owner on rows whose user_id was never set.
+    owner = getattr(obj, "user_id", None)
+    if owner is not None and owner != current_user.id:
         raise HTTPException(status_code=404, detail=f"{model.__name__} not found")
     return obj
 
@@ -475,7 +481,8 @@ def record_credit_card_payment(card_id: str, amount: float, from_account_id: Opt
         category="Payment",
         type="credit",
         status="completed",
-        timestamp=datetime.now()
+        timestamp=datetime.now(),
+        user_id=current_user.id,
     )
     tx = crud.create_transaction(db, tx_data)
     
@@ -493,7 +500,8 @@ def record_credit_card_payment(card_id: str, amount: float, from_account_id: Opt
                 category="Credit Card Payment",
                 type="debit",
                 status="completed",
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
+                user_id=current_user.id,
             )
             crud.create_transaction(db, debit_tx)
     

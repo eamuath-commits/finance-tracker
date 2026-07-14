@@ -602,13 +602,17 @@ def bulk_delete_statements(
     deleted = 0
     skipped = 0
     for s in statements:
-        if s.status == "approved":
+        if s.status in ("approved", "posted"):
             skipped += 1
             continue
         # Delete draft transactions
         db.query(models.Transaction).filter(
             models.Transaction.statement_id == s.id,
             models.Transaction.status == "draft",
+        ).delete(synchronize_session=False)
+        # Delete parsed lines (FK statement_lines.statement_id is NOT NULL, NO ACTION)
+        db.query(models.StatementLine).filter(
+            models.StatementLine.statement_id == s.id
         ).delete(synchronize_session=False)
         # Delete PDF
         if s.file_path and os.path.exists(s.file_path):
@@ -690,25 +694,31 @@ def delete_statement(
     if not statement:
         raise HTTPException(status_code=404, detail="Statement not found")
     
-    if statement.status == "approved":
+    if statement.status in ("approved", "posted"):
         raise HTTPException(
             status_code=400,
-            detail="Cannot delete an approved statement. Reject it first."
+            detail="Cannot delete a posted statement (its transactions are in the ledger). Reject it first."
         )
-    
+
     # Delete associated draft transactions
     deleted_tx_count = db.query(models.Transaction).filter(
         models.Transaction.statement_id == statement_id,
         models.Transaction.status == "draft",
     ).delete(synchronize_session=False)
-    
+
+    # Delete the statement's parsed lines (FK statement_lines.statement_id is NOT NULL,
+    # NO ACTION — leaving them would raise an IntegrityError on delete).
+    db.query(models.StatementLine).filter(
+        models.StatementLine.statement_id == statement_id
+    ).delete(synchronize_session=False)
+
     # Delete the PDF file
     if statement.file_path and os.path.exists(statement.file_path):
         try:
             os.remove(statement.file_path)
         except OSError as e:
             logger.warning(f"Failed to delete PDF file: {e}")
-    
+
     # Delete the statement record
     db.delete(statement)
     db.commit()

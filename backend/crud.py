@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 import models
 import schemas
 from typing import List, Optional
@@ -78,10 +78,23 @@ def update_credit_card(db: Session, card_id: str, card_update: schemas.CreditCar
     return db_card
 
 def delete_credit_card(db: Session, card_id: str):
-    """Delete a credit card"""
+    """Delete a credit card and its transactions."""
     db_card = db.query(models.CreditCard).filter(models.CreditCard.id == card_id).first()
     if not db_card:
         return False
+    # Remove the card's transactions (clearing each one's references first)
+    tx_ids = [row[0] for row in db.query(models.Transaction.id).filter(
+        models.Transaction.credit_card_id == card_id
+    ).all()]
+    for tid in tx_ids:
+        _clear_transaction_refs(db, tid)
+    db.query(models.Transaction).filter(
+        models.Transaction.credit_card_id == card_id
+    ).delete(synchronize_session=False)
+    # Remove any queue rows still tied to this card
+    db.query(models.TransactionQueue).filter(
+        models.TransactionQueue.credit_card_id == card_id
+    ).delete(synchronize_session=False)
     db.delete(db_card)
     db.commit()
     return True
@@ -134,15 +147,75 @@ def create_account_alias(db: Session, account_id: str, alias: schemas.AccountAli
     return db_alias
 
 def delete_account(db: Session, account_id: str):
+    """Delete an account and every row that references it, in dependency order."""
     db_account = db.query(models.Account).filter(models.Account.id == account_id).first()
-    if db_account:
-        # Delete related allocation rules that reference this account
-        db.query(models.AllocationRule).filter(
-            models.AllocationRule.target_account_id == account_id
+    if not db_account:
+        return None
+
+    import bank_models
+
+    # 1. The account's transactions (clear each one's references first, then bulk delete)
+    tx_ids = [row[0] for row in db.query(models.Transaction.id).filter(
+        models.Transaction.account_id == account_id
+    ).all()]
+    for tid in tx_ids:
+        _clear_transaction_refs(db, tid)
+    db.query(models.Transaction).filter(
+        models.Transaction.account_id == account_id
+    ).delete(synchronize_session=False)
+
+    # 2. Statements for this account, plus their parsed lines
+    stmt_ids = [row[0] for row in db.query(models.Statement.id).filter(
+        models.Statement.account_id == account_id
+    ).all()]
+    if stmt_ids:
+        db.query(models.StatementLine).filter(
+            models.StatementLine.statement_id.in_(stmt_ids)
         ).delete(synchronize_session=False)
-        
-        db.delete(db_account)
-        db.commit()
+        db.query(models.Statement).filter(
+            models.Statement.id.in_(stmt_ids)
+        ).delete(synchronize_session=False)
+
+    # 3. Distributions referencing this account (source/target are NOT NULL — must delete)
+    dist_ids = [row[0] for row in db.query(models.Distribution.id).filter(
+        or_(models.Distribution.source_account_id == account_id,
+            models.Distribution.target_account_id == account_id)
+    ).all()]
+    if dist_ids:
+        db.query(models.DistributionTransaction).filter(
+            models.DistributionTransaction.distribution_id.in_(dist_ids)
+        ).delete(synchronize_session=False)
+        db.query(models.Distribution).filter(
+            models.Distribution.id.in_(dist_ids)
+        ).delete(synchronize_session=False)
+
+    # 4. Remaining direct children
+    db.query(models.TransactionQueue).filter(
+        models.TransactionQueue.account_id == account_id
+    ).delete(synchronize_session=False)
+    db.query(models.AllocationRule).filter(
+        models.AllocationRule.target_account_id == account_id
+    ).delete(synchronize_session=False)
+    db.query(models.AccountAudit).filter(
+        models.AccountAudit.account_id == account_id
+    ).delete(synchronize_session=False)
+    db.query(models.AccountAlias).filter(
+        models.AccountAlias.account_id == account_id
+    ).delete(synchronize_session=False)
+    db.query(models.CurrencyWallet).filter(
+        models.CurrencyWallet.account_id == account_id
+    ).delete(synchronize_session=False)
+
+    # 5. Nullable links — unlink rather than delete
+    db.query(models.MonthlyObligation).filter(
+        models.MonthlyObligation.target_account_id == account_id
+    ).update({"target_account_id": None}, synchronize_session=False)
+    db.query(bank_models.BankAccount).filter(
+        bank_models.BankAccount.account_id == account_id
+    ).update({"account_id": None}, synchronize_session=False)
+
+    db.delete(db_account)
+    db.commit()
     return db_account
 
 
@@ -1073,21 +1146,52 @@ def update_transaction(db: Session, transaction_id: str, transaction_update: sch
     db.refresh(db_tx)
     return db_tx
 
+def _clear_transaction_refs(db: Session, tx_id: str):
+    """
+    Unlink/remove every row that references a transaction so it can be deleted
+    without hitting a NO ACTION foreign-key constraint on PostgreSQL. Statement
+    lines, payments and direct distribution links are UNLINKED (kept, set NULL);
+    queue entries and junction rows are removed.
+    """
+    db.query(models.TransactionQueue).filter(
+        models.TransactionQueue.transaction_id == tx_id
+    ).delete(synchronize_session=False)
+    # Reconciliation links (NO ACTION FKs) — unlink, keep the statement line
+    db.query(models.StatementLine).filter(
+        models.StatementLine.matched_transaction_id == tx_id
+    ).update({"matched_transaction_id": None}, synchronize_session=False)
+    db.query(models.StatementLine).filter(
+        models.StatementLine.posted_transaction_id == tx_id
+    ).update({"posted_transaction_id": None}, synchronize_session=False)
+    # Direct single-transaction links — unlink
+    db.query(models.Distribution).filter(
+        models.Distribution.transaction_id == tx_id
+    ).update({"transaction_id": None}, synchronize_session=False)
+    db.query(models.Payment).filter(
+        models.Payment.transaction_id == tx_id
+    ).update({"transaction_id": None}, synchronize_session=False)
+    # Many-to-many junctions — remove the link rows
+    db.query(models.PaymentTransaction).filter(
+        models.PaymentTransaction.transaction_id == tx_id
+    ).delete(synchronize_session=False)
+    db.query(models.DistributionTransaction).filter(
+        models.DistributionTransaction.transaction_id == tx_id
+    ).delete(synchronize_session=False)
+
+
 def delete_transaction(db: Session, transaction_id: str):
     import logging
     logger = logging.getLogger(__name__)
-    
+
     logger.info(f"[DELETE_TX] Starting delete for transaction_id: {transaction_id}")
-    
+
     db_tx = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
     if not db_tx:
         logger.warning(f"[DELETE_TX] Transaction not found: {transaction_id}")
         return None
-    
-    # Delete queue entry first to avoid FK constraint issues
-    db.query(models.TransactionQueue).filter(
-        models.TransactionQueue.transaction_id == transaction_id
-    ).delete()
+
+    # Clear all referencing rows first to avoid FK constraint errors
+    _clear_transaction_refs(db, transaction_id)
     
     # INTERNAL TRANSFER CLEANUP: Delete corresponding credit leg
     # If this is a debit transfer, find and delete the matching credit leg
@@ -1108,10 +1212,8 @@ def delete_transaction(db: Session, transaction_id: str):
                 credit_leg.account.current_balance -= credit_leg.amount
                 db.add(credit_leg.account)
                 logger.info(f"[DELETE_TX] Reverted credit leg balance: {credit_leg.account.name} -= {credit_leg.amount}")
-            # Delete queue entry for credit leg
-            db.query(models.TransactionQueue).filter(
-                models.TransactionQueue.transaction_id == credit_leg.id
-            ).delete()
+            # Clear references for the credit leg before deleting it
+            _clear_transaction_refs(db, credit_leg.id)
             db.delete(credit_leg)
     
     # Also check if THIS is a credit leg, and clean up the debit leg
@@ -1134,10 +1236,8 @@ def delete_transaction(db: Session, transaction_id: str):
                     debit_leg.account.current_balance += debit_leg.fees
                 db.add(debit_leg.account)
                 logger.info(f"[DELETE_TX] Reverted debit leg balance: {debit_leg.account.name} += {debit_leg.amount}")
-            # Delete queue entry for debit leg
-            db.query(models.TransactionQueue).filter(
-                models.TransactionQueue.transaction_id == debit_leg.id
-            ).delete()
+            # Clear references for the debit leg before deleting it
+            _clear_transaction_refs(db, debit_leg.id)
             db.delete(debit_leg)
 
     logger.info(f"[DELETE_TX] Found tx: type={db_tx.type}, amount={db_tx.amount}, account_id={db_tx.account_id}, cc_id={db_tx.credit_card_id}, status={db_tx.status}")
