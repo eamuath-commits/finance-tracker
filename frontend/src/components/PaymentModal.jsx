@@ -12,7 +12,7 @@ const PaymentModal = ({ isOpen, onClose, obligation, initialDate, initialAmount,
     const years = [currentYear - 1, currentYear, currentYear + 1];
 
     const [form, setForm] = useState({
-        id: null,
+        historyId: null,
         amount: '',
         note: '',
         status: 'PAID',
@@ -21,10 +21,11 @@ const PaymentModal = ({ isOpen, onClose, obligation, initialDate, initialAmount,
 
     useEffect(() => {
         if (isOpen && obligation) {
-            if (existingPayment) {
-                // Edit Mode
+            // Edit mode only when editing a REAL recorded payment (historyId),
+            // not merely because an obligation is selected.
+            if (existingPayment && existingPayment.historyId) {
                 setForm({
-                    id: existingPayment.id,
+                    historyId: existingPayment.historyId,
                     amount: existingPayment.amount,
                     note: existingPayment.note || '',
                     status: existingPayment.status || 'PAID',
@@ -33,7 +34,7 @@ const PaymentModal = ({ isOpen, onClose, obligation, initialDate, initialAmount,
             } else {
                 // Create Mode
                 setForm({
-                    id: null,
+                    historyId: null,
                     amount: initialAmount !== null ? initialAmount : '',
                     note: '',
                     status: 'PAID',
@@ -67,13 +68,13 @@ const PaymentModal = ({ isOpen, onClose, obligation, initialDate, initialAmount,
     };
 
     return (
-        <Modal isOpen={true} title={form.id ? `Edit Payment: ${obligation.name}` : `Pay: ${obligation.name}`} onClose={onClose}>
+        <Modal isOpen={true} title={form.historyId ? `Edit Payment: ${obligation.name}` : `Pay: ${obligation.name}`} onClose={onClose}>
             <form onSubmit={handleSubmit} className="space-y-4">
 
                 {/* Summary / Tip */}
                 <div className="bg-blue-900/20 p-3 rounded border border-blue-900/50 mb-4">
                     <p className="text-sm text-blue-200">
-                        {form.id ? "Updating existing payment record." : `Recording payment for ${obligation.name}.`}
+                        {form.historyId ? "Updating existing payment record." : `Recording payment for ${obligation.name}.`}
                     </p>
                 </div>
 
@@ -142,7 +143,7 @@ const PaymentModal = ({ isOpen, onClose, obligation, initialDate, initialAmount,
                     type="submit"
                     className="w-full p-3 rounded font-bold shadow-lg mt-4 bg-green-600 hover:bg-green-500 text-white transition"
                 >
-                    {form.id ? "Update Payment" : "Confirm Payment"}
+                    {form.historyId ? "Update Payment" : "Confirm Payment"}
                 </button>
             </form>
         </Modal>

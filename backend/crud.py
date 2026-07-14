@@ -822,10 +822,12 @@ def get_obligation(db: Session, obligation_id: str):
 def create_obligation(db: Session, obligation: schemas.ObligationCreate, user_id: str = None):
     db_obj = models.MonthlyObligation(
         name=obligation.name,
+        amount=obligation.amount,
         due_day=obligation.due_day,
         category=obligation.category,
         provider=obligation.provider,
         notes=obligation.notes,
+        target_account_id=obligation.target_account_id,
         user_id=user_id
     )
     db.add(db_obj)

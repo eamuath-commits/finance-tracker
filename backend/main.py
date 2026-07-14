@@ -595,8 +595,7 @@ def get_obligations_monthly_status(month_offset: int = 0, db: Session = Depends(
     """
     from datetime import datetime
     now = datetime.now()
-    target_date = datetime(now.year, now.month + month_offset, 1) if now.month + month_offset > 0 else datetime(now.year - 1, 12 + now.month + month_offset, 1)
-    # Properly handle month overflow
+    # Month overflow handled with modular arithmetic (avoids datetime(year, 13, 1) crashes)
     year = now.year + ((now.month - 1 + month_offset) // 12)
     month = ((now.month - 1 + month_offset) % 12) + 1
     target_date = datetime(year, month, 1)
@@ -606,10 +605,13 @@ def get_obligations_monthly_status(month_offset: int = 0, db: Session = Depends(
 
     obligations = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.user_id == current_user.id).order_by(models.MonthlyObligation.display_order).all()
 
-    # Get all payments for this month in one query
+    # Get this month's payments for THIS user's obligations. billing_month is stored
+    # in mixed widths ("YYYY-MM", "YYYY-MM-01", "YYYY-MM-DD"), so match by prefix.
+    obl_ids = [o.id for o in obligations]
     all_payments = db.query(models.Payment).filter(
-        models.Payment.billing_month == month_str
-    ).all()
+        models.Payment.obligation_id.in_(obl_ids),
+        models.Payment.billing_month.like(f"{month_str}%")
+    ).all() if obl_ids else []
     payments_by_obl = {}
     for p in all_payments:
         payments_by_obl[p.obligation_id] = p
@@ -808,9 +810,10 @@ def get_all_obligation_matches(db: Session = Depends(get_db), current_user: mode
 
     obligations = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.user_id == current_user.id).all()
 
-    # Get payments for current month to identify unpaid ones
+    # Get payments for current month to identify unpaid ones.
+    # billing_month is stored in mixed widths, so match by prefix, not equality.
     current_payments = db.query(models.Payment).filter(
-        models.Payment.billing_month == month_str,
+        models.Payment.billing_month.like(f"{month_str}%"),
         models.Payment.status.in_([models.PaymentStatus.PAID, "PAID"])
     ).all()
     paid_obl_ids = {p.obligation_id for p in current_payments}
@@ -3048,12 +3051,17 @@ def get_distribution(distribution_id: str, db: Session = Depends(get_db)):
     source = crud.get_account(db, d.source_account_id)
     target = crud.get_account(db, d.target_account_id)
     linked_tx = crud.get_transaction(db, d.transaction_id) if d.transaction_id else None
-    
+    # Resolve the junction rows to real Transactions (the raw junction objects
+    # can't validate against List[Transaction], which is what caused the 500).
+    linked_txs = [lt.transaction for lt in (d.linked_transactions or []) if lt.transaction]
+
     return {
-        **d.__dict__,
+        **{k: v for k, v in d.__dict__.items() if k != "linked_transactions"},
         "source_account_name": source.name if source else None,
         "target_account_name": target.name if target else None,
-        "linked_transaction": linked_tx
+        "linked_transaction": linked_tx,
+        "linked_transactions": linked_txs,
+        "linked_transactions_count": len(linked_txs),
     }
 
 @app.get("/distributions/{distribution_id}/matches", response_model=List[schemas.Transaction])
@@ -3079,12 +3087,14 @@ def update_distribution(distribution_id: str, update: schemas.DistributionUpdate
     
     source = crud.get_account(db, result.source_account_id)
     target = crud.get_account(db, result.target_account_id)
-    
+
     return {
-        **result.__dict__,
+        **{k: v for k, v in result.__dict__.items() if k != "linked_transactions"},
         "source_account_name": source.name if source else None,
         "target_account_name": target.name if target else None,
-        "linked_transaction": None
+        "linked_transaction": None,
+        "linked_transactions": [],
+        "linked_transactions_count": 0,
     }
 
 @app.delete("/distributions/{distribution_id}")

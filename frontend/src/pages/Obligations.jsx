@@ -306,7 +306,7 @@ const Obligations = () => {
                 payment_date: new Date().toISOString(), amount: parseFloat(data.amount || 0),
                 billing_month: data.billing_month, note: data.note, status: data.status
             };
-            if (data.id && data.historyId) {
+            if (data.historyId) {
                 await api.put(`${API_URL}/obligations/history/${data.historyId}`, payload);
             } else {
                 await api.post(`${API_URL}/obligations/${paymentForm.id}/pay`, payload);
@@ -571,7 +571,7 @@ const Obligations = () => {
             )}
 
             {showPaymentModal && paymentForm.id && (
-                <PaymentModal isOpen={showPaymentModal} onClose={() => setShowPaymentModal(false)} obligation={currentPaymentObligation || { name: paymentForm.name, id: paymentForm.id }} initialDate={paymentForm.billing_month} initialAmount={paymentForm.amount} existingPayment={paymentForm.id ? paymentForm : null} onSave={handleProcessPayment} />
+                <PaymentModal isOpen={showPaymentModal} onClose={() => setShowPaymentModal(false)} obligation={currentPaymentObligation || { name: paymentForm.name, id: paymentForm.id }} initialDate={paymentForm.billing_month} initialAmount={paymentForm.amount} existingPayment={paymentForm.historyId ? paymentForm : null} onSave={handleProcessPayment} />
             )}
 
             {showHistoryModal && (

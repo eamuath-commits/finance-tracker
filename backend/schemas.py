@@ -377,7 +377,7 @@ class SMSIngest(BaseModel):
 
 class CategoryBase(BaseModel):
     name: str
-    type: str
+    type: Optional[str] = "BOTH"  # OBLIGATION | TRANSACTION | BOTH (matches model default)
 
 class CategoryCreate(CategoryBase):
     pass
