@@ -2798,140 +2798,113 @@ def get_obligations(db: Session = Depends(get_db)):
 
 @app.post("/allocation/preview", response_model=schemas.AllocationPreviewResponse)
 def preview_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    return crud.calculate_allocation_preview(db, req.source_account_id, req.month_offset)
+    _require_owned(db, models.Account, req.source_account_id, current_user)
+    return crud.calculate_allocation_preview(db, req.source_account_id, req.month_offset, user_id=current_user.id)
 
 @app.post("/allocation/execute")
 def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    preview = crud.calculate_allocation_preview(db, req.source_account_id, req.month_offset)
-    
-    source_acc = crud.get_account(db, req.source_account_id)
-    if not source_acc:
-        raise HTTPException(status_code=404, detail="Source account not found")
+    source_acc = _require_owned(db, models.Account, req.source_account_id, current_user)
+    preview = crud.calculate_allocation_preview(db, req.source_account_id, req.month_offset, user_id=current_user.id)
 
     # Calculate billing month
     from dateutil.relativedelta import relativedelta
     target_date = datetime.now() + relativedelta(months=req.month_offset)
     billing_month = target_date.strftime('%Y-%m')
 
-    # Group by target envelope
-    envelope_groups = {}  # target_account_id -> {items, total, account_name}
-    
+    # Create ONE distribution PER OBLIGATION, idempotently (upsert on
+    # source+target+month+obligation), so re-running never duplicates and each
+    # distribution stays linked to the obligation it funds (precise reverse).
+    executed_transfers = []
     for item in preview.allocations:
-        # Only process pending items with positive pending amounts
         if item.pending_amount <= 0 or item.status == 'transferred':
             continue
-        
-        # Filter by specific obligations if provided
         if req.obligation_ids and item.obligation_id not in req.obligation_ids:
             continue
-        
-        # Use override amount if provided for this obligation
         transfer_amount = item.pending_amount
         if req.override_amounts and item.obligation_id in req.override_amounts:
             transfer_amount = req.override_amounts[item.obligation_id]
-        
-        key = item.target_account_id
-        if key not in envelope_groups:
-            envelope_groups[key] = {
-                "target_account_id": key,
-                "target_account_name": item.target_account_name,
-                "total": 0.0,
-                "obligations": []
-            }
-        envelope_groups[key]["total"] += transfer_amount
-        envelope_groups[key]["obligations"].append({
+        if not transfer_amount or transfer_amount <= 0:
+            continue
+
+        note = f"Payday: {item.obligation_name}"
+        existing = db.query(models.Distribution).filter(
+            models.Distribution.source_account_id == source_acc.id,
+            models.Distribution.target_account_id == item.target_account_id,
+            models.Distribution.billing_month == billing_month,
+            models.Distribution.obligation_id == item.obligation_id,
+        ).first()
+        if existing:
+            existing.amount = round(transfer_amount, 2)
+            existing.note = note
+        else:
+            db.add(models.Distribution(
+                source_account_id=source_acc.id,
+                target_account_id=item.target_account_id,
+                obligation_id=item.obligation_id,
+                amount=round(transfer_amount, 2),
+                billing_month=billing_month,
+                note=note,
+                user_id=current_user.id,
+            ))
+        executed_transfers.append({
             "obligation_id": item.obligation_id,
             "obligation_name": item.obligation_name,
-            "amount": transfer_amount
+            "target_account": item.target_account_name,
+            "amount": round(transfer_amount, 2),
         })
-    
-    executed_transfers = []
-    
-    for key, group in envelope_groups.items():
-        # Build note with all obligation names
-        obl_names = [o["obligation_name"] for o in group["obligations"]]
-        note = f"Payday: {', '.join(obl_names)}"
-        
-        # Create ONE distribution per target envelope
-        distribution = schemas.DistributionCreate(
-            source_account_id=source_acc.id,
-            target_account_id=group["target_account_id"],
-            amount=round(group["total"], 2),
-            billing_month=billing_month,
-            note=note
-        )
-        crud.create_distribution(db, distribution)
-        
-        executed_transfers.append({
-            "target_account": group["target_account_name"],
-            "amount": round(group["total"], 2),
-            "obligations": group["obligations"]
-        })
-        
+    db.commit()
+
     return {
-        "status": "success", 
+        "status": "success",
         "transfers_count": len(executed_transfers),
         "details": executed_transfers,
-        "note": "Distribution records created per envelope. Link to real bank transfers when they occur."
+        "note": "One distribution per obligation (idempotent). Link each to its real bank transfer when it occurs."
     }
 
 @app.post("/allocation/reverse")
 def reverse_allocation(req: schemas.AllocationReverseRequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    """Reverse/undo a payday distribution for specific obligations or envelopes."""
+    """Reverse/undo a payday distribution for specific obligations.
+
+    Only removes the requested obligation's OWN per-obligation distributions, and
+    refuses to delete any distribution that already has a real linked bank
+    transaction (that money actually moved) — such rows are reported as skipped.
+    """
+    _require_owned(db, models.Account, req.source_account_id, current_user)
     from dateutil.relativedelta import relativedelta
     target_date = datetime.now() + relativedelta(months=req.month_offset)
     billing_month = target_date.strftime('%Y-%m')
-    
+
     reversed_items = []
-    
-    # Collect target_account_ids from the obligations being reversed
-    target_accounts_to_reverse = set()
+    skipped_already_transferred = []
+
     for obl_id in req.obligation_ids:
-        # First try to find per-obligation distributions (legacy)
         dists = db.query(models.Distribution).filter(
             models.Distribution.source_account_id == req.source_account_id,
             models.Distribution.billing_month == billing_month,
             models.Distribution.obligation_id == obl_id
         ).all()
-        
+
         for d in dists:
+            has_link = bool(d.transaction_id) or db.query(models.DistributionTransaction).filter(
+                models.DistributionTransaction.distribution_id == d.id
+            ).first() is not None
+            if has_link:
+                skipped_already_transferred.append({
+                    "obligation_id": obl_id, "amount": d.amount, "distribution_id": d.id
+                })
+                continue
             reversed_items.append({
-                "obligation_id": obl_id,
-                "amount": d.amount,
-                "distribution_id": d.id
+                "obligation_id": obl_id, "amount": d.amount, "distribution_id": d.id
             })
             db.delete(d)
-        
-        # Also track this obligation's target account for envelope-level distributions
-        obl = db.query(models.MonthlyObligation).filter(
-            models.MonthlyObligation.id == obl_id
-        ).first()
-        if obl and obl.target_account_id:
-            target_accounts_to_reverse.add(obl.target_account_id)
-    
-    # Also delete envelope-level distributions (no obligation_id) for the same target accounts
-    for target_acc_id in target_accounts_to_reverse:
-        envelope_dists = db.query(models.Distribution).filter(
-            models.Distribution.source_account_id == req.source_account_id,
-            models.Distribution.billing_month == billing_month,
-            models.Distribution.target_account_id == target_acc_id,
-            models.Distribution.obligation_id == None
-        ).all()
-        
-        for d in envelope_dists:
-            reversed_items.append({
-                "target_account_id": target_acc_id,
-                "amount": d.amount,
-                "distribution_id": d.id
-            })
-            db.delete(d)
-    
+
     db.commit()
-    
+
     return {
         "status": "reversed",
         "reversed_count": len(reversed_items),
         "details": reversed_items,
+        "skipped_already_transferred": skipped_already_transferred,
         "billing_month": billing_month
     }
 

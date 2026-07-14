@@ -1787,7 +1787,7 @@ def get_random_training_examples(db: Session, limit: int = 3):
     return db.query(models.TrainingExample).order_by(func.random()).limit(limit).all()
 
 
-def calculate_allocation_preview(db: Session, source_account_id: str, month_offset: int = 0):
+def calculate_allocation_preview(db: Session, source_account_id: str, month_offset: int = 0, user_id: str = None):
     """
     Calculate allocation preview for salary distribution planning.
     
@@ -1805,46 +1805,56 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     prev_month = target_date - relativedelta(months=1)
     prev_month_str = prev_month.strftime('%Y-%m')
     
-    # Get all accounts for name lookup
-    accounts = db.query(models.Account).all()
+    # Scope everything to the owner (accounts, obligations, distributions, payments)
+    acct_q = db.query(models.Account)
+    obl_q = db.query(models.MonthlyObligation)
+    if user_id:
+        acct_q = acct_q.filter(models.Account.user_id == user_id)
+        obl_q = obl_q.filter(models.MonthlyObligation.user_id == user_id)
+    accounts = acct_q.all()
     accounts_by_id = {a.id: a for a in accounts}
-    
-    # Get all obligations
-    obligations = db.query(models.MonthlyObligation).order_by(
+    user_acct_ids = list(accounts_by_id.keys()) or [None]
+
+    obligations = obl_q.order_by(
         models.MonthlyObligation.display_order.asc(),
         models.MonthlyObligation.due_day.asc()
     ).all()
-    
-    # Get existing Distributions for this month
+    obl_ids = [o.id for o in obligations] or [None]
+
+    # Existing distributions for this month, scoped to the caller's accounts
     existing_distributions = db.query(models.Distribution).filter(
-        models.Distribution.billing_month == target_month_str
+        models.Distribution.billing_month == target_month_str,
+        models.Distribution.source_account_id.in_(user_acct_ids)
     ).all()
-    
-    # Check which distributions have linked transactions
+
+    # Which distributions have a real linked transaction (junction or legacy scalar)
     dist_ids = [d.id for d in existing_distributions]
     linked_dist_ids = set()
     if dist_ids:
-        # Check junction table (multi-link)
         linked_junctions = db.query(models.DistributionTransaction.distribution_id).filter(
             models.DistributionTransaction.distribution_id.in_(dist_ids)
         ).distinct().all()
         linked_dist_ids = {row[0] for row in linked_junctions}
-    
-    # Also check legacy single-link (transaction_id on distribution)
     for d in existing_distributions:
         if d.transaction_id:
             linked_dist_ids.add(d.id)
-    
-    # Build lookup: target_account_id -> total amount from distributions WITH linked transactions
+
+    # Transferred amounts from LINKED distributions — tracked per obligation (new
+    # per-obligation model) and per envelope (legacy obligation_id=None, fallback).
+    transferred_by_obl = {}
     transferred_by_envelope = {}
     for d in existing_distributions:
-        if d.id in linked_dist_ids:
-            tid = d.target_account_id
-            transferred_by_envelope[tid] = transferred_by_envelope.get(tid, 0) + d.amount
+        if d.id not in linked_dist_ids:
+            continue
+        if d.obligation_id:
+            transferred_by_obl[d.obligation_id] = transferred_by_obl.get(d.obligation_id, 0) + d.amount
+        else:
+            transferred_by_envelope[d.target_account_id] = transferred_by_envelope.get(d.target_account_id, 0) + d.amount
     
     # Get all payments for target month
     target_payments = db.query(models.Payment).filter(
-        models.Payment.billing_month.like(f"{target_month_str}%")
+        models.Payment.billing_month.like(f"{target_month_str}%"),
+        models.Payment.obligation_id.in_(obl_ids)
     ).all()
     target_payment_amounts = {}
     target_budget_amounts = {}
@@ -1856,15 +1866,17 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     
     # Get previous month payments for Smart Default amounts
     prev_payments = db.query(models.Payment).filter(
-        models.Payment.billing_month.like(f"{prev_month_str}%")
+        models.Payment.billing_month.like(f"{prev_month_str}%"),
+        models.Payment.obligation_id.in_(obl_ids)
     ).all()
     prev_amounts_by_obl = {}
     for p in prev_payments:
         prev_amounts_by_obl[p.obligation_id] = p.amount
-    
+
     # Get previous month distributions for fallback amounts
     prev_distributions = db.query(models.Distribution).filter(
-        models.Distribution.billing_month == prev_month_str
+        models.Distribution.billing_month == prev_month_str,
+        models.Distribution.source_account_id.in_(user_acct_ids)
     ).all()
     prev_dist_by_obl = {}
     for d in prev_distributions:
@@ -1907,29 +1919,28 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
             obls_by_target[obl.target_account_id] = []
         obls_by_target[obl.target_account_id].append((obl, expected_amount))
     
-    # Second pass: determine status from linked transactions
+    # Second pass: determine status from linked transactions.
+    # A per-obligation linked distribution funds its own obligation directly; only
+    # obligations without one share any legacy envelope-level (obligation_id=None) pool.
     for target_id, obl_list in obls_by_target.items():
         envelope_transferred = transferred_by_envelope.get(target_id, 0)
-        group_required = sum(ea for _, ea in obl_list)
-        
-        # Distribute linked amount proportionally across obligations
+        group_required = sum(ea for o, ea in obl_list if o.id not in transferred_by_obl)
         remaining = envelope_transferred
-        
+
         for i, (obl, expected_amount) in enumerate(obl_list):
-            if remaining > 0 and group_required > 0:
-                if i == len(obl_list) - 1:
-                    share = remaining
-                else:
-                    share = round(envelope_transferred * (expected_amount / group_required), 2)
-                    share = min(share, remaining)
+            if obl.id in transferred_by_obl:
+                already_transferred = min(transferred_by_obl[obl.id], expected_amount)
+            elif remaining > 0 and group_required > 0:
+                share = round(envelope_transferred * (expected_amount / group_required), 2)
+                share = min(share, remaining, expected_amount)
                 already_transferred = share
                 remaining -= share
             else:
                 already_transferred = 0
-            
+
             pending_amount = max(0, expected_amount - already_transferred)
-            
-            # Only 2 states: transferred (has linked tx) or pending
+
+            # Fully funded => transferred; anything else remains actionable as pending
             if already_transferred >= expected_amount:
                 status = 'transferred'
             else:
