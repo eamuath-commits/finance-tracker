@@ -2736,45 +2736,10 @@ def get_obligations(db: Session = Depends(get_db)):
             obl.target_account_name = accounts_cache[obl.target_account_id]
     return obligations
 
-@app.post("/obligations/", response_model=schemas.Obligation)
-def create_obligation(obligation: schemas.ObligationCreate, db: Session = Depends(get_db)):
-    return crud.create_obligation(db, obligation)
-
-@app.put("/obligations/{obligation_id}", response_model=schemas.Obligation)
-def update_obligation(obligation_id: str, obligation: schemas.ObligationUpdate, db: Session = Depends(get_db)):
-    return crud.update_obligation(db, obligation_id, obligation)
-
-@app.delete("/obligations/{obligation_id}")
-def delete_obligation(obligation_id: str, db: Session = Depends(get_db)):
-    crud.delete_obligation(db, obligation_id)
-    return {"message": "Deleted"}
-
-@app.put("/obligations/reorder")
-def reorder_obligations(payload: schemas.ReorderSchema, db: Session = Depends(get_db)):
-    crud.reorder_obligations(db, payload.ordered_ids)
-    return {"message": "Reordered"}
-
-# --- Payments (Obligation History) ---
-
-@app.get("/obligations/{obligation_id}/payments", response_model=List[schemas.Payment])
-def get_payment_history(obligation_id: str, db: Session = Depends(get_db)):
-    return crud.get_payment_history(db, obligation_id)
-
-@app.post("/obligations/{obligation_id}/pay", response_model=schemas.Payment)
-def create_payment(obligation_id: str, payment: schemas.PaymentCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    return crud.create_payment(db, obligation_id, payment)
-
-@app.put("/obligations/history/{payment_id}", response_model=schemas.Payment)
-def update_payment(payment_id: int, payment: schemas.PaymentUpdate, db: Session = Depends(get_db)):
-    return crud.update_payment(db, payment_id, payment)
-
-@app.delete("/obligations/history/{payment_id}")
-def delete_payment(payment_id: int, db: Session = Depends(get_db)):
-    crud.delete_payment(db, payment_id)
-    return {"message": "Deleted"}
-    if not success:
-        raise HTTPException(status_code=404, detail="Rule not found")
-    return {"message": "Rule deleted"}
+# NOTE: Duplicate/shadowed /obligations/* and /obligations/history/* routes were
+# removed here. The authoritative, auth-scoped versions are registered earlier
+# (create/update/delete/reorder ~L553-582, pay/payments ~L1012-1022,
+# history PUT/DELETE ~L1082-1089); FastAPI served those and this block was dead.
 
 @app.post("/allocation/preview", response_model=schemas.AllocationPreviewResponse)
 def preview_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
