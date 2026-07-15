@@ -1,4 +1,11 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Date, Enum, Text, Boolean, JSON, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Date, Enum, Text, Boolean, JSON, UniqueConstraint, Numeric
+
+
+# Money columns use exact decimal storage but return Python float to the app
+# (asdecimal=False) so no Decimal arithmetic ripple is required. Rates
+# (interest_rate, apr, exchange_rate, minimum_payment_percent) stay Float.
+def Money():
+    return Numeric(14, 2, asdecimal=False)
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
@@ -38,11 +45,11 @@ class Account(Base):
     bank_name = Column(String, nullable=True) # User requested mandatory for new, but keep nullable for legacy/migration safety
     bank_logo_url = Column(String, nullable=True)
     last_4_digits = Column(String, index=True) # Critical for SMS matching (unique per user via __table_args__)
-    current_balance = Column(Float, default=0.0)
+    current_balance = Column(Money(), default=0.0)
     notes = Column(Text, nullable=True)
-    credit_limit = Column(Float, nullable=True) 
+    credit_limit = Column(Money(), nullable=True) 
     interest_rate = Column(Float, nullable=True) # APR for Credit Cards
-    minimum_payment = Column(Float, nullable=True) # Minimum monthly payment
+    minimum_payment = Column(Money(), nullable=True) # Minimum monthly payment
     is_income = Column(Boolean, default=False)
     last_successful_audit_date = Column(DateTime, nullable=True)
 
@@ -66,8 +73,8 @@ class CreditCard(Base):
     last_4_digits = Column(String, index=True)  # For SMS matching (unique per user via __table_args__)
     
     # Balance & Limits
-    current_balance = Column(Float, default=0.0)    # What you owe (positive = debt)
-    credit_limit = Column(Float, default=0.0)       # Maximum credit line
+    current_balance = Column(Money(), default=0.0)    # What you owe (positive = debt)
+    credit_limit = Column(Money(), default=0.0)       # Maximum credit line
     
     # Billing Cycle
     statement_day = Column(Integer, nullable=True)   # Day of month statement closes (1-28)
@@ -105,9 +112,9 @@ class AccountAudit(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     account_id = Column(String, ForeignKey("accounts.id"), nullable=False)
     audit_date = Column(DateTime, default=datetime.utcnow)
-    system_balance = Column(Float, nullable=False)
-    actual_balance = Column(Float, nullable=False)
-    difference = Column(Float, nullable=False)
+    system_balance = Column(Money(), nullable=False)
+    actual_balance = Column(Money(), nullable=False)
+    difference = Column(Money(), nullable=False)
     status = Column(String, nullable=False) # "MATCH" or "MISMATCH"
     notes = Column(Text, nullable=True)
 
@@ -129,7 +136,7 @@ class CurrencyWallet(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     account_id = Column(String, ForeignKey("accounts.id"), nullable=False)
     currency_code = Column(String, nullable=False) # USD, EUR, etc.
-    balance = Column(Float, default=0.0)
+    balance = Column(Money(), default=0.0)
     last_updated = Column(DateTime, default=datetime.utcnow)
 
     account = relationship("Account", back_populates="wallets")
@@ -194,22 +201,22 @@ class Transaction(Base):
     user_id = Column(String, ForeignKey("users.id"), nullable=True)
     account_id = Column(String, ForeignKey("accounts.id"), nullable=True)  # Nullable for CC transactions
     credit_card_id = Column(String, ForeignKey("credit_cards.id"), nullable=True)  # NEW: For credit card transactions
-    amount = Column(Float, nullable=False)
+    amount = Column(Money(), nullable=False)
     merchant = Column(String)
     raw_sms_content = Column(Text)
     timestamp = Column(DateTime)
     category = Column(String, nullable=True)
     type = Column(String, default="debit") # "credit" or "debit"
-    balance_after_transaction = Column(Float, nullable=True)
+    balance_after_transaction = Column(Money(), nullable=True)
     status = Column(String, default="completed", nullable=False) # pending, completed, pending_action
     notes = Column(Text, nullable=True)
     
     # Financial fields
-    original_amount = Column(Float, nullable=True)
+    original_amount = Column(Money(), nullable=True)
     original_currency = Column(String, nullable=True)
     exchange_rate = Column(Float, nullable=True)
     logo_url = Column(String, nullable=True)
-    fees = Column(Float, default=0.0)
+    fees = Column(Money(), default=0.0)
     parsed_data = Column(Text, nullable=True)  # JSON: Full AI-extracted data from SMS
     source = Column(String, nullable=True)  # Source of transaction: 'telegram', 'webui', 'manual', 'statement'
     statement_id = Column(String, ForeignKey("statements.id", ondelete="SET NULL"), nullable=True)  # FK to imported statement
@@ -235,13 +242,13 @@ class Loan(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, ForeignKey("users.id"), nullable=True)
     name = Column(String, nullable=False)
-    principal_amount = Column(Float, nullable=False)
+    principal_amount = Column(Money(), nullable=False)
     interest_rate = Column(Float, nullable=False) # Annual percentage
     start_date = Column(Date, nullable=False)
     term_months = Column(Integer, nullable=False)
-    remaining_balance = Column(Float, nullable=False)
+    remaining_balance = Column(Money(), nullable=False)
     notes = Column(Text, nullable=True)
-    monthly_payment = Column(Float, nullable=True) # Explicit monthly payment amount
+    monthly_payment = Column(Money(), nullable=True) # Explicit monthly payment amount
     due_day = Column(Integer, nullable=True) # Day of month payment is due
     display_order = Column(Integer, default=0) # For UI ordering
 
@@ -251,7 +258,7 @@ class MonthlyObligation(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, ForeignKey("users.id"), nullable=True)
     name = Column(String, nullable=False)
-    amount = Column(Float, nullable=True) # User requested optional amount
+    amount = Column(Money(), nullable=True) # User requested optional amount
     due_day = Column(Integer, nullable=False) # e.g. 1 for 1st of month
     category = Column(String, nullable=True)
     provider = Column(String, nullable=True) # New optional field
@@ -274,8 +281,8 @@ class Payment(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=True)
     obligation_id = Column(String, ForeignKey("obligations.id"))
-    amount = Column(Float)
-    planned_amount = Column(Float, nullable=True) # Snapshot of budget at time of payment creation
+    amount = Column(Money())
+    planned_amount = Column(Money(), nullable=True) # Snapshot of budget at time of payment creation
     payment_date = Column(Date)
     billing_month = Column(String) # YYYY-MM to track monthly payments
     note = Column(String, nullable=True)
@@ -316,8 +323,8 @@ class SavingsGoal(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, ForeignKey("users.id"), nullable=True)
     name = Column(String, nullable=False)
-    target_amount = Column(Float, nullable=False)
-    current_amount = Column(Float, default=0.0)
+    target_amount = Column(Money(), nullable=False)
+    current_amount = Column(Money(), default=0.0)
     target_date = Column(Date, nullable=True)
     icon = Column(String, nullable=True) # e.g. "Plane", "Car"
     color = Column(String, nullable=True) # Hex color
@@ -345,13 +352,13 @@ class AllocationHistory(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, ForeignKey("users.id"), nullable=True)
     month = Column(String, nullable=False) # YYYY-MM
-    income = Column(Float, default=0.0)
-    needs_planned = Column(Float, default=0.0)
-    needs_actual = Column(Float, default=0.0)
-    wants_planned = Column(Float, default=0.0)
-    wants_actual = Column(Float, default=0.0)
-    savings_planned = Column(Float, default=0.0)
-    savings_actual = Column(Float, default=0.0)
+    income = Column(Money(), default=0.0)
+    needs_planned = Column(Money(), default=0.0)
+    needs_actual = Column(Money(), default=0.0)
+    wants_planned = Column(Money(), default=0.0)
+    wants_actual = Column(Money(), default=0.0)
+    savings_planned = Column(Money(), default=0.0)
+    savings_actual = Column(Money(), default=0.0)
 
 class Distribution(Base):
     """Track salary distribution records with transaction linking"""
@@ -362,7 +369,7 @@ class Distribution(Base):
     source_account_id = Column(String, ForeignKey("accounts.id"), nullable=False)
     target_account_id = Column(String, ForeignKey("accounts.id"), nullable=False)
     obligation_id = Column(String, ForeignKey("obligations.id"), nullable=True)  # Which obligation this transfer is for
-    amount = Column(Float, nullable=False)
+    amount = Column(Money(), nullable=False)
     billing_month = Column(String, nullable=False)  # "2026-01"
     note = Column(String, nullable=True)
     transaction_id = Column(String, ForeignKey("transactions.id"), nullable=True)  # Linked transaction
@@ -441,8 +448,8 @@ class Statement(Base):
     file_path = Column(String, nullable=True)  # Server path to stored PDF
     statement_period_start = Column(Date, nullable=True)
     statement_period_end = Column(Date, nullable=True)
-    opening_balance = Column(Float, nullable=True)
-    closing_balance = Column(Float, nullable=True)
+    opening_balance = Column(Money(), nullable=True)
+    closing_balance = Column(Money(), nullable=True)
     account_number = Column(String, nullable=True)  # Full account number from statement header
     transaction_count = Column(Integer, default=0)
     reconciliation_status = Column(String, default="pending")  # pending / reconciled / flagged
@@ -478,11 +485,11 @@ class StatementLine(Base):
     txn_time = Column(String, nullable=True)      # HH:MM:SS from the PDF
     type_line = Column(String, nullable=True)     # e.g. "Internal Transfer between Accounts"
     note = Column(Text, nullable=True)
-    debit = Column(Float, default=0.0)
-    credit = Column(Float, default=0.0)
-    balance = Column(Float, nullable=True)        # running balance printed on the row
+    debit = Column(Money(), default=0.0)
+    credit = Column(Money(), default=0.0)
+    balance = Column(Money(), nullable=True)        # running balance printed on the row
     direction = Column(String, nullable=True)     # 'debit' | 'credit'
-    amount = Column(Float, default=0.0)           # the non-zero side
+    amount = Column(Money(), default=0.0)           # the non-zero side
     category = Column(String, nullable=True)
 
     # Reconciliation signals extracted from the note

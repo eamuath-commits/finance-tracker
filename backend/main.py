@@ -202,6 +202,62 @@ def run_migrations(engine):
                     conn.execute(text("ALTER TABLE transactions ADD COLUMN statement_id VARCHAR"))
                     conn.commit()
 
+        # --- Batch 4: money precision + indexes + billing_month guard (all idempotent) ---
+        _b4_money = [
+            ("accounts","current_balance"),("accounts","credit_limit"),("accounts","minimum_payment"),
+            ("credit_cards","current_balance"),("credit_cards","credit_limit"),
+            ("account_audits","system_balance"),("account_audits","actual_balance"),("account_audits","difference"),
+            ("currency_wallets","balance"),
+            ("transactions","amount"),("transactions","balance_after_transaction"),("transactions","original_amount"),("transactions","fees"),
+            ("loans","principal_amount"),("loans","remaining_balance"),("loans","monthly_payment"),
+            ("obligations","amount"),("payments","amount"),("payments","planned_amount"),
+            ("savings_goals","target_amount"),("savings_goals","current_amount"),
+            ("allocation_history","income"),("allocation_history","needs_planned"),("allocation_history","needs_actual"),
+            ("allocation_history","wants_planned"),("allocation_history","wants_actual"),
+            ("allocation_history","savings_planned"),("allocation_history","savings_actual"),
+            ("distributions","amount"),("statements","opening_balance"),("statements","closing_balance"),
+            ("statement_lines","debit"),("statement_lines","credit"),("statement_lines","balance"),("statement_lines","amount"),
+        ]
+        _b4_indexes = [
+            "CREATE INDEX IF NOT EXISTS ix_tx_user ON transactions(user_id)",
+            "CREATE INDEX IF NOT EXISTS ix_tx_account ON transactions(account_id)",
+            "CREATE INDEX IF NOT EXISTS ix_tx_cc ON transactions(credit_card_id)",
+            "CREATE INDEX IF NOT EXISTS ix_tx_ts ON transactions(timestamp)",
+            "CREATE INDEX IF NOT EXISTS ix_tx_status ON transactions(status)",
+            "CREATE INDEX IF NOT EXISTS ix_tx_statement ON transactions(statement_id)",
+            "CREATE INDEX IF NOT EXISTS ix_payments_obl ON payments(obligation_id)",
+            "CREATE INDEX IF NOT EXISTS ix_payments_bm ON payments(billing_month)",
+            "CREATE INDEX IF NOT EXISTS ix_dist_source ON distributions(source_account_id)",
+            "CREATE INDEX IF NOT EXISTS ix_dist_bm ON distributions(billing_month)",
+            "CREATE INDEX IF NOT EXISTS ix_dist_obl ON distributions(obligation_id)",
+            "CREATE INDEX IF NOT EXISTS ix_queue_status ON transaction_queue(status)",
+            "CREATE INDEX IF NOT EXISTS ix_pt_tx ON payment_transactions(transaction_id)",
+            "CREATE INDEX IF NOT EXISTS ix_dt_tx ON distribution_transactions(transaction_id)",
+            "CREATE INDEX IF NOT EXISTS ix_stmtlines_stmt ON statement_lines(statement_id)",
+        ]
+        _b4_tables = set(inspector.get_table_names())
+        with engine.connect() as conn:
+            for _t, _c in _b4_money:
+                if _t not in _b4_tables:
+                    continue
+                try:
+                    _ct = next((col['type'] for col in inspector.get_columns(_t) if col['name'] == _c), None)
+                    if _ct is not None and 'NUMERIC' not in str(_ct).upper():
+                        conn.execute(text(f"ALTER TABLE {_t} ALTER COLUMN {_c} TYPE numeric(14,2) USING round({_c}::numeric, 2)"))
+                except Exception:
+                    pass
+            for _stmt in _b4_indexes:
+                try:
+                    conn.execute(text(_stmt))
+                except Exception:
+                    pass
+            try:
+                conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_payment_obl_month "
+                                  "ON payments (obligation_id, left(billing_month,7)) WHERE obligation_id IS NOT NULL"))
+            except Exception:
+                pass
+            conn.commit()
+
     except Exception as e:
         print(f"Migration failed: {e}")
 

@@ -1314,11 +1314,14 @@ def create_payment(db: Session, obligation_id: str, payment: schemas.PaymentCrea
     _obl = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
     _owner = _obl.user_id if _obl else None
 
-    # Check for duplicate billing_month
+    # Check for an existing payment for the same obligation+month. billing_month is
+    # stored in mixed widths; match by the YYYY-MM prefix so the upsert works across
+    # formats and never trips the UNIQUE(obligation_id, left(billing_month,7)) guard.
     if payment.billing_month:
+        month_prefix = payment.billing_month[:7]
         existing = db.query(models.Payment).filter(
             models.Payment.obligation_id == obligation_id,
-            models.Payment.billing_month == payment.billing_month
+            models.Payment.billing_month.like(f"{month_prefix}%")
         ).first()
         if existing:
             # Upsert Logic
