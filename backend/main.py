@@ -2818,19 +2818,11 @@ def delete_goal(goal_id: str, db: Session = Depends(get_db)):
     return deleted_goal
 
 # --- Allocation Rules ---
-
-@app.post("/allocation/rules", response_model=schemas.AllocationRule)
-def create_allocation_rule(rule: schemas.AllocationRuleCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    return crud.create_allocation_rule(db, rule, user_id=current_user.id)
-
-@app.get("/allocation/rules", response_model=List[schemas.AllocationRule])
-def get_allocation_rules(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    return db.query(models.AllocationRule).filter(models.AllocationRule.user_id == current_user.id).all()
-
-@app.delete("/allocation/rules/{rule_id}")
-def delete_allocation_rule(rule_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    success = crud.delete_allocation_rule(db, rule_id)
-    return {"success": success}
+# The /allocation/rules API was DEAD: no frontend calls it, and the allocation
+# engine never reads AllocationRule (envelope assignment works via each
+# obligation's target_account_id, set in the Allocation UI). Endpoints removed.
+# The allocation_rules table (13 inert rows) + model are kept for now so account
+# deletion FK-cleanup keeps working and no data is dropped without consent.
 
 # --- Obligations ---
 
