@@ -2834,21 +2834,9 @@ def delete_allocation_rule(rule_id: str, db: Session = Depends(get_db), current_
 
 # --- Obligations ---
 
-@app.get("/obligations/", response_model=List[schemas.Obligation])
-def get_obligations(db: Session = Depends(get_db)):
-    obligations = crud.get_obligations(db)
-    # Resolve target_account_name for each obligation
-    accounts_cache = {}
-    for obl in obligations:
-        if obl.target_account_id:
-            if obl.target_account_id not in accounts_cache:
-                acc = crud.get_account(db, obl.target_account_id)
-                accounts_cache[obl.target_account_id] = acc.name if acc else None
-            obl.target_account_name = accounts_cache[obl.target_account_id]
-    return obligations
-
 # NOTE: Duplicate/shadowed /obligations/* and /obligations/history/* routes were
-# removed here. The authoritative, auth-scoped versions are registered earlier
+# removed here (including an unauthenticated, all-users GET /obligations/). The
+# authoritative, auth-scoped versions are registered earlier
 # (create/update/delete/reorder ~L553-582, pay/payments ~L1012-1022,
 # history PUT/DELETE ~L1082-1089); FastAPI served those and this block was dead.
 
