@@ -1498,9 +1498,24 @@ def update_currency_wallet(db: Session, wallet_id: str, update_data: schemas.Cur
 # --- Allocation Rules ---
 
 def create_allocation_rule(db: Session, rule: schemas.AllocationRuleCreate, user_id: str = None):
-    rule_data = rule.dict()
-    rule_data['user_id'] = user_id
-    db_rule = models.AllocationRule(**rule_data)
+    # Upsert: one rule per (user, rule_type, identifier) — re-assigning a category's
+    # envelope updates it rather than creating a duplicate.
+    existing = db.query(models.AllocationRule).filter(
+        models.AllocationRule.user_id == user_id,
+        models.AllocationRule.rule_type == rule.rule_type,
+        models.AllocationRule.identifier == rule.identifier,
+    ).first()
+    if existing:
+        existing.target_account_id = rule.target_account_id
+        db.commit()
+        db.refresh(existing)
+        return existing
+    db_rule = models.AllocationRule(
+        rule_type=rule.rule_type,
+        identifier=rule.identifier,
+        target_account_id=rule.target_account_id,
+        user_id=user_id,
+    )
     db.add(db_rule)
     db.commit()
     db.refresh(db_rule)
@@ -1902,7 +1917,17 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     
     # First pass: collect obligations per target account with their expected amounts
     obls_by_target = {}  # target_account_id -> [(obl, expected_amount), ...]
-    
+
+    # Envelope rules: map a category (or loan name) -> a sub-account, so an
+    # obligation inherits its category's envelope instead of being assigned one by
+    # one. Explicit per-obligation target_account_id still wins as an override.
+    _rule_q = db.query(models.AllocationRule)
+    if user_id:
+        _rule_q = _rule_q.filter(models.AllocationRule.user_id == user_id)
+    _rules = _rule_q.all()
+    cat_rule_map = {r.identifier: r.target_account_id for r in _rules if r.rule_type == 'CATEGORY'}
+    loan_rule_map = {r.identifier: r.target_account_id for r in _rules if r.rule_type == 'LOAN'}
+
     for obl in obligations:
         # Determine expected amount: PAID > BUDGET > prev payment > prev distribution > obligation.amount
         if obl.id in target_payment_amounts:
@@ -1921,13 +1946,13 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
         if expected_amount <= 0:
             continue
         
-        if not obl.target_account_id:
+        # Resolve envelope: explicit override, else category rule, else loan rule.
+        envelope_id = obl.target_account_id or cat_rule_map.get(obl.category) or loan_rule_map.get(obl.name)
+        if not envelope_id:
             unassigned_items.append(obl.name)
             continue
-        
-        if obl.target_account_id not in obls_by_target:
-            obls_by_target[obl.target_account_id] = []
-        obls_by_target[obl.target_account_id].append((obl, expected_amount))
+
+        obls_by_target.setdefault(envelope_id, []).append((obl, expected_amount))
     
     # Second pass: determine status from linked transactions.
     # A per-obligation linked distribution funds its own obligation directly; only
@@ -1956,17 +1981,17 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
             else:
                 status = 'pending'
             
-            target_acc = accounts_by_id.get(obl.target_account_id)
+            target_acc = accounts_by_id.get(target_id)
             total_required += expected_amount
             total_transferred += already_transferred
             total_pending += pending_amount
-            
+
             allocations.append(schemas.AllocationItem(
                 obligation_id=obl.id,
                 obligation_name=obl.name,
                 category=obl.category,
                 provider=obl.provider,
-                target_account_id=obl.target_account_id,
+                target_account_id=target_id,
                 target_account_name=target_acc.name if target_acc else "Unknown",
                 amount=expected_amount,
                 already_transferred=already_transferred,

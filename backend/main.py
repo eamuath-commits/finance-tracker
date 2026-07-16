@@ -2817,12 +2817,31 @@ def delete_goal(goal_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Goal not found")
     return deleted_goal
 
-# --- Allocation Rules ---
-# The /allocation/rules API was DEAD: no frontend calls it, and the allocation
-# engine never reads AllocationRule (envelope assignment works via each
-# obligation's target_account_id, set in the Allocation UI). Endpoints removed.
-# The allocation_rules table (13 inert rows) + model are kept for now so account
-# deletion FK-cleanup keeps working and no data is dropped without consent.
+# --- Allocation Rules: map a category / loan -> an envelope sub-account. ---
+# These now DRIVE the allocation engine: an obligation inherits its category's
+# envelope (calculate_allocation_preview) unless it has an explicit override.
+
+@app.get("/allocation/rules", response_model=List[schemas.AllocationRule])
+def get_allocation_rules(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return db.query(models.AllocationRule).filter(models.AllocationRule.user_id == current_user.id).all()
+
+@app.post("/allocation/rules", response_model=schemas.AllocationRule)
+def create_allocation_rule(rule: schemas.AllocationRuleCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # The envelope account must belong to the caller.
+    _require_owned(db, models.Account, rule.target_account_id, current_user)
+    return crud.create_allocation_rule(db, rule, user_id=current_user.id)
+
+@app.delete("/allocation/rules/{rule_id}")
+def delete_allocation_rule(rule_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    rule = db.query(models.AllocationRule).filter(
+        models.AllocationRule.id == rule_id,
+        models.AllocationRule.user_id == current_user.id,
+    ).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    db.delete(rule)
+    db.commit()
+    return {"success": True}
 
 # --- Obligations ---
 
