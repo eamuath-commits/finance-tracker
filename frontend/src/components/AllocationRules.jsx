@@ -26,15 +26,44 @@ const AllocationRules = ({ accounts }) => {
     const [saving, setSaving] = useState(null); // obligation ID being saved
     const [searchTerm, setSearchTerm] = useState('');
     const [collapsedCats, setCollapsedCats] = useState(new Set());
+    const [categoryRules, setCategoryRules] = useState({}); // category -> rule object
 
     const fetchData = async () => {
         try {
-            const res = await api.get(`${API_URL}/obligations/`);
-            setObligations(res.data);
+            const [oblRes, ruleRes] = await Promise.all([
+                api.get(`${API_URL}/obligations/`),
+                api.get(`${API_URL}/allocation/rules`),
+            ]);
+            setObligations(oblRes.data);
+            const map = {};
+            (ruleRes.data || []).forEach(r => { if (r.rule_type === 'CATEGORY') map[r.identifier] = r; });
+            setCategoryRules(map);
         } catch (error) {
-            console.error("Error fetching obligations", error);
+            console.error("Error fetching allocation data", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Set (or clear) the envelope rule for an entire category. Obligations in the
+    // category inherit it unless they have their own explicit override.
+    const handleSetCategoryRule = async (category, targetAccountId) => {
+        try {
+            if (!targetAccountId) {
+                const existing = categoryRules[category];
+                if (existing) {
+                    await api.delete(`${API_URL}/allocation/rules/${existing.id}`);
+                    setCategoryRules(prev => { const n = { ...prev }; delete n[category]; return n; });
+                }
+                return;
+            }
+            const res = await api.post(`${API_URL}/allocation/rules`, {
+                rule_type: 'CATEGORY', identifier: category, target_account_id: targetAccountId
+            });
+            setCategoryRules(prev => ({ ...prev, [category]: res.data }));
+        } catch (error) {
+            console.error("Error setting category envelope:", error);
+            alert(error.response?.data?.detail || "Failed to set category envelope");
         }
     };
 
@@ -155,7 +184,8 @@ const AllocationRules = ({ accounts }) => {
                 {sortedCategories.map(cat => {
                     const items = grouped[cat];
                     const isCollapsed = collapsedCats.has(cat);
-                    const catAssigned = items.filter(o => o.target_account_id).length;
+                    const catRuleAcct = categoryRules[cat]?.target_account_id || null;
+                    const catAssigned = items.filter(o => o.target_account_id || catRuleAcct).length;
                     const borderColor = CATEGORY_COLORS[cat] || "border-gray-500/40";
 
                     return (
@@ -179,19 +209,21 @@ const AllocationRules = ({ accounts }) => {
                                         <AlertTriangle size={12} className="text-amber-400" />
                                     )}
                                 </button>
-                                {/* Bulk assign for entire category */}
-                                <select
-                                    className="bg-slate-700/60 text-slate-300 text-[10px] rounded-lg px-2 py-1 border border-slate-600/50 outline-none focus:border-blue-500 transition"
-                                    value=""
-                                    onChange={(e) => {
-                                        if (e.target.value) handleBulkAssign(cat, e.target.value);
-                                    }}
-                                >
-                                    <option value="">Bulk assign...</option>
-                                    {accounts.map(acc => (
-                                        <option key={acc.id} value={acc.id}>{acc.name}</option>
-                                    ))}
-                                </select>
+                                {/* Category envelope rule — every obligation here inherits it (unless overridden) */}
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-[9px] text-slate-500 uppercase tracking-wider">Envelope</span>
+                                    <select
+                                        className={`text-[10px] rounded-lg px-2 py-1 border outline-none focus:border-blue-500 transition ${catRuleAcct ? 'bg-blue-600/20 text-blue-200 border-blue-500/40' : 'bg-slate-700/60 text-slate-300 border-slate-600/50'}`}
+                                        value={catRuleAcct || ''}
+                                        onChange={(e) => handleSetCategoryRule(cat, e.target.value)}
+                                        title="Set one envelope account for this whole category; new obligations inherit it automatically"
+                                    >
+                                        <option value="">— none —</option>
+                                        {accounts.map(acc => (
+                                            <option key={acc.id} value={acc.id}>{acc.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
 
                             {/* Obligation Rows */}
@@ -231,10 +263,10 @@ const AllocationRules = ({ accounts }) => {
                                                                 className={`flex-1 bg-slate-700/60 text-sm rounded-lg px-3 py-1.5 border outline-none transition ${
                                                                     obl.target_account_id
                                                                         ? 'border-emerald-500/30 text-white'
-                                                                        : 'border-amber-500/30 text-slate-400'
+                                                                        : (catRuleAcct ? 'border-blue-500/30 text-blue-200/70' : 'border-amber-500/30 text-slate-400')
                                                                 } focus:border-blue-500 disabled:opacity-50`}
                                                             >
-                                                                <option value="">-- Select Envelope --</option>
+                                                                <option value="">{catRuleAcct ? `⤷ inherits ${accounts.find(a => a.id === catRuleAcct)?.name || 'category envelope'}` : '-- Select Envelope --'}</option>
                                                                 {accounts.map(acc => (
                                                                     <option key={acc.id} value={acc.id}>{acc.name} ({acc.account_type})</option>
                                                                 ))}
@@ -244,7 +276,7 @@ const AllocationRules = ({ accounts }) => {
                                                     <td className="px-3 py-2 text-center">
                                                         {saving === obl.id ? (
                                                             <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent mx-auto" />
-                                                        ) : obl.target_account_id ? (
+                                                        ) : (obl.target_account_id || catRuleAcct) ? (
                                                             <CheckCircle size={14} className="text-emerald-400 mx-auto" />
                                                         ) : (
                                                             <AlertTriangle size={14} className="text-amber-400/40 mx-auto" />
