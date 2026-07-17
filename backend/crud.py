@@ -1531,17 +1531,6 @@ def delete_allocation_rule(db: Session, rule_id: str):
         db.commit()
     return True
 
-def delete_allocation_history_items(db: Session, ids: List[str]):
-    try:
-        db.query(models.AllocationHistory).filter(models.AllocationHistory.id.in_(ids)).delete(synchronize_session=False)
-        db.commit()
-        return True
-    except Exception as e:
-        db.rollback()
-        print(f"Error deleting allocation history: {e}")
-        return False
-
-
 def find_transaction_matches(
     db: Session,
     keyword: str,

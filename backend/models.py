@@ -346,19 +346,7 @@ class AllocationRule(Base):
     identifier = Column(String, nullable=False)  # Category name or Loan name
     target_account_id = Column(String, ForeignKey("accounts.id"), nullable=False)  # Target envelope account
 
-class AllocationHistory(Base):
-    __tablename__ = "allocation_history"
-    
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String, ForeignKey("users.id"), nullable=True)
-    month = Column(String, nullable=False) # YYYY-MM
-    income = Column(Money(), default=0.0)
-    needs_planned = Column(Money(), default=0.0)
-    needs_actual = Column(Money(), default=0.0)
-    wants_planned = Column(Money(), default=0.0)
-    wants_actual = Column(Money(), default=0.0)
-    savings_planned = Column(Money(), default=0.0)
-    savings_actual = Column(Money(), default=0.0)
+# (AllocationHistory model removed — dead 50/30/20 snapshot table, never written or read)
 
 class Distribution(Base):
     """Track salary distribution records with transaction linking"""

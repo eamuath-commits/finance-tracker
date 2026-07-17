@@ -465,22 +465,6 @@ class AllocationRule(AllocationRuleBase):
     class Config:
         from_attributes = True
 
-class AllocationHistoryBase(BaseModel):
-    month: str
-    income: float
-    needs_planned: float
-    needs_actual: float
-    wants_planned: float
-    wants_actual: float
-    savings_planned: float
-    savings_actual: float
-
-class AllocationHistory(AllocationHistoryBase):
-    id: str
-
-    class Config:
-        from_attributes = True
-        
 # --- Allocation Preview Schemas ---
 class AllocationItem(BaseModel):
     obligation_id: str  # The obligation this allocation is for

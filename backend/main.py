@@ -212,9 +212,6 @@ def run_migrations(engine):
             ("loans","principal_amount"),("loans","remaining_balance"),("loans","monthly_payment"),
             ("obligations","amount"),("payments","amount"),("payments","planned_amount"),
             ("savings_goals","target_amount"),("savings_goals","current_amount"),
-            ("allocation_history","income"),("allocation_history","needs_planned"),("allocation_history","needs_actual"),
-            ("allocation_history","wants_planned"),("allocation_history","wants_actual"),
-            ("allocation_history","savings_planned"),("allocation_history","savings_actual"),
             ("distributions","amount"),("statements","opening_balance"),("statements","closing_balance"),
             ("statement_lines","debit"),("statement_lines","credit"),("statement_lines","balance"),("statement_lines","amount"),
         ]
