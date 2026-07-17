@@ -39,6 +39,35 @@ STATEMENTS_DIR = Path("/app/statements")
 STATEMENTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
+# Statement lifecycle:  draft -> posted   (+ rejected)
+#   draft  = uploaded/parsed, nothing in the ledger
+#   posted = transactions written to the ledger (set ONLY by POST /{id}/post)
+# Status must reflect ledger reality, never a hand-applied label.
+MANUAL_STATUSES = ("draft", "rejected")
+
+
+def _guard_manual_status(statement: models.Statement, new_status: str):
+    """
+    Reject any attempt to set a status by hand that would misrepresent the ledger.
+
+    'posted' is earned by actually writing transactions to the ledger, so it can
+    never be set manually; and a statement that IS posted must not be relabelled
+    back to draft/rejected while its transactions are still in the ledger.
+    """
+    if new_status not in MANUAL_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=(f"Invalid status '{new_status}'. Only {' or '.join(MANUAL_STATUSES)} "
+                    "can be set manually — 'posted' is set by posting to the ledger."),
+        )
+    if statement.status == "posted":
+        raise HTTPException(
+            status_code=400,
+            detail=("This statement is posted — its transactions are in the ledger, "
+                    "so its status cannot be changed by hand."),
+        )
+
+
 def detect_pdf_type(file_path: str) -> str:
     """
     Detect whether a PDF is text-based or scanned (image-based).
@@ -566,8 +595,7 @@ def update_statement(
     if body.notes is not None:
         statement.notes = body.notes
     if body.status is not None:
-        if body.status not in ("draft", "reviewed", "approved", "rejected"):
-            raise HTTPException(status_code=400, detail="Invalid status. Must be draft, reviewed, approved, or rejected.")
+        _guard_manual_status(statement, body.status)
         statement.status = body.status
     if body.account_id is not None:
         # Verify account belongs to current user
@@ -660,19 +688,37 @@ def bulk_update_status(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    """Update status of multiple statements."""
+    """Update status of multiple statements (draft/rejected only)."""
     ids = body.get("ids", [])
     status = body.get("status", "")
-    if status not in ("draft", "reviewed", "approved", "rejected"):
-        raise HTTPException(status_code=400, detail="Invalid status")
-    
-    updated = db.query(models.Statement).filter(
+    if status not in MANUAL_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=(f"Invalid status '{status}'. Only {' or '.join(MANUAL_STATUSES)} "
+                    "can be set manually — 'posted' is set by posting to the ledger."),
+        )
+
+    statements = db.query(models.Statement).filter(
         models.Statement.id.in_(ids),
         models.Statement.user_id == current_user.id,
-    ).update({"status": status}, synchronize_session=False)
-    
+    ).all()
+
+    updated, skipped = 0, []
+    for s in statements:
+        # Never relabel a posted statement — its transactions are in the ledger.
+        if s.status == "posted":
+            skipped.append({"id": s.id, "reason": "posted — transactions are in the ledger"})
+            continue
+        s.status = status
+        updated += 1
+
     db.commit()
-    return {"message": f"Updated {updated} statements to {status}", "updated": updated}
+    return {
+        "message": f"Updated {updated} statements to {status}"
+                   + (f"; skipped {len(skipped)} already posted" if skipped else ""),
+        "updated": updated,
+        "skipped": skipped,
+    }
 
 
 @router.delete("/{statement_id}")
@@ -824,308 +870,16 @@ def get_statement_lines(
     }
 
 
-class CommitRequest(BaseModel):
-    exclude_row_indices: Optional[List[int]] = None  # Row indices to skip (matched duplicates)
-
-
-@router.post("/{statement_id}/commit")
-def commit_statement_to_ledger(
-    statement_id: str,
-    body: CommitRequest = CommitRequest(),
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
-):
-    """
-    Commit parsed statement transactions into the master Transaction ledger.
-    
-    Creates Transaction records with status='draft'. They will NOT affect
-    account balances until explicitly approved.
-    
-    Accepts optional exclude_row_indices to skip matched/duplicate transactions.
-    """
-    statement = db.query(models.Statement).filter(
-        models.Statement.id == statement_id,
-        models.Statement.user_id == current_user.id,
-    ).first()
-    
-    if not statement:
-        raise HTTPException(status_code=404, detail="Statement not found")
-    
-    if statement.status not in ("draft", "reviewed"):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Statement must be in draft or reviewed status to commit (current: {statement.status})"
-        )
-    
-    if not statement.account_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Statement must be linked to an account before committing. "
-                   "The account could not be auto-resolved from the statement header."
-        )
-    
-    if not statement.file_path or not os.path.exists(statement.file_path):
-        raise HTTPException(status_code=404, detail="PDF file not found on server")
-    
-    # Check if already committed (has draft transactions)
-    existing_draft_count = db.query(models.Transaction).filter(
-        models.Transaction.statement_id == statement_id,
-        models.Transaction.status == "draft",
-    ).count()
-    
-    if existing_draft_count > 0:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Statement already has {existing_draft_count} draft transactions. "
-                   "Delete them first or approve the existing ones."
-        )
-    
-    # Parse the PDF
-    parsed = parse_statement_pdf(statement.file_path)
-    if parsed.get("error"):
-        raise HTTPException(status_code=500, detail=f"Parse failed: {parsed['error']}")
-    
-    raw_transactions = parsed.get("transactions", [])
-    if not raw_transactions:
-        raise HTTPException(status_code=400, detail="No transactions found in statement")
-    
-    # Build set of excluded row indices (from frontend duplicate detection)
-    excluded_rows = set(body.exclude_row_indices or [])
-    
-    # --- Create Transaction records ---
-    created = []
-    skipped = 0
-    excluded_count = 0
-    
-    for tx in raw_transactions:
-        row_idx = tx.get("row_index", 0)
-        
-        # Skip excluded (matched) rows
-        if row_idx in excluded_rows:
-            excluded_count += 1
-            continue
-        
-        tx_date_str = tx.get("transaction_date")  # YYYY/MM/DD
-        tx_time_str = tx.get("transaction_time")  # HH:MM:SS
-        direction = tx.get("direction", "debit")
-        
-        # Determine amount
-        if direction == "credit":
-            amount = tx.get("credit_amount") or tx.get("amount") or 0
-        else:
-            amount = tx.get("debit_amount") or tx.get("amount") or 0
-        
-        if amount <= 0:
-            skipped += 1
-            continue
-        
-        # Build timestamp — prefer actual time from PDF, fall back to row_index for ordering
-        timestamp = None
-        if tx_date_str:
-            try:
-                date_part = tx_date_str.replace('/', '-')
-                if tx_time_str:
-                    # Use actual time from the statement PDF
-                    try:
-                        timestamp = datetime.strptime(f"{date_part} {tx_time_str}", "%Y-%m-%d %H:%M:%S")
-                    except ValueError:
-                        try:
-                            timestamp = datetime.strptime(f"{date_part} {tx_time_str}", "%Y-%m-%d %H:%M")
-                        except ValueError:
-                            timestamp = None
-                
-                if not timestamp:
-                    # Fallback: use row_index for ordering within the same date
-                    hour = (row_idx // 3600) % 24
-                    minute = (row_idx % 3600) // 60
-                    second = row_idx % 60
-                    timestamp = datetime.strptime(date_part, "%Y-%m-%d").replace(
-                        hour=hour, minute=minute, second=second
-                    )
-            except ValueError:
-                timestamp = datetime.utcnow()
-        else:
-            timestamp = datetime.utcnow()
-        
-        # Map category from type_line
-        category = map_type_to_category(tx.get("type_line", ""))
-        
-        # Build notes
-        parts = []
-        if tx_time_str:
-            parts.append(f"Original Time: {tx_time_str}")
-        if tx.get("type_line"):
-            parts.append(f"Type: {tx['type_line']}")
-        if tx.get("note_text"):
-            parts.append(f"Note: {tx['note_text']}")
-        notes_text = "\n".join(parts) if parts else None
-        
-        new_tx = models.Transaction(
-            id=str(uuid.uuid4()),
-            user_id=current_user.id,
-            account_id=statement.account_id,
-            amount=round(amount, 2),
-            merchant=tx.get("merchant_or_beneficiary"),
-            type=direction,
-            timestamp=timestamp,
-            balance_after_transaction=tx.get("balance"),
-            category=category,
-            notes=notes_text,
-            raw_sms_content=tx.get("raw_description", ""),
-            source="statement",
-            statement_id=statement.id,
-            statement_row_index=tx.get("row_index"),
-            status="completed",
-            fees=0.0,
-        )
-        db.add(new_tx)
-        created.append({
-            "id": new_tx.id,
-            "amount": new_tx.amount,
-            "merchant": new_tx.merchant,
-            "type": new_tx.type,
-            "category": category,
-            "timestamp": timestamp.isoformat() if timestamp else None,
-        })
-    
-    # Auto-approve: mark statement as approved
-    statement.status = "approved"
-    db.flush()
-    
-    # Recalculate account balance
-    old_balance = None
-    new_balance = None
-    if statement.account_id:
-        account = db.query(models.Account).filter(
-            models.Account.id == statement.account_id
-        ).first()
-        if account:
-            old_balance = round(account.current_balance or 0, 2)
-        
-        from main import _recalculate_account_balance
-        result = _recalculate_account_balance(db, statement.account_id)
-        if result:
-            new_balance = result.get("new_balance")
-    
-    db.commit()
-    
-    logger.info(
-        f"Committed statement {statement_id}: "
-        f"{len(created)} created, {excluded_count} excluded (duplicates), {skipped} skipped, "
-        f"balance {old_balance} → {new_balance}"
-    )
-    
-    return {
-        "statement_id": statement.id,
-        "created": len(created),
-        "excluded": excluded_count,
-        "skipped": skipped,
-        "old_balance": old_balance,
-        "new_balance": new_balance,
-        "transactions": created[:20],  # Preview first 20
-        "message": f"{len(created)} transactions committed and approved. Balance updated.",
-    }
-
-
-class ApproveRequest(BaseModel):
-    transaction_ids: Optional[List[str]] = None  # If None, approve all drafts
-
-
-@router.post("/{statement_id}/approve")
-def approve_statement_transactions(
-    statement_id: str,
-    body: ApproveRequest = ApproveRequest(),
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
-):
-    """
-    Approve draft transactions for a statement:
-    - If transaction_ids is provided, only approve those specific transactions
-    - If transaction_ids is None/empty, approve ALL draft transactions
-    Then recalculate the account balance chain.
-    """
-    statement = db.query(models.Statement).filter(
-        models.Statement.id == statement_id,
-        models.Statement.user_id == current_user.id,
-    ).first()
-    
-    if not statement:
-        raise HTTPException(status_code=404, detail="Statement not found")
-    
-    if statement.status not in ("reviewed", "approved"):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Statement must be in 'reviewed' status to approve (current: {statement.status}). "
-                   "Commit the statement first."
-        )
-    
-    # Find draft transactions to approve
-    query = db.query(models.Transaction).filter(
-        models.Transaction.statement_id == statement_id,
-        models.Transaction.status == "draft",
-    )
-    
-    if body.transaction_ids:
-        # Only approve selected transactions
-        query = query.filter(models.Transaction.id.in_(body.transaction_ids))
-    
-    draft_txs = query.all()
-    
-    if not draft_txs:
-        raise HTTPException(
-            status_code=400,
-            detail="No draft transactions found to approve."
-        )
-    
-    approved_count = len(draft_txs)
-    
-    # Promote selected drafts to completed
-    for tx in draft_txs:
-        tx.status = "completed"
-    
-    # Check if any drafts remain — only mark statement as approved if none left
-    remaining_drafts = db.query(models.Transaction).filter(
-        models.Transaction.statement_id == statement_id,
-        models.Transaction.status == "draft",
-    ).count()
-    
-    if remaining_drafts == 0:
-        statement.status = "approved"
-    
-    db.flush()
-    
-    # Recalculate account balance chain
-    old_balance = None
-    new_balance = None
-    if statement.account_id:
-        account = db.query(models.Account).filter(
-            models.Account.id == statement.account_id
-        ).first()
-        if account:
-            old_balance = round(account.current_balance or 0, 2)
-        
-        # Import and call the recalculation function
-        from main import _recalculate_account_balance
-        result = _recalculate_account_balance(db, statement.account_id)
-        if result:
-            new_balance = result.get("new_balance")
-    
-    db.commit()
-    
-    logger.info(
-        f"Approved statement {statement_id}: {approved_count} transactions promoted, "
-        f"balance {old_balance} → {new_balance}, {remaining_drafts} drafts remaining"
-    )
-    
-    return {
-        "statement_id": statement.id,
-        "approved_count": approved_count,
-        "remaining_drafts": remaining_drafts,
-        "account_id": statement.account_id,
-        "old_balance": old_balance,
-        "new_balance": new_balance,
-        "message": f"{approved_count} transactions approved. Account balance updated.",
-    }
+# NOTE: the legacy /{statement_id}/commit and /{statement_id}/approve endpoints
+# were removed here. They implemented the old two-phase draft->approve flow that
+# never actually worked (commit created transactions with status='completed' while
+# approve only ever promoted status='draft' rows, so approve was unreachable), and
+# they set status='approved' — a state the current flow never produces. The UI has
+# used POST /{statement_id}/post since Phase 3.
+#
+# Statement lifecycle is now simply:  draft -> posted   (+ rejected)
+#   draft  = uploaded/parsed, nothing in the ledger
+#   posted = transactions written to the ledger (earned by posting, never by label)
 
 
 @router.post("/{statement_id}/post")

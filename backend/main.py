@@ -253,6 +253,19 @@ def run_migrations(engine):
                                   "ON payments (obligation_id, left(billing_month,7)) WHERE obligation_id IS NOT NULL"))
             except Exception:
                 pass
+            # Retire the legacy statement statuses. The lifecycle is now
+            # draft -> posted (+ rejected); 'approved'/'reviewed' came from the old
+            # two-phase flow. Resolve each to the TRUTH: posted if the statement
+            # actually has transactions in the ledger, otherwise draft. Idempotent.
+            try:
+                if 'statements' in _b4_tables:
+                    conn.execute(text(
+                        "UPDATE statements SET status='posted' WHERE status IN ('approved','reviewed') "
+                        "AND EXISTS (SELECT 1 FROM transactions t WHERE t.statement_id = statements.id)"))
+                    conn.execute(text(
+                        "UPDATE statements SET status='draft' WHERE status IN ('approved','reviewed')"))
+            except Exception:
+                pass
             conn.commit()
 
     except Exception as e:
