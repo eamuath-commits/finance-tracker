@@ -270,9 +270,10 @@ class MonthlyObligation(Base):
 
 
 class PaymentStatus(enum.Enum):
+    # Only two states by design: BUDGET = planned for the month, PAID = actually paid.
+    # (PENDING was removed — nothing ever created it and no rows used it.)
     PAID = "PAID"
     BUDGET = "BUDGET"
-    PENDING = "PENDING"
     # Status Enum Definition
 
 class Payment(Base):
