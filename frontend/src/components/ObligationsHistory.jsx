@@ -9,6 +9,10 @@ import { exportToCSV } from '../utils/csvExport';
 import { useConfirm } from './ConfirmProvider';
 
 
+// Compact inline filter select — the shared selectClass is w-full, which made
+// these four dropdowns each take a full row and stack.
+const compactSelect = "bg-slate-800 border border-slate-600 rounded-lg text-xs text-gray-300 px-2.5 py-2 outline-none focus:border-blue-500 transition";
+
 const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDelete, onRefresh, forecast }) => {
     const confirm = useConfirm();
     const [searchTerm, setSearchTerm] = useState('');
@@ -587,11 +591,24 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                 </div>
 
                 <div className="bg-gradient-to-br from-amber-900/20 to-slate-900/90 backdrop-blur-sm border border-amber-500/20 rounded-xl p-4 shadow-lg">
-                    <p className="text-[10px] text-amber-400 uppercase tracking-wider font-semibold mb-1">Budget</p>
+                    <p className="text-[10px] text-amber-400 uppercase tracking-wider font-semibold mb-1">Left to pay</p>
                     <p className="text-2xl font-bold text-white font-mono">{formatCurrency(totalBudget)}</p>
                     <p className="text-[10px] text-amber-400/60 mt-1">{allItems.filter(i => i.type === 'planned').length} pending obligations</p>
                 </div>
             </div>
+
+            {/* Progress: how much of this month's commitment is paid */}
+            {selectedYear !== 'All' && selectedMonth !== 'All' && totalDisplay > 0 && (
+                <div className="px-1">
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
+                        <span>{months.find(m => m.value === selectedMonth)?.label} {selectedYear} — {allItems.filter(i => i.type === 'payment').length} of {allItems.length} paid</span>
+                        <span className="font-mono">{Math.round((visiblePaid / totalDisplay) * 100)}%</span>
+                    </div>
+                    <div className="w-full bg-slate-700/50 rounded-full h-1.5 overflow-hidden">
+                        <div className="h-1.5 rounded-full bg-emerald-500 transition-all" style={{ width: `${Math.min(100, (visiblePaid / totalDisplay) * 100)}%` }} />
+                    </div>
+                </div>
+            )}
 
             {/* Toolbar — matches Manager tab */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -606,20 +623,20 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                             className="bg-slate-800/80 border border-slate-700/50 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 outline-none focus:border-blue-500/50 transition w-48"
                         />
                     </div>
-                    <select className={`${selectClass} text-xs py-2`} value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)}>
+                    <select className={compactSelect} value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)}>
                         <option value="All">All Years</option>
                         {years.map(y => <option key={y} value={y}>{y}</option>)}
                     </select>
-                    <select className={`${selectClass} text-xs py-2`} value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
+                    <select className={compactSelect} value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
                         <option value="All">All Months</option>
                         {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                     </select>
-                    <select className={`${selectClass} text-xs py-2`} value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
+                    <select className={compactSelect} value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
                         <option value="All">All Status</option>
                         <option value="Paid">Paid</option>
                         <option value="BUDGET">Budget</option>
                     </select>
-                    <select className={`${selectClass} text-xs py-2`} value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
+                    <select className={compactSelect} value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
                         <option value="All">All Categories</option>
                         {categories.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>

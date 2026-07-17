@@ -435,9 +435,12 @@ const Obligations = () => {
                             </button>
                         </div>
 
-                        {/* Shared Controls: Category Filter + Month Nav */}
+                        {/* Shared Controls: Category Filter + Month Nav.
+                            The Payments view owns its own compact filters, so we
+                            hide these there to avoid a doubled category + month control. */}
                         <div className="flex items-center gap-2 flex-wrap">
-                            {/* Category Filter (universal across all views) */}
+                            {/* Category Filter (Manager & Forecast) */}
+                            {viewMode !== 'payments' && (
                             <select
                                 className="bg-slate-800 text-xs text-gray-300 border border-slate-600 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 mr-1"
                                 value={categoryFilter || ""}
@@ -453,9 +456,10 @@ const Obligations = () => {
                                     <option key={name} value={name}>{name}</option>
                                 ))}
                             </select>
+                            )}
 
-                            {/* Month Nav (shown for Payments and Forecast) */}
-                            {(viewMode === 'payments' || viewMode === 'forecast') && (
+                            {/* Month Nav (Forecast only; Payments has its own month picker) */}
+                            {viewMode === 'forecast' && (
                                 <>
                                     <button onClick={() => setMonthOffset(p => p - 1)} className="p-1.5 hover:bg-slate-700 rounded-lg text-gray-400 transition"><ArrowLeft size={16} /></button>
                                     <span className="text-sm font-bold text-white min-w-[120px] text-center">{currentDateView}</span>
