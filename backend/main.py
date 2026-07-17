@@ -977,7 +977,16 @@ def get_all_obligation_matches(db: Session = Depends(get_db), current_user: mode
                     reasons.append("notes_match")
                     break
 
-            # Amount match
+            # ---- DESCRIPTION IS REQUIRED ----
+            # Everything above is description evidence. Amount is NOT a reliable
+            # signal here: a BUDGET figure is only an estimate of the last paid
+            # amount, so the real transaction routinely differs. Without any
+            # description evidence, an amount/date coincidence must never surface
+            # an unrelated transaction as a match. Amount only ranks from here.
+            if score == 0:
+                continue
+
+            # Amount match (ranking booster only — cannot qualify a match on its own)
             if obl.amount and tx.amount:
                 diff = abs(tx.amount - obl.amount)
                 if obl.amount > 0 and diff / obl.amount <= 0.1:
@@ -1083,8 +1092,15 @@ def get_obligation_matches(obligation_id: str, db: Session = Depends(get_db), cu
                 if k in merchant_lower or k in notes_lower:
                     match_score += 50
                     break
-            
-        # E. Amount Match (if Obligation has amount)
+
+        # ---- DESCRIPTION IS REQUIRED (A-D above are description evidence) ----
+        # A BUDGET amount is only an estimate of the last paid amount, so the real
+        # transaction routinely differs — amount must never qualify a match by
+        # itself, only rank one that already matched on description.
+        if match_score == 0:
+            continue
+
+        # E. Amount Match (ranking booster only — cannot qualify on its own)
         if obligation.amount and tx.amount:
             diff = abs(tx.amount - obligation.amount)
             if obligation.amount > 0 and diff / obligation.amount <= 0.1:
@@ -1430,8 +1446,26 @@ def get_suggested_transactions(payment_id: int, db: Session = Depends(get_db), c
     for tx in transactions:
         score = 0
         reasons = []
-        
-        # Amount matching (within 10% tolerance)
+
+        # Description matching FIRST — this is the primary signal. Also look in the
+        # transaction notes, which carry the statement's own description text.
+        merchant_lower = (tx.merchant or "").lower()
+        notes_lower = (tx.notes or "").lower()
+        for term in search_terms:
+            if term and (term in merchant_lower or term in notes_lower):
+                score += 40
+                reasons.append("name_match")
+                break
+
+        # ---- DESCRIPTION IS REQUIRED ----
+        # The payment amount is only an estimate (a BUDGET is derived from the last
+        # paid amount), so the real transaction routinely differs. Never suggest a
+        # transaction purely because its amount is close — that is exactly how the
+        # wrong transaction gets auto-linked to a bill.
+        if score == 0:
+            continue
+
+        # Amount matching (ranking booster only — cannot qualify on its own)
         if payment_amount > 0 and tx.amount:
             diff_pct = abs(tx.amount - payment_amount) / payment_amount * 100
             if diff_pct < 1:
@@ -1440,15 +1474,7 @@ def get_suggested_transactions(payment_id: int, db: Session = Depends(get_db), c
             elif diff_pct < 10:
                 score += 30
                 reasons.append("similar_amount")
-        
-        # Merchant name matching
-        merchant_lower = (tx.merchant or "").lower()
-        for term in search_terms:
-            if term in merchant_lower:
-                score += 40
-                reasons.append("name_match")
-                break
-        
+
         # Date proximity bonus
         if tx.timestamp:
             days_diff = abs((tx.timestamp.date() - target_date.date()).days)
