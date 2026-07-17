@@ -147,6 +147,13 @@ const Obligations = () => {
         }).catch(() => { });
     }, []);
 
+    // Categories the obligations actually use — the filter dropdown should offer
+    // only these, not every global category (filtering by an unused one is a no-op
+    // and the full ~40-item list is what made this control feel cluttered).
+    const usedCategories = React.useMemo(() => {
+        return [...new Set(obligations.map(o => o.category).filter(Boolean))].sort();
+    }, [obligations]);
+
     // Filter Obligations based on URL params
     const filteredObligations = React.useMemo(() => {
         console.log("Filtering Logic - Filter:", categoryFilter, "Obligations Count:", obligations.length);
@@ -442,8 +449,8 @@ const Obligations = () => {
                                 })}
                             >
                                 <option value="">All Categories</option>
-                                {categoriesList.map(c => (
-                                    <option key={c.id} value={c.name}>{c.name}</option>
+                                {usedCategories.map(name => (
+                                    <option key={name} value={name}>{name}</option>
                                 ))}
                             </select>
 
@@ -467,6 +474,8 @@ const Obligations = () => {
                         <ObligationsManager
                             obligations={filteredObligations}
                             openObligationModal={openObligationModal}
+                            payments={payments}
+                            openPaymentModal={openPaymentModal}
                         />
                     )}
 
