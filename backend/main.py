@@ -1493,8 +1493,12 @@ def link_payment_to_transaction(payment_id: int, transaction_id: str, db: Sessio
     
     # Update payment
     payment.transaction_id = transaction_id
-    payment.status = models.PaymentStatus.PAID
-    
+    # A BUDGET row is a PLAN, not an actual payment — attaching a transaction to it
+    # must not silently convert it to PAID. Any other status still promotes to PAID.
+    # (status is stored as VARCHAR against an Enum column, so compare both forms.)
+    if payment.status not in (models.PaymentStatus.BUDGET, "BUDGET"):
+        payment.status = models.PaymentStatus.PAID
+
     # Optionally update amount if not set
     if payment.amount is None or payment.amount == 0:
         payment.amount = transaction.amount
