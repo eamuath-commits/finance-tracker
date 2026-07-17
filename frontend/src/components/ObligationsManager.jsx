@@ -4,6 +4,43 @@ import { CATEGORY_ICONS, CATEGORY_COLORS, CategoryHeader, CategorySectionWrapper
 import { Edit2, Download, Search, Plus, Box } from 'lucide-react';
 import { exportToCSV } from '../utils/csvExport';
 
+// --- Obligation Row ---
+// NOTE: this definition was accidentally dropped by the "unify visual style"
+// refactor (6e98ef3) while CategorySection still rendered <ObligationRow>, which
+// crashed the whole Obligations page with "ObligationRow is not defined".
+const ObligationRow = ({ obl, openObligationModal }) => {
+    return (
+        <tr className="border-b border-slate-700/20 hover:bg-slate-800/50 transition-colors group">
+            <td className="px-4 py-1.5">
+                <div className="flex items-center gap-1.5">
+                    {obl.provider && (
+                        <span className="text-[9px] text-slate-500 font-semibold uppercase">{obl.provider}</span>
+                    )}
+                    {obl.provider && <span className="text-slate-600 text-[8px]">·</span>}
+                    <span className="font-medium text-white text-[12px] truncate">{obl.name}</span>
+                </div>
+            </td>
+            <td className="px-3 py-1.5 text-center">
+                <span className="text-[11px] font-mono text-slate-400">{obl.due_day}</span>
+            </td>
+            <td className="px-3 py-1.5">
+                <span className="text-[11px] text-slate-500 truncate block max-w-[200px]">{obl.notes || '—'}</span>
+            </td>
+            <td className="px-3 py-1.5">
+                <div className="flex items-center justify-end">
+                    <button
+                        onClick={() => openObligationModal(obl)}
+                        className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-blue-400 p-1 rounded transition"
+                        title="Edit"
+                    >
+                        <Edit2 size={12} />
+                    </button>
+                </div>
+            </td>
+        </tr>
+    );
+};
+
 // --- Category Section (Collapsible) ---
 const CategorySection = ({ category, obligations, openObligationModal }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
