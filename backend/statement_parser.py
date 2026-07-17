@@ -505,7 +505,19 @@ def parse_transactions_from_text(all_pages_text: list[str]) -> list[RawTransacti
 def parse_statement_pdf(file_path: str) -> dict:
     """
     Main entry point: parse an Al Rajhi statement PDF.
-    
+
+    Reads the transaction grid with pdfplumber's TABLE extraction. The PDF's rows
+    are a real table — [Date, Details, Debit, Credit, Balance] — so the columns are
+    read directly instead of being reassembled from wrapped text lines. The old
+    line-scanning approach mis-assembled multi-line cells: it dropped rows, lost the
+    type/time, and under-counted credits. Details cell looks like:
+
+        Internal Transfer between Accounts        <- type (first line)
+        Time:17:47:21, Notes:W-/TOACCT/446...     <- time + note
+
+    Note separator differs between statements ("**Note:" vs ", Notes:"), so both
+    are accepted.
+
     Returns {
         "header": StatementHeader dict,
         "transactions": list of RawTransaction dicts,
@@ -516,44 +528,77 @@ def parse_statement_pdf(file_path: str) -> dict:
     try:
         import pdfplumber
     except ImportError:
-        return {"header": None, "transactions": [], "page_count": 0, 
+        return {"header": None, "transactions": [], "page_count": 0,
                 "error": "pdfplumber not installed"}
-    
+
     try:
         with pdfplumber.open(file_path) as pdf:
             page_count = len(pdf.pages)
             if page_count == 0:
                 return {"header": None, "transactions": [], "page_count": 0,
                         "error": "PDF has no pages"}
-            
-            # Extract text from all pages, normalizing Arabic
-            all_text = []
+
+            # Header comes from page 1's text (summary page)
+            header = parse_header(normalize_arabic(pdf.pages[0].extract_text() or ""))
+
+            transactions = []
+            idx = 0
             for page in pdf.pages:
-                text = page.extract_text() or ""
-                text = normalize_arabic(text)
-                all_text.append(text)
-            
-            # Parse header from first page
-            header = parse_header(all_text[0])
-            
-            # Parse transactions from pages 2+ (index 1+)
-            # Page 1 is the header/summary page
-            tx_pages = all_text[1:] if len(all_text) > 1 else []
-            transactions = parse_transactions_from_text(tx_pages)
-            
+                for table in (page.extract_tables() or []):
+                    for cells in table:
+                        # A transaction row is [Date, Details, Debit, Credit, Balance]
+                        if not cells or len(cells) < 5:
+                            continue
+                        date_cell = (cells[0] or "").strip()
+                        if not _DATE_CELL_RE.match(date_cell):
+                            continue  # skips headers/footers/summary rows
+
+                        details = normalize_arabic(cells[1] or "")
+                        type_line = details.split("\n")[0].strip() or None
+
+                        tm = _TIME_RE.search(details)
+                        nm = _NOTE_SEP_RE.search(details)
+                        note_text = re.sub(r"\s+", " ", nm.group(1)).strip() if nm else None
+
+                        debit = parse_amount(cells[2]) or 0.0
+                        credit = parse_amount(cells[3]) or 0.0
+                        balance = parse_amount(cells[4])
+
+                        direction = "credit" if credit > 0 else "debit"
+                        amount = credit if credit > 0 else debit
+
+                        merchant, reference = parse_merchant_from_note(note_text or "", type_line or "")
+
+                        transactions.append(RawTransaction(
+                            row_index=idx,
+                            transaction_date=date_cell,
+                            transaction_time=tm.group(1) if tm else None,
+                            type_line=type_line,
+                            raw_description=details,
+                            debit_amount=debit,
+                            credit_amount=credit,
+                            amount=amount,
+                            direction=direction,
+                            balance=balance,
+                            merchant_or_beneficiary=merchant,
+                            reference_id=reference,
+                            note_text=note_text,
+                        ))
+                        idx += 1
+
             logger.info(
-                f"Parsed statement: account={header.account_number}, "
+                f"Parsed statement (tables): account={header.account_number}, "
                 f"period={header.period_start} to {header.period_end}, "
                 f"{len(transactions)} transactions from {page_count} pages"
             )
-            
+
             return {
                 "header": asdict(header),
                 "transactions": [asdict(tx) for tx in transactions],
                 "page_count": page_count,
                 "error": None,
             }
-    
+
     except Exception as e:
         logger.error(f"Failed to parse statement PDF: {e}", exc_info=True)
         return {"header": None, "transactions": [], "page_count": 0,
@@ -572,6 +617,9 @@ def parse_statement_pdf(file_path: str) -> dict:
 # ─────────────────────────────────────────────────────────────────────
 
 _TIME_RE = re.compile(r'Time:(\d{1,2}:\d{2}:\d{2})')
+# Statements differ in how the note is introduced: "Time:..**Note:x" vs
+# "Time:.., Notes:x". Accept both so the note/merchant is never lost.
+_NOTE_SEP_RE = re.compile(r'(?:\*\*Notes?:|,\s*Notes?:)\s*(.*)', re.S)
 _ACCT_RE = re.compile(r'(FRACCT|TOACCT)/(\d+)(?:(?:FR|TO))?([^/\d-]+)?')
 _IPS_RE = re.compile(r'([A-Z0-9]{10,})\/([A-Z][A-Za-z .]+)')
 _DATE_CELL_RE = re.compile(r'^\d{4}/\d{2}/\d{2}$')
@@ -632,8 +680,8 @@ def extract_statement_rows(file_path: str) -> dict:
                         details = cells[1] or ""
                         first_line = details.split('\n')[0].strip()
                         tm = _TIME_RE.search(details)
-                        note = (details.split('**Note:')[-1].replace('\n', ' ').strip()
-                                if '**Note:' in details else "")
+                        _nm = _NOTE_SEP_RE.search(details)
+                        note = re.sub(r'\s+', ' ', _nm.group(1)).strip() if _nm else ""
 
                         debit = parse_amount(cells[2]) or 0.0
                         credit = parse_amount(cells[3]) or 0.0
