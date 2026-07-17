@@ -1220,8 +1220,13 @@ def update_payment(payment_id: int, payment_update: schemas.PaymentUpdate, db: S
 def auto_match_obligations(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """
     Batch process: Scan unpaid obligations for the current and previous month.
-    For each, find a debit transaction with 100% amount match within ±5 days of due_day.
-    Creates a PAID payment with source='auto' and links the transaction.
+
+    For each, find a debit transaction within ±5 days of due_day that matches the
+    obligation BY DESCRIPTION (name/provider/notes). Amount is not a filter — a
+    BUDGET is only an estimate of the last paid amount, so the actual transaction
+    routinely differs; amount/date only rank the description-matched candidates.
+    Creates a PAID payment (recording the transaction's real amount, with the
+    estimate kept as planned_amount) with source='auto' and links the transaction.
     Idempotent — safe to run repeatedly.
     """
     from datetime import datetime, timedelta
@@ -1311,24 +1316,59 @@ def auto_match_obligations(db: Session = Depends(get_db), current_user: models.U
             start_date = due_date - timedelta(days=5)
             end_date = due_date + timedelta(days=5)
 
-            # Find exact-match debit transactions in the window
+            # Candidate debits in the ±5 day window. Amount is deliberately NOT a
+            # filter: a BUDGET is only an estimate of the last paid amount, so the
+            # real transaction routinely differs (and exact float equality would
+            # rarely match anyway).
             candidates = db.query(models.Transaction).filter(
                 models.Transaction.user_id == current_user.id,
                 models.Transaction.timestamp >= start_date,
                 models.Transaction.timestamp <= end_date,
                 models.Transaction.type == "debit",
-                models.Transaction.amount == expected_amount
-            ).order_by(
-                # Prefer transactions closest to due date
-                models.Transaction.timestamp
-            ).all()
+            ).order_by(models.Transaction.timestamp).all()
 
-            # Find the first candidate not already linked
+            # DESCRIPTION-FIRST: a transaction must match the obligation by
+            # description to be considered at all; amount/date only rank the
+            # survivors. This endpoint CREATES a PAID payment, so an amount
+            # coincidence must never be enough on its own.
+            keyword = (obl.name or "").lower()
+            provider_lower = (obl.provider or "").lower()
+            note_keywords = [w.lower() for w in (obl.notes or "").split() if len(w) > 2]
+
             matched_tx = None
+            best_score = 0
             for tx in candidates:
-                if tx.id not in linked_tx_ids:
+                if tx.id in linked_tx_ids:
+                    continue
+                merchant_lower = (tx.merchant or "").lower()
+                notes_lower = (tx.notes or "").lower()
+
+                score = 0
+                if keyword and (keyword in merchant_lower or keyword in notes_lower):
+                    score += 50
+                if provider_lower and len(provider_lower) > 2 and (
+                        provider_lower in merchant_lower or provider_lower in notes_lower):
+                    score += 40
+                for k in note_keywords:
+                    if k in merchant_lower or k in notes_lower:
+                        score += 30
+                        break
+                if score == 0:
+                    continue  # no description evidence -> never auto-create a payment
+
+                # Rank only: amount closeness, then proximity to the due date
+                if expected_amount and tx.amount:
+                    diff = abs(tx.amount - expected_amount)
+                    if diff == 0:
+                        score += 20
+                    elif diff / expected_amount <= 0.1:
+                        score += 10
+                if tx.timestamp:
+                    score += max(0, 5 - abs((tx.timestamp - due_date).days))
+
+                if score > best_score:
+                    best_score = score
                     matched_tx = tx
-                    break
 
             if not matched_tx:
                 skipped.append({"name": obl.name, "month": bm_prefix, "reason": "no_matching_transaction"})
@@ -1339,7 +1379,10 @@ def auto_match_obligations(db: Session = Depends(get_db), current_user: models.U
             new_payment = models.Payment(
                 obligation_id=obl.id,
                 user_id=current_user.id,
-                amount=expected_amount,
+                # Record what was ACTUALLY paid (the transaction), keeping the
+                # estimate as planned_amount — the two legitimately differ.
+                amount=matched_tx.amount if matched_tx.amount is not None else expected_amount,
+                planned_amount=expected_amount,
                 payment_date=matched_tx.timestamp.date() if matched_tx.timestamp else now.date(),
                 billing_month=billing_month_str,
                 status=models.PaymentStatus.PAID,
