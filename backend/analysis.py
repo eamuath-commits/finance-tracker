@@ -1,5 +1,5 @@
 from typing import List, Dict, Optional
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 import math
 
 def calculate_amortization(
@@ -145,40 +145,56 @@ def simulate_payoff_plan(
 from sqlalchemy.orm import Session
 import models
 
-def calculate_allocation(db: Session):
+def calculate_allocation(db: Session, user_id: str = None):
     """
-    Analyzes liquid cash vs upcoming obligations to recommend allocation.
+    Analyzes liquid cash vs the bills still owed this month.
+
+    Scoped to a single owner: aggregating across users would both leak balances
+    between accounts and report a meaningless total.
     """
-    # 1. Calculate Liquid Cash (Checking Accounts primarily)
-    # Defaulting to checking accounts only for "Spendable" cash
-    checking_accounts = db.query(models.Account).filter(models.Account.account_type == models.AccountType.CHECKING).all()
-    liquid_cash = sum(acc.current_balance for acc in checking_accounts)
-    
-    # 2. Calculate Unpaid Obligations for Current Month
-    # This logic assumes we look at "Estimated" amount of Obligations
-    # A true implementation would check if a Payment exists for THIS month for each obligation.
-    # For now, let's keep it simple: Sum of all obligation amounts.
-    # Refined: We should filter out those marked as PAID for this month. 
-    # (But that requires complex query). 
-    # Let's start with Total Obligations vs Cash.
-    
-    obligations = db.query(models.MonthlyObligation).all()
-    # TODO: Filter out paid ones. For now, assume full burden.
-    unpaid_obligations = sum(ob.amount for ob in obligations if ob.amount)
-    
-    freedom_cash = liquid_cash - unpaid_obligations
-    
+    # 1. Liquid Cash — checking accounts only. Envelope sub-accounts are also
+    # Checking, so money parked in an envelope still counts here; the bill it is
+    # earmarked for is still counted below, so the two cancel out.
+    acct_q = db.query(models.Account).filter(models.Account.account_type == models.AccountType.CHECKING)
+    obl_q = db.query(models.MonthlyObligation)
+    if user_id:
+        acct_q = acct_q.filter(models.Account.user_id == user_id)
+        obl_q = obl_q.filter(models.MonthlyObligation.user_id == user_id)
+
+    liquid_cash = round(sum(float(acc.current_balance or 0) for acc in acct_q.all()), 2)
+
+    # 2. Bills still owed this month. A bill already PAID has left the account,
+    # so charging it against the balance again understates what is free to spend.
+    obligations = obl_q.all()
+    obl_ids = [ob.id for ob in obligations]
+    paid_ids = set()
+    if obl_ids:
+        month_prefix = datetime.now().strftime("%Y-%m")
+        paid_ids = {
+            p.obligation_id
+            for p in db.query(models.Payment).filter(
+                models.Payment.obligation_id.in_(obl_ids),
+                models.Payment.status == models.PaymentStatus.PAID,
+                models.Payment.billing_month.like(f"{month_prefix}%"),
+            ).all()
+        }
+
+    remaining = [ob for ob in obligations if ob.id not in paid_ids]
+    unpaid_obligations = round(sum(float(ob.amount) for ob in remaining if ob.amount), 2)
+
+    freedom_cash = round(liquid_cash - unpaid_obligations, 2)
+
     recommendations = []
-    
+
     if freedom_cash < 0:
         recommendations.append({
-            "type": "warning", 
-            "text": f"Deficit warning! You are short {abs(freedom_cash)} SAR for bills."
+            "type": "warning",
+            "text": f"Deficit warning! You are short {abs(freedom_cash):,.2f} SAR for bills."
         })
     elif freedom_cash > 0:
         recommendations.append({
             "type": "save",
-            "text": f"You have {freedom_cash} SAR free. Consider moving some to savings."
+            "text": f"You have {freedom_cash:,.2f} SAR free. Consider moving some to savings."
         })
     else:
         recommendations.append({
@@ -186,10 +202,19 @@ def calculate_allocation(db: Session):
             "text": "You are exactly breaking even. Monitor closely."
         })
 
+    if paid_ids:
+        recommendations.append({
+            "type": "bill",
+            "text": f"{len(paid_ids)} of {len(obligations)} bills already paid this month."
+        })
+
     return {
         "liquid_cash": liquid_cash,
         "unpaid_obligations_this_month": unpaid_obligations,
         "freedom_cash": freedom_cash,
+        "bills_total": len(obligations),
+        "bills_paid": len(paid_ids),
+        "bills_remaining": len(remaining),
         "message": "Allocation Analysis",
         "recommendations": recommendations
     }

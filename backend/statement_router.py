@@ -437,6 +437,10 @@ def statement_health_summary(
     
     total = len(statements)
     drafts = sum(1 for s in statements if s.status == "draft")
+    posted = sum(1 for s in statements if s.status == "posted")
+    rejected = sum(1 for s in statements if s.status == "rejected")
+    # 'reviewed'/'approved' are retired statuses kept only so an un-migrated row
+    # is still counted somewhere rather than silently vanishing from the totals.
     reviewed = sum(1 for s in statements if s.status == "reviewed")
     approved = sum(1 for s in statements if s.status == "approved")
     total_txs = sum(s.transaction_count or 0 for s in statements)
@@ -470,6 +474,8 @@ def statement_health_summary(
     return {
         "total_statements": total,
         "drafts": drafts,
+        "posted": posted,
+        "rejected": rejected,
         "reviewed": reviewed,
         "approved": approved,
         "total_transactions": total_txs,

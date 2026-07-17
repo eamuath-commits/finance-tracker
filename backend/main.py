@@ -2023,8 +2023,11 @@ def process_queue(
 
 # --- Analysis Endpoints ---
 @app.get("/analysis/allocation", response_model=analysis_schema.AllocationResponse)
-def get_allocation_analysis(db: Session = Depends(get_db)):
-    return analysis.calculate_allocation(db)
+def get_allocation_analysis(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    return analysis.calculate_allocation(db, user_id=current_user.id)
 
 # --- Background SMS Processing ---
 async def _process_sms_background(raw_msg_id: str, sender: str, body: str, source: str = "webhook"):

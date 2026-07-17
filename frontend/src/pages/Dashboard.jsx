@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import api, { API_URL } from '../utils/api';
+import api, { API_URL, authUtils } from '../utils/api';
 import { Card, SectionHeader, Modal, formatCurrency, formatCurrencyText, inputClass, selectClass } from '../components/UI';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, verticalListSortingStrategy, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable';
@@ -277,6 +277,11 @@ const AllocationCard = ({ analysis }) => {
                 <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700/50">
                     <p className="text-xs text-gray-400 uppercase">Upcoming Bills</p>
                     <p className="text-lg font-bold text-white">{formatCurrency(analysis.unpaid_obligations_this_month)}</p>
+                    {analysis.bills_total > 0 && (
+                        <p className="text-xs text-gray-500 mt-0.5">
+                            {analysis.bills_remaining} of {analysis.bills_total} still due
+                        </p>
+                    )}
                 </div>
                 <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700/50">
                     <p className="text-xs text-gray-400 uppercase">Safe to Spend</p>
@@ -362,6 +367,7 @@ const Dashboard = () => {
     const [loading, setLoading] = useState(true);
     const [selectedAccountId, setSelectedAccountId] = useState('all');
     const [statementHealth, setStatementHealth] = useState(null);
+    const displayName = authUtils.getUser()?.username || '';
 
     // Modal
     const [showTransactionModal, setShowTransactionModal] = useState(false);
@@ -510,9 +516,9 @@ const Dashboard = () => {
                         <div className="bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
                             <div className="flex items-center gap-2 mb-1">
                                 <CheckCircle2 size={14} className="text-emerald-400" />
-                                <span className="text-xs text-gray-400">Approved</span>
+                                <span className="text-xs text-gray-400">Posted</span>
                             </div>
-                            <p className="text-xl font-bold text-emerald-400">{statementHealth.approved}</p>
+                            <p className="text-xl font-bold text-emerald-400">{statementHealth.posted ?? 0}</p>
                         </div>
                         <div className="bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
                             <div className="flex items-center gap-2 mb-1">
@@ -529,8 +535,8 @@ const Dashboard = () => {
                                 <span className="text-gray-400">Latest:</span>
                                 <span className="text-white font-medium truncate">{statementHealth.recent.filename}</span>
                                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                    statementHealth.recent.status === 'approved' ? 'bg-emerald-500/15 text-emerald-400' :
-                                    statementHealth.recent.status === 'reviewed' ? 'bg-blue-500/15 text-blue-400' :
+                                    statementHealth.recent.status === 'posted' ? 'bg-emerald-500/15 text-emerald-400' :
+                                    statementHealth.recent.status === 'rejected' ? 'bg-red-500/15 text-red-400' :
                                     'bg-amber-500/15 text-amber-400'
                                 }`}>{statementHealth.recent.status}</span>
                             </div>
@@ -555,7 +561,9 @@ const Dashboard = () => {
             <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                     <h1 className="text-2xl md:text-3xl font-bold text-white">Overview</h1>
-                    <p className="text-gray-400 text-sm md:text-base">Welcome back, Muath</p>
+                    <p className="text-gray-400 text-sm md:text-base">
+                        {displayName ? `Welcome back, ${displayName}` : 'Welcome back'}
+                    </p>
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                     <Filter size={16} className="text-gray-400" />
