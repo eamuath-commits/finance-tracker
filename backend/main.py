@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Body
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Body, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text, inspect, func
@@ -6,6 +6,7 @@ from typing import List, Optional
 from datetime import datetime
 import os
 import re
+import uuid
 import logging
 
 # Setup logger for API
@@ -21,6 +22,7 @@ from sms_parser import parser
 import sms_agent
 import analysis
 import analysis_schema
+import sms_enrichment
 import queue_processor
 from rate_limiter import RateLimitMiddleware
 from webhook import router as webhook_router
@@ -52,6 +54,20 @@ def run_migrations(engine):
             print("Migrating: Adding fees to transactions")
             with engine.connect() as conn:
                 conn.execute(text("ALTER TABLE transactions ADD COLUMN fees FLOAT DEFAULT 0.0"))
+                conn.commit()
+
+        # SMS name-enrichment: preserve the statement's original label (for undo)
+        # and stamp each row with the batch that renamed it.
+        if 'merchant_original' not in columns:
+            print("Migrating: Adding merchant_original to transactions")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE transactions ADD COLUMN merchant_original VARCHAR"))
+                conn.commit()
+
+        if 'enrichment_batch_id' not in columns:
+            print("Migrating: Adding enrichment_batch_id to transactions")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE transactions ADD COLUMN enrichment_batch_id VARCHAR"))
                 conn.commit()
 
         # Check for table rename (obligation_history -> payments)
@@ -2028,6 +2044,140 @@ def get_allocation_analysis(
     current_user: models.User = Depends(get_current_user),
 ):
     return analysis.calculate_allocation(db, user_id=current_user.id)
+
+
+# --- SMS name enrichment ---------------------------------------------------
+# Overwrite ONLY the counterparty name on already-imported statement rows using
+# the real names carried in a bulk bank-SMS export. Never creates, deletes, or
+# re-amounts anything. See sms_enrichment.py for the parser and match rules.
+
+_GENERIC_STATEMENT_SOURCE = "statement"
+
+
+def _statement_txrows(db: Session, user_id: str) -> List[sms_enrichment.TxRow]:
+    """The user's statement-imported transactions, projected for the matcher."""
+    rows = db.query(models.Transaction).filter(
+        models.Transaction.user_id == user_id,
+        models.Transaction.source == _GENERIC_STATEMENT_SOURCE,
+        models.Transaction.timestamp.isnot(None),
+    ).all()
+    return [
+        sms_enrichment.TxRow(
+            id=r.id, timestamp=r.timestamp,
+            amount=float(r.amount or 0), type=r.type, merchant=r.merchant,
+        )
+        for r in rows
+    ]
+
+
+@app.post("/api/sms/enrich/preview")
+async def sms_enrich_preview(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Parse an uploaded bulk-SMS .txt and return proposed name overwrites.
+    Writes NOTHING — this is the dry-run half of the flow."""
+    if not file.filename or not file.filename.lower().endswith((".txt", ".text")):
+        raise HTTPException(status_code=400, detail="Only .txt SMS exports are accepted")
+    contents = await file.read()
+    if len(contents) > 8 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large (max 8 MB)")
+    try:
+        raw = contents.decode("utf-8")
+    except UnicodeDecodeError:
+        raw = contents.decode("utf-8", errors="replace")
+
+    events = sms_enrichment.parse_export(raw)
+    txs = _statement_txrows(db, current_user.id)
+    result = sms_enrichment.match(events, txs)
+
+    proposals = [
+        {
+            "transaction_id": p.transaction_id,
+            "old_merchant": p.old_merchant,
+            "new_merchant": p.new_merchant,
+            "amount": p.amount,
+            "direction": p.direction,
+            "tx_timestamp": p.tx_timestamp.isoformat(),
+            "sms_timestamp": p.sms_timestamp.isoformat(),
+            "delta_seconds": round(p.delta_seconds, 1),
+            "shape": p.shape,
+            "truncated": p.truncated,
+            "raw_sms": p.raw_sms,
+        }
+        for p in result.proposals
+    ]
+    return {"stats": result.stats, "skipped": result.skipped, "proposals": proposals}
+
+
+@app.post("/api/sms/enrich/apply")
+def sms_enrich_apply(
+    payload: schemas.EnrichApplyRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Apply approved name overwrites as one reversible batch. Re-validates every
+    item server-side: owned, statement-sourced, and still a generic label. Uses a
+    targeted column write — never crud.update_transaction, which would reverse and
+    re-derive balance snapshots across the whole account for a name-only edit."""
+    if not payload.items:
+        raise HTTPException(status_code=400, detail="No items to apply")
+
+    batch_id = uuid.uuid4().hex
+    applied = 0
+    failed = []
+
+    for item in payload.items:
+        new_name = (item.new_merchant or "").strip()[:255]
+        if not new_name:
+            failed.append({"transaction_id": item.transaction_id, "reason": "empty name"})
+            continue
+        tx = db.query(models.Transaction).filter(
+            models.Transaction.id == item.transaction_id,
+        ).first()
+        if tx is None:
+            failed.append({"transaction_id": item.transaction_id, "reason": "not found"})
+            continue
+        if tx.user_id is not None and tx.user_id != current_user.id:
+            failed.append({"transaction_id": item.transaction_id, "reason": "not found"})
+            continue
+        if tx.source != _GENERIC_STATEMENT_SOURCE:
+            failed.append({"transaction_id": item.transaction_id, "reason": "not a statement transaction"})
+            continue
+        if not sms_enrichment.is_generic_label(tx.merchant):
+            failed.append({"transaction_id": item.transaction_id, "reason": "label no longer generic"})
+            continue
+        # Preserve the FIRST original only; a re-run must never clobber it.
+        if tx.merchant_original is None:
+            tx.merchant_original = tx.merchant
+        tx.merchant = new_name
+        tx.enrichment_batch_id = batch_id
+        applied += 1
+
+    db.commit()
+    return {"batch_id": batch_id, "applied": applied, "failed": failed}
+
+
+@app.post("/api/sms/enrich/undo/{batch_id}")
+def sms_enrich_undo(
+    batch_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Restore the original statement labels for one enrichment batch."""
+    rows = db.query(models.Transaction).filter(
+        models.Transaction.enrichment_batch_id == batch_id,
+        models.Transaction.user_id == current_user.id,
+    ).all()
+    restored = 0
+    for tx in rows:
+        if tx.merchant_original is not None:
+            tx.merchant = tx.merchant_original
+        tx.enrichment_batch_id = None
+        restored += 1
+    db.commit()
+    return {"batch_id": batch_id, "restored": restored}
 
 # --- Background SMS Processing ---
 async def _process_sms_background(raw_msg_id: str, sender: str, body: str, source: str = "webhook"):

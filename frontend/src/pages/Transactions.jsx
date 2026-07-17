@@ -2,9 +2,10 @@ import React, { useState, useEffect, useMemo } from "react";
 import api, { API_URL } from '../utils/api';
 import { useSearchParams } from 'react-router-dom';
 import { format } from "date-fns";
-import { Search, Edit3, Trash2, Plus, User, Calendar, Filter, X, MessageSquare, Upload, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Edit3, Trash2, Plus, User, Calendar, Filter, X, MessageSquare, Upload, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { Modal, formatCurrency, inputClass, selectClass } from "../components/UI";
 import SMSIngestTab from "../components/SMSIngestTab";
+import SMSEnrichTab from "../components/SMSEnrichTab";
 import { useConfirm } from "../components/ConfirmProvider";
 
 
@@ -703,6 +704,13 @@ function Transactions() {
                         <Upload size={16} />
                         SMS Ingest
                     </button>
+                    <button
+                        onClick={() => setActiveTab('enrich')}
+                        className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'enrich' ? 'bg-cyan-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        <Sparkles size={16} />
+                        SMS Enrich
+                    </button>
                 </div>
             </div>
 
@@ -1321,6 +1329,11 @@ function Transactions() {
                     onTransactionCreated={fetchData}
                 />
             </div>
+
+            {/* SMS Enrichment Tab */}
+            {activeTab === "enrich" && (
+                <SMSEnrichTab onApplied={fetchData} />
+            )}
 
             {/* Transaction Modal */}
             <Modal isOpen={showTxModal} title={editingTx ? "Edit Transaction" : "Add Transaction"} onClose={() => setShowTxModal(false)}>

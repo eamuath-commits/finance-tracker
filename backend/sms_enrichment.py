@@ -1,0 +1,481 @@
+"""
+SMS-based name-only enrichment for statement-imported transactions.
+
+Bank statement PDFs carry generic type labels where the counterparty name
+should be ("POS purchase Apple pay (Domestic)", "Debit - Credit Cards
+Transactions", or a bare Arabic first name like "ساره"). The bank's SMS for the
+same event carries the real name ("At:HUNGERSTA", "To:MOHAMMED ISLAM",
+"Service:STC BILL"). This module parses a bulk SMS text export locally (no AI)
+and proposes overwriting ONLY the merchant name on an already-imported
+transaction it can match with high confidence. It never creates, deletes, or
+re-amounts anything.
+
+Every threshold here was derived from a measured study of a 982-message AlRajhi
+export against live data. Two rules keep it safe:
+
+  1. ALLOWLIST, fail closed. Only an enumerated set of message shapes that carry
+     a genuine counterparty may propose a name. Everything else — OTPs, declines,
+     beneficiary notices, operation-type labels — is dropped at classification
+     time, before any field is read. A new/unknown bank message format is
+     therefore inert by default, not a silent enrichment source.
+
+  2. 1:1 BIJECTION over the FULL money-event pool. A proposal is made only when
+     exactly one SMS and exactly one transaction claim each other on
+     (amount, direction, timestamp within 60s). The competitor pool includes
+     name-less money SMS (card top-ups, own-transfers), because filtering to
+     named messages first is what lets a purchase name land on the top-up row
+     that funded it.
+
+The header timestamp is authoritative; the in-body timestamp is inconsistently
+formatted and occasionally off by the Riyadh UTC offset, so it is never used.
+"""
+from __future__ import annotations
+
+import re
+import unicodedata
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Tuple
+
+# Matching tolerances — measured optima, do not loosen without re-measuring.
+# Widening the time window strictly adds ambiguity without adding matches.
+TIME_WINDOW = timedelta(seconds=60)
+AMOUNT_EPS = 0.02
+
+# Currency tokens that mean Saudi Riyal and are therefore comparable to the
+# SAR-settled statement amount. "SR" is a spelling variant, not a foreign
+# currency (~160 records). "682" is the ISO-4217 numeric code for SAR.
+LOCAL_CURRENCIES = {"SAR", "SR", "ريال", "682"}
+# Any other currency (USD/EUR/AED/840/978/...) carries a FOREIGN amount while the
+# statement holds the SAR-settled value; they can never be joined on amount, so
+# they are excluded from the pool entirely rather than mis-compared.
+_ALL_CURRENCIES = r"SAR|SR|USD|EUR|AED|GBP|ريال|682|840|978|784|826"
+
+# ---------------------------------------------------------------------------
+# Record splitting and header
+# ---------------------------------------------------------------------------
+
+# Records are separated by a line of 4+ dashes. Anchored so the file's leading
+# separator does not glue a 52-dash line onto the first record.
+_RECORD_SEP = re.compile(r"(?:^|\n)-{4,}[ \t]*(?:\n|$)")
+# "2026-03-01 01:19:01 from AlRajhiBank" — 1 record in the wild is "to
+# AlRajhiBank" (an outbound message); only "from" is bank-authored.
+_HEADER = re.compile(
+    r"^(?P<ts>\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})\s+from\s+(?P<sender>.+?)\s*$",
+    re.MULTILINE,
+)
+
+# Amount: currency may lead or trail the number, with or without a space, and an
+# Arabic tatweel ("بـSR") may precede the code — hence a non-alphanumeric
+# lookbehind rather than \b. "SAR" must precede "SR" in the alternation.
+_AMT = r"\d[\d,]*(?:\.\d+)?"
+_AMOUNT_RE = re.compile(
+    r"(?:(?<![A-Za-z0-9])(?P<c1>" + _ALL_CURRENCIES + r")\s*(?P<a1>" + _AMT + r")(?![\d])"
+    r"|(?<![\d.,])(?P<a2>" + _AMT + r")\s*(?P<c2>" + _ALL_CURRENCIES + r")(?![A-Za-z0-9]))"
+)
+
+_DIGITS4 = re.compile(r"^\*?\d{3,4}$")
+# An "At:" value that is really a date/time (the sole "Outgoing Funds Transfer
+# Declined" record puts a timestamp there) must never become a name.
+_LOOKS_LIKE_DATE = re.compile(r"^\d{1,4}[/\-:]\d{1,2}")
+
+
+def _clean(text: str) -> str:
+    """Strip invisible control/format characters that defeat keyword matching
+    (a raw 0x98 byte splits 'fund\\x98in'; U+061C ARABIC LETTER MARK appears in
+    several records), keeping newlines and ordinary whitespace."""
+    out = []
+    for ch in text:
+        if ch in "\n\t":
+            out.append(ch)
+            continue
+        cat = unicodedata.category(ch)
+        if cat in ("Cc", "Cf", "Co", "Cn"):
+            continue
+        out.append(ch)
+    return "".join(out)
+
+
+def parse_amount(body: str) -> Tuple[Optional[float], Optional[str]]:
+    """Return (amount, currency_token) or (None, None). Never uses a bare \\d{3}
+    branch — a numeric currency code is only accepted from the explicit list, so
+    '1000.00 ريال' can never parse as amount=0.00, currency='100'."""
+    m = _AMOUNT_RE.search(body)
+    if not m:
+        return None, None
+    raw = m.group("a1") or m.group("a2")
+    cur = (m.group("c1") or m.group("c2") or "").strip()
+    try:
+        return float(raw.replace(",", "")), cur
+    except ValueError:
+        return None, None
+
+
+# ---------------------------------------------------------------------------
+# Classification
+# ---------------------------------------------------------------------------
+
+# A message KIND either (a) may enrich — it is a completed money movement that
+# exposes a real counterparty; (b) is money but exposes no usable name (still a
+# bijection competitor so it can block a wrong match); or (c) is noise.
+
+_NOISE = "noise"          # never money; excluded before any field is read
+_MONEY_UNNAMED = "money"  # real money, no counterparty — competitor only
+_MONEY_NAMED = "named"    # real money with a counterparty — may enrich
+
+# Order matters: noise is tested first so a decline that also carries "At:MERCHANT"
+# is excluded by KIND before extraction ever runs.
+_NOISE_RULES = [
+    re.compile(r"one\s*time\s*password|(?<![a-z])otp(?![a-z])", re.I),
+    re.compile(r"رمز\s*مؤقت|لا\s*تفصح"),
+    re.compile(r"declin", re.I),                        # covers "Outgoing Funds Transfer Declined"
+    re.compile(r"^\s*beneficiary\s+(added|activated)", re.I | re.M),
+    re.compile(r"مستفيد|المستفيد"),
+    re.compile(r"new\s+device|new\s+login|reset\s+your\s+password", re.I),
+    re.compile(r"statement\b.*(due|amount due)|amount due", re.I),
+    re.compile(r"عميلنا\s+العزيز"),                       # service-request notices
+    re.compile(r"payment\s+has\s+been\s+approved", re.I),
+    re.compile(r"تمنحك|جوائز|عرض\s|الفوز"),               # marketing / promo
+]
+
+
+@dataclass
+class Event:
+    index: int
+    timestamp: Optional[datetime]
+    sender: str
+    body: str
+    kind: str = _NOISE          # _NOISE | _MONEY_UNNAMED | _MONEY_NAMED
+    shape: str = "unknown"      # human-readable sub-type, for stats
+    amount: Optional[float] = None
+    currency: Optional[str] = None
+    direction: Optional[str] = None   # "debit" | "credit"
+    name: Optional[str] = None
+    is_local: bool = False      # amount comparable to a SAR statement row
+
+    @property
+    def matchable(self) -> bool:
+        """Eligible to sit in the bijection pool: real money, local currency,
+        known direction, parsed amount."""
+        return (
+            self.kind in (_MONEY_UNNAMED, _MONEY_NAMED)
+            and self.is_local
+            and self.amount is not None
+            and self.direction in ("debit", "credit")
+        )
+
+
+def _to_names(body: str, field_name: str) -> List[str]:
+    """All values of a 'Field:...' line that are NOT a bare account number."""
+    vals = re.findall(rf"^{field_name}\s*:\s*(.+)$", body, re.MULTILINE | re.IGNORECASE)
+    out = []
+    for v in vals:
+        v = v.strip()
+        if not v or _DIGITS4.match(v) or _LOOKS_LIKE_DATE.match(v):
+            continue
+        out.append(v)
+    return out
+
+
+def _first(body: str, field_name: str) -> Optional[str]:
+    names = _to_names(body, field_name)
+    return names[0] if names else None
+
+
+def classify(body: str) -> Tuple[str, str, Optional[str], Optional[str]]:
+    """Return (kind, shape, direction, name). Pure function of the body text.
+
+    Direction/name are only meaningful for money kinds. The counterparty name
+    is drawn from a fixed whitelist of fields; an operation-type label (OTP
+    'Reason:', Arabic 'نوع العملية:') is deliberately never treated as a name.
+    """
+    first = body.strip().split("\n", 1)[0].strip()
+
+    for rx in _NOISE_RULES:
+        if rx.search(body):
+            return _NOISE, "noise", None, None
+
+    # --- card purchases: counterparty is At: ---
+    if re.match(r"^(PoS International(\s+purchase)?)", first, re.I):
+        return _MONEY_NAMED, "pos_international", "debit", _first(body, "At")
+    if re.match(r"^PoS\b", first, re.I):
+        return _MONEY_NAMED, "pos_domestic", "debit", _first(body, "At")
+    if re.match(r"^Online Purchase", first, re.I):
+        return _MONEY_NAMED, "online_purchase", "debit", _first(body, "At")
+    if re.match(r"^شراء\s+(إنترنت|انترنت|عبر)", first):
+        return _MONEY_NAMED, "online_purchase_ar", "debit", _first(body, "لدى") or _first(body, "At")
+
+    # --- refunds / reversals: money comes BACK, so direction is credit ---
+    if re.match(r"^Refund PoS", first, re.I):
+        return _MONEY_NAMED, "refund_pos", "credit", _first(body, "At")
+    if re.match(r"^Reverse Transaction", first, re.I):
+        return _MONEY_NAMED, "reverse_transaction", "credit", _first(body, "At")
+    if re.match(r"^Credit Card Refund", first, re.I):
+        return _MONEY_NAMED, "credit_card_refund", "credit", _first(body, "From")
+    if re.match(r"^استرجاع\s+عملية", first):
+        return _MONEY_NAMED, "reversal_ar", "credit", _first(body, "لدى") or _first(body, "At")
+
+    # --- outgoing transfers: user's account is From:, counterparty in To: ---
+    if re.match(r"^Debit Internal Transfer", first, re.I):
+        return _MONEY_NAMED, "debit_internal_transfer", "debit", _first(body, "To")
+    if re.match(r"^Debit Transfer Local", first, re.I):
+        return _MONEY_NAMED, "debit_transfer_local", "debit", _first(body, "To")
+
+    # --- incoming transfers: roles INVERT, counterparty in From: ---
+    if re.match(r"^Credit Transfer Local", first, re.I):
+        return _MONEY_NAMED, "credit_transfer_local", "credit", _first(body, "From")
+    if re.match(r"^Credit Transfer Internal", first, re.I):
+        return _MONEY_NAMED, "credit_transfer_internal", "credit", _first(body, "From")
+
+    # --- bills ---
+    if re.match(r"^Bill Payment", first, re.I):
+        svc = _first(body, "Service")
+        return _MONEY_NAMED, "bill_payment", "debit", svc
+    if re.match(r"^MOI Payments", first, re.I):
+        return _MONEY_NAMED, "moi_payments", "debit", _first(body, "Provider") or _first(body, "Service")
+
+    # --- Arabic core-banking deposit: remitter only present after '.من:' ---
+    if "تم ايداع" in body or "تم إيداع" in body:
+        m = re.search(r"من\s*:\s*(.+?)\s*$", body, re.MULTILINE)
+        name = m.group(1).strip() if m else None
+        if name and not _DIGITS4.match(name):
+            return _MONEY_NAMED, "ar_credit_deposit", "credit", name
+        return _MONEY_UNNAMED, "ar_credit_deposit", "credit", None
+
+    # --- money, but NO usable counterparty (bijection competitors only) ---
+    # 'نوع العملية:' is an OPERATION TYPE, never a name — must stay unnamed.
+    if "تم سحب" in body:
+        return _MONEY_UNNAMED, "ar_debit_operation", "debit", None
+    if re.match(r"^Credit Card\s*:?\s*Payment", first, re.I):
+        return _MONEY_UNNAMED, "credit_card_payment", "debit", None
+    if re.match(r"^بطاقة\s+(فيزا|ائتمانية)\s*:?\s*سداد", first):
+        return _MONEY_UNNAMED, "card_payment_ar", "debit", None
+    if re.match(r"^Transfer Between Your Accounts", first, re.I):
+        return _MONEY_UNNAMED, "own_transfer", "debit", None
+    if re.match(r"^Withdrawal\s*:?\s*ATM", first, re.I):
+        # 'Place:' is an ATM LOCATION, not a merchant — writing it makes a cash
+        # withdrawal render as a purchase there. Money event, but never a name.
+        return _MONEY_UNNAMED, "atm_withdrawal", "debit", None
+    if re.match(r"^Debit\s*:?\s*Loan Instalment", first, re.I):
+        return _MONEY_UNNAMED, "loan_instalment", "debit", None
+    if re.match(r"^MOI Payments", first, re.I):
+        return _MONEY_UNNAMED, "moi_payments", "debit", None
+    if re.match(r"^Credit Card\s*:?\s*transfer", first, re.I):
+        return _MONEY_UNNAMED, "cc_transfer", "debit", None
+
+    return _NOISE, "unknown", None, None
+
+
+# ---------------------------------------------------------------------------
+# Parsing a whole export
+# ---------------------------------------------------------------------------
+
+def parse_export(raw: str) -> List[Event]:
+    """Parse a bulk SMS text export into a list of Events (any encoding of the
+    AlRajhi phone export). Never raises on a malformed record — it is skipped."""
+    raw = _clean(raw)
+    events: List[Event] = []
+    for idx, chunk in enumerate(_RECORD_SEP.split(raw)):
+        chunk = chunk.strip("\n")
+        if not chunk.strip():
+            continue
+        hm = _HEADER.search(chunk)
+        if not hm:
+            continue  # no bank header (incl. the lone outbound "to AlRajhiBank")
+        try:
+            ts = datetime.strptime(hm.group("ts").replace("T", " "), "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            ts = None
+        sender = hm.group("sender").strip()
+        body = chunk[hm.end():].strip()
+
+        ev = Event(index=idx, timestamp=ts, sender=sender, body=body)
+        ev.kind, ev.shape, ev.direction, ev.name = classify(body)
+        if ev.kind != _NOISE:
+            ev.amount, ev.currency = parse_amount(body)
+            ev.is_local = ev.currency in LOCAL_CURRENCIES
+            if ev.name:
+                ev.name = ev.name.strip()
+                if not ev.name or _DIGITS4.match(ev.name):
+                    ev.name = None
+                    ev.kind = _MONEY_UNNAMED
+        events.append(ev)
+    return events
+
+
+# ---------------------------------------------------------------------------
+# Generic-label gate
+# ---------------------------------------------------------------------------
+
+# The statement labels a name-only enrichment is allowed to replace. Anything
+# not matching stays untouched, so an already-good name is never degraded.
+_GENERIC_PREFIXES = (
+    "pos purchase", "online purchase", "point of sale", "purchase ",
+    "debit - credit cards", "credit cards transaction",
+    "sadad payment", "sadad ", "atm withdrawal", "cash withdrawal",
+    "outward ips", "inward ips", "outward credit", "transfer from customer",
+    "transfer to customer", "refund purchase", "local transfer",
+    "internal transfer", "funds transfer", "e-channel", "quick transfer",
+)
+_GENERIC_EXACT = {"transfer", "pos", "purchase", "payment", "withdrawal", "deposit"}
+# One bare Arabic token (a first name) — the statement's usual counterparty label.
+_ARABIC_SINGLE = re.compile(r"^[؀-ۿ]+$")
+
+
+def is_generic_label(merchant: Optional[str]) -> bool:
+    """True if `merchant` is a placeholder the enrichment may overwrite."""
+    if merchant is None:
+        return True
+    m = merchant.strip()
+    if not m:
+        return True
+    low = m.lower()
+    if low in _GENERIC_EXACT:
+        return True
+    if any(low.startswith(p) for p in _GENERIC_PREFIXES):
+        return True
+    # A single bare Arabic token is a first-name-only statement label.
+    if _ARABIC_SINGLE.match(m):
+        return True
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Matching
+# ---------------------------------------------------------------------------
+
+@dataclass
+class TxRow:
+    """The minimal projection of a statement-imported transaction the matcher
+    needs. Keeps this module free of SQLAlchemy so it is unit-testable."""
+    id: str
+    timestamp: datetime
+    amount: float
+    type: str            # "debit" | "credit"
+    merchant: Optional[str]
+
+
+@dataclass
+class Proposal:
+    transaction_id: str
+    old_merchant: Optional[str]
+    new_merchant: str
+    amount: float
+    direction: str
+    tx_timestamp: datetime
+    sms_timestamp: datetime
+    delta_seconds: float
+    shape: str
+    truncated: bool          # bank-truncated ~9-char fragment
+    raw_sms: str
+
+
+@dataclass
+class MatchResult:
+    proposals: List[Proposal] = field(default_factory=list)
+    stats: Dict[str, int] = field(default_factory=dict)
+    skipped: Dict[str, int] = field(default_factory=dict)
+
+
+def _candidate(ev: Event, tx: TxRow) -> bool:
+    return (
+        ev.direction == tx.type
+        and abs(ev.amount - tx.amount) <= AMOUNT_EPS
+        and abs((ev.timestamp - tx.timestamp).total_seconds()) <= TIME_WINDOW.total_seconds()
+    )
+
+
+def match(events: List[Event], txs: List[TxRow]) -> MatchResult:
+    """Core bijection matcher. Proposes a name overwrite for a transaction only
+    when exactly one money SMS and exactly one transaction claim each other, the
+    SMS is a named-allowlisted kind, and the current label is generic.
+
+    The competitor pool is EVERY matchable money event (named or not): a card
+    top-up that funded a purchase must be able to block the purchase's name from
+    landing on the top-up row.
+    """
+    pool = [e for e in events if e.matchable]
+
+    # Bidirectional candidate degree over the full pool.
+    ev_cands: Dict[int, List[TxRow]] = {id(e): [] for e in pool}
+    tx_cands: Dict[str, List[Event]] = {t.id: [] for t in txs}
+    for e in pool:
+        for t in txs:
+            if _candidate(e, t):
+                ev_cands[id(e)].append(t)
+                tx_cands[t.id].append(e)
+
+    res = MatchResult()
+    skipped = {
+        "ambiguous_sms": 0,       # SMS matches >1 transaction
+        "contested_row": 0,       # transaction matched by >1 money SMS (top-up guard)
+        "already_named": 0,       # matched but current label not generic
+        "no_match": 0,            # named SMS with zero transactions
+    }
+
+    seen_tx = set()
+    for e in pool:
+        if e.kind != _MONEY_NAMED or not e.name:
+            continue
+        mine = ev_cands[id(e)]
+        if len(mine) == 0:
+            skipped["no_match"] += 1
+            continue
+        if len(mine) > 1:
+            skipped["ambiguous_sms"] += 1
+            continue
+        tx = mine[0]
+        # The row must be claimed by this SMS alone — a competing money SMS
+        # (named or not) means we cannot tell which event this row is.
+        if len(tx_cands[tx.id]) != 1:
+            skipped["contested_row"] += 1
+            continue
+        if not is_generic_label(tx.merchant):
+            skipped["already_named"] += 1
+            continue
+        if tx.id in seen_tx:
+            skipped["contested_row"] += 1
+            continue
+        seen_tx.add(tx.id)
+
+        delta = (e.timestamp - tx.timestamp).total_seconds()
+        name = e.name.strip()
+        res.proposals.append(Proposal(
+            transaction_id=tx.id,
+            old_merchant=tx.merchant,
+            new_merchant=name,
+            amount=tx.amount,
+            direction=tx.type,
+            tx_timestamp=tx.timestamp,
+            sms_timestamp=e.timestamp,
+            delta_seconds=delta,
+            shape=e.shape,
+            truncated=_is_truncated(name, e.shape),
+            raw_sms=e.body,
+        ))
+
+    res.skipped = skipped
+    res.stats = {
+        "records": len(events),
+        "noise": sum(1 for e in events if e.kind == _NOISE),
+        "money_events": sum(1 for e in events if e.kind in (_MONEY_NAMED, _MONEY_UNNAMED)),
+        "matchable_pool": len(pool),
+        "named_local": sum(1 for e in pool if e.kind == _MONEY_NAMED and e.name),
+        "fx_skipped": sum(1 for e in events
+                          if e.kind in (_MONEY_NAMED, _MONEY_UNNAMED) and not e.is_local),
+        "proposals": len(res.proposals),
+    }
+    return res
+
+
+# The bank truncates the merchant name on card purchases (the "At:" field) to
+# ~9 characters; transfer/bill counterparties are not truncated.
+_CARD_SHAPES = {"pos_domestic", "online_purchase", "pos_international",
+                "refund_pos", "reverse_transaction"}
+
+
+def _is_truncated(name: str, shape: str) -> bool:
+    """Flag a likely bank-truncated fragment ('HUNGERSTA', 'Al Sultan') so the
+    UI can group them — they still beat the generic label, but the user asked to
+    see them before approving."""
+    return shape in _CARD_SHAPES and len(name.strip()) in (9, 10)

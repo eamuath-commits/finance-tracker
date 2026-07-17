@@ -203,6 +203,8 @@ class Transaction(Base):
     credit_card_id = Column(String, ForeignKey("credit_cards.id"), nullable=True)  # NEW: For credit card transactions
     amount = Column(Money(), nullable=False)
     merchant = Column(String)
+    merchant_original = Column(String, nullable=True)  # statement label before SMS enrichment (for undo)
+    enrichment_batch_id = Column(String, nullable=True)  # batch that renamed this row, if any
     raw_sms_content = Column(Text)
     timestamp = Column(DateTime)
     category = Column(String, nullable=True)

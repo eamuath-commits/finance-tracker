@@ -634,3 +634,12 @@ class StatementUpdate(BaseModel):
     status: Optional[str] = None
     reconciliation_status: Optional[str] = None
 
+
+# --- SMS name-enrichment ---
+class EnrichItem(BaseModel):
+    transaction_id: str
+    new_merchant: str
+
+class EnrichApplyRequest(BaseModel):
+    items: List[EnrichItem]
+
