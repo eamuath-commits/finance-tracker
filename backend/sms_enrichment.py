@@ -37,9 +37,17 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
-# Matching tolerances — measured optima, do not loosen without re-measuring.
-# Widening the time window strictly adds ambiguity without adding matches.
-TIME_WINDOW = timedelta(seconds=60)
+# Matching tolerances — measured optima, do not change without re-measuring.
+#
+# 45s, not 60s. The bank SMSes within a few seconds of the transaction: the
+# largest delta among accepted matches is 36s, so nothing real sits in the
+# 45-60s band. Those extra 15 seconds only pulled in spurious candidates and
+# created ambiguity — a fee paid twice 54s apart had both messages seeing both
+# transactions, so neither could be told apart and both were refused. Measured
+# over the full export: 60s -> 487 proposals / 43 contested; 45s -> 489 / 39,
+# with zero proposals lost. Narrowing further is expensive, not safer: 15s drops
+# to 252 proposals, discarding ~235 real names to resolve a handful of clashes.
+TIME_WINDOW = timedelta(seconds=45)
 AMOUNT_EPS = 0.02
 
 # Loan instalments are the one measured exception to the 60s window: the bank
