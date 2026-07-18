@@ -387,10 +387,13 @@ const Statements = () => {
     const getStatusBadge = (status) => {
         const configs = {
             draft: { color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20', icon: Clock, label: 'Draft' },
-            approved: { color: 'bg-green-500/10 text-green-400 border-green-500/20', icon: CheckCircle2, label: 'Approved' },
+            posted: { color: 'bg-green-500/10 text-green-400 border-green-500/20', icon: CheckCircle2, label: 'Posted' },
             rejected: { color: 'bg-red-500/10 text-red-400 border-red-500/20', icon: XCircle, label: 'Rejected' },
+            approved: { color: 'bg-green-500/10 text-green-400 border-green-500/20', icon: CheckCircle2, label: 'Approved' },
         };
-        const config = configs[status] || configs.draft;
+        const config = configs[status] || {
+            color: 'bg-slate-500/10 text-slate-400 border-slate-500/20', icon: FileText, label: status || 'Unknown',
+        };
         const Icon = config.icon;
         return (
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${config.color}`}>
@@ -1789,14 +1792,25 @@ const Statements = () => {
         setActionMenuId(null);
     };
 
+    // NOTE: 'posted' must be here. It was missing, so every statement that had
+    // been posted to the ledger fell through to the default and rendered as
+    // "Draft" — making it impossible to tell from the list which statements were
+    // already processed. The fallback now shows the raw status rather than
+    // claiming "Draft", so an unmapped status looks odd instead of looking wrong.
     const getStatusConfig = (status) => {
         const configs = {
             draft: { color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20', icon: Clock, label: 'Draft' },
+            posted: { color: 'bg-green-500/10 text-green-400 border-green-500/20', icon: CheckCircle2, label: 'Posted' },
+            rejected: { color: 'bg-red-500/10 text-red-400 border-red-500/20', icon: XCircle, label: 'Rejected' },
+            // Retired statuses — kept only so an un-migrated row still renders.
             reviewed: { color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', icon: Eye, label: 'Reviewed' },
             approved: { color: 'bg-green-500/10 text-green-400 border-green-500/20', icon: CheckCircle2, label: 'Approved' },
-            rejected: { color: 'bg-red-500/10 text-red-400 border-red-500/20', icon: XCircle, label: 'Rejected' },
         };
-        return configs[status] || configs.draft;
+        return configs[status] || {
+            color: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+            icon: FileText,
+            label: status || 'Unknown',
+        };
     };
 
     const SortHeader = ({ col, label, align = 'left' }) => (
@@ -2059,9 +2073,8 @@ const Statements = () => {
                         className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 appearance-none cursor-pointer min-w-[100px]"
                     >
                         <option value="all">All Status</option>
-                        <option value="draft">Draft</option>
-                        <option value="reviewed">Reviewed</option>
-                        <option value="approved">Approved</option>
+                        <option value="draft">Draft — not in ledger</option>
+                        <option value="posted">Posted to ledger</option>
                         <option value="rejected">Rejected</option>
                     </select>
                     <div className="flex items-center gap-1 ml-auto">
@@ -2300,7 +2313,11 @@ const Statements = () => {
                                                         <>
                                                             <div className="fixed inset-0 z-40" onClick={() => setActionMenuId(null)} />
                                                             <div className="absolute left-0 bottom-full mb-1 w-36 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-50 overflow-hidden">
-                                                                {['draft', 'reviewed', 'approved', 'rejected'].map(st => (
+                                                                {/* Only draft/rejected — the backend's MANUAL_STATUSES. 'posted' is
+                                                                    earned by posting to the ledger and 400s if set by hand, and
+                                                                    reviewed/approved are retired, so offering them here produced
+                                                                    menu entries that could only ever fail. */}
+                                                                {['draft', 'rejected'].map(st => (
                                                                     <button
                                                                         key={st}
                                                                         onClick={() => handleStatusChange(s.id, st)}
