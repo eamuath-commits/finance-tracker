@@ -35,3 +35,7 @@ backups/
 
 # Logs
 *.log
+
+# Uploaded personal financial data — never commit
+backend/sms_uploads/
+backend/statements/

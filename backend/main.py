@@ -2053,6 +2053,39 @@ def get_allocation_analysis(
 
 _GENERIC_STATEMENT_SOURCE = "statement"
 
+# Uploaded SMS exports are kept so the enrichment can be re-run later (after a
+# parser improvement, or once more statements are imported) without the user
+# having to find the file again.
+from pathlib import Path as _Path
+SMS_UPLOADS_DIR = _Path("/app/sms_uploads")
+SMS_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _user_sms_dir(user_id: str) -> "_Path":
+    d = SMS_UPLOADS_DIR / user_id
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _read_stored_sms(user_id: str):
+    """Return (raw_texts, file_infos) for every SMS export this user has uploaded."""
+    raws, infos = [], []
+    for p in sorted(_user_sms_dir(user_id).glob("*.txt")):
+        try:
+            raws.append(p.read_text(encoding="utf-8", errors="replace"))
+        except OSError:
+            continue
+        stat = p.stat()
+        # stored as "<uuid>__<original name>.txt"
+        original = p.name.split("__", 1)[1] if "__" in p.name else p.name
+        infos.append({
+            "id": p.name.split("__", 1)[0],
+            "filename": original,
+            "size": stat.st_size,
+            "uploaded_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+        })
+    return raws, infos
+
 
 def _statement_txrows(db: Session, user_id: str) -> List[sms_enrichment.TxRow]:
     """The user's statement-imported transactions, projected for the matcher."""
@@ -2068,6 +2101,77 @@ def _statement_txrows(db: Session, user_id: str) -> List[sms_enrichment.TxRow]:
         )
         for r in rows
     ]
+
+
+def _enrich_response(result, sources=None):
+    """Shared payload for the preview and re-run endpoints."""
+    payload = {
+        "stats": result.stats,
+        "skipped": result.skipped,
+        "proposals": [
+            {
+                "transaction_id": p.transaction_id,
+                "old_merchant": p.old_merchant,
+                "new_merchant": p.new_merchant,
+                "amount": p.amount,
+                "direction": p.direction,
+                "tx_timestamp": p.tx_timestamp.isoformat(),
+                "sms_timestamp": p.sms_timestamp.isoformat(),
+                "delta_seconds": round(p.delta_seconds, 1),
+                "shape": p.shape,
+                "truncated": p.truncated,
+                "raw_sms": p.raw_sms,
+            }
+            for p in result.proposals
+        ],
+    }
+    if sources is not None:
+        payload["sources"] = sources
+    return payload
+
+
+@app.get("/api/sms/enrich/sources")
+def sms_enrich_sources(current_user: models.User = Depends(get_current_user)):
+    """The SMS exports this user has uploaded, available for a re-run."""
+    _, infos = _read_stored_sms(current_user.id)
+    return {"sources": infos}
+
+
+@app.post("/api/sms/enrich/rerun")
+def sms_enrich_rerun(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Re-run enrichment over every stored SMS export, without re-uploading.
+
+    Useful after the parser improves or more statements are imported. Rows already
+    enriched are skipped by the generic-label gate, so this only ever fills gaps.
+    """
+    raws, infos = _read_stored_sms(current_user.id)
+    if not raws:
+        raise HTTPException(status_code=400, detail="No stored SMS exports yet — upload one first.")
+    events = sms_enrichment.parse_exports(raws)
+    txs = _statement_txrows(db, current_user.id)
+    result = sms_enrichment.match(events, txs)
+    return _enrich_response(result, sources=infos)
+
+
+@app.delete("/api/sms/enrich/sources/{source_id}")
+def sms_enrich_delete_source(
+    source_id: str,
+    current_user: models.User = Depends(get_current_user),
+):
+    """Forget a stored SMS export so it no longer feeds re-runs."""
+    if not re.fullmatch(r"[0-9a-f]{32}", source_id or ""):
+        raise HTTPException(status_code=400, detail="Invalid source id")
+    removed = 0
+    for p in _user_sms_dir(current_user.id).glob(f"{source_id}__*"):
+        try:
+            p.unlink()
+            removed += 1
+        except OSError:
+            pass
+    return {"removed": removed}
 
 
 @app.post("/api/sms/enrich/preview")
@@ -2088,27 +2192,20 @@ async def sms_enrich_preview(
     except UnicodeDecodeError:
         raw = contents.decode("utf-8", errors="replace")
 
+    # Keep the export so it can be re-run later without re-uploading.
+    try:
+        safe = re.sub(r"[^A-Za-z0-9._ -]", "_", os.path.basename(file.filename))[:80]
+        if not safe.lower().endswith(".txt"):
+            safe += ".txt"
+        (_user_sms_dir(current_user.id) / f"{uuid.uuid4().hex}__{safe}").write_text(raw, encoding="utf-8")
+    except OSError as exc:
+        logger.warning(f"Could not store SMS export for re-run: {exc}")
+
     events = sms_enrichment.parse_export(raw)
     txs = _statement_txrows(db, current_user.id)
     result = sms_enrichment.match(events, txs)
 
-    proposals = [
-        {
-            "transaction_id": p.transaction_id,
-            "old_merchant": p.old_merchant,
-            "new_merchant": p.new_merchant,
-            "amount": p.amount,
-            "direction": p.direction,
-            "tx_timestamp": p.tx_timestamp.isoformat(),
-            "sms_timestamp": p.sms_timestamp.isoformat(),
-            "delta_seconds": round(p.delta_seconds, 1),
-            "shape": p.shape,
-            "truncated": p.truncated,
-            "raw_sms": p.raw_sms,
-        }
-        for p in result.proposals
-    ]
-    return {"stats": result.stats, "skipped": result.skipped, "proposals": proposals}
+    return _enrich_response(result)
 
 
 @app.post("/api/sms/enrich/apply")

@@ -42,6 +42,20 @@ from typing import Dict, List, Optional, Tuple
 TIME_WINDOW = timedelta(seconds=60)
 AMOUNT_EPS = 0.02
 
+# Loan instalments are the one measured exception to the 60s window: the bank
+# SMSes them a day BEFORE the statement posts them (statement 2026-04-25 vs SMS
+# 2026-04-24, consistent across every month). Their amount is also heavily shared
+# with unrelated transfers, so this wider window is only ever applied against rows
+# that are themselves loan-instalment labelled — see _candidate().
+LOAN_WINDOW = timedelta(days=2)
+_LOAN_LABEL_RE = re.compile(r"instal?lments?|loan\s+instal", re.I)
+
+
+def is_loan_label(merchant):
+    """True if a statement label denotes a loan instalment ('Debit T & F
+    installments', 'Loan Instalment')."""
+    return bool(merchant and _LOAN_LABEL_RE.search(merchant))
+
 # Currency tokens that mean Saudi Riyal and are therefore comparable to the
 # SAR-settled statement amount. "SR" is a spelling variant, not a foreign
 # currency (~160 records). "682" is the ISO-4217 numeric code for SAR.
@@ -257,7 +271,11 @@ def classify(body: str) -> Tuple[str, str, Optional[str], Optional[str]]:
         # withdrawal render as a purchase there. Money event, but never a name.
         return _MONEY_UNNAMED, "atm_withdrawal", "debit", None
     if re.match(r"^Debit\s*:?\s*Loan Instalment", first, re.I):
-        return _MONEY_UNNAMED, "loan_instalment", "debit", None
+        # No counterparty in the body (just "Instalment:", "From:", "Remaining
+        # Amount:"), but the type itself is a better label than the statement's
+        # cryptic "Debit T & F installments", so it may write its own name — and
+        # only ever onto a loan-instalment row (see _candidate/_can_write).
+        return _MONEY_NAMED, "loan_instalment", "debit", "Loan Instalment"
     if re.match(r"^MOI Payments", first, re.I):
         return _MONEY_UNNAMED, "moi_payments", "debit", None
     if re.match(r"^Credit Card\s*:?\s*transfer", first, re.I):
@@ -303,6 +321,27 @@ def parse_export(raw: str) -> List[Event]:
     return events
 
 
+def parse_exports(raws: List[str]) -> List[Event]:
+    """Parse several exports into one event list, de-duplicated.
+
+    Phone exports overlap heavily (a fresh dump repeats everything an older one
+    already had). Duplicates are not merely wasteful — two identical SMS would
+    both claim the same transaction, the row would look contested, and the
+    bijection would correctly refuse to enrich it. So identical messages
+    (same header timestamp + same body) collapse to one.
+    """
+    seen = set()
+    out: List[Event] = []
+    for raw in raws:
+        for ev in parse_export(raw):
+            key = (ev.timestamp, ev.body.strip())
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(ev)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Generic-label gate
 # ---------------------------------------------------------------------------
@@ -336,6 +375,9 @@ def is_generic_label(merchant: Optional[str]) -> bool:
         return True
     # A single bare Arabic token is a first-name-only statement label.
     if _ARABIC_SINGLE.match(m):
+        return True
+    # "Debit T & F installments" and friends — a loan-instalment type label.
+    if is_loan_label(m):
         return True
     return False
 
@@ -378,11 +420,23 @@ class MatchResult:
 
 
 def _candidate(ev: Event, tx: TxRow) -> bool:
-    return (
-        ev.direction == tx.type
-        and abs(ev.amount - tx.amount) <= AMOUNT_EPS
-        and abs((ev.timestamp - tx.timestamp).total_seconds()) <= TIME_WINDOW.total_seconds()
-    )
+    if ev.direction != tx.type or abs(ev.amount - tx.amount) > AMOUNT_EPS:
+        return False
+    dt = abs((ev.timestamp - tx.timestamp).total_seconds())
+    if ev.shape == "loan_instalment" and is_loan_label(tx.merchant):
+        # Only the loan-labelled row gets the wide window. Against every other
+        # row this SMS keeps the normal 60s rule, so it still competes correctly
+        # for near-simultaneous events without dragging in same-amount transfers.
+        return dt <= LOAN_WINDOW.total_seconds()
+    return dt <= TIME_WINDOW.total_seconds()
+
+
+def _can_write(ev: Event, tx: TxRow) -> bool:
+    """A loan-instalment SMS may only ever name a loan-instalment row; writing
+    'Loan Instalment' onto some unrelated same-amount transfer would be wrong."""
+    if ev.shape == "loan_instalment":
+        return is_loan_label(tx.merchant)
+    return True
 
 
 def match(events: List[Event], txs: List[TxRow]) -> MatchResult:
@@ -430,16 +484,26 @@ def match(events: List[Event], txs: List[TxRow]) -> MatchResult:
         if len(tx_cands[tx.id]) != 1:
             skipped["contested_row"] += 1
             continue
+        if not _can_write(e, tx):
+            skipped["wrong_row_type"] = skipped.get("wrong_row_type", 0) + 1
+            continue
         if not is_generic_label(tx.merchant):
             skipped["already_named"] += 1
             continue
         if tx.id in seen_tx:
             skipped["contested_row"] += 1
             continue
-        seen_tx.add(tx.id)
 
-        delta = (e.timestamp - tx.timestamp).total_seconds()
         name = e.name.strip()
+        # A proposal that wouldn't change anything is noise — and without this a
+        # row we already wrote (e.g. "Loan Instalment", which still reads as a
+        # generic loan label) would be re-proposed on every single re-run.
+        if (tx.merchant or "").strip().lower() == name.lower():
+            skipped["no_change"] = skipped.get("no_change", 0) + 1
+            continue
+
+        seen_tx.add(tx.id)
+        delta = (e.timestamp - tx.timestamp).total_seconds()
         res.proposals.append(Proposal(
             transaction_id=tx.id,
             old_merchant=tx.merchant,

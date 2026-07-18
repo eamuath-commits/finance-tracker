@@ -1,9 +1,9 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import api, { API_URL } from "../utils/api";
 import { formatCurrency } from "./UI";
 import {
     Upload, FileText, Loader2, CheckCircle2, AlertTriangle, ArrowRight,
-    Undo2, ChevronDown, ChevronRight, Scissors, Sparkles, Ban,
+    Undo2, ChevronDown, ChevronRight, Scissors, Sparkles, Ban, RefreshCw, Trash2,
 } from "lucide-react";
 
 // Overwrite ONLY the counterparty name on statement-imported transactions using
@@ -34,6 +34,14 @@ const SMSEnrichTab = ({ onApplied }) => {
     const [expanded, setExpanded] = useState(new Set());
     const [applyResult, setApplyResult] = useState(null);
     const [undoing, setUndoing] = useState(false);
+    const [sources, setSources] = useState([]);   // previously uploaded exports
+
+    const loadSources = () => {
+        api.get(`${API_URL}/api/sms/enrich/sources`)
+            .then(res => setSources(res.data?.sources || []))
+            .catch(() => setSources([]));
+    };
+    useEffect(() => { loadSources(); }, []);
 
     const proposals = preview?.proposals || [];
     const truncatedCount = useMemo(() => proposals.filter(p => p.truncated).length, [proposals]);
@@ -58,12 +66,36 @@ const SMSEnrichTab = ({ onApplied }) => {
             // still beat the statement label — but they can review before applying.
             setSelected(new Set((res.data.proposals || []).map(p => p.transaction_id)));
             setStage("preview");
+            loadSources();
         } catch (err) {
             const detail = err.response?.data?.detail;
             setError(typeof detail === "string" ? detail : "Failed to read the SMS file. Check it's a plain-text export.");
         } finally {
             setLoading(false);
         }
+    };
+
+    // Re-run against every stored export — no re-upload needed.
+    const runRerun = async () => {
+        setLoading(true); setError(null);
+        try {
+            const res = await api.post(`${API_URL}/api/sms/enrich/rerun`, {}, { timeout: 180000 });
+            setPreview(res.data);
+            setSelected(new Set((res.data.proposals || []).map(p => p.transaction_id)));
+            setStage("preview");
+        } catch (err) {
+            const detail = err.response?.data?.detail;
+            setError(typeof detail === "string" ? detail : "Re-run failed.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const forgetSource = async (id) => {
+        try {
+            await api.delete(`${API_URL}/api/sms/enrich/sources/${id}`);
+            loadSources();
+        } catch { /* non-fatal */ }
     };
 
     const onPick = (f) => { if (f) { setFile(f); runPreview(f); } };
@@ -154,6 +186,41 @@ const SMSEnrichTab = ({ onApplied }) => {
                             <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" /> {error}
                         </div>
                     )}
+
+                    {/* Previously uploaded exports — re-run without re-uploading */}
+                    {sources.length > 0 && (
+                        <div className="mt-5 pt-4 border-t border-slate-700/50">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-[11px] text-gray-400 uppercase tracking-wider font-semibold">
+                                    Saved exports ({sources.length})
+                                </span>
+                                <button
+                                    onClick={runRerun}
+                                    disabled={loading}
+                                    className="flex items-center gap-1.5 bg-cyan-600/20 hover:bg-cyan-600/40 disabled:opacity-50 text-cyan-300 border border-cyan-500/30 text-xs font-semibold px-3 py-1.5 rounded-lg transition"
+                                >
+                                    <RefreshCw size={13} /> Re-run enrichment
+                                </button>
+                            </div>
+                            <p className="text-[11px] text-gray-500 mb-2">
+                                Re-checks every saved export against your statements. Names you've already
+                                applied are left alone — this only fills in what was missed.
+                            </p>
+                            <div className="space-y-1">
+                                {sources.map(s => (
+                                    <div key={s.id} className="flex items-center gap-2 text-[11px] text-gray-400 bg-slate-900/40 border border-slate-700/40 rounded px-2 py-1.5">
+                                        <FileText size={12} className="text-gray-600 flex-shrink-0" />
+                                        <span className="truncate flex-1">{s.filename}</span>
+                                        <span className="text-gray-600 flex-shrink-0">{Math.round(s.size / 1024)} KB</span>
+                                        <button onClick={() => forgetSource(s.id)} title="Forget this export"
+                                            className="text-gray-600 hover:text-red-400 transition flex-shrink-0">
+                                            <Trash2 size={12} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -181,7 +248,7 @@ const SMSEnrichTab = ({ onApplied }) => {
                         </button>
                         <button onClick={resetAll}
                             className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition">
-                            <Upload size={16} /> Enrich another file
+                            <Upload size={16} /> Upload or re-run
                         </button>
                     </div>
                     {error && <p className="text-sm text-red-400 mt-4">{error}</p>}
