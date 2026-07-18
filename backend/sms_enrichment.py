@@ -415,8 +415,9 @@ class Proposal:
 @dataclass
 class MatchResult:
     proposals: List[Proposal] = field(default_factory=list)
-    stats: Dict[str, int] = field(default_factory=dict)
-    skipped: Dict[str, int] = field(default_factory=dict)
+    stats: Dict[str, int] = field(default_factory=dict)      # per-message view
+    skipped: Dict[str, int] = field(default_factory=dict)    # why messages were dropped
+    coverage: Dict = field(default_factory=dict)             # per-transaction view
 
 
 def _candidate(ev: Event, tx: TxRow) -> bool:
@@ -528,6 +529,64 @@ def match(events: List[Event], txs: List[TxRow]) -> MatchResult:
         "fx_skipped": sum(1 for e in events
                           if e.kind in (_MONEY_NAMED, _MONEY_UNNAMED) and not e.is_local),
         "proposals": len(res.proposals),
+    }
+
+    # ── Coverage, counted from the TRANSACTIONS rather than the SMS ──
+    # Every figure above answers "what happened to each message". The question
+    # actually asked of this feature is the other way round — "I have N
+    # transactions, why did only M get a name?" — so report that side too, and
+    # group what is left by its current label, which is what explains the gap
+    # (internal transfers and card settlements carry no counterparty in the SMS
+    # at all, so they can never be named from one).
+    proposed_ids = {p.transaction_id for p in res.proposals}
+    already_named = [t for t in txs if not is_generic_label(t.merchant)]
+    enrichable = [t for t in txs if is_generic_label(t.merchant)]
+
+    unmatched, contested, unnamed_sms = [], [], []
+    for t in enrichable:
+        if t.id in proposed_ids:
+            continue
+        cands = tx_cands.get(t.id, [])
+        if not cands:
+            unmatched.append(t)
+        elif len(cands) > 1:
+            contested.append(t)
+        else:
+            # Exactly one SMS is this transaction, but it carries no counterparty
+            # to write — "Transfer Between Your Accounts", "Credit Card:Payment"
+            # and the Arabic operation-type messages name no one. Without this
+            # bucket these rows vanished from the totals and the figures did not
+            # add up to the transaction count.
+            unnamed_sms.append(t)
+
+    def _by_label(rows):
+        out = {}
+        for t in rows:
+            label = (t.merchant or "(no label)").strip()
+            out[label] = out.get(label, 0) + 1
+        return sorted(({"label": k, "count": v} for k, v in out.items()),
+                      key=lambda r: r["count"], reverse=True)[:8]
+
+    reasons = {}
+    for t in unmatched:
+        label = (t.merchant or "(no label)").strip()
+        reasons[label] = reasons.get(label, 0) + 1
+
+    res.coverage = {
+        "transactions": len(txs),
+        "already_named": len(already_named),
+        "enrichable": len(enrichable),
+        "will_be_named": len(proposed_ids),
+        "no_sms_found": len(unmatched),
+        "sms_has_no_name": len(unnamed_sms),
+        "contested": len(contested),
+        # These five buckets are exhaustive and disjoint — they must sum to
+        # `transactions`, so the panel can never quietly lose rows.
+        "unmatched_by_label": sorted(
+            ({"label": k, "count": v} for k, v in reasons.items()),
+            key=lambda r: r["count"], reverse=True,
+        )[:8],
+        "unnamed_sms_by_label": _by_label(unnamed_sms),
     }
     return res
 

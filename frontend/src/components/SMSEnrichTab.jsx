@@ -22,6 +22,15 @@ const SKIP_LABELS = {
     no_match: "no matching transaction",
 };
 
+const pct = (n, total) => (total > 0 ? Math.round((n / total) * 100) : 0);
+
+const Stat = ({ n, label, hint, color }) => (
+    <div className="bg-slate-900/40 border border-slate-700/40 rounded-lg px-2 py-2" title={hint || ""}>
+        <p className={`text-lg font-bold font-mono ${color}`}>{n ?? 0}</p>
+        <p className="text-[10px] text-gray-500 leading-tight">{label}</p>
+    </div>
+);
+
 const SMSEnrichTab = ({ onApplied }) => {
     const [stage, setStage] = useState("upload");      // upload | preview | done
     const [file, setFile] = useState(null);
@@ -337,6 +346,7 @@ const SMSEnrichTab = ({ onApplied }) => {
     // ---------- PREVIEW ----------
     const stats = preview?.stats || {};
     const skipped = preview?.skipped || {};
+    const coverage = preview?.coverage || {};
     const selectedCount = selected.size;
 
     return (
@@ -357,7 +367,7 @@ const SMSEnrichTab = ({ onApplied }) => {
                         <Upload size={14} /> Start over
                     </button>
                 </div>
-                {/* what was left alone */}
+                {/* what was left alone (per-message view) */}
                 <div className="flex flex-wrap gap-2 mt-3">
                     {Object.entries(skipped).filter(([, v]) => v > 0).map(([k, v]) => (
                         <span key={k} className="text-[11px] text-gray-400 bg-slate-700/40 border border-slate-600/40 rounded px-2 py-0.5">
@@ -365,6 +375,61 @@ const SMSEnrichTab = ({ onApplied }) => {
                         </span>
                     ))}
                 </div>
+
+                {/* Coverage — counted from the TRANSACTIONS, which is the question
+                    people actually ask: "I have N transactions, why did only M get
+                    a name?" The per-message counts above cannot answer that. */}
+                {coverage.transactions > 0 && (
+                    <div className="mt-4 pt-4 border-t border-slate-700/50">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-[11px] text-gray-400 uppercase tracking-wider font-semibold">
+                                Your {coverage.transactions} statement transactions
+                            </span>
+                            <span className="text-[11px] text-gray-500">
+                                {pct(coverage.already_named + coverage.will_be_named, coverage.transactions)}% will have a real name
+                            </span>
+                        </div>
+
+                        {/* one bar, three segments: already named / to be named / left generic */}
+                        <div className="flex h-2 rounded-full overflow-hidden bg-slate-700/50 mb-3">
+                            <div className="bg-slate-500" style={{ width: `${pct(coverage.already_named, coverage.transactions)}%` }}
+                                 title={`${coverage.already_named} already had a real name`} />
+                            <div className="bg-cyan-500" style={{ width: `${pct(coverage.will_be_named, coverage.transactions)}%` }}
+                                 title={`${coverage.will_be_named} will be named by this run`} />
+                            <div className="bg-amber-500/60" style={{ width: `${pct(coverage.no_sms_found + coverage.sms_has_no_name + coverage.contested, coverage.transactions)}%` }}
+                                 title={`${coverage.no_sms_found + coverage.sms_has_no_name + coverage.contested} cannot be named`} />
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+                            <Stat n={coverage.already_named} label="already named" hint="the statement gave a usable name" color="text-gray-300" />
+                            <Stat n={coverage.will_be_named} label="named by this run" color="text-cyan-400" />
+                            <Stat n={coverage.sms_has_no_name} label="SMS names no one" hint="the matching message is an internal transfer or card settlement — the bank sends only an account or card number" color="text-amber-400" />
+                            <Stat n={coverage.no_sms_found} label="no SMS found" hint="no message matched this transaction" color="text-amber-400" />
+                            <Stat n={coverage.contested} label="too ambiguous" hint="more than one message could be this row — not guessed" color="text-amber-400" />
+                        </div>
+
+                        {coverage.unmatched_by_label?.length > 0 && (
+                            <details className="mt-3 group">
+                                <summary className="text-[11px] text-gray-500 hover:text-gray-300 cursor-pointer select-none">
+                                    Why {coverage.no_sms_found} could not be named →
+                                </summary>
+                                <div className="mt-2 space-y-1">
+                                    {coverage.unmatched_by_label.map(r => (
+                                        <div key={r.label} className="flex items-center gap-2 text-[11px]">
+                                            <span className="font-mono text-gray-500 w-10 text-right">{r.count}</span>
+                                            <span className="text-gray-400 truncate flex-1">{r.label}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className="text-[10px] text-gray-600 mt-2 leading-relaxed">
+                                    Internal transfers and card settlements carry no counterparty in the SMS — the
+                                    bank only sends an account or card number — so they cannot be named from a
+                                    message no matter how many you upload.
+                                </p>
+                            </details>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Controls */}

@@ -2169,6 +2169,7 @@ def _enrich_response(result, sources=None):
     payload = {
         "stats": result.stats,
         "skipped": result.skipped,
+        "coverage": result.coverage,
         "proposals": [
             {
                 "transaction_id": p.transaction_id,
