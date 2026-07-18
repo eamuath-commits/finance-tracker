@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import api, { API_URL } from '../utils/api';
-import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, ArrowLeft, ArrowUpRight, ArrowDownLeft, ChevronRight, ChevronDown, RefreshCw, Filter, Wallet, Calendar, Search, X, Download, Edit3, Check, MoreVertical, Eye, ShieldCheck, Link2, GitBranch, BarChart3, TrendingUp, TrendingDown, LayoutGrid, List, FileSearch, MessageSquare, Repeat, Tag, FileSpreadsheet } from 'lucide-react';
+import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, ArrowLeft, ArrowUpRight, ArrowDownLeft, ChevronRight, ChevronDown, RefreshCw, Filter, Wallet, Calendar, Search, X, Download, Edit3, Check, MoreVertical, Eye, ShieldCheck, Link2, GitBranch, BarChart3, TrendingUp, TrendingDown, LayoutGrid, List, FileSearch, MessageSquare, Repeat, Tag, FileSpreadsheet, Undo2 } from 'lucide-react';
 import { useConfirm } from '../components/ConfirmProvider';
 
 const Statements = () => {
@@ -284,6 +284,49 @@ const Statements = () => {
                     fetchStatements();
                 } catch (err) {
                     setError(err.response?.data?.detail || 'Post to ledger failed');
+                } finally {
+                    setCommitting(false);
+                }
+            }
+        });
+    };
+
+    const handleReversePosting = async () => {
+        if (!selectedStatement) return;
+        setError(null);
+
+        // Ask the server what this would actually destroy before warning the user.
+        let impact = null;
+        try {
+            const res = await api.post(`/api/statements/${selectedStatement}/unpost?preview=true`);
+            impact = res.data;
+        } catch (err) {
+            setError(err.response?.data?.detail || 'Could not check what reversing would remove');
+            return;
+        }
+
+        const links = (impact?.payment_links || 0) + (impact?.payments_unlinked || 0);
+        const linkWarning = links > 0
+            ? `\n\n⚠ ${links} payment link${links !== 1 ? 's' : ''} to obligations will be broken — you would need to re-link them.`
+            : '';
+
+        setConfirmDialog({
+            open: true,
+            title: 'Reverse Ledger Posting',
+            message: `This removes ${impact?.transactions ?? 0} transaction${impact?.transactions !== 1 ? 's' : ''} from the ledger and puts the statement back to draft, so you can correct it and post again.\n\nThe account balance will be recalculated without them.${linkWarning}\n\nAny SMS name enrichment applied to these transactions is discarded with them. This cannot be undone — but you can re-post the statement afterwards.`,
+            variant: 'danger',
+            onConfirm: async () => {
+                setConfirmDialog(prev => ({ ...prev, open: false }));
+                setCommitting(true);
+                setCommitResult(null);
+                try {
+                    const res = await api.post(`/api/statements/${selectedStatement}/unpost`);
+                    setCommitResult(res.data);
+                    const detailRes = await api.get(`/api/statements/${selectedStatement}`);
+                    setStatementDetail(detailRes.data);
+                    fetchStatements();
+                } catch (err) {
+                    setError(err.response?.data?.detail || 'Reversing the posting failed');
                 } finally {
                     setCommitting(false);
                 }
@@ -726,9 +769,23 @@ const Statements = () => {
                         </button>
                     )}
                     {statementDetail?.status === 'posted' && (
-                        <span className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/10 text-green-400 border border-green-500/20 text-sm font-medium">
-                            <CheckCircle2 size={14} />Posted to ledger
-                        </span>
+                        <>
+                            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/10 text-green-400 border border-green-500/20 text-sm font-medium">
+                                <CheckCircle2 size={14} />Posted to ledger
+                            </span>
+                            <button
+                                onClick={handleReversePosting}
+                                disabled={committing || loadingDetail}
+                                title="Remove these transactions from the ledger and return the statement to draft"
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600/15 hover:bg-red-600/30 text-red-300 border border-red-500/30 text-sm font-medium transition-colors disabled:opacity-50"
+                            >
+                                {committing ? (
+                                    <><Loader2 size={14} className="animate-spin" />Reversing...</>
+                                ) : (
+                                    <><Undo2 size={14} />Reverse posting</>
+                                )}
+                            </button>
+                        </>
                     )}
                 </div>
 

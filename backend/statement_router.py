@@ -888,6 +888,133 @@ def get_statement_lines(
 #   posted = transactions written to the ledger (earned by posting, never by label)
 
 
+def _unpost_impact(db: Session, statement_id: str) -> dict:
+    """What reversing this statement's posting would remove/unlink. Read-only."""
+    tx_ids = [r[0] for r in db.query(models.Transaction.id).filter(
+        models.Transaction.statement_id == statement_id
+    ).all()]
+    if not tx_ids:
+        return {"transactions": 0, "payment_links": 0, "distribution_links": 0,
+                "payments_unlinked": 0, "tx_ids": []}
+    return {
+        "transactions": len(tx_ids),
+        "payment_links": db.query(models.PaymentTransaction).filter(
+            models.PaymentTransaction.transaction_id.in_(tx_ids)).count(),
+        "distribution_links": db.query(models.DistributionTransaction).filter(
+            models.DistributionTransaction.transaction_id.in_(tx_ids)).count(),
+        "payments_unlinked": db.query(models.Payment).filter(
+            models.Payment.transaction_id.in_(tx_ids)).count(),
+        "tx_ids": tx_ids,
+    }
+
+
+def _remove_posted_transactions(db: Session, statement_id: str) -> dict:
+    """Delete a statement's ledger transactions, unlinking everything first.
+
+    statement_lines.posted/matched_transaction_id and distributions.transaction_id
+    are NO ACTION foreign keys, so those rows MUST be unlinked before the delete
+    or PostgreSQL rejects it. Posting always sets posted_transaction_id, which is
+    why a plain bulk delete here raised ForeignKeyViolation and made re-posting
+    fail despite being documented as idempotent.
+
+    Shared by re-posting and the explicit reverse action.
+    """
+    impact = _unpost_impact(db, statement_id)
+    tx_ids = impact.pop("tx_ids")
+    if not tx_ids:
+        return impact
+
+    db.query(models.TransactionQueue).filter(
+        models.TransactionQueue.transaction_id.in_(tx_ids)).delete(synchronize_session=False)
+    db.query(models.StatementLine).filter(
+        models.StatementLine.matched_transaction_id.in_(tx_ids)).update(
+        {"matched_transaction_id": None}, synchronize_session=False)
+    db.query(models.StatementLine).filter(
+        models.StatementLine.posted_transaction_id.in_(tx_ids)).update(
+        {"posted_transaction_id": None}, synchronize_session=False)
+    db.query(models.Distribution).filter(
+        models.Distribution.transaction_id.in_(tx_ids)).update(
+        {"transaction_id": None}, synchronize_session=False)
+    db.query(models.Payment).filter(
+        models.Payment.transaction_id.in_(tx_ids)).update(
+        {"transaction_id": None}, synchronize_session=False)
+    db.query(models.PaymentTransaction).filter(
+        models.PaymentTransaction.transaction_id.in_(tx_ids)).delete(synchronize_session=False)
+    db.query(models.DistributionTransaction).filter(
+        models.DistributionTransaction.transaction_id.in_(tx_ids)).delete(synchronize_session=False)
+    db.query(models.Transaction).filter(
+        models.Transaction.id.in_(tx_ids)).delete(synchronize_session=False)
+    db.flush()
+    return impact
+
+
+@router.post("/{statement_id}/unpost")
+def unpost_statement_from_ledger(
+    statement_id: str,
+    preview: bool = False,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Reverse a ledger posting: remove this statement's transactions and put it
+    back to draft, so it can be corrected and posted again.
+
+    Pass preview=true to see the impact without changing anything — reversing
+    breaks any payment/obligation links made against these transactions, and
+    discards SMS name enrichment applied to them, so the caller should confirm.
+    """
+    statement = db.query(models.Statement).filter(
+        models.Statement.id == statement_id,
+        models.Statement.user_id == current_user.id,
+    ).first()
+    if not statement:
+        raise HTTPException(status_code=404, detail="Statement not found")
+    if statement.status != "posted":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Only a posted statement can be reversed (this one is '{statement.status}').",
+        )
+
+    impact = _unpost_impact(db, statement_id)
+    impact.pop("tx_ids", None)
+    if preview:
+        return {"statement_id": statement.id, "preview": True, **impact}
+
+    removed = _remove_posted_transactions(db, statement_id)
+
+    # Put the lines and the statement back to their pre-posting state.
+    db.query(models.StatementLine).filter(
+        models.StatementLine.statement_id == statement_id
+    ).update({"match_status": "pending"}, synchronize_session=False)
+    statement.status = "draft"
+    statement.reconciliation_status = "pending"
+    db.flush()
+
+    new_balance = None
+    if statement.account_id:
+        from main import _recalculate_account_balance
+        recalc = _recalculate_account_balance(db, statement.account_id)
+        new_balance = recalc.get("new_balance") if recalc else None
+    db.commit()
+
+    logger.info(
+        f"Unposted statement {statement_id}: removed {removed['transactions']} transactions, "
+        f"{removed['payment_links']} payment links, balance now {new_balance}"
+    )
+    return {
+        "statement_id": statement.id,
+        "status": statement.status,
+        "removed_transactions": removed["transactions"],
+        "payment_links_removed": removed["payment_links"],
+        "distribution_links_removed": removed["distribution_links"],
+        "payments_unlinked": removed["payments_unlinked"],
+        "new_balance": new_balance,
+        "message": (
+            f"Reversed: {removed['transactions']} transactions removed from the ledger. "
+            f"Statement is back to draft."
+        ),
+    }
+
+
 @router.post("/{statement_id}/post")
 def post_statement_to_ledger(
     statement_id: str,
@@ -932,10 +1059,10 @@ def post_statement_to_ledger(
     if not lines:
         raise HTTPException(status_code=400, detail="No parsed lines found in statement")
 
-    # Idempotency: remove this statement's own previously-posted transactions
-    db.query(models.Transaction).filter(
-        models.Transaction.statement_id == statement_id
-    ).delete(synchronize_session=False)
+    # Idempotency: remove this statement's own previously-posted transactions.
+    # Must go through the unlinking helper — a plain bulk delete here violated
+    # statement_lines' NO ACTION foreign key and made re-posting fail outright.
+    _remove_posted_transactions(db, statement_id)
 
     created = 0
     folded_fees = 0
