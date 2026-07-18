@@ -445,8 +445,33 @@ def _recalculate_account_balance(db: Session, account_id: str):
     stmt_txs = [tx for tx in all_txs if tx.source == "statement" and tx.statement_row_index is not None]
     non_stmt_txs = [tx for tx in all_txs if tx not in stmt_txs]
     
-    # Sort statement transactions by (statement_id, statement_row_index) — bank processing order
-    stmt_txs.sort(key=lambda tx: (tx.statement_id or "", tx.statement_row_index or 0))
+    # Order the statements CHRONOLOGICALLY, then by row_index within each.
+    #
+    # This used to sort by statement_id, which is a UUID — so with more than one
+    # statement on an account the statements replayed in random order. On the
+    # Expense account the newer statement (Jun 25 - Jul 16) sorted before the
+    # older one (Jan 25 - Jun 24), so the baseline was reverse-engineered from
+    # the newer statement's opening row and the older statement's transactions
+    # were applied on top of it, inverting the chain and leaving the balance
+    # 164.34 short of the statement's closing figure.
+    #
+    # row_index within a statement is kept — that is the bank's own processing
+    # order, which can differ from the timestamp order.
+    stmt_ids = {tx.statement_id for tx in stmt_txs if tx.statement_id}
+    stmt_by_id = {}
+    stmt_order = {}
+    if stmt_ids:
+        for s in db.query(models.Statement).filter(models.Statement.id.in_(stmt_ids)).all():
+            stmt_by_id[s.id] = s
+            if s.statement_period_start:
+                stmt_order[s.id] = str(s.statement_period_start)
+    for sid in stmt_ids:
+        # No period on the statement — fall back to its earliest transaction.
+        if sid not in stmt_order:
+            dates = [tx.timestamp for tx in stmt_txs if tx.statement_id == sid and tx.timestamp]
+            stmt_order[sid] = min(dates).isoformat() if dates else ""
+
+    stmt_txs.sort(key=lambda tx: (stmt_order.get(tx.statement_id, ""), tx.statement_row_index or 0))
     
     # Sort non-statement transactions by timestamp
     non_stmt_txs.sort(key=lambda tx: (tx.timestamp or datetime(2000, 1, 1)))
@@ -454,13 +479,26 @@ def _recalculate_account_balance(db: Session, account_id: str):
     # Build ordered transaction list: statement transactions first, then non-statement
     ordered_txs = stmt_txs + non_stmt_txs
     
-    # Use first transaction's balance_after_transaction as baseline if available
-    # Otherwise start from 0
     first_tx = ordered_txs[0]
     baseline = first_tx.balance_after_transaction
     corrections = 0
-    
-    if baseline is not None:
+
+    # Prefer the earliest statement's OWN opening balance as the baseline.
+    #
+    # Reverse-engineering it from the first row's balance_after assumes that row
+    # is chronologically first, but row_index is the bank's print order — on the
+    # Expense account row 0 carried a balance_after of 419.82 while the statement
+    # header declared an opening of 283.98, so the whole chain started 143.84 out
+    # and the posted balance missed the statement's closing figure. The header is
+    # what the bank asserts, and each statement's rows verify against it
+    # (opening + credits - debits - fees == closing), so it is the trustworthy
+    # anchor. Reverse-engineering stays as the fallback for statements that never
+    # recorded an opening balance.
+    opening_stmt = stmt_by_id.get(first_tx.statement_id) if stmt_txs else None
+    if opening_stmt is not None and opening_stmt.opening_balance is not None:
+        running_cents = round(float(opening_stmt.opening_balance) * 100)
+        baseline = float(opening_stmt.opening_balance)
+    elif baseline is not None:
         # Reverse-engineer the starting balance from the first tx
         if first_tx.type == "credit":
             running_cents = round((baseline - first_tx.amount) * 100)
