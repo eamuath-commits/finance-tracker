@@ -1208,8 +1208,17 @@ const Statements = () => {
                                     {timelineData.timeline.map((block, idx) => {
                                         const isCurrent = block.type === 'statement' && block.statement_id === selectedStatement;
                                         if (block.type === 'statement') {
+                                            // Both ends must use the SAME format. The start used to be
+                                            // {month, year:'2-digit'} while the end used {month, day} — so a
+                                            // period of 25 Jun – 17 Jul 2026 rendered as "Jun 26 — Jul 17",
+                                            // where the 26 is the YEAR but reads as a day. Dates are built
+                                            // from parts so a date-only string is never shifted by UTC.
+                                            const fmtDay = (iso) => {
+                                                const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number);
+                                                return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                                            };
                                             const periodLabel = block.period_start && block.period_end
-                                                ? `${new Date(block.period_start).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })} — ${new Date(block.period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                                                ? `${fmtDay(block.period_start)} — ${fmtDay(block.period_end)}, ${String(block.period_end).slice(0, 4)}`
                                                 : 'No dates';
                                             const statusColor = block.status === 'approved'
                                                 ? 'border-emerald-500/40 bg-emerald-500/5'
