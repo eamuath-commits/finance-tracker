@@ -8,11 +8,20 @@ import requests
 import sys
 
 BASE_URL = os.getenv("API_URL", "http://10.10.80.150:8000")
-USERNAME = "test"
-PASSWORD = "Muath@123"
+USERNAME = os.getenv("TEST_USER", "test")
+# Never hardcode a credential here — this file is committed and pushed. Supply it
+# via the environment:  TEST_USER_PASSWORD=... python tests/test_statement_features.py
+PASSWORD = os.getenv("TEST_USER_PASSWORD")
 
 # ─────── Auth ───────
 def get_token():
+    # Checked here rather than at import: pytest imports this module during
+    # collection, so raising at import time breaks the whole suite.
+    if not PASSWORD:
+        raise SystemExit(
+            "TEST_USER_PASSWORD is not set. Export it before running this script, e.g.\n"
+            "  TEST_USER_PASSWORD='...' python tests/test_statement_features.py"
+        )
     res = requests.post(f"{BASE_URL}/auth/token", data={"username": USERNAME, "password": PASSWORD})
     assert res.status_code == 200, f"Login failed: {res.text}"
     return res.json()["access_token"]
