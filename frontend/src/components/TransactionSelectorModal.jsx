@@ -37,6 +37,10 @@ export default function TransactionSelectorModal({
         type: ''
     });
     const [accounts, setAccounts] = useState([]);
+    const [total, setTotal] = useState(0);          // full match count, not just this page
+    const [loadingMore, setLoadingMore] = useState(false);
+
+    const PAGE_SIZE = 100;
 
     // Fetch accounts for filter dropdown
     useEffect(() => {
@@ -47,25 +51,33 @@ export default function TransactionSelectorModal({
         }
     }, [isOpen]);
 
-    // Fetch transactions
+    const buildParams = (offset) => {
+        const params = new URLSearchParams();
+        if (searchQuery) params.set('query', searchQuery);
+        if (filters.accountId) params.set('account_id', filters.accountId);
+        if (filters.minAmount) params.set('min_amount', filters.minAmount);
+        if (filters.maxAmount) params.set('max_amount', filters.maxAmount);
+        if (filters.startDate) params.set('start_date', filters.startDate);
+        if (filters.endDate) params.set('end_date', filters.endDate);
+        if (filters.type) params.set('type', filters.type);
+        params.set('limit', String(PAGE_SIZE));
+        params.set('offset', String(offset));
+        return params;
+    };
+
+    // Fetch first page (re-runs on search/filter change)
     useEffect(() => {
         if (!isOpen) return;
 
         const fetchTransactions = async () => {
             setLoading(true);
             try {
-                const params = new URLSearchParams();
-                if (searchQuery) params.set('query', searchQuery);
-                if (filters.accountId) params.set('account_id', filters.accountId);
-                if (filters.minAmount) params.set('min_amount', filters.minAmount);
-                if (filters.maxAmount) params.set('max_amount', filters.maxAmount);
-                if (filters.startDate) params.set('start_date', filters.startDate);
-                if (filters.endDate) params.set('end_date', filters.endDate);
-                if (filters.type) params.set('type', filters.type);
-                params.set('limit', '50');
-
-                const res = await api.get(`/transactions/search?${params}`);
-                setTransactions(res.data);
+                const res = await api.get(`/transactions/search?${buildParams(0)}`);
+                // The endpoint now returns {transactions, total}; tolerate the old
+                // bare-array shape so a stale backend doesn't blank the modal.
+                const data = Array.isArray(res.data) ? res.data : (res.data?.transactions || []);
+                setTransactions(data);
+                setTotal(Array.isArray(res.data) ? data.length : (res.data?.total ?? data.length));
             } catch (err) {
                 console.error('Failed to fetch transactions:', err);
             } finally {
@@ -76,6 +88,23 @@ export default function TransactionSelectorModal({
         const debounce = setTimeout(fetchTransactions, 300);
         return () => clearTimeout(debounce);
     }, [isOpen, searchQuery, filters]);
+
+    const loadMore = async () => {
+        setLoadingMore(true);
+        try {
+            const res = await api.get(`/transactions/search?${buildParams(transactions.length)}`);
+            const data = Array.isArray(res.data) ? res.data : (res.data?.transactions || []);
+            // De-dupe defensively: paging while rows shift could otherwise repeat one.
+            setTransactions(prev => {
+                const seen = new Set(prev.map(t => t.id));
+                return [...prev, ...data.filter(t => !seen.has(t.id))];
+            });
+        } catch (err) {
+            console.error('Failed to load more transactions:', err);
+        } finally {
+            setLoadingMore(false);
+        }
+    };
 
     const toggleSelect = (txId) => {
         setSelected(prev => {
@@ -362,6 +391,26 @@ export default function TransactionSelectorModal({
                                 </div>
                             );
                         })
+                    )}
+
+                    {/* Paging — the list used to stop silently at 50, which looked
+                        like the user simply had no more transactions to link. */}
+                    {!loading && transactions.length > 0 && (
+                        <div className="pt-2 pb-1 text-center">
+                            <p className="text-[11px] text-slate-500 mb-2">
+                                Showing {transactions.length} of {total}
+                            </p>
+                            {transactions.length < total && (
+                                <button
+                                    type="button"
+                                    onClick={loadMore}
+                                    disabled={loadingMore}
+                                    className="text-xs font-semibold text-blue-300 bg-blue-600/20 hover:bg-blue-600/40 disabled:opacity-50 border border-blue-500/30 rounded-lg px-4 py-2 transition"
+                                >
+                                    {loadingMore ? 'Loading…' : `Load ${Math.min(PAGE_SIZE, total - transactions.length)} more`}
+                                </button>
+                            )}
+                        </div>
                     )}
                 </div>
 

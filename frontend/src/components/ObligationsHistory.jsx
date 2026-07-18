@@ -370,7 +370,10 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                     const suggestRes = await api.get(`${API_URL}/payments/${newPayment.id}/suggested-transactions`);
                     const suggestions = suggestRes.data || [];
                     const bestMatch = suggestions.length > 0 ? suggestions[0] : null;
-                    if (bestMatch && bestMatch.score >= 80 && !bestMatch.already_linked) {
+                    // `qualified` (a description match) is mandatory — unqualified
+                    // candidates are shown for the user to pick from, but must never
+                    // be linked automatically on amount+date alone.
+                    if (bestMatch && bestMatch.qualified && bestMatch.score >= 80 && !bestMatch.already_linked) {
                         await api.post(`${API_URL}/payments/${newPayment.id}/transactions`, {
                             transaction_ids: [bestMatch.transaction_id],
                             link_source: 'auto'

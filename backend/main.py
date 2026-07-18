@@ -1529,13 +1529,18 @@ def get_suggested_transactions(payment_id: int, db: Session = Depends(get_db), c
                 reasons.append("name_match")
                 break
 
-        # ---- DESCRIPTION IS REQUIRED ----
+        # ---- DESCRIPTION IS REQUIRED TO *QUALIFY* ----
         # The payment amount is only an estimate (a BUDGET is derived from the last
-        # paid amount), so the real transaction routinely differs. Never suggest a
-        # transaction purely because its amount is close — that is exactly how the
-        # wrong transaction gets auto-linked to a bill.
-        if score == 0:
-            continue
+        # paid amount), so the real transaction routinely differs. A transaction
+        # whose amount merely looks close must never be treated as a real match —
+        # that is exactly how the wrong transaction gets auto-linked to a bill.
+        #
+        # But for many obligations the statement text is generic ("Loan Instalment",
+        # a bare first name), so nothing ever matches by description and the user is
+        # left with an empty list. Those still surface as UNQUALIFIED candidates:
+        # ranked below every real match, flagged for the UI, and — critically —
+        # never eligible for auto-linking (see `qualified` below).
+        qualified = score > 0
 
         # Amount matching (ranking booster only — cannot qualify on its own)
         if payment_amount > 0 and tx.amount:
@@ -1557,23 +1562,33 @@ def get_suggested_transactions(payment_id: int, db: Session = Depends(get_db), c
                 score += 10
                 reasons.append("close_date")
         
-        # Only include if there's some relevance
-        if score > 0:
-            suggestions.append({
-                "transaction_id": tx.id,
-                "merchant": tx.merchant,
-                "amount": tx.amount,
-                "date": tx.timestamp.isoformat() if tx.timestamp else None,
-                "score": score,
-                "reasons": reasons,
-                "already_linked": tx.id == payment.transaction_id,
-                "raw_sms_content": tx.raw_sms_content
-            })
-    
-    # Sort by score descending
-    suggestions.sort(key=lambda x: x["score"], reverse=True)
-    
-    return suggestions[:10]  # Return top 10 suggestions
+        # Unqualified candidates need *some* signal of their own to be worth
+        # showing at all — a close amount, or a transaction on the due date.
+        if not qualified and not any(
+            r in reasons for r in ("exact_amount", "similar_amount", "exact_date")
+        ):
+            continue
+
+        suggestions.append({
+            "transaction_id": tx.id,
+            "merchant": tx.merchant,
+            "amount": tx.amount,
+            "date": tx.timestamp.isoformat() if tx.timestamp else None,
+            "score": score,
+            "reasons": reasons,
+            # Only a description match qualifies. The auto-linker must check this
+            # flag, not the score — an unqualified row can still score highly on
+            # amount+date alone, and auto-linking it is the exact failure mode
+            # this gate exists to prevent.
+            "qualified": qualified,
+            "already_linked": tx.id == payment.transaction_id,
+            "raw_sms_content": tx.raw_sms_content
+        })
+
+    # Every qualified match ranks above every guess, then by score.
+    suggestions.sort(key=lambda x: (x["qualified"], x["score"]), reverse=True)
+
+    return suggestions[:25]
 
 @app.post("/payments/{payment_id}/link-transaction")
 def link_payment_to_transaction(payment_id: int, transaction_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -3709,11 +3724,20 @@ def search_transactions(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     type: Optional[str] = None,
-    limit: int = 50,
+    limit: int = 100,
+    offset: int = 0,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    """Search transactions with filters for the transaction selector modal."""
+    """Search transactions with filters for the transaction selector modal.
+
+    Returns {transactions, total, limit, offset}. `total` is the full match count
+    so the caller can page through it — previously this returned a bare list
+    silently capped at 50, which made it look like the user had no more
+    transactions to link.
+    """
+    limit = max(1, min(limit, 500))
+    offset = max(0, offset)
     q = db.query(models.Transaction).filter(models.Transaction.user_id == current_user.id)
     
     if query:
@@ -3745,9 +3769,24 @@ def search_transactions(
     if type:
         q = q.filter(models.Transaction.type == type)
     
+    total = q.count()
     q = q.order_by(models.Transaction.timestamp.desc())
-    transactions = q.limit(limit).all()
-    
+    transactions = q.limit(limit).offset(offset).all()
+
+    # Resolve the link state for the whole page in two queries rather than two
+    # per row — at limit=500 the old per-row lookups meant 1000 round trips.
+    tx_ids = [t.id for t in transactions]
+    payment_by_tx, dist_by_tx = {}, {}
+    if tx_ids:
+        for pl in db.query(models.PaymentTransaction).filter(
+            models.PaymentTransaction.transaction_id.in_(tx_ids)
+        ).all():
+            payment_by_tx.setdefault(pl.transaction_id, pl.payment_id)
+        for dl in db.query(models.DistributionTransaction).filter(
+            models.DistributionTransaction.transaction_id.in_(tx_ids)
+        ).all():
+            dist_by_tx.setdefault(dl.transaction_id, dl.distribution_id)
+
     result = []
     for tx in transactions:
         tx_dict = {
@@ -3758,26 +3797,13 @@ def search_transactions(
             "category": tx.category,
             "type": str(tx.type.value) if hasattr(tx.type, 'value') else str(tx.type),
             "timestamp": tx.timestamp,
-            "linked_to_payment_id": None,
-            "linked_to_distribution_id": None,
+            "linked_to_payment_id": payment_by_tx.get(tx.id),
+            "linked_to_distribution_id": dist_by_tx.get(tx.id),
             "raw_sms_content": tx.raw_sms_content
         }
-        
-        payment_link = db.query(models.PaymentTransaction).filter(
-            models.PaymentTransaction.transaction_id == tx.id
-        ).first()
-        if payment_link:
-            tx_dict["linked_to_payment_id"] = payment_link.payment_id
-        
-        dist_link = db.query(models.DistributionTransaction).filter(
-            models.DistributionTransaction.transaction_id == tx.id
-        ).first()
-        if dist_link:
-            tx_dict["linked_to_distribution_id"] = dist_link.distribution_id
-        
         result.append(tx_dict)
-    
-    return result
+
+    return {"transactions": result, "total": total, "limit": limit, "offset": offset}
 
 
 # ============================================================
