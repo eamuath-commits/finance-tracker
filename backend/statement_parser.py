@@ -149,6 +149,34 @@ def parse_header(first_page_text: str) -> StatementHeader:
     if m:
         header.ref_no = m.group(1)
 
+    # ── Bank Aljazira labels its metadata differently ("Account No.:",
+    # "Statement Date: 25/01/26 - 24/06/26"). Only fill what Al Rajhi's
+    # patterns left empty, so this can never override a good value.
+    if header.account_number is None:
+        m = re.search(r'Account\s+No\.?\s*:?\s*(\d{6,})', first_page_text)
+        if m:
+            header.account_number = m.group(1)
+
+    if header.iban is None:
+        m = re.search(r'\b(SA\d{20,})\b', first_page_text)
+        if m:
+            header.iban = m.group(1)
+
+    if header.customer_name is None:
+        m = re.search(r'Account\s+Name\s*:?\s*(.+?)\s*(?:\n|$)', first_page_text)
+        if m and m.group(1).strip():
+            header.customer_name = m.group(1).strip()
+
+    if header.period_start is None:
+        # "Statement Date: 25/01/26 - 24/06/26" (DD/MM/YY, day-first)
+        m = re.search(r'(\d{2}/\d{2}/\d{2})\s*-\s*(\d{2}/\d{2}/\d{2})', first_page_text)
+        if m:
+            start = normalize_date_cell(m.group(1))
+            end = normalize_date_cell(m.group(2))
+            if start and end:
+                header.period_start = start.replace('/', '-')
+                header.period_end = end.replace('/', '-')
+
     return header
 
 
@@ -540,29 +568,34 @@ def parse_statement_pdf(file_path: str) -> dict:
 
             # Header comes from page 1's text (summary page)
             header = parse_header(normalize_arabic(pdf.pages[0].extract_text() or ""))
+            _fill_summary_from_last_page(pdf, header)
+
+            cols = _document_columns(pdf)
+            need = max(cols.values()) + 1
+            bal_i = cols.get("balance")
 
             transactions = []
             idx = 0
             for page in pdf.pages:
                 for table in (page.extract_tables() or []):
                     for cells in table:
-                        # A transaction row is [Date, Details, Debit, Credit, Balance]
-                        if not cells or len(cells) < 5:
+                        if not cells or len(cells) < need:
                             continue
-                        date_cell = (cells[0] or "").strip()
-                        if not _DATE_CELL_RE.match(date_cell):
-                            continue  # skips headers/footers/summary rows
+                        # Non-dates (header labels, footers, summary rows) drop out here.
+                        date_cell = normalize_date_cell(cells[cols["date"]])
+                        if not date_cell:
+                            continue
 
-                        details = normalize_arabic(cells[1] or "")
+                        details = normalize_arabic(cells[cols["details"]] or "")
                         type_line = details.split("\n")[0].strip() or None
 
                         tm = _TIME_RE.search(details)
                         nm = _NOTE_SEP_RE.search(details)
                         note_text = re.sub(r"\s+", " ", nm.group(1)).strip() if nm else None
 
-                        debit = parse_amount(cells[2]) or 0.0
-                        credit = parse_amount(cells[3]) or 0.0
-                        balance = parse_amount(cells[4])
+                        debit = parse_amount(cells[cols["debit"]]) or 0.0
+                        credit = parse_amount(cells[cols["credit"]]) or 0.0
+                        balance = parse_amount(cells[bal_i]) if bal_i is not None else None
 
                         direction = "credit" if credit > 0 else "debit"
                         amount = credit if credit > 0 else debit
@@ -624,6 +657,118 @@ _ACCT_RE = re.compile(r'(FRACCT|TOACCT)/(\d+)(?:(?:FR|TO))?([^/\d-]+)?')
 _IPS_RE = re.compile(r'([A-Z0-9]{10,})\/([A-Z][A-Za-z .]+)')
 _DATE_CELL_RE = re.compile(r'^\d{4}/\d{2}/\d{2}$')
 
+# ─────────────────────────────────────────────────────────────────────
+# Multi-bank layout support.
+#
+# Banks lay the transaction grid out differently:
+#   Al Rajhi      no header row, [Date, Details, Debit, Credit, Balance],
+#                 dates as YYYY/MM/DD.
+#   Bank Aljazira labelled header, [Date, Description, Value Date,
+#                 Withdrawal (Dr), Deposit (Cr), Balance], dates as DD/MM/YY.
+#
+# Reading Aljazira with Al Rajhi's positional map would take its *Value Date*
+# as the debit amount — silently producing wrong money rather than failing —
+# so the layout is detected from a header row when the statement has one, and
+# falls back to Al Rajhi's positional layout when it does not.
+# ─────────────────────────────────────────────────────────────────────
+
+_DATE_YMD_RE = re.compile(r'^(\d{4})/(\d{2})/(\d{2})$')   # Al Rajhi  2026/01/25
+_DATE_DMY_RE = re.compile(r'^(\d{2})/(\d{2})/(\d{2})$')   # Aljazira  26/01/26
+
+_COL_PATTERNS = {
+    "value_date": re.compile(r'value\s*date', re.I),
+    "date":       re.compile(r'^date$', re.I),
+    "details":    re.compile(r'^(description|details|particulars|narration)$', re.I),
+    "debit":      re.compile(r'withdraw|debit|\(dr\)', re.I),
+    "credit":     re.compile(r'deposit|credit|\(cr\)', re.I),
+    "balance":    re.compile(r'^balance$', re.I),
+}
+
+# Al Rajhi's layout, used when a statement has no labelled header row.
+_LEGACY_COLUMNS = {"date": 0, "details": 1, "debit": 2, "credit": 3, "balance": 4}
+
+
+def normalize_date_cell(text: str) -> Optional[str]:
+    """Return a cell's date as YYYY/MM/DD, or None if it isn't a date.
+
+    Two-digit dates are read day-first (DD/MM/YY) — the Saudi convention, and
+    the statement periods confirm it. Everything is normalised to Al Rajhi's
+    existing YYYY/MM/DD shape so downstream consumers need no changes.
+    """
+    t = (text or "").strip()
+    if _DATE_YMD_RE.match(t):
+        return t
+    m = _DATE_DMY_RE.match(t)
+    if m:
+        day, month, year = m.groups()
+        return f"20{year}/{month}/{day}"
+    return None
+
+
+def _detect_columns(row) -> Optional[dict]:
+    """Build a column map from a table's header row, or None if it isn't one."""
+    if not row:
+        return None
+    found = {}
+    for i, cell in enumerate(row):
+        text = re.sub(r'\s+', ' ', (cell or '')).strip()
+        if not text or len(text) > 24:
+            continue
+        if _COL_PATTERNS["value_date"].search(text):
+            continue  # a second date column we deliberately ignore
+        for key in ("date", "details", "debit", "credit", "balance"):
+            if key not in found and _COL_PATTERNS[key].search(text):
+                found[key] = i
+                break
+    # Only a genuine header row names all four date/description/money columns.
+    if {"date", "details", "debit", "credit"} <= set(found):
+        return found
+    return None
+
+
+def _fill_summary_from_last_page(pdf, header) -> None:
+    """Fill balances from a closing summary table when the header block lacks them.
+
+    Bank Aljazira prints "Previous Balance / Total Withdrawal (Dr) /
+    Total Deposit (Cr) / New Balance" as a table on the final page instead of in
+    the page-1 header. Only fills values still missing, so Al Rajhi is untouched.
+    """
+    if header.opening_balance is not None and header.closing_balance is not None:
+        return
+    try:
+        for table in (pdf.pages[-1].extract_tables() or []):
+            for i, row in enumerate(table):
+                joined = " ".join((c or "") for c in row)
+                if re.search(r'Previous\s+Balance', joined, re.I) and i + 1 < len(table):
+                    vals = [v for v in (parse_amount(c) for c in table[i + 1]) if v is not None]
+                    if len(vals) >= 4:
+                        if header.opening_balance is None:
+                            header.opening_balance = vals[0]
+                        if header.total_withdrawals is None:
+                            header.total_withdrawals = vals[1]
+                        if header.total_deposits is None:
+                            header.total_deposits = vals[2]
+                        if header.closing_balance is None:
+                            header.closing_balance = vals[3]
+                    return
+    except Exception:  # a malformed summary must never fail the whole parse
+        pass
+
+
+def _document_columns(pdf) -> dict:
+    """Detect the layout once for the whole PDF.
+
+    The header row is printed only on the first table; later tables (and later
+    pages) are bare continuation rows, so the map cannot be re-derived per table.
+    """
+    for page in pdf.pages:
+        for table in (page.extract_tables() or []):
+            if table:
+                cols = _detect_columns(table[0])
+                if cols:
+                    return cols
+    return _LEGACY_COLUMNS
+
 
 def _cents(value: float) -> int:
     """Convert a currency float to integer cents to avoid float drift."""
@@ -666,26 +811,30 @@ def extract_statement_rows(file_path: str) -> dict:
 
             header = asdict(parse_header(normalize_arabic(pdf.pages[0].extract_text() or "")))
 
+            cols = _document_columns(pdf)
+            need = max(cols.values()) + 1
+            bal_i = cols.get("balance")
+
             rows = []
             idx = 0
             for page in pdf.pages:
                 for table in (page.extract_tables() or []):
                     for cells in table:
-                        if not cells or len(cells) < 5:
+                        if not cells or len(cells) < need:
                             continue
-                        date = (cells[0] or "").strip()
-                        if not _DATE_CELL_RE.match(date):
+                        date = normalize_date_cell(cells[cols["date"]])
+                        if not date:
                             continue
 
-                        details = cells[1] or ""
+                        details = cells[cols["details"]] or ""
                         first_line = details.split('\n')[0].strip()
                         tm = _TIME_RE.search(details)
                         _nm = _NOTE_SEP_RE.search(details)
                         note = re.sub(r'\s+', ' ', _nm.group(1)).strip() if _nm else ""
 
-                        debit = parse_amount(cells[2]) or 0.0
-                        credit = parse_amount(cells[3]) or 0.0
-                        balance = parse_amount(cells[4]) or 0.0
+                        debit = parse_amount(cells[cols["debit"]]) or 0.0
+                        credit = parse_amount(cells[cols["credit"]]) or 0.0
+                        balance = (parse_amount(cells[bal_i]) or 0.0) if bal_i is not None else 0.0
 
                         counterparty_account = counterparty_name = reference = None
                         am = _ACCT_RE.search(details)
