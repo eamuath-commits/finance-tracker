@@ -1270,9 +1270,25 @@ def delete_transaction(db: Session, transaction_id: str):
                 wallet.balance += (db_tx.original_amount or 0.0)
             db.add(wallet)
     
+    # Revert this transaction's own effect on the account balance.
+    #
+    # _recalculate_account_balance() below normally overwrites the balance by
+    # replaying what is left, so this is redundant whenever anything remains.
+    # But it early-returns when the account has NO transactions left, leaving the
+    # balance still carrying the deleted transaction's effect — so deleting the
+    # last transaction on an account silently kept its amount applied.
+    # (Transfer legs above already revert themselves this way.)
+    if not is_pending and account_id and db_tx.account:
+        amount = (db_tx.amount or 0.0) + (db_tx.fees or 0.0)
+        if db_tx.type == models.TransactionType.CREDIT or str(db_tx.type).lower() == "credit":
+            db_tx.account.current_balance = round((db_tx.account.current_balance or 0.0) - amount, 2)
+        else:
+            db_tx.account.current_balance = round((db_tx.account.current_balance or 0.0) + amount, 2)
+        db.add(db_tx.account)
+
     db.delete(db_tx)
     db.commit()
-    
+
     # Recalculate account balance from first transaction baseline
     # This replays all remaining transactions chronologically and fixes everything
     if account_id and not is_pending:
