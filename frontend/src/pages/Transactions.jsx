@@ -1528,6 +1528,33 @@ function Transactions() {
                                 placeholder={txForm.type === 'transfer' ? 'e.g. Monthly savings' : 'e.g. Starbucks'}
                                 required={txForm.type !== 'transfer'}
                             />
+                            {/* Where this name came from. A name written by SMS enrichment is
+                                not one the user typed, so editing it here is a deliberate
+                                override — say so, and show what the statement originally said. */}
+                            {editingTx?.merchant_original && editingTx.merchant_original !== editingTx.merchant && (
+                                <div className="mt-2 flex items-start gap-2 bg-cyan-500/5 border border-cyan-500/25 rounded-lg px-2.5 py-2">
+                                    <Sparkles size={12} className="text-cyan-400 mt-0.5 flex-shrink-0" />
+                                    <div className="min-w-0 text-[11px] leading-relaxed">
+                                        <span className="text-cyan-300 font-semibold">Name enriched from SMS</span>
+                                        {editingTx.enriched_at && (
+                                            <span className="text-gray-500">
+                                                {' · '}{new Date(editingTx.enriched_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                            </span>
+                                        )}
+                                        <div className="text-gray-400 truncate">
+                                            statement said “<span className="text-gray-300">{editingTx.merchant_original}</span>”
+                                        </div>
+                                        <div className="text-gray-500 mt-0.5">
+                                            Editing replaces it. Reversing the enrichment batch restores the original.
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            {editingTx?.merchant_original && editingTx.merchant_original === editingTx.merchant && (
+                                <p className="mt-2 text-[11px] text-gray-500">
+                                    Enrichment for this transaction was reversed — showing the statement's original label.
+                                </p>
+                            )}
                         </div>
                     )}
 
@@ -1537,25 +1564,50 @@ function Transactions() {
                         <input type="number" step="0.01" className={inputClass} value={txForm.amount} onChange={e => setTxForm({ ...txForm, amount: e.target.value })} placeholder="0.00" required />
                     </div>
 
-                    {/* Previous Balance - show when editing existing transaction (account or credit card) */}
-                    {editingTx && (
-                        <div className="bg-slate-900/50 p-3 rounded-lg border border-blue-500/30">
-                            <label className="text-blue-400 text-xs mb-1 block">
-                                Previous Balance (Balance Before This Transaction)
-                            </label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                className={inputClass}
-                                value={txForm.previous_balance}
-                                onChange={e => setTxForm({ ...txForm, previous_balance: e.target.value })}
-                                placeholder="Leave empty to keep current"
-                            />
-                            <p className="text-gray-500 text-xs mt-1">
-                                Setting this will recalculate this transaction's balance and all subsequent transactions.
-                            </p>
-                        </div>
-                    )}
+                    {/* Balance context — the box used to be an empty override input that
+                        never showed what the previous balance actually WAS. Derive it from
+                        the stored balance_after by undoing this transaction's own effect. */}
+                    {editingTx && (() => {
+                        const after = editingTx.balance_after_transaction;
+                        const amt = Number(editingTx.amount) || 0;
+                        const fees = Number(editingTx.fees) || 0;
+                        const before = (after === null || after === undefined)
+                            ? null
+                            : (editingTx.type === 'credit' ? after - amt : after + amt + fees);
+                        const fmt = (v) => v === null || v === undefined
+                            ? '—'
+                            : Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        return (
+                            <div className="bg-slate-900/50 p-3 rounded-lg border border-blue-500/30">
+                                <label className="text-blue-400 text-xs mb-2 block">Balance around this transaction</label>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <div className="flex-1 bg-slate-800/60 rounded px-2.5 py-2 text-center">
+                                        <p className="text-[9px] text-gray-500 uppercase tracking-wide">Before</p>
+                                        <p className="text-sm font-mono text-white">{fmt(before)}</p>
+                                    </div>
+                                    <span className={`text-xs font-mono ${editingTx.type === 'credit' ? 'text-emerald-400' : 'text-red-400'}`}>
+                                        {editingTx.type === 'credit' ? '+' : '−'}{fmt(amt)}
+                                    </span>
+                                    <div className="flex-1 bg-slate-800/60 rounded px-2.5 py-2 text-center">
+                                        <p className="text-[9px] text-gray-500 uppercase tracking-wide">After</p>
+                                        <p className="text-sm font-mono text-white">{fmt(after)}</p>
+                                    </div>
+                                </div>
+                                <label className="text-gray-400 text-xs mb-1 block">Override the balance before this transaction</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    className={inputClass}
+                                    value={txForm.previous_balance}
+                                    onChange={e => setTxForm({ ...txForm, previous_balance: e.target.value })}
+                                    placeholder={before !== null ? `Currently ${fmt(before)} — leave empty to keep` : 'Leave empty to keep current'}
+                                />
+                                <p className="text-gray-500 text-xs mt-1">
+                                    Setting this recalculates this transaction's balance and every one after it.
+                                </p>
+                            </div>
+                        );
+                    })()}
 
                     {/* Category - hidden for transfers since it's auto-set */}
                     {txForm.type !== 'transfer' && (

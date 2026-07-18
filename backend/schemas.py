@@ -244,6 +244,11 @@ class Transaction(TransactionBase):
     merchant_id: Optional[str] = None
     beneficiary_id: Optional[str] = None
     biller_id: Optional[str] = None
+    # SMS name enrichment: the statement's original label and the batch that
+    # replaced it, so the UI can show that a name was not typed by the user.
+    merchant_original: Optional[str] = None
+    enrichment_batch_id: Optional[str] = None
+    enriched_at: Optional[datetime] = None
     # Nested counterparty objects (populated from relationships)
     merchant_info: Optional[Merchant] = None
     beneficiary_info: Optional[Beneficiary] = None
