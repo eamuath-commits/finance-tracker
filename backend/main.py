@@ -70,6 +70,14 @@ def run_migrations(engine):
                 conn.execute(text("ALTER TABLE transactions ADD COLUMN enrichment_batch_id VARCHAR"))
                 conn.commit()
 
+        # When the batch was applied — without it past batches cannot be listed
+        # or ordered, so a batch was only reversible on the screen that created it.
+        if 'enriched_at' not in columns:
+            print("Migrating: Adding enriched_at to transactions")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE transactions ADD COLUMN enriched_at TIMESTAMP"))
+                conn.commit()
+
         # Check for table rename (obligation_history -> payments)
         table_names = inspector.get_table_names()
         if 'obligation_history' in table_names and 'payments' not in table_names:
@@ -2275,6 +2283,7 @@ def sms_enrich_apply(
         raise HTTPException(status_code=400, detail="No items to apply")
 
     batch_id = uuid.uuid4().hex
+    applied_at = datetime.utcnow()
     applied = 0
     failed = []
 
@@ -2303,10 +2312,47 @@ def sms_enrich_apply(
             tx.merchant_original = tx.merchant
         tx.merchant = new_name
         tx.enrichment_batch_id = batch_id
+        tx.enriched_at = applied_at
         applied += 1
 
     db.commit()
     return {"batch_id": batch_id, "applied": applied, "failed": failed}
+
+
+@app.get("/api/sms/enrich/batches")
+def sms_enrich_batches(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Every enrichment batch this user has applied and can still reverse.
+
+    Mirrors the statement flow: posting is reversible from the statement list at
+    any time, so an applied enrichment should be reversible from a list too —
+    not only on the screen that produced it.
+    """
+    rows = db.query(models.Transaction).filter(
+        models.Transaction.user_id == current_user.id,
+        models.Transaction.enrichment_batch_id.isnot(None),
+    ).all()
+
+    batches = {}
+    for tx in rows:
+        b = batches.setdefault(tx.enrichment_batch_id, {
+            "batch_id": tx.enrichment_batch_id,
+            "count": 0,
+            "applied_at": None,
+            "samples": [],
+        })
+        b["count"] += 1
+        if tx.enriched_at and (b["applied_at"] is None or tx.enriched_at > b["applied_at"]):
+            b["applied_at"] = tx.enriched_at
+        if len(b["samples"]) < 3:
+            b["samples"].append({"from": tx.merchant_original, "to": tx.merchant})
+
+    out = sorted(batches.values(), key=lambda b: (b["applied_at"] is not None, b["applied_at"]), reverse=True)
+    for b in out:
+        b["applied_at"] = b["applied_at"].isoformat() if b["applied_at"] else None
+    return {"batches": out}
 
 
 @app.post("/api/sms/enrich/undo/{batch_id}")
@@ -2320,14 +2366,18 @@ def sms_enrich_undo(
         models.Transaction.enrichment_batch_id == batch_id,
         models.Transaction.user_id == current_user.id,
     ).all()
+    if not rows:
+        raise HTTPException(status_code=404, detail="No enrichment batch found to reverse")
     restored = 0
     for tx in rows:
+        # Only count rows we can actually put back.
         if tx.merchant_original is not None:
             tx.merchant = tx.merchant_original
+            restored += 1
         tx.enrichment_batch_id = None
-        restored += 1
+        tx.enriched_at = None
     db.commit()
-    return {"batch_id": batch_id, "restored": restored}
+    return {"batch_id": batch_id, "restored": restored, "affected": len(rows)}
 
 # --- Background SMS Processing ---
 async def _process_sms_background(raw_msg_id: str, sender: str, body: str, source: str = "webhook"):

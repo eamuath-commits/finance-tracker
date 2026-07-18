@@ -35,13 +35,44 @@ const SMSEnrichTab = ({ onApplied }) => {
     const [applyResult, setApplyResult] = useState(null);
     const [undoing, setUndoing] = useState(false);
     const [sources, setSources] = useState([]);   // previously uploaded exports
+    const [batches, setBatches] = useState([]);   // previously applied enrichments
+    const [reversingId, setReversingId] = useState(null);
 
     const loadSources = () => {
         api.get(`${API_URL}/api/sms/enrich/sources`)
             .then(res => setSources(res.data?.sources || []))
             .catch(() => setSources([]));
     };
-    useEffect(() => { loadSources(); }, []);
+    const loadBatches = () => {
+        api.get(`${API_URL}/api/sms/enrich/batches`)
+            .then(res => setBatches(res.data?.batches || []))
+            .catch(() => setBatches([]));
+    };
+    useEffect(() => { loadSources(); loadBatches(); }, []);
+
+    // Reverse a previously applied batch, from the list rather than only from
+    // the screen that created it — the same way a posted statement can be
+    // reversed from the statement list at any time.
+    const reverseBatch = async (batch) => {
+        const ok = window.confirm(
+            `Reverse this enrichment?\n\n` +
+            `${batch.count} transaction${batch.count !== 1 ? 's' : ''} will go back to their original ` +
+            `statement labels (e.g. "${batch.samples?.[0]?.to || ''}" back to "${batch.samples?.[0]?.from || ''}").\n\n` +
+            `The names can be re-applied afterwards by running the enrichment again.`
+        );
+        if (!ok) return;
+        setReversingId(batch.batch_id);
+        setError(null);
+        try {
+            await api.post(`${API_URL}/api/sms/enrich/undo/${batch.batch_id}`);
+            loadBatches();
+            if (onApplied) onApplied();
+        } catch (err) {
+            setError(err.response?.data?.detail || "Could not reverse that enrichment.");
+        } finally {
+            setReversingId(null);
+        }
+    };
 
     const proposals = preview?.proposals || [];
     const truncatedCount = useMemo(() => proposals.filter(p => p.truncated).length, [proposals]);
@@ -215,6 +246,52 @@ const SMSEnrichTab = ({ onApplied }) => {
                                         <button onClick={() => forgetSource(s.id)} title="Forget this export"
                                             className="text-gray-600 hover:text-red-400 transition flex-shrink-0">
                                             <Trash2 size={12} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Applied enrichments — reversible at any time, like a posted statement */}
+                    {batches.length > 0 && (
+                        <div className="mt-5 pt-4 border-t border-slate-700/50">
+                            <span className="text-[11px] text-gray-400 uppercase tracking-wider font-semibold">
+                                Applied enrichments ({batches.length})
+                            </span>
+                            <p className="text-[11px] text-gray-500 mt-1 mb-2">
+                                Each batch can be reversed at any time — the original statement labels are
+                                kept, so reversing puts every name in that batch back.
+                            </p>
+                            <div className="space-y-1.5">
+                                {batches.map(b => (
+                                    <div key={b.batch_id} className="flex items-center gap-3 bg-slate-900/40 border border-slate-700/40 rounded px-2.5 py-2">
+                                        <Sparkles size={12} className="text-cyan-400 flex-shrink-0" />
+                                        <div className="min-w-0 flex-1">
+                                            <div className="text-[11px] text-gray-300">
+                                                <span className="font-semibold text-white">{b.count}</span> name{b.count !== 1 ? 's' : ''} applied
+                                                {b.applied_at && (
+                                                    <span className="text-gray-500">
+                                                        {' · '}{new Date(b.applied_at).toLocaleString(undefined, {
+                                                            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                                                        })}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {b.samples?.[0] && (
+                                                <div className="text-[10px] text-gray-500 truncate">
+                                                    e.g. “{b.samples[0].from}” → “{b.samples[0].to}”
+                                                </div>
+                                            )}
+                                        </div>
+                                        <button
+                                            onClick={() => reverseBatch(b)}
+                                            disabled={reversingId === b.batch_id}
+                                            className="flex items-center gap-1.5 text-[11px] font-semibold text-red-300 bg-red-600/15 hover:bg-red-600/30 disabled:opacity-50 border border-red-500/30 rounded px-2.5 py-1 transition flex-shrink-0"
+                                        >
+                                            {reversingId === b.batch_id
+                                                ? <><Loader2 size={11} className="animate-spin" />Reversing…</>
+                                                : <><Undo2 size={11} />Reverse</>}
                                         </button>
                                     </div>
                                 ))}
