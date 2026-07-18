@@ -2320,6 +2320,37 @@ def sms_enrich_apply(
     return {"batch_id": batch_id, "applied": applied, "failed": failed}
 
 
+@app.get("/api/sms/enrich/report")
+def sms_enrich_report(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Coverage report over the stored exports and the CURRENT transactions.
+
+    Read-only and repeatable: the coverage figures used to exist only inside a
+    preview response, so they could be read once and not again without
+    re-uploading. This recomputes them on demand and proposes nothing.
+    """
+    raws, infos = _read_stored_sms(current_user.id)
+    txs = _statement_txrows(db, current_user.id)
+    if not raws:
+        return {
+            "has_sources": False,
+            "sources": infos,
+            "coverage": {"transactions": len(txs)},
+            "stats": {},
+            "skipped": {},
+        }
+    result = sms_enrichment.match(sms_enrichment.parse_exports(raws), txs)
+    return {
+        "has_sources": True,
+        "sources": infos,
+        "coverage": result.coverage,
+        "stats": result.stats,
+        "skipped": result.skipped,
+    }
+
+
 @app.get("/api/sms/enrich/batches")
 def sms_enrich_batches(
     db: Session = Depends(get_db),

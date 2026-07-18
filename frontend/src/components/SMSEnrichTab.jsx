@@ -24,12 +24,126 @@ const SKIP_LABELS = {
 
 const pct = (n, total) => (total > 0 ? Math.round((n / total) * 100) : 0);
 
-const Stat = ({ n, label, hint, color }) => (
-    <div className="bg-slate-900/40 border border-slate-700/40 rounded-lg px-2 py-2" title={hint || ""}>
+const Stat = ({ n, label, hint, color, onClick, active }) => (
+    <button
+        type="button"
+        onClick={onClick}
+        disabled={!onClick || !n}
+        title={hint || ""}
+        className={`bg-slate-900/40 border rounded-lg px-2 py-2 text-center transition ${
+            active ? 'border-cyan-500/50 bg-cyan-500/5' : 'border-slate-700/40'
+        } ${onClick && n ? 'hover:border-slate-500 cursor-pointer' : 'cursor-default'}`}
+    >
         <p className={`text-lg font-bold font-mono ${color}`}>{n ?? 0}</p>
         <p className="text-[10px] text-gray-500 leading-tight">{label}</p>
-    </div>
+    </button>
 );
+
+const money = (v) => Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const shortDate = (iso) => (iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—');
+
+// The transactions behind one bucket. For a contested row the competing messages
+// are shown too — that is what makes an ambiguous case actionable rather than
+// just a count.
+const BucketRows = ({ title, note, rows }) => {
+    if (!rows?.length) return null;
+    return (
+        <div className="mt-3 bg-slate-900/40 border border-slate-700/40 rounded-lg p-3">
+            <p className="text-[11px] text-gray-300 font-semibold mb-1">{title}</p>
+            {note && <p className="text-[10px] text-gray-500 mb-2 leading-relaxed">{note}</p>}
+            <div className="max-h-72 overflow-y-auto space-y-1">
+                {rows.map(r => (
+                    <div key={r.transaction_id} className="text-[11px] border-b border-slate-800/60 last:border-b-0 pb-1">
+                        <div className="flex items-center gap-2">
+                            <span className="text-gray-500 w-12 flex-shrink-0">{shortDate(r.timestamp)}</span>
+                            <span className={`font-mono w-24 text-right flex-shrink-0 ${r.direction === 'credit' ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {r.direction === 'credit' ? '+' : '−'}{money(r.amount)}
+                            </span>
+                            <span className="text-gray-300 truncate flex-1">{r.label}</span>
+                        </div>
+                        {r.candidates?.length > 0 && (
+                            <div className="ml-14 mt-0.5 space-y-0.5">
+                                {r.candidates.map((c, i) => (
+                                    <div key={i} className="text-[10px] text-gray-500 flex items-center gap-2">
+                                        <span className="text-amber-500/70">competing:</span>
+                                        <span className="text-gray-400 truncate">{c.name || `(${c.shape} — names no one)`}</span>
+                                        <span className="text-gray-600">{c.delta_seconds > 0 ? '+' : ''}{c.delta_seconds}s</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// Coverage counted from the TRANSACTIONS, which is the question people actually
+// ask ("I have N transactions, why did only M get a name?"). Shared by the
+// preview screen and the standalone report so both tell the same story.
+const CoveragePanel = ({ coverage, openBucket, setOpenBucket, namedLabel = "named by this run", className = "" }) => {
+    if (!coverage?.transactions) return null;
+    const stuck = (coverage.no_sms_found || 0) + (coverage.sms_has_no_name || 0) + (coverage.contested || 0);
+    const toggle = (k) => setOpenBucket(openBucket === k ? null : k);
+    return (
+        <div className={className}>
+            <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] text-gray-400 uppercase tracking-wider font-semibold">
+                    Your {coverage.transactions} statement transactions
+                </span>
+                <span className="text-[11px] text-gray-500">
+                    {pct((coverage.already_named || 0) + (coverage.will_be_named || 0), coverage.transactions)}% have a real name
+                </span>
+            </div>
+
+            <div className="flex h-2 rounded-full overflow-hidden bg-slate-700/50 mb-3">
+                <div className="bg-slate-500" style={{ width: `${pct(coverage.already_named, coverage.transactions)}%` }}
+                     title={`${coverage.already_named} already had a real name`} />
+                <div className="bg-cyan-500" style={{ width: `${pct(coverage.will_be_named, coverage.transactions)}%` }}
+                     title={`${coverage.will_be_named} ${namedLabel}`} />
+                <div className="bg-amber-500/60" style={{ width: `${pct(stuck, coverage.transactions)}%` }}
+                     title={`${stuck} cannot be named`} />
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+                <Stat n={coverage.already_named} label="already named" hint="the statement gave a usable name" color="text-gray-300" />
+                <Stat n={coverage.will_be_named} label={namedLabel} color="text-cyan-400" />
+                <Stat n={coverage.sms_has_no_name} label="SMS names no one" color="text-amber-400"
+                      hint="the matching message is an internal transfer or card settlement — the bank sends only an account or card number. Click to see them."
+                      onClick={() => toggle('sms_has_no_name')} active={openBucket === 'sms_has_no_name'} />
+                <Stat n={coverage.no_sms_found} label="no SMS found" color="text-amber-400"
+                      hint="no message matched this transaction. Click to see them."
+                      onClick={() => toggle('no_sms_found')} active={openBucket === 'no_sms_found'} />
+                <Stat n={coverage.contested} label="too ambiguous" color="text-amber-400"
+                      hint="more than one message could be this row — not guessed. Click to see them and the competing messages."
+                      onClick={() => toggle('contested')} active={openBucket === 'contested'} />
+            </div>
+
+            {openBucket === 'contested' && (
+                <BucketRows
+                    title={`${coverage.contested} transactions with more than one possible message`}
+                    note="Each had several messages that could plausibly be it, so none was applied rather than guessing. The competing messages are listed under each row."
+                    rows={coverage.details?.contested}
+                />
+            )}
+            {openBucket === 'no_sms_found' && (
+                <BucketRows
+                    title={`${coverage.no_sms_found} transactions with no matching message`}
+                    note="No message in your exports matched these on amount, direction and time — usually the SMS was never captured, or it is from a bank whose messages are not in the export."
+                    rows={coverage.details?.no_sms_found}
+                />
+            )}
+            {openBucket === 'sms_has_no_name' && (
+                <BucketRows
+                    title={`${coverage.sms_has_no_name} transactions whose message names no one`}
+                    note="A message does match these, but it carries no counterparty — internal transfers, card settlements and ATM withdrawals only quote an account or card number. No amount of uploading will name them."
+                    rows={coverage.details?.sms_has_no_name}
+                />
+            )}
+        </div>
+    );
+};
 
 const SMSEnrichTab = ({ onApplied }) => {
     const [stage, setStage] = useState("upload");      // upload | preview | done
@@ -46,6 +160,25 @@ const SMSEnrichTab = ({ onApplied }) => {
     const [sources, setSources] = useState([]);   // previously uploaded exports
     const [batches, setBatches] = useState([]);   // previously applied enrichments
     const [reversingId, setReversingId] = useState(null);
+    const [openBucket, setOpenBucket] = useState(null);  // which coverage bucket is expanded
+    const [report, setReport] = useState(null);          // on-demand coverage report
+    const [loadingReport, setLoadingReport] = useState(false);
+
+    // The coverage figures used to live only inside a preview response, so they
+    // could be read once and then only by re-uploading. This recomputes them
+    // against the current transactions whenever asked, and changes nothing.
+    const loadReport = async () => {
+        setLoadingReport(true);
+        setError(null);
+        try {
+            const res = await api.get(`${API_URL}/api/sms/enrich/report`, { timeout: 180000 });
+            setReport(res.data);
+        } catch (err) {
+            setError(err.response?.data?.detail || "Could not build the coverage report.");
+        } finally {
+            setLoadingReport(false);
+        }
+    };
 
     const loadSources = () => {
         api.get(`${API_URL}/api/sms/enrich/sources`)
@@ -246,6 +379,37 @@ const SMSEnrichTab = ({ onApplied }) => {
                                 Re-checks every saved export against your statements. Names you've already
                                 applied are left alone — this only fills in what was missed.
                             </p>
+
+                            {/* Coverage report — read-only, repeatable, proposes nothing */}
+                            <div className="mb-3">
+                                <button
+                                    onClick={() => (report ? setReport(null) : loadReport())}
+                                    disabled={loadingReport}
+                                    className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-300 bg-slate-700/50 hover:bg-slate-700 disabled:opacity-50 border border-slate-600/50 rounded-lg px-3 py-1.5 transition"
+                                >
+                                    {loadingReport
+                                        ? <><Loader2 size={12} className="animate-spin" />Building report…</>
+                                        : <><FileText size={12} />{report ? 'Hide coverage report' : 'Coverage report'}</>}
+                                </button>
+                                {report?.coverage?.transactions > 0 && (
+                                    <div className="mt-3 bg-slate-900/30 border border-slate-700/40 rounded-lg p-3">
+                                        <CoveragePanel
+                                            coverage={report.coverage}
+                                            openBucket={openBucket}
+                                            setOpenBucket={setOpenBucket}
+                                            namedLabel="would be named now"
+                                        />
+                                        <p className="text-[10px] text-gray-600 mt-3">
+                                            Recomputed against your transactions right now. Nothing was changed.
+                                        </p>
+                                    </div>
+                                )}
+                                {report && !report.has_sources && (
+                                    <p className="text-[11px] text-amber-400 mt-2">
+                                        No saved exports yet — upload one to get a coverage report.
+                                    </p>
+                                )}
+                            </div>
                             <div className="space-y-1">
                                 {sources.map(s => (
                                     <div key={s.id} className="flex items-center gap-2 text-[11px] text-gray-400 bg-slate-900/40 border border-slate-700/40 rounded px-2 py-1.5">
@@ -376,60 +540,13 @@ const SMSEnrichTab = ({ onApplied }) => {
                     ))}
                 </div>
 
-                {/* Coverage — counted from the TRANSACTIONS, which is the question
-                    people actually ask: "I have N transactions, why did only M get
-                    a name?" The per-message counts above cannot answer that. */}
-                {coverage.transactions > 0 && (
-                    <div className="mt-4 pt-4 border-t border-slate-700/50">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-[11px] text-gray-400 uppercase tracking-wider font-semibold">
-                                Your {coverage.transactions} statement transactions
-                            </span>
-                            <span className="text-[11px] text-gray-500">
-                                {pct(coverage.already_named + coverage.will_be_named, coverage.transactions)}% will have a real name
-                            </span>
-                        </div>
-
-                        {/* one bar, three segments: already named / to be named / left generic */}
-                        <div className="flex h-2 rounded-full overflow-hidden bg-slate-700/50 mb-3">
-                            <div className="bg-slate-500" style={{ width: `${pct(coverage.already_named, coverage.transactions)}%` }}
-                                 title={`${coverage.already_named} already had a real name`} />
-                            <div className="bg-cyan-500" style={{ width: `${pct(coverage.will_be_named, coverage.transactions)}%` }}
-                                 title={`${coverage.will_be_named} will be named by this run`} />
-                            <div className="bg-amber-500/60" style={{ width: `${pct(coverage.no_sms_found + coverage.sms_has_no_name + coverage.contested, coverage.transactions)}%` }}
-                                 title={`${coverage.no_sms_found + coverage.sms_has_no_name + coverage.contested} cannot be named`} />
-                        </div>
-
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
-                            <Stat n={coverage.already_named} label="already named" hint="the statement gave a usable name" color="text-gray-300" />
-                            <Stat n={coverage.will_be_named} label="named by this run" color="text-cyan-400" />
-                            <Stat n={coverage.sms_has_no_name} label="SMS names no one" hint="the matching message is an internal transfer or card settlement — the bank sends only an account or card number" color="text-amber-400" />
-                            <Stat n={coverage.no_sms_found} label="no SMS found" hint="no message matched this transaction" color="text-amber-400" />
-                            <Stat n={coverage.contested} label="too ambiguous" hint="more than one message could be this row — not guessed" color="text-amber-400" />
-                        </div>
-
-                        {coverage.unmatched_by_label?.length > 0 && (
-                            <details className="mt-3 group">
-                                <summary className="text-[11px] text-gray-500 hover:text-gray-300 cursor-pointer select-none">
-                                    Why {coverage.no_sms_found} could not be named →
-                                </summary>
-                                <div className="mt-2 space-y-1">
-                                    {coverage.unmatched_by_label.map(r => (
-                                        <div key={r.label} className="flex items-center gap-2 text-[11px]">
-                                            <span className="font-mono text-gray-500 w-10 text-right">{r.count}</span>
-                                            <span className="text-gray-400 truncate flex-1">{r.label}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                                <p className="text-[10px] text-gray-600 mt-2 leading-relaxed">
-                                    Internal transfers and card settlements carry no counterparty in the SMS — the
-                                    bank only sends an account or card number — so they cannot be named from a
-                                    message no matter how many you upload.
-                                </p>
-                            </details>
-                        )}
-                    </div>
-                )}
+                <CoveragePanel
+                    coverage={coverage}
+                    openBucket={openBucket}
+                    setOpenBucket={setOpenBucket}
+                    namedLabel="named by this run"
+                    className="mt-4 pt-4 border-t border-slate-700/50"
+                />
             </div>
 
             {/* Controls */}

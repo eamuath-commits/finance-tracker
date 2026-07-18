@@ -567,6 +567,37 @@ def match(events: List[Event], txs: List[TxRow]) -> MatchResult:
         return sorted(({"label": k, "count": v} for k, v in out.items()),
                       key=lambda r: r["count"], reverse=True)[:8]
 
+    # The transactions themselves, so the report can show WHICH rows are in each
+    # bucket rather than only how many. Capped — these are for review, and a
+    # bucket in the hundreds is a pattern to read, not a list to page through.
+    _CAP = 300
+
+    def _rows(rows, with_candidates=False):
+        out = []
+        for t in rows[:_CAP]:
+            item = {
+                "transaction_id": t.id,
+                "timestamp": t.timestamp.isoformat() if t.timestamp else None,
+                "amount": t.amount,
+                "direction": t.type,
+                "label": t.merchant,
+            }
+            if with_candidates:
+                # Which messages competed for this row — this is what makes an
+                # ambiguous case resolvable by hand instead of just a number.
+                item["candidates"] = [
+                    {
+                        "name": e.name,
+                        "shape": e.shape,
+                        "timestamp": e.timestamp.isoformat(),
+                        "amount": e.amount,
+                        "delta_seconds": round((e.timestamp - t.timestamp).total_seconds(), 1),
+                    }
+                    for e in tx_cands.get(t.id, [])[:6]
+                ]
+            out.append(item)
+        return out
+
     reasons = {}
     for t in unmatched:
         label = (t.merchant or "(no label)").strip()
@@ -587,6 +618,11 @@ def match(events: List[Event], txs: List[TxRow]) -> MatchResult:
             key=lambda r: r["count"], reverse=True,
         )[:8],
         "unnamed_sms_by_label": _by_label(unnamed_sms),
+        "details": {
+            "contested": _rows(contested, with_candidates=True),
+            "no_sms_found": _rows(unmatched),
+            "sms_has_no_name": _rows(unnamed_sms),
+        },
     }
     return res
 
