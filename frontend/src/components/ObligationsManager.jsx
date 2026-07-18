@@ -1,123 +1,66 @@
 import React, { useState, useMemo } from 'react';
-import { formatCurrency } from './UI';
 import { CategoryHeader, CategorySectionWrapper } from './categoryStyles';
-import { Edit2, Download, Search, Plus, Box, Check, Wallet } from 'lucide-react';
+import { Edit2, Download, Search, Plus, Box, Wallet } from 'lucide-react';
 import { exportToCSV } from '../utils/csvExport';
 
-// The current calendar month — the Manager view always shows "this month".
-const monthNow = () => {
-    const now = new Date();
-    return {
-        y: now.getFullYear(),
-        m: now.getMonth(),
-        day: now.getDate(),
-        billing: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`,
-    };
-};
+// The Manager view DEFINES the obligations — what exists, when it is due, who
+// bills it and which envelope funds it. Deliberately no money: amounts, paid
+// state and the pay action live in the Payments view, which is the per-month
+// money screen. Keeping the two apart is what stops the same figure being
+// reported two different ways.
 
-// Did this obligation get a payment THIS month, and of what kind?
-// PAID = actually paid, BUDGET = planned/set-aside, none = still due.
-const statusFor = (obl, payments) => {
-    const { y, m } = monthNow();
-    const list = payments?.[obl.id] || [];
-    const match = list.find(p => {
-        if (p.billing_month) {
-            const [py, pm] = p.billing_month.split('-').map(Number);
-            return (pm - 1) === m && py === y;
-        }
-        if (p.payment_date) {
-            const d = new Date(p.payment_date);
-            return d.getMonth() === m && d.getFullYear() === y;
-        }
-        return false;
-    });
-    const status = match?.status || null;
-    return {
-        paid: status === 'PAID',
-        budget: status === 'BUDGET',
-        paidAmount: status === 'PAID' ? Number(match.amount || 0) : 0,
-    };
-};
-
-// --- One obligation row ---
-const ObligationRow = ({ obl, payments, openObligationModal, onPay }) => {
-    const st = statusFor(obl, payments);
-    const { day } = monthNow();
-    const pastDue = !st.paid && !st.budget && obl.due_day && obl.due_day < day;
-
-    const badge =
-        st.paid ? 'bg-emerald-500/10 text-emerald-400'
-        : pastDue ? 'bg-red-500/10 text-red-400'
-        : st.budget ? 'bg-blue-500/10 text-blue-400'
-        : 'bg-slate-700/50 text-slate-400';
-
-    return (
-        <div className="flex items-center gap-3 px-3 md:px-4 py-2 border-b border-slate-800/40 last:border-b-0 hover:bg-slate-800/40 transition-colors group">
-            {/* Due-day badge */}
-            <div className={`flex-shrink-0 w-9 h-9 rounded-lg flex flex-col items-center justify-center ${badge}`} title={`Due day ${obl.due_day || '?'}`}>
-                <span className="text-[13px] font-bold font-mono leading-none">{obl.due_day || '?'}</span>
-                <span className="text-[7px] uppercase tracking-wide opacity-70 leading-none mt-0.5">day</span>
-            </div>
-
-            {/* Name + provider (+ notes) */}
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                    {obl.provider && <span className="text-[9px] text-slate-500 font-semibold uppercase">{obl.provider}</span>}
-                    {obl.provider && <span className="text-slate-600 text-[8px]">·</span>}
-                    <span className="text-sm text-white font-medium truncate">{obl.name}</span>
-                </div>
-                {obl.notes && <span className="text-[10px] text-slate-500 truncate block max-w-[240px]">{obl.notes}</span>}
-            </div>
-
-            {/* Amount */}
-            <div className="flex-shrink-0 w-24 text-right">
-                {obl.amount ? (
-                    <span className="text-sm font-mono text-slate-200">{formatCurrency(obl.amount)}</span>
-                ) : (
-                    <span className="text-[11px] text-slate-600 italic">no amount</span>
-                )}
-            </div>
-
-            {/* Status pill */}
-            <div className="flex-shrink-0 w-[76px] flex justify-end">
-                {st.paid ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-2 py-0.5">
-                        <Check size={10} /> Paid
-                    </span>
-                ) : st.budget ? (
-                    <span className="text-[10px] font-semibold text-blue-400 bg-blue-500/10 border border-blue-500/25 rounded-full px-2 py-0.5">Budgeted</span>
-                ) : (
-                    <span className={`text-[10px] font-semibold rounded-full px-2 py-0.5 border ${pastDue ? 'text-red-400 bg-red-500/10 border-red-500/25' : 'text-slate-400 bg-slate-700/40 border-slate-600/40'}`}>
-                        {pastDue ? 'Overdue' : 'Due'}
-                    </span>
-                )}
-            </div>
-
-            {/* Actions */}
-            <div className="flex-shrink-0 w-[68px] flex items-center justify-end gap-1">
-                {!st.paid && (
-                    <button
-                        onClick={() => onPay(obl)}
-                        className="text-[10px] font-semibold text-blue-300 bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 rounded px-2 py-1 transition"
-                        title="Log a payment for this month"
-                    >
-                        Pay
-                    </button>
-                )}
-                <button
-                    onClick={() => openObligationModal(obl)}
-                    className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-blue-400 p-1 rounded transition"
-                    title="Edit"
-                >
-                    <Edit2 size={12} />
-                </button>
-            </div>
+// --- One obligation row (definition only) ---
+const ObligationRow = ({ obl, envelopeName, openObligationModal }) => (
+    <div className="flex items-center gap-3 px-3 md:px-4 py-2 border-b border-slate-800/40 last:border-b-0 hover:bg-slate-800/40 transition-colors group">
+        {/* Due day */}
+        <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-slate-700/50 text-slate-300 flex flex-col items-center justify-center"
+             title={`Due on day ${obl.due_day || '?'} of the month`}>
+            <span className="text-[13px] font-bold font-mono leading-none">{obl.due_day || '?'}</span>
+            <span className="text-[7px] uppercase tracking-wide opacity-60 leading-none mt-0.5">day</span>
         </div>
-    );
-};
 
-// --- Collapsible category section (single table, no repeated column header) ---
-const CategorySection = ({ category, obligations, subtotal, paidCount, payments, openObligationModal, onPay }) => {
+        {/* Name + provider */}
+        <div className="flex-1 min-w-0">
+            <span className="text-sm text-white font-medium truncate block">{obl.name}</span>
+            {obl.provider && (
+                <span className="text-[10px] text-slate-500 uppercase tracking-wide">{obl.provider}</span>
+            )}
+        </div>
+
+        {/* Envelope that funds it (obligation.target_account_id) */}
+        <div className="flex-shrink-0 w-32 hidden sm:block">
+            {envelopeName ? (
+                <span className="inline-flex items-center gap-1 text-[10px] text-indigo-300 bg-indigo-500/10 border border-indigo-500/25 rounded-full px-2 py-0.5 max-w-full">
+                    <Wallet size={9} className="flex-shrink-0" />
+                    <span className="truncate">{envelopeName}</span>
+                </span>
+            ) : (
+                <span className="text-[10px] text-slate-600 italic">no envelope</span>
+            )}
+        </div>
+
+        {/* Notes */}
+        <div className="flex-shrink-0 w-40 hidden lg:block">
+            <span className="text-[11px] text-slate-500 truncate block" title={obl.notes || ''}>
+                {obl.notes || '—'}
+            </span>
+        </div>
+
+        {/* Edit */}
+        <div className="flex-shrink-0 w-8 flex justify-end">
+            <button
+                onClick={() => openObligationModal(obl)}
+                className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-blue-400 p-1 rounded transition"
+                title="Edit definition"
+            >
+                <Edit2 size={12} />
+            </button>
+        </div>
+    </div>
+);
+
+// --- Collapsible category section ---
+const CategorySection = ({ category, obligations, envelopeFor, openObligationModal }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const rows = useMemo(
         () => [...obligations].sort((a, b) => (a.due_day || 99) - (b.due_day || 99)),
@@ -131,14 +74,6 @@ const CategorySection = ({ category, obligations, subtotal, paidCount, payments,
                 count={obligations.length}
                 isCollapsed={isCollapsed}
                 onToggle={() => setIsCollapsed(!isCollapsed)}
-                rightContent={
-                    <div className="flex items-center gap-3">
-                        {paidCount > 0 && (
-                            <span className="text-[9px] text-emerald-400/80">{paidCount}/{obligations.length} paid</span>
-                        )}
-                        <span className="text-[11px] font-mono text-slate-300">{formatCurrency(subtotal)}<span className="text-slate-600 text-[9px]">/mo</span></span>
-                    </div>
-                }
             />
             {!isCollapsed && (
                 <div className="animate-fade-in">
@@ -146,9 +81,8 @@ const CategorySection = ({ category, obligations, subtotal, paidCount, payments,
                         <ObligationRow
                             key={obl.id}
                             obl={obl}
-                            payments={payments}
+                            envelopeName={envelopeFor(obl)}
                             openObligationModal={openObligationModal}
-                            onPay={onPay}
                         />
                     ))}
                 </div>
@@ -158,8 +92,16 @@ const CategorySection = ({ category, obligations, subtotal, paidCount, payments,
 };
 
 // --- Main component ---
-const ObligationsManager = ({ obligations, openObligationModal, payments = {}, openPaymentModal }) => {
+const ObligationsManager = ({ obligations, openObligationModal, accounts = [] }) => {
     const [searchTerm, setSearchTerm] = useState('');
+
+    const accountNames = useMemo(() => {
+        const m = {};
+        (accounts || []).forEach(a => { m[a.id] = a.name; });
+        return m;
+    }, [accounts]);
+
+    const envelopeFor = (obl) => (obl.target_account_id ? accountNames[obl.target_account_id] : null);
 
     const filteredObligations = useMemo(() => {
         if (!searchTerm) return obligations;
@@ -171,17 +113,6 @@ const ObligationsManager = ({ obligations, openObligationModal, payments = {}, o
         );
     }, [obligations, searchTerm]);
 
-    // This-month money summary: committed = sum of expected amounts,
-    // paid = sum of PAID payments this month, left = the difference.
-    const totals = useMemo(() => {
-        let committed = 0, paid = 0;
-        filteredObligations.forEach(o => {
-            committed += Number(o.amount || 0);
-            paid += statusFor(o, payments).paidAmount;
-        });
-        return { committed, paid, remaining: Math.max(0, committed - paid) };
-    }, [filteredObligations, payments]);
-
     const grouped = useMemo(() => {
         return filteredObligations.reduce((acc, obl) => {
             const cat = obl.category || 'Other';
@@ -190,16 +121,8 @@ const ObligationsManager = ({ obligations, openObligationModal, payments = {}, o
         }, {});
     }, [filteredObligations]);
 
-    const catTotal = (cat) => grouped[cat].reduce((s, o) => s + Number(o.amount || 0), 0);
-    const catPaidCount = (cat) => grouped[cat].filter(o => statusFor(o, payments).paid).length;
-
-    // Biggest commitments first — "where the money goes" order.
-    const sortedCategories = useMemo(
-        () => Object.keys(grouped).sort((a, b) => catTotal(b) - catTotal(a)),
-        [grouped]
-    );
-
-    const paidPct = totals.committed > 0 ? Math.min(100, (totals.paid / totals.committed) * 100) : 0;
+    // Alphabetical: a definition list should be predictable to scan, not ranked.
+    const sortedCategories = useMemo(() => Object.keys(grouped).sort(), [grouped]);
 
     const handleExport = () => {
         const rows = obligations.map(obl => ({
@@ -207,47 +130,16 @@ const ObligationsManager = ({ obligations, openObligationModal, payments = {}, o
             Provider: obl.provider || '',
             Name: obl.name,
             'Due Day': obl.due_day,
-            Amount: obl.amount || '',
+            Envelope: envelopeFor(obl) || '',
             Notes: obl.notes || '',
         }));
         exportToCSV(rows, `obligations_list.csv`);
     };
 
-    const onPay = (obl) => {
-        if (openPaymentModal) openPaymentModal(obl, monthNow().billing, obl.amount ?? null);
-    };
-
     return (
         <div className="animate-fade-in space-y-4">
-            {/* This-month money summary */}
-            <div className="bg-gradient-to-br from-slate-800/80 to-slate-900/90 border border-slate-700/50 rounded-xl p-4 shadow-lg">
-                <div className="flex items-center justify-between mb-3">
-                    <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold flex items-center gap-1.5">
-                        <Wallet size={12} className="text-blue-400" /> This month
-                    </span>
-                    <span className="text-[10px] text-slate-500">{obligations.length} obligations · {sortedCategories.length} categories</span>
-                </div>
-                <div className="grid grid-cols-3 gap-3 mb-3">
-                    <div>
-                        <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-0.5">Committed</p>
-                        <p className="text-xl font-bold text-white font-mono">{formatCurrency(totals.committed)}</p>
-                    </div>
-                    <div>
-                        <p className="text-[10px] text-emerald-500/70 uppercase tracking-wide mb-0.5">Paid</p>
-                        <p className="text-xl font-bold text-emerald-400 font-mono">{formatCurrency(totals.paid)}</p>
-                    </div>
-                    <div>
-                        <p className="text-[10px] text-amber-500/70 uppercase tracking-wide mb-0.5">Left</p>
-                        <p className="text-xl font-bold text-amber-400 font-mono">{formatCurrency(totals.remaining)}</p>
-                    </div>
-                </div>
-                <div className="w-full bg-slate-700/50 rounded-full h-1.5 overflow-hidden">
-                    <div className="h-1.5 rounded-full bg-emerald-500 transition-all" style={{ width: `${paidPct}%` }} />
-                </div>
-            </div>
-
             {/* Toolbar */}
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => openObligationModal(null)}
@@ -266,12 +158,17 @@ const ObligationsManager = ({ obligations, openObligationModal, payments = {}, o
                         />
                     </div>
                 </div>
-                <button
-                    onClick={handleExport}
-                    className="flex items-center gap-1.5 text-slate-400 hover:text-white text-xs py-2 px-3 rounded-lg border border-slate-700/50 hover:border-slate-600 transition"
-                >
-                    <Download size={14} /> Export
-                </button>
+                <div className="flex items-center gap-3">
+                    <span className="text-[11px] text-slate-500">
+                        {obligations.length} obligation{obligations.length !== 1 ? 's' : ''} · {sortedCategories.length} categories
+                    </span>
+                    <button
+                        onClick={handleExport}
+                        className="flex items-center gap-1.5 text-slate-400 hover:text-white text-xs py-2 px-3 rounded-lg border border-slate-700/50 hover:border-slate-600 transition"
+                    >
+                        <Download size={14} /> Export
+                    </button>
+                </div>
             </div>
 
             {/* Category sections */}
@@ -281,11 +178,8 @@ const ObligationsManager = ({ obligations, openObligationModal, payments = {}, o
                         key={cat}
                         category={cat}
                         obligations={grouped[cat]}
-                        subtotal={catTotal(cat)}
-                        paidCount={catPaidCount(cat)}
-                        payments={payments}
+                        envelopeFor={envelopeFor}
                         openObligationModal={openObligationModal}
-                        onPay={onPay}
                     />
                 ))}
 

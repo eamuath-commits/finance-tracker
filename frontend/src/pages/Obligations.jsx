@@ -26,6 +26,9 @@ const Obligations = () => {
     const [payments, setPayments] = useState({});
     const [forecast, setForecast] = useState(null);
 
+    // --- Accounts (to name each obligation's envelope in the Manager view) ---
+    const [accounts, setAccounts] = useState([]);
+
     // --- Categories Data State ---
     const [categoriesList, setCategoriesList] = useState([]);
     const [newCategoryName, setNewCategoryName] = useState('');
@@ -94,14 +97,16 @@ const Obligations = () => {
         console.log("🚀 Starting fetchData...");
         setLoading(true);
         try {
-            const [oblRes, catRes, forecastRes] = await Promise.all([
+            const [oblRes, catRes, forecastRes, acctRes] = await Promise.all([
                 api.get(`${API_URL}/obligations/`),
                 api.get(`${API_URL}/categories`),
-                api.get(`${API_URL}/obligations/forecast?months_ahead=1`).catch(() => ({ data: null }))
+                api.get(`${API_URL}/obligations/forecast?months_ahead=1`).catch(() => ({ data: null })),
+                api.get(`${API_URL}/accounts/`).catch(() => ({ data: [] }))
             ]);
 
             setObligations(oblRes.data);
             setForecast(forecastRes.data);
+            setAccounts(acctRes.data || []);
 
             // Auto-Migration: If no categories in DB, populate from existing obligations
             let finalCategories = catRes.data;
@@ -478,8 +483,7 @@ const Obligations = () => {
                         <ObligationsManager
                             obligations={filteredObligations}
                             openObligationModal={openObligationModal}
-                            payments={payments}
-                            openPaymentModal={openPaymentModal}
+                            accounts={accounts}
                         />
                     )}
 
