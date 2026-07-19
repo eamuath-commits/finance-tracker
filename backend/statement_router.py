@@ -24,6 +24,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 
 from database import get_db
+import transaction_types
 import models
 import schemas
 from auth import get_current_user
@@ -1109,6 +1110,9 @@ def post_statement_to_ledger(
             timestamp=ts,
             balance_after_transaction=ln.balance,
             category=ln.category,
+            # The bank's own operation type, taken from the statement's type_line
+            # rather than guessed — this is fact, not inference.
+            transaction_type=transaction_types.classify_type_line(ln.type_line, ln.direction),
             notes="\n".join(note_bits) if note_bits else None,
             source="statement",
             statement_id=statement.id,

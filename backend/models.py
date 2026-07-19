@@ -208,8 +208,12 @@ class Transaction(Base):
     enriched_at = Column(DateTime, nullable=True)        # when that batch was applied
     raw_sms_content = Column(Text)
     timestamp = Column(DateTime)
-    category = Column(String, nullable=True)
+    category = Column(String, nullable=True)              # what it was FOR (Groceries, Fuel)
     type = Column(String, default="debit") # "credit" or "debit"
+    # What the BANK did — PURCHASE, INTERNAL_TRANSFER, FEE, BILL_PAYMENT ...
+    # A separate axis from `category`: an internal transfer has no spending
+    # category, and counting it as one overstated expenses. See transaction_types.
+    transaction_type = Column(String, nullable=True, index=True)
     balance_after_transaction = Column(Money(), nullable=True)
     status = Column(String, default="completed", nullable=False) # pending, completed, pending_action
     notes = Column(Text, nullable=True)

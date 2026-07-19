@@ -9,14 +9,23 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#F97316'];
 
+// Moving money between your own accounts is not spending, and a transfer charge
+// is real money but not a purchase. Both were counted as expenses while the only
+// axis available was the spending category — on this data that was 254 internal
+// transfers inflating the totals. transaction_type carries the bank's own
+// operation, so they can be excluded properly.
+const NON_SPENDING_TYPES = new Set(['INTERNAL_TRANSFER', 'FEE']);
+const isSpending = (tx) => tx.type === 'debit' && !NON_SPENDING_TYPES.has(tx.transaction_type);
+const isIncome = (tx) => tx.type === 'credit' && !NON_SPENDING_TYPES.has(tx.transaction_type);
+
 // --- Monthly Summary Cards ---
 const MonthlySummaryCards = ({ transactions }) => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const monthTxs = transactions.filter(tx => new Date(tx.timestamp) >= monthStart);
-    const income = monthTxs.filter(tx => tx.type === 'credit').reduce((s, tx) => s + tx.amount, 0);
-    const expenses = monthTxs.filter(tx => tx.type === 'debit').reduce((s, tx) => s + tx.amount, 0);
+    const income = monthTxs.filter(isIncome).reduce((s, tx) => s + tx.amount, 0);
+    const expenses = monthTxs.filter(isSpending).reduce((s, tx) => s + tx.amount, 0);
     const net = income - expenses;
 
     const cards = [
@@ -52,7 +61,7 @@ const MonthlySummaryCards = ({ transactions }) => {
 const TopMerchantsWidget = ({ transactions }) => {
     const merchantData = useMemo(() => {
         const map = {};
-        transactions.filter(tx => tx.type === 'debit').forEach(tx => {
+        transactions.filter(isSpending).forEach(tx => {
             const info = tx.merchant_info;
             const key = info ? info.name : (tx.merchant || 'Unknown');
             if (!map[key]) {
@@ -108,7 +117,7 @@ const TopMerchantsWidget = ({ transactions }) => {
 const CategoryPieChart = ({ transactions, onCategoryClick }) => {
     const pieData = useMemo(() => {
         const cats = {};
-        transactions.filter(tx => tx.type === 'debit').forEach(tx => {
+        transactions.filter(isSpending).forEach(tx => {
             const cat = tx.category || 'Uncategorized';
             cats[cat] = (cats[cat] || 0) + tx.amount;
         });
@@ -182,7 +191,7 @@ const SpendingTrendChart = ({ transactions }) => {
             const key = d.toISOString().slice(0, 10);
             days[key] = 0;
         }
-        transactions.filter(tx => tx.type === 'debit').forEach(tx => {
+        transactions.filter(isSpending).forEach(tx => {
             const key = new Date(tx.timestamp).toISOString().slice(0, 10);
             if (days[key] !== undefined) days[key] += tx.amount;
         });
@@ -226,8 +235,8 @@ const IncomeVsExpensesChart = ({ transactions }) => {
         transactions.forEach(tx => {
             const key = new Date(tx.timestamp).toISOString().slice(0, 7);
             if (months[key]) {
-                if (tx.type === 'credit') months[key].income += tx.amount;
-                else months[key].expenses += tx.amount;
+                if (isIncome(tx)) months[key].income += tx.amount;
+                else if (isSpending(tx)) months[key].expenses += tx.amount;
             }
         });
         return Object.entries(months).map(([month, data]) => ({

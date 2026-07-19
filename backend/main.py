@@ -70,6 +70,17 @@ def run_migrations(engine):
                 conn.execute(text("ALTER TABLE transactions ADD COLUMN enrichment_batch_id VARCHAR"))
                 conn.commit()
 
+        # The bank's own operation type (PURCHASE, INTERNAL_TRANSFER, FEE ...),
+        # kept separate from the spending category. Backfilled from each row's
+        # statement line by _backfill_transaction_types() below.
+        if 'transaction_type' not in columns:
+            print("Migrating: Adding transaction_type to transactions")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE transactions ADD COLUMN transaction_type VARCHAR"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_transactions_transaction_type "
+                                  "ON transactions (transaction_type)"))
+                conn.commit()
+
         # When the batch was applied — without it past batches cannot be listed
         # or ordered, so a batch was only reversible on the screen that created it.
         if 'enriched_at' not in columns:
@@ -423,6 +434,55 @@ def delete_account(account_id: str, db: Session = Depends(get_db), current_user:
     if not deleted_account:
         raise HTTPException(status_code=404, detail="Account not found")
     return {"message": "Account deleted successfully"}
+
+def _backfill_transaction_types(engine):
+    """Classify existing statement transactions that predate transaction_type.
+
+    Each row is matched back to its statement line by (statement_id, row_index)
+    so the bank's own type_line is used rather than guessing from the merchant
+    name. Idempotent: only rows where transaction_type IS NULL are touched, so a
+    value set by hand or by a later import is never overwritten.
+    """
+    import transaction_types as _tt
+    from sqlalchemy import text as _text
+    try:
+        with engine.connect() as conn:
+            pending = conn.execute(_text(
+                "SELECT COUNT(*) FROM transactions WHERE transaction_type IS NULL"
+            )).scalar()
+            if not pending:
+                return
+            rows = conn.execute(_text(
+                "SELECT t.id, sl.type_line, t.type "
+                "FROM transactions t "
+                "LEFT JOIN statement_lines sl "
+                "  ON sl.statement_id = t.statement_id "
+                " AND sl.row_index = t.statement_row_index "
+                "WHERE t.transaction_type IS NULL"
+            )).fetchall()
+            updates = {}
+            for tx_id, type_line, direction in rows:
+                updates.setdefault(
+                    _tt.classify_type_line(type_line, direction), []
+                ).append(tx_id)
+            for ttype, ids in updates.items():
+                for i in range(0, len(ids), 500):        # chunk to keep the IN() sane
+                    chunk = ids[i:i + 500]
+                    conn.execute(
+                        _text("UPDATE transactions SET transaction_type = :t WHERE id IN :ids"),
+                        {"t": ttype, "ids": tuple(chunk)},
+                    )
+            conn.commit()
+            print(f"Backfilled transaction_type for {len(rows)} transactions: "
+                  + ", ".join(f"{k}={len(v)}" for k, v in sorted(updates.items())))
+    except Exception as exc:  # never block startup on a backfill
+        logger.warning(f"transaction_type backfill skipped: {exc}")
+
+
+# Runs here rather than beside run_migrations() because the module executes top
+# to bottom and the function is defined above this point, not below it.
+_backfill_transaction_types(engine)
+
 
 def _recalculate_account_balance(db: Session, account_id: str):
     """
