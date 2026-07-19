@@ -428,16 +428,36 @@ class MatchResult:
     coverage: Dict = field(default_factory=dict)             # per-transaction view
 
 
+_DAY_SECONDS = 86400.0
+
+
 def _candidate(ev: Event, tx: TxRow) -> bool:
     if ev.direction != tx.type or abs(ev.amount - tx.amount) > AMOUNT_EPS:
         return False
-    dt = abs((ev.timestamp - tx.timestamp).total_seconds())
+    signed = (ev.timestamp - tx.timestamp).total_seconds()
+    dt = abs(signed)
     if ev.shape == "loan_instalment" and is_loan_label(tx.merchant):
         # Only the loan-labelled row gets the wide window. Against every other
-        # row this SMS keeps the normal 60s rule, so it still competes correctly
-        # for near-simultaneous events without dragging in same-amount transfers.
+        # row this SMS keeps the normal rule, so it still competes correctly for
+        # near-simultaneous events without dragging in same-amount transfers.
         return dt <= LOAN_WINDOW.total_seconds()
-    return dt <= TIME_WINDOW.total_seconds()
+    if dt <= TIME_WINDOW.total_seconds():
+        return True
+
+    # ── The bank's evening posting cutoff ──
+    # Anything paid after roughly 20:00 is SMSed immediately but posted to the
+    # statement the NEXT day, so the two are ~24h apart while the time-of-day
+    # still agrees — often to the second. Measured over the full export: 92 such
+    # transactions, every one after 20:00, and in every case the SMS is the
+    # EARLIER of the pair. (The loan-instalment rule above was this same effect,
+    # special-cased before it was understood as a general property of the bank.)
+    #
+    # This does NOT loosen the time-of-day tolerance: the same window still has
+    # to hold, just measured against one day earlier. Requiring the SMS to be the
+    # earlier one keeps a transaction from claiming the NEXT day's message.
+    if signed < 0:
+        return abs(dt - _DAY_SECONDS) <= TIME_WINDOW.total_seconds()
+    return False
 
 
 def _can_write(ev: Event, tx: TxRow) -> bool:

@@ -42,10 +42,18 @@ const Stat = ({ n, label, hint, color, onClick, active }) => (
 const money = (v) => Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const shortDate = (iso) => (iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—');
 
+// A ~24h gap is the bank's evening posting cutoff, not a bad match — show it as
+// "1 day earlier" rather than a confusing -86400s.
+const fmtDelta = (s) => {
+    const a = Math.abs(s);
+    if (Math.abs(a - 86400) <= 120) return `${s < 0 ? '1 day earlier' : '1 day later'} (${Math.round(a - 86400)}s)`;
+    return `${s > 0 ? '+' : ''}${Math.round(s)}s`;
+};
+
 // The transactions behind one bucket. For a contested row the competing messages
 // are shown too — that is what makes an ambiguous case actionable rather than
 // just a count.
-const BucketRows = ({ title, note, rows }) => {
+const BucketRows = ({ title, note, rows, onPick, picking }) => {
     if (!rows?.length) return null;
     return (
         <div className="mt-3 bg-slate-900/40 border border-slate-700/40 rounded-lg p-3">
@@ -66,8 +74,18 @@ const BucketRows = ({ title, note, rows }) => {
                                 {r.candidates.map((c, i) => (
                                     <div key={i} className="text-[10px] text-gray-500 flex items-center gap-2">
                                         <span className="text-amber-500/70">competing:</span>
-                                        <span className="text-gray-400 truncate">{c.name || `(${c.shape} — names no one)`}</span>
-                                        <span className="text-gray-600">{c.delta_seconds > 0 ? '+' : ''}{c.delta_seconds}s</span>
+                                        <span className="text-gray-400 truncate flex-1">{c.name || `(${c.shape} — names no one)`}</span>
+                                        <span className="text-gray-600 flex-shrink-0">{fmtDelta(c.delta_seconds)}</span>
+                                        {/* The matcher will not choose between these, but you can. */}
+                                        {onPick && c.name && (
+                                            <button
+                                                onClick={() => onPick(r.transaction_id, c.name)}
+                                                disabled={picking === r.transaction_id}
+                                                className="flex-shrink-0 text-[10px] font-semibold text-cyan-300 bg-cyan-600/15 hover:bg-cyan-600/30 disabled:opacity-50 border border-cyan-500/30 rounded px-1.5 py-0.5 transition"
+                                            >
+                                                {picking === r.transaction_id ? '…' : 'use this'}
+                                            </button>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -82,7 +100,7 @@ const BucketRows = ({ title, note, rows }) => {
 // Coverage counted from the TRANSACTIONS, which is the question people actually
 // ask ("I have N transactions, why did only M get a name?"). Shared by the
 // preview screen and the standalone report so both tell the same story.
-const CoveragePanel = ({ coverage, openBucket, setOpenBucket, namedLabel = "named by this run", className = "" }) => {
+const CoveragePanel = ({ coverage, openBucket, setOpenBucket, namedLabel = "named by this run", className = "", onPick, picking }) => {
     if (!coverage?.transactions) return null;
     const stuck = (coverage.no_sms_found || 0) + (coverage.sms_has_no_name || 0) + (coverage.contested || 0);
     const toggle = (k) => setOpenBucket(openBucket === k ? null : k);
@@ -123,8 +141,10 @@ const CoveragePanel = ({ coverage, openBucket, setOpenBucket, namedLabel = "name
             {openBucket === 'contested' && (
                 <BucketRows
                     title={`${coverage.contested} transactions with more than one possible message`}
-                    note="Each had several messages that could plausibly be it, so none was applied rather than guessing. The competing messages are listed under each row."
+                    note="Each had several messages that could plausibly be it, so none was applied rather than guessing. Pick one with “use this” and it is applied as a normal enrichment — reversible with the rest of its batch."
                     rows={coverage.details?.contested}
+                    onPick={onPick}
+                    picking={picking}
                 />
             )}
             {openBucket === 'no_sms_found' && (
@@ -163,6 +183,28 @@ const SMSEnrichTab = ({ onApplied }) => {
     const [openBucket, setOpenBucket] = useState(null);  // which coverage bucket is expanded
     const [report, setReport] = useState(null);          // on-demand coverage report
     const [loadingReport, setLoadingReport] = useState(false);
+    const [picking, setPicking] = useState(null);        // transaction being resolved by hand
+
+    // Resolve an ambiguous row by choosing one of its competing messages. The
+    // matcher refuses to guess between them; you are allowed to. Goes through the
+    // normal apply endpoint, so it re-validates server-side and lands in a batch
+    // that can be reversed like any other.
+    const pickCandidate = async (transactionId, name) => {
+        setPicking(transactionId);
+        setError(null);
+        try {
+            await api.post(`${API_URL}/api/sms/enrich/apply`, {
+                items: [{ transaction_id: transactionId, new_merchant: name }],
+            });
+            await loadReport();
+            loadBatches();
+            if (onApplied) onApplied();
+        } catch (err) {
+            setError(err.response?.data?.detail || "Could not apply that name.");
+        } finally {
+            setPicking(null);
+        }
+    };
 
     // The coverage figures used to live only inside a preview response, so they
     // could be read once and then only by re-uploading. This recomputes them
@@ -398,6 +440,8 @@ const SMSEnrichTab = ({ onApplied }) => {
                                             openBucket={openBucket}
                                             setOpenBucket={setOpenBucket}
                                             namedLabel="would be named now"
+                                            onPick={pickCandidate}
+                                            picking={picking}
                                         />
                                         <p className="text-[10px] text-gray-600 mt-3">
                                             Recomputed against your transactions right now. Nothing was changed.
