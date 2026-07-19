@@ -160,6 +160,32 @@ function Transactions() {
         return { start: fmtDate(start), end: fmtDate(end), label };
     }, [monthOffset, periodStartDay]);
 
+    // Months that actually contain transactions, newest first, each with the
+    // monthOffset the navigator uses so picking one reuses the existing period
+    // logic (including a period_start_day other than the 1st).
+    const availableMonths = useMemo(() => {
+        const now = new Date();
+        const counts = {};
+        (transactions || []).forEach(tx => {
+            if (!tx.timestamp) return;
+            const d = new Date(tx.timestamp);
+            if (isNaN(d)) return;
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            counts[key] = (counts[key] || 0) + 1;
+        });
+        return Object.entries(counts)
+            .map(([key, count]) => {
+                const [y, m] = key.split('-').map(Number);
+                return {
+                    key,
+                    count,
+                    offset: (y - now.getFullYear()) * 12 + (m - 1 - now.getMonth()),
+                    label: new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+                };
+            })
+            .sort((a, b) => b.key.localeCompare(a.key));
+    }, [transactions]);
+
     // When monthPeriod changes, update dateRange
     useEffect(() => {
         if (monthPeriod) {
@@ -748,6 +774,26 @@ function Transactions() {
                     {/* Month Navigation */}
                     <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700 mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
+                            {/* Jump straight to a month, rather than stepping with the arrows
+                                or entering two dates. Only months that actually have
+                                transactions are listed, so every choice shows something. */}
+                            <select
+                                value={monthOffset === null ? '' : monthOffset}
+                                onChange={e => {
+                                    const v = e.target.value;
+                                    if (v === '') { setMonthOffset(null); setDateRange({ start: '', end: '' }); }
+                                    else setMonthOffset(Number(v));
+                                }}
+                                className="bg-slate-800 border border-slate-600 rounded-lg text-xs text-gray-200 px-2.5 py-2 outline-none focus:border-blue-500 transition"
+                                title="Filter to a single month"
+                            >
+                                <option value="">All Time</option>
+                                {availableMonths.map(m => (
+                                    <option key={m.offset} value={m.offset}>
+                                        {m.label} ({m.count})
+                                    </option>
+                                ))}
+                            </select>
                             <button
                                 onClick={() => setMonthOffset(prev => (prev ?? 0) - 1)}
                                 className="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white transition"
