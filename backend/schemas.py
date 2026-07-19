@@ -247,6 +247,10 @@ class Transaction(TransactionBase):
     # What the bank did (PURCHASE, INTERNAL_TRANSFER, FEE ...), separate from the
     # spending category.
     transaction_type: Optional[str] = None
+    # Both legs of one internal transfer share a group id; the counterpart is the
+    # account on the other side, so the pair can render as "Liability -> General".
+    transfer_group_id: Optional[str] = None
+    transfer_counterpart_account_id: Optional[str] = None
     # SMS name enrichment: the statement's original label and the batch that
     # replaced it, so the UI can show that a name was not typed by the user.
     merchant_original: Optional[str] = None

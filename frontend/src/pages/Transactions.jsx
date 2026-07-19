@@ -160,6 +160,14 @@ function Transactions() {
         return { start: fmtDate(start), end: fmtDate(end), label };
     }, [monthOffset, periodStartDay]);
 
+    // id -> name, so a linked transfer can render as "Liability → General".
+    const accountNameById = useMemo(() => {
+        const m = {};
+        (accounts || []).forEach(a => { m[a.id] = a.name; });
+        (creditCards || []).forEach(c => { m[c.id] = c.name; });
+        return m;
+    }, [accounts, creditCards]);
+
     // Months that actually contain transactions, newest first, each with the
     // monthOffset the navigator uses so picking one reuses the existing period
     // logic (including a period_start_day other than the 1st).
@@ -1195,6 +1203,18 @@ function Transactions() {
                                                                 )}
                                                                 <span className="text-[10px] bg-emerald-600/30 text-emerald-300 px-1.5 py-0.5 rounded font-medium">Merchant</span>
                                                                 <span dir="auto">{tx.merchant_info.name}</span>
+                                                            </span>
+                                                        ) : tx.transfer_group_id && accountNameById[tx.transfer_counterpart_account_id] ? (
+                                                            /* Both legs of an internal transfer are kept as separate rows —
+                                                               each is real on its own account — but they are one movement,
+                                                               so show it with a direction instead of a bare name. */
+                                                            <span className="inline-flex items-center gap-1.5">
+                                                                <span className="text-[10px] bg-blue-600/30 text-blue-300 px-1.5 py-0.5 rounded font-medium">Transfer</span>
+                                                                <span dir="auto" className="text-slate-300">
+                                                                    {tx.type === 'debit'
+                                                                        ? `${accountNameById[tx.account_id] || 'This account'} → ${accountNameById[tx.transfer_counterpart_account_id]}`
+                                                                        : `${accountNameById[tx.transfer_counterpart_account_id]} → ${accountNameById[tx.account_id] || 'This account'}`}
+                                                                </span>
                                                             </span>
                                                         ) : (
                                                             <span dir="auto">{tx.merchant || 'Unknown'}</span>

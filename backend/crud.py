@@ -1204,15 +1204,31 @@ def delete_transaction(db: Session, transaction_id: str):
     
     # INTERNAL TRANSFER CLEANUP: Delete corresponding credit leg
     # If this is a debit transfer, find and delete the matching credit leg
-    if db_tx.category == "Transfer" and str(db_tx.type).lower() == "debit":
-        # Find credit leg by matching timestamp, amount, and category
-        credit_leg = db.query(models.Transaction).filter(
-            models.Transaction.id != transaction_id,  # Not the same transaction
-            models.Transaction.amount == db_tx.amount,
-            models.Transaction.category == "Transfer",
+    if db_tx.transfer_group_id or (db_tx.category == "Transfer" and str(db_tx.type).lower() == "debit"):
+        # Prefer the explicit link when the legs were paired; fall back to the
+        # old amount+timestamp guess only when they were not.
+        #
+        # NOTE the user_id filter: without it this matched on amount, category,
+        # type and timestamp alone across the WHOLE table, so deleting one user's
+        # transfer could delete a different user's identical-looking row and
+        # adjust their balance.
+        leg_q = db.query(models.Transaction).filter(
+            models.Transaction.id != transaction_id,
+            models.Transaction.user_id == db_tx.user_id,
             models.Transaction.type == "credit",
-            models.Transaction.timestamp == db_tx.timestamp
-        ).first()
+        )
+        if db_tx.transfer_group_id:
+            credit_leg = leg_q.filter(
+                models.Transaction.transfer_group_id == db_tx.transfer_group_id
+            ).first()
+        elif str(db_tx.type).lower() == "debit":
+            credit_leg = leg_q.filter(
+                models.Transaction.amount == db_tx.amount,
+                models.Transaction.category == "Transfer",
+                models.Transaction.timestamp == db_tx.timestamp,
+            ).first()
+        else:
+            credit_leg = None
         
         if credit_leg:
             logger.info(f"[DELETE_TX] Found credit leg on account {credit_leg.account_id}, deleting...")
@@ -1226,15 +1242,25 @@ def delete_transaction(db: Session, transaction_id: str):
             db.delete(credit_leg)
     
     # Also check if THIS is a credit leg, and clean up the debit leg
-    if db_tx.category == "Transfer" and str(db_tx.type).lower() == "credit":
-        # Find debit leg by matching timestamp, amount, and category
-        debit_leg = db.query(models.Transaction).filter(
+    if db_tx.transfer_group_id or (db_tx.category == "Transfer" and str(db_tx.type).lower() == "credit"):
+        # Same as above: explicit link first, and scoped to the owner.
+        leg_q = db.query(models.Transaction).filter(
             models.Transaction.id != transaction_id,
-            models.Transaction.amount == db_tx.amount,
-            models.Transaction.category == "Transfer",
+            models.Transaction.user_id == db_tx.user_id,
             models.Transaction.type == "debit",
-            models.Transaction.timestamp == db_tx.timestamp
-        ).first()
+        )
+        if db_tx.transfer_group_id:
+            debit_leg = leg_q.filter(
+                models.Transaction.transfer_group_id == db_tx.transfer_group_id
+            ).first()
+        elif str(db_tx.type).lower() == "credit":
+            debit_leg = leg_q.filter(
+                models.Transaction.amount == db_tx.amount,
+                models.Transaction.category == "Transfer",
+                models.Transaction.timestamp == db_tx.timestamp,
+            ).first()
+        else:
+            debit_leg = None
         
         if debit_leg:
             logger.info(f"[DELETE_TX] Found debit leg on account {debit_leg.account_id}, deleting...")

@@ -23,6 +23,7 @@ import sms_agent
 import analysis
 import analysis_schema
 import sms_enrichment
+import transfer_linking
 import queue_processor
 from rate_limiter import RateLimitMiddleware
 from webhook import router as webhook_router
@@ -79,6 +80,22 @@ def run_migrations(engine):
                 conn.execute(text("ALTER TABLE transactions ADD COLUMN transaction_type VARCHAR"))
                 conn.execute(text("CREATE INDEX IF NOT EXISTS ix_transactions_transaction_type "
                                   "ON transactions (transaction_type)"))
+                conn.commit()
+
+        # Links the two legs of one internal transfer without merging them.
+        if 'transfer_group_id' not in columns:
+            print("Migrating: Adding transfer_group_id to transactions")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE transactions ADD COLUMN transfer_group_id VARCHAR"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_transactions_transfer_group_id "
+                                  "ON transactions (transfer_group_id)"))
+                conn.commit()
+
+        if 'transfer_counterpart_account_id' not in columns:
+            print("Migrating: Adding transfer_counterpart_account_id to transactions")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE transactions "
+                                  "ADD COLUMN transfer_counterpart_account_id VARCHAR"))
                 conn.commit()
 
         # When the batch was applied — without it past batches cannot be listed
@@ -2378,6 +2395,28 @@ def sms_enrich_apply(
 
     db.commit()
     return {"batch_id": batch_id, "applied": applied, "failed": failed}
+
+
+@app.post("/transactions/link-transfers")
+def link_internal_transfers(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Pair up the two legs of each internal transfer for this user.
+
+    The rows are left exactly as they are — this only records that a debit on one
+    account and a credit on another are the same movement, so the pair can be
+    shown as "Liability -> General". Only unambiguous pairs are linked; a
+    repeated round-number transfer with several possible partners is left alone.
+    """
+    txs = db.query(models.Transaction).filter(
+        models.Transaction.user_id == current_user.id,
+    ).all()
+    pairs, stats = transfer_linking.pair_internal_transfers(txs)
+    linked = transfer_linking.apply_pairs(pairs)
+    db.commit()
+    logger.info(f"Linked {linked} internal transfer pairs for {current_user.username}: {stats}")
+    return {"linked": linked, **stats}
 
 
 @app.get("/api/sms/enrich/report")

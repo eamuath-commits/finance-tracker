@@ -214,6 +214,17 @@ class Transaction(Base):
     # A separate axis from `category`: an internal transfer has no spending
     # category, and counting it as one overstated expenses. See transaction_types.
     transaction_type = Column(String, nullable=True, index=True)
+    # Both legs of one internal transfer share a transfer_group_id. The rows stay
+    # separate — each is real on its own account and its own statement — this only
+    # records that they are the same movement of money, so it can be shown as
+    # "Liability -> General" and so deleting one leg can find the other reliably
+    # instead of re-guessing it from amount+timestamp.
+    transfer_group_id = Column(String, nullable=True, index=True)
+    # Deliberately NOT a ForeignKey: a second FK from transactions to accounts
+    # makes Account.transactions ambiguous to resolve, and it would also give
+    # account deletion another NO ACTION reference to trip over. The authoritative
+    # link is transfer_group_id; this is a denormalised hint for display.
+    transfer_counterpart_account_id = Column(String, nullable=True)
     balance_after_transaction = Column(Money(), nullable=True)
     status = Column(String, default="completed", nullable=False) # pending, completed, pending_action
     notes = Column(Text, nullable=True)
