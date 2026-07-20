@@ -84,7 +84,9 @@ class TestBankNeutrality:
 
     def test_aljazira_commodity_loan_leg(self):
         # "Through Bank Aljazira" — the murabaha commodity legs, per the owner.
-        assert T.classify_type_line("Through Bank Aljazira", "debit") == T.LOAN_INSTALMENT
+        # Now bank-scoped: it classifies only for an Aljazira statement (the
+        # scoping itself is covered in TestBankScoping).
+        assert T.classify_type_line("Through Bank Aljazira", "debit", bank_key="aljazira") == T.LOAN_INSTALMENT
 
     def test_aljazira_transfers_both_directions(self):
         assert T.classify_type_line("Incoming Local Transfer", "credit") == T.TRANSFER_IN
@@ -100,6 +102,30 @@ class TestBankNeutrality:
         assert T.classify_type_line("Debit T & F installments") == T.LOAN_INSTALMENT
         assert T.classify_type_line("Sadad Payments") == T.BILL_PAYMENT
         assert T.classify_type_line("Outward IPS Credit Transaction Charges") == T.FEE
+
+
+class TestBankScoping:
+    """Bank-specific wording applies ONLY to that bank's statements. The same
+    words on another bank must not classify — that is the whole point of scoping
+    a generic phrase like 'Through Bank Aljazira'."""
+
+    def test_aljazira_rule_fires_for_aljazira(self):
+        assert T.classify_type_line("Through Bank Aljazira", "debit", bank_key="aljazira") == T.LOAN_INSTALMENT
+
+    def test_aljazira_rule_does_not_fire_for_al_rajhi(self):
+        assert T.classify_type_line("Through Bank Aljazira", "debit", bank_key="alrajhi") == T.OTHER
+
+    def test_aljazira_rule_does_not_fire_without_a_bank(self):
+        assert T.classify_type_line("Through Bank Aljazira", "debit") == T.OTHER
+
+    def test_an_unknown_bank_still_gets_the_universal_rules(self):
+        assert T.classify_type_line("Sadad Payments", bank_key="some_new_bank") == T.BILL_PAYMENT
+        assert T.classify_type_line("Loan Repayment", bank_key="some_new_bank") == T.LOAN_INSTALMENT
+
+    def test_universal_rules_are_unaffected_by_bank(self):
+        for bank in (None, "alrajhi", "aljazira", "unknown"):
+            assert T.classify_type_line("POS purchase Apple pay (Domestic)", bank_key=bank) == T.PURCHASE
+            assert T.classify_type_line("Incoming Local Transfer", "credit", bank_key=bank) == T.TRANSFER_IN
 
 
 class TestRuleOrderingMatters:

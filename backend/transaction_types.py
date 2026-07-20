@@ -60,12 +60,23 @@ TYPE_LABELS = {
 }
 
 # ── Matching rules ──
-# Ordered: the FIRST rule whose needle appears in the lowercased type_line wins,
-# so put the specific before the general ("credit transaction charges" must beat
-# "credit transfer"). Needles are substrings, not prefixes — the previous mapper
-# used prefixes written against type_lines these statements never emit, which is
-# why almost everything fell through to "Other".
-_RULES = [
+# The taxonomy above is universal; the WORDING that maps into it is per-bank.
+# So the rules are in two sets:
+#
+#   _UNIVERSAL_RULES  words that mean the same at any bank ("sadad", "purchase",
+#                     "outgoing", "loan repayment"). Every statement uses these.
+#   _BANK_RULES       words unique to ONE bank, applied ONLY to that bank's
+#                     statements. A generic descriptor like "Through Bank
+#                     Aljazira" is safe here because it can never touch another
+#                     bank's rows.
+#
+# classify_type_line() checks the statement's own bank rules first (most
+# specific), then the universal set, then a direction-based fallback. Adding a
+# bank means adding its words here — never a new type.
+#
+# Ordered within a set: the FIRST needle found in the lowercased type_line wins,
+# so specific beats general ("transaction charges" must beat "transfer").
+_UNIVERSAL_RULES = [
     # Fees first — several contain the word "transfer" or "payment".
     ("transaction charges", FEE),
     ("payment fees", FEE),
@@ -124,36 +135,50 @@ _RULES = [
     ("international", PURCHASE_INTL),
     ("purchase", PURCHASE),
     ("pos ", PURCHASE),
-
-    # ── Bank-specific wording ──
-    # The types above are universal; these are phrasings unique to one bank that
-    # do not generalise. Kept distinctive enough not to collide with any other
-    # bank's words. As more banks are imported, add their words here, never a new
-    # type — the taxonomy is fixed, only the wording varies.
-    #
-    # Bank Aljazira: the two commodity legs of a murabaha loan settlement print
-    # as "Through Bank Aljazira" (confirmed by the account owner as part of the
-    # RBG EIR DINAR COMMODITY loan). NOTE this is fragile — "Through Bank
-    # Aljazira" is a generic descriptor, and it is trusted here only because it
-    # appears as a row's TYPE LINE solely on those loan legs. When Aljazira is
-    # imported for real this should become a bank-scoped rule rather than global.
-    ("through bank aljazira", LOAN_INSTALMENT),
 ]
 
+# Words unique to one bank, applied ONLY when the statement is from that bank.
+# Keyed by bank_key (see bank_detection). Safe to be generic here — these never
+# run against another bank's rows.
+_BANK_RULES = {
+    "aljazira": [
+        # The two commodity legs of a murabaha loan settlement print as "Through
+        # Bank Aljazira" (confirmed by the account owner as part of the RBG EIR
+        # DINAR COMMODITY loan). This is a generic descriptor, so it MUST stay
+        # bank-scoped: applied to an Al Rajhi statement it would be wrong.
+        ("through bank aljazira", LOAN_INSTALMENT),
+    ],
+}
 
-def classify_type_line(type_line: Optional[str], direction: Optional[str] = None) -> str:
-    """Map a statement's own type_line to a bank transaction type.
 
-    `direction` ("debit"/"credit") only breaks the tie for a bare "Transfer",
-    which the bank emits without saying which way it went.
+def _apply(rules, text):
+    for needle, ttype in rules:
+        if needle in text:
+            return ttype
+    return None
+
+
+def classify_type_line(type_line: Optional[str], direction: Optional[str] = None,
+                       bank_key: Optional[str] = None) -> str:
+    """Map a statement's own type_line to a universal transaction type.
+
+    bank_key scopes the bank-specific wording: an Aljazira rule only fires for an
+    Aljazira statement. `direction` ("debit"/"credit") only breaks the tie for a
+    bare "Transfer", which the bank emits without saying which way it went.
     """
     text = (type_line or "").strip().lower()
     if not text:
         return OTHER
 
-    for needle, ttype in _RULES:
-        if needle in text:
-            return ttype
+    # This bank's own words first (most specific), then the universal set.
+    if bank_key:
+        hit = _apply(_BANK_RULES.get(bank_key, []), text)
+        if hit:
+            return hit
+
+    hit = _apply(_UNIVERSAL_RULES, text)
+    if hit:
+        return hit
 
     # A bare "Transfer" says nothing about direction; the ledger does.
     if "transfer" in text:

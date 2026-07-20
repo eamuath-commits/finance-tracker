@@ -82,6 +82,14 @@ def run_migrations(engine):
                                   "ON transactions (transaction_type)"))
                 conn.commit()
 
+        # Which bank issued each statement — scopes the transaction-type wording.
+        stmt_cols = [c["name"] for c in inspector.get_columns("statements")] if inspector.has_table("statements") else []
+        if stmt_cols and 'bank_key' not in stmt_cols:
+            print("Migrating: Adding bank_key to statements")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE statements ADD COLUMN bank_key VARCHAR"))
+                conn.commit()
+
         # Links the two legs of one internal transfer without merging them.
         if 'transfer_group_id' not in columns:
             print("Migrating: Adding transfer_group_id to transactions")
@@ -469,18 +477,21 @@ def _backfill_transaction_types(engine):
             )).scalar()
             if not pending:
                 return
+            # Pull the statement's bank_key too, so bank-specific wording is
+            # applied to the right rows (an Aljazira loan leg vs an Al Rajhi one).
             rows = conn.execute(_text(
-                "SELECT t.id, sl.type_line, t.type "
+                "SELECT t.id, sl.type_line, t.type, s.bank_key "
                 "FROM transactions t "
                 "LEFT JOIN statement_lines sl "
                 "  ON sl.statement_id = t.statement_id "
                 " AND sl.row_index = t.statement_row_index "
+                "LEFT JOIN statements s ON s.id = t.statement_id "
                 "WHERE t.transaction_type IS NULL"
             )).fetchall()
             updates = {}
-            for tx_id, type_line, direction in rows:
+            for tx_id, type_line, direction, bank_key in rows:
                 updates.setdefault(
-                    _tt.classify_type_line(type_line, direction), []
+                    _tt.classify_type_line(type_line, direction, bank_key=bank_key), []
                 ).append(tx_id)
             for ttype, ids in updates.items():
                 for i in range(0, len(ids), 500):        # chunk to keep the IN() sane
@@ -496,8 +507,55 @@ def _backfill_transaction_types(engine):
         logger.warning(f"transaction_type backfill skipped: {exc}")
 
 
-# Runs here rather than beside run_migrations() because the module executes top
-# to bottom and the function is defined above this point, not below it.
+def _backfill_statement_banks(engine):
+    """Detect and store bank_key for statements imported before detection existed.
+
+    Reads each statement's first page. Best-effort and idempotent: only fills
+    rows where bank_key IS NULL, and a statement whose PDF is gone is skipped.
+    Runs before the transaction-type backfill so that can be bank-aware.
+    """
+    import statement_parser as _sp
+    from sqlalchemy import text as _text
+    try:
+        import pdfplumber
+    except ImportError:
+        return
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(_text(
+                "SELECT id, file_path FROM statements WHERE bank_key IS NULL"
+            )).fetchall()
+            done = 0
+            for sid, path in rows:
+                if not path or not os.path.exists(path):
+                    continue
+                try:
+                    with pdfplumber.open(path) as pdf:
+                        text_ = _sp.normalize_arabic(pdf.pages[0].extract_text() or "") if pdf.pages else ""
+                    # parse_header does the IBAN-code detection internally.
+                    hdr = _sp.parse_header(text_)
+                    key, name = hdr.bank_key, hdr.bank_name
+                except Exception:
+                    continue
+                if key:
+                    # bank_name is set from detection too — an earlier bad guess
+                    # or an upload default may have left a wrong name behind.
+                    conn.execute(
+                        _text("UPDATE statements SET bank_key = :k, bank_name = :n WHERE id = :id"),
+                        {"k": key, "n": name, "id": sid},
+                    )
+                    done += 1
+            if done:
+                conn.commit()
+                print(f"Backfilled bank_key for {done} statements")
+    except Exception as exc:
+        logger.warning(f"bank_key backfill skipped: {exc}")
+
+
+# Run here rather than beside run_migrations() because the module executes top to
+# bottom and these functions are defined above this point. Banks first, so the
+# transaction-type backfill below can scope wording by bank.
+_backfill_statement_banks(engine)
 _backfill_transaction_types(engine)
 
 

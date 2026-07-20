@@ -28,6 +28,41 @@ class TestDateNormalisation:
             assert SP.normalize_date_cell(value) is None, f"{value!r} should not parse as a date"
 
 
+class TestBankDetection:
+    """The issuing bank is identified by the account's own IBAN bank code, which
+    a counterparty bank named in a transaction line cannot spoof."""
+
+    def test_al_rajhi_by_iban_code_80(self):
+        key, name = SP.detect_bank("", "SA5880000501608011777772")
+        assert key == "alrajhi"
+
+    def test_aljazira_by_iban_code_60(self):
+        key, name = SP.detect_bank("", "SA1460100003680047908001")
+        assert key == "aljazira"
+
+    def test_iban_wins_over_a_transaction_naming_another_bank(self):
+        # The real trap: an Aljazira statement quotes "From ALRAJHI BANK" as a
+        # remitter. The account's own IBAN (code 60) must still win.
+        text = "Bank Aljazira statement\nIncoming Local Transfer From ALRAJHI BANK"
+        key, _ = SP.detect_bank(text, "SA1460100003680047908001")
+        assert key == "aljazira"
+
+    def test_falls_back_to_letterhead_when_no_iban(self):
+        key, _ = SP.detect_bank("Bank Aljazira — Account e-Statement", None)
+        assert key == "aljazira"
+
+    def test_letterhead_fallback_is_scored_not_first_hit(self):
+        # One "alrajhi" mention (a transaction) must not beat many "aljazira".
+        text = ("aljazira bank statement aljazira aljazira aljazira "
+                "incoming transfer from alrajhi bank")
+        key, _ = SP.detect_bank(text, None)
+        assert key == "aljazira"
+
+    def test_unknown_bank_is_none(self):
+        assert SP.detect_bank("Some Other Bank", "SA9910000000000000000000") == (None, None)
+        assert SP.detect_bank("", None) == (None, None)
+
+
 class TestColumnDetection:
     ALJAZIRA_HEADER = ["Date", "Description", "Value Date", "Withdrawal (Dr)", "Deposit (Cr)", "Balance"]
 

@@ -219,6 +219,10 @@ def _parse_and_store(statement: models.Statement, db: Session, user_id: str = No
     
     header = result.get("header", {})
     if header:
+        if header.get("bank_key"):
+            statement.bank_key = header["bank_key"]
+        if header.get("bank_name") and not statement.bank_name:
+            statement.bank_name = header["bank_name"]
         statement.account_number = header.get("account_number")
         if header.get("opening_balance") is not None:
             statement.opening_balance = header["opening_balance"]
@@ -269,6 +273,14 @@ def _store_statement_lines(statement: models.Statement, db: Session) -> dict:
     if extracted.get("error"):
         logger.warning(f"Line extraction failed for {statement.id}: {extracted['error']}")
         return extracted
+
+    # Capture the issuing bank if we haven't already (older statements were
+    # parsed before bank detection existed; posting backfills lines through here).
+    _hdr = extracted.get("header") or {}
+    if _hdr.get("bank_key") and not statement.bank_key:
+        statement.bank_key = _hdr["bank_key"]
+    if _hdr.get("bank_name") and not statement.bank_name:
+        statement.bank_name = _hdr["bank_name"]
 
     # Replace any existing lines for this statement (idempotent re-parse)
     db.query(models.StatementLine).filter(
@@ -1111,8 +1123,9 @@ def post_statement_to_ledger(
             balance_after_transaction=ln.balance,
             category=ln.category,
             # The bank's own operation type, taken from the statement's type_line
-            # rather than guessed — this is fact, not inference.
-            transaction_type=transaction_types.classify_type_line(ln.type_line, ln.direction),
+            # rather than guessed. bank_key scopes any bank-specific wording.
+            transaction_type=transaction_types.classify_type_line(
+                ln.type_line, ln.direction, bank_key=statement.bank_key),
             notes="\n".join(note_bits) if note_bits else None,
             source="statement",
             statement_id=statement.id,

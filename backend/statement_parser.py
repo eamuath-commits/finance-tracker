@@ -41,9 +41,53 @@ def normalize_arabic(text: str) -> str:
     return _ARABIC_RE.sub(_reverse_match, text)
 
 
+# Which bank issued a statement. bank_key is the canonical id used to scope the
+# transaction-type wording rules; bank_name is for display.
+#
+# The reliable signal is the account's OWN IBAN bank code (SA + 2 check + 2 bank
+# code): every Saudi bank has a fixed code, and it can't be confused with a
+# counterparty bank named in a transaction line — which is exactly what fooled a
+# text-only match (an Aljazira statement quotes "ALRAJHI BANK" as a remitter).
+# Name/domain tokens are only a fallback for when no IBAN is found.
+_SAUDI_BANK_CODES = {
+    "80": ("alrajhi", "Al Rajhi Bank"),
+    "60": ("aljazira", "Bank Aljazira"),
+    # Extend as more banks are imported — a new code here, never a new type.
+}
+
+# Fallback only. Scored by count so a single mention of another bank in a
+# transaction narrative cannot outweigh the issuer's own repeated branding.
+_BANK_SIGNATURES = [
+    ("alrajhi", "Al Rajhi Bank", ("al rajhi", "alrajhi", "الراجحي")),
+    ("aljazira", "Bank Aljazira", ("aljazira", "al jazira", "الجزيرة")),
+]
+
+
+def detect_bank(first_page_text: str, iban: Optional[str] = None):
+    """Return (bank_key, bank_name) for the ISSUING bank, or (None, None).
+
+    Pass the account's own IBAN (from the header) — its bank code is the
+    authoritative signal. Falls back to scored letterhead tokens otherwise.
+    """
+    if iban and iban.upper().startswith("SA") and len(iban) >= 6:
+        code = iban[4:6]
+        if code in _SAUDI_BANK_CODES:
+            return _SAUDI_BANK_CODES[code]
+
+    text = (first_page_text or "").lower()
+    best_key, best_name, best_score = None, None, 0
+    for key, name, needles in _BANK_SIGNATURES:
+        score = sum(text.count(n) for n in needles)
+        if score > best_score:
+            best_key, best_name, best_score = key, name, score
+    return (best_key, best_name) if best_score else (None, None)
+
+
 @dataclass
 class StatementHeader:
     """Metadata extracted from the statement's first page."""
+    bank_key: Optional[str] = None       # canonical issuer id ("alrajhi", "aljazira")
+    bank_name: Optional[str] = None      # display name
     account_number: Optional[str] = None
     iban: Optional[str] = None
     customer_name: Optional[str] = None
@@ -161,6 +205,9 @@ def parse_header(first_page_text: str) -> StatementHeader:
         m = re.search(r'\b(SA\d{20,})\b', first_page_text)
         if m:
             header.iban = m.group(1)
+
+    # Issuing bank — after the IBAN, whose bank code is the authoritative signal.
+    header.bank_key, header.bank_name = detect_bank(first_page_text, header.iban)
 
     if header.customer_name is None:
         m = re.search(r'Account\s+Name\s*:?\s*(.+?)\s*(?:\n|$)', first_page_text)
