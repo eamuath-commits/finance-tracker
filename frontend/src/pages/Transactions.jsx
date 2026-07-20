@@ -9,6 +9,28 @@ import SMSEnrichTab from "../components/SMSEnrichTab";
 import { useConfirm } from "../components/ConfirmProvider";
 
 
+// Bank transaction types — what the bank DID, separate from the spending
+// category. Short label + pill styling per type; order is the filter order.
+const TX_TYPES = [
+    'PURCHASE', 'PURCHASE_INTL', 'CARD_PAYMENT', 'ATM_WITHDRAWAL',
+    'INTERNAL_TRANSFER', 'TRANSFER_IN', 'TRANSFER_OUT',
+    'BILL_PAYMENT', 'LOAN_INSTALMENT', 'FEE', 'REFUND', 'OTHER',
+];
+const TX_TYPE_META = {
+    PURCHASE:          { label: 'Purchase',       cls: 'bg-slate-700/60 text-slate-200 border-slate-600' },
+    PURCHASE_INTL:     { label: 'Purchase · Intl', cls: 'bg-indigo-900/30 text-indigo-300 border-indigo-800' },
+    CARD_PAYMENT:      { label: 'Card Payment',    cls: 'bg-purple-900/30 text-purple-300 border-purple-800' },
+    ATM_WITHDRAWAL:    { label: 'ATM',             cls: 'bg-orange-900/30 text-orange-300 border-orange-800' },
+    INTERNAL_TRANSFER: { label: 'Internal',        cls: 'bg-blue-900/30 text-blue-300 border-blue-800' },
+    TRANSFER_IN:       { label: 'Transfer In',     cls: 'bg-emerald-900/30 text-emerald-300 border-emerald-800' },
+    TRANSFER_OUT:      { label: 'Transfer Out',    cls: 'bg-rose-900/30 text-rose-300 border-rose-800' },
+    BILL_PAYMENT:      { label: 'Bill',            cls: 'bg-amber-900/30 text-amber-300 border-amber-800' },
+    LOAN_INSTALMENT:   { label: 'Loan',            cls: 'bg-pink-900/30 text-pink-300 border-pink-800' },
+    FEE:               { label: 'Fee',             cls: 'bg-gray-800/60 text-gray-400 border-gray-700' },
+    REFUND:            { label: 'Refund',          cls: 'bg-green-900/30 text-green-300 border-green-800' },
+    OTHER:             { label: 'Other',           cls: 'bg-slate-800/60 text-slate-400 border-slate-700' },
+};
+
 // Categories list
 const Categories = [
     'Food & Dining', 'Transport', 'Shopping', 'Entertainment', 'Bills & Utilities',
@@ -77,6 +99,7 @@ function Transactions() {
     const [searchTerm, setSearchTermRaw] = useState(storedFilters.searchTerm || '');
     const [accountFilter, setAccountFilterRaw] = useState(storedFilters.accountFilter || '');
     const [typeFilter, setTypeFilterRaw] = useState(storedFilters.typeFilter || '');
+    const [bankTypeFilter, setBankTypeFilterRaw] = useState(storedFilters.bankTypeFilter || '');
     const [categoryFilter, setCategoryFilterRaw] = useState(storedFilters.categoryFilter || '');
     const [dateRange, setDateRangeRaw] = useState(storedFilters.dateRange || { start: '', end: '' });
     const [sortColumn, setSortColumnRaw] = useState(storedFilters.sortColumn || 'date');
@@ -88,6 +111,7 @@ function Transactions() {
     const setSearchTerm = (v) => { setSearchTermRaw(v); persist('searchTerm', v); };
     const setAccountFilter = (v) => { setAccountFilterRaw(v); persist('accountFilter', v); };
     const setTypeFilter = (v) => { setTypeFilterRaw(v); persist('typeFilter', v); };
+    const setBankTypeFilter = (v) => { setBankTypeFilterRaw(v); persist('bankTypeFilter', v); };
     const setCategoryFilter = (v) => { setCategoryFilterRaw(v); persist('categoryFilter', v); };
     const setDateRange = (v) => { setDateRangeRaw(v); persist('dateRange', v); };
     const setSortColumn = (v) => { setSortColumnRaw(v); persist('sortColumn', v); };
@@ -257,6 +281,7 @@ function Transactions() {
                 if (typeFilter === 'Transfer' && tx.category !== 'Transfer') return false;
             }
             // Category filter
+            if (bankTypeFilter && (tx.transaction_type || 'OTHER') !== bankTypeFilter) return false;
             if (categoryFilter && tx.category !== categoryFilter) return false;
             // Date range filter
             if (dateRange.start) {
@@ -299,7 +324,7 @@ function Transactions() {
             return sorted.slice(0, parseInt(countLimit));
         }
         return sorted;
-    }, [transactions, searchTerm, accountFilter, typeFilter, categoryFilter, dateRange, sortColumn, sortDir, countLimit]);
+    }, [transactions, searchTerm, accountFilter, typeFilter, bankTypeFilter, categoryFilter, dateRange, sortColumn, sortDir, countLimit]);
 
     // Calculate totals based on filtered transactions
     const totals = useMemo(() => {
@@ -554,7 +579,7 @@ function Transactions() {
         }
     };
 
-    const hasActiveFilters = searchTerm || accountFilter || typeFilter || categoryFilter || dateRange.start || dateRange.end || monthOffset !== null;
+    const hasActiveFilters = searchTerm || accountFilter || typeFilter || bankTypeFilter || categoryFilter || dateRange.start || dateRange.end || monthOffset !== null;
 
     // Export state
     const [showExportMenu, setShowExportMenu] = useState(false);
@@ -889,6 +914,19 @@ function Transactions() {
                                 <div className="absolute right-3 top-3.5 text-gray-400 pointer-events-none">▼</div>
                             </div>
 
+                            {/* Bank transaction type */}
+                            <div className="relative">
+                                <select
+                                    className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 appearance-none"
+                                    value={bankTypeFilter}
+                                    onChange={e => setBankTypeFilter(e.target.value)}
+                                >
+                                    <option value="">All Bank Types</option>
+                                    {TX_TYPES.map(t => <option key={t} value={t}>{TX_TYPE_META[t].label}</option>)}
+                                </select>
+                                <div className="absolute right-3 top-3.5 text-gray-400 pointer-events-none">▼</div>
+                            </div>
+
                             {/* Category */}
                             <div className="relative">
                                 <select
@@ -1037,6 +1075,7 @@ function Transactions() {
                                         { key: 'date', label: 'Date', align: 'left', hideClass: '' },
                                         { key: null, label: 'From:', align: 'left', hideClass: '' },
                                         { key: null, label: 'To:', align: 'left', hideClass: '' },
+                                        { key: null, label: 'Type', align: 'left', hideClass: 'hidden md:table-cell' },
                                         { key: 'category', label: 'Category', align: 'left', hideClass: 'hidden lg:table-cell' },
                                         { key: 'amount', label: 'Amount', align: 'right', hideClass: '' },
                                         { key: 'balance', label: 'Balance', align: 'right', hideClass: 'hidden md:table-cell' },
@@ -1228,6 +1267,14 @@ function Transactions() {
                                                     </>
                                                 )}
                                             </td>
+                                            <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-sm hidden md:table-cell">
+                                                {(() => {
+                                                    const meta = TX_TYPE_META[tx.transaction_type];
+                                                    return meta
+                                                        ? <span className={`px-2 py-0.5 rounded text-xs border font-medium ${meta.cls}`}>{meta.label}</span>
+                                                        : <span className="text-gray-600">—</span>;
+                                                })()}
+                                            </td>
                                             <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-sm text-gray-400 hidden lg:table-cell">
                                                 {tx.category ? <span className={`px-2 py-0.5 rounded text-xs border ${txIsCredit ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800' : 'bg-slate-700 text-blue-300 border-slate-600'}`}>{tx.category}</span> : '-'}
                                             </td>
@@ -1278,7 +1325,7 @@ function Transactions() {
                                     );
                                 })}
                                 {filteredTransactions.length === 0 && (
-                                    <tr><td colSpan="8" className="px-6 py-8 text-center text-gray-500">No transactions found.</td></tr>
+                                    <tr><td colSpan="9" className="px-6 py-8 text-center text-gray-500">No transactions found.</td></tr>
                                 )}
                             </tbody>
                         </table>
