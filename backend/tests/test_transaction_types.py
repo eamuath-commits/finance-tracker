@@ -62,6 +62,46 @@ class TestRealStatementTypes:
         assert unclassified == []
 
 
+class TestBankNeutrality:
+    """The taxonomy is universal; the wording is per-bank. Two banks describe the
+    same operation differently and both must land on the same type. These pin the
+    cross-bank behaviour so an Al Rajhi tweak cannot quietly break Aljazira."""
+
+    @pytest.mark.parametrize("alrajhi,aljazira,expected", [
+        ("Debit - Credit Cards Transactions", "Credit Card Payment", T.CARD_PAYMENT),
+        ("Inward IPS Credit Transfer", "Incoming Local Transfer", T.TRANSFER_IN),
+        ("Inward IPS Credit Transfer", "Instant Incoming Transfer", T.TRANSFER_IN),
+        ("Outward IPS Credit Transfer", "Instant Outgoing Transfer", T.TRANSFER_OUT),
+        ("Outward IPS Credit Transfer", "Outgoing Local Transfer", T.TRANSFER_OUT),
+        ("Debit T & F installments", "Loan Repayment", T.LOAN_INSTALMENT),
+    ])
+    def test_both_banks_map_to_the_same_type(self, alrajhi, aljazira, expected):
+        assert T.classify_type_line(alrajhi) == expected
+        assert T.classify_type_line(aljazira) == expected
+
+    def test_aljazira_loan_repayment(self):
+        assert T.classify_type_line("Loan Repayment", "debit") == T.LOAN_INSTALMENT
+
+    def test_aljazira_commodity_loan_leg(self):
+        # "Through Bank Aljazira" — the murabaha commodity legs, per the owner.
+        assert T.classify_type_line("Through Bank Aljazira", "debit") == T.LOAN_INSTALMENT
+
+    def test_aljazira_transfers_both_directions(self):
+        assert T.classify_type_line("Incoming Local Transfer", "credit") == T.TRANSFER_IN
+        assert T.classify_type_line("Outgoing Local Transfer", "debit") == T.TRANSFER_OUT
+
+    def test_loan_repayment_does_not_leak_into_bill_payment(self):
+        # "repayment" contains "payment"; make sure it still classifies as a loan.
+        assert T.classify_type_line("Loan Repayment") == T.LOAN_INSTALMENT
+
+    def test_al_rajhi_classification_is_unchanged_by_the_new_rules(self):
+        # None of the Aljazira additions may alter an existing Al Rajhi mapping.
+        assert T.classify_type_line("POS purchase Apple pay (Domestic)") == T.PURCHASE
+        assert T.classify_type_line("Debit T & F installments") == T.LOAN_INSTALMENT
+        assert T.classify_type_line("Sadad Payments") == T.BILL_PAYMENT
+        assert T.classify_type_line("Outward IPS Credit Transaction Charges") == T.FEE
+
+
 class TestRuleOrderingMatters:
     """Several fee and refund types contain the words 'transfer' or 'purchase',
     so the specific rules have to beat the general ones."""

@@ -78,11 +78,15 @@ _RULES = [
     ("refund", REFUND),
     ("reversal", REFUND),
 
-    # Loans.
+    # Loans. "installment/instalment" is Al Rajhi ("Debit T & F installments");
+    # "loan repayment" is Bank Aljazira. Both are bank-neutral words for the same
+    # thing, so they live in the universal set.
     ("t & f installment", LOAN_INSTALMENT),
     ("t&f installment", LOAN_INSTALMENT),
     ("instalment", LOAN_INSTALMENT),
     ("installment", LOAN_INSTALMENT),
+    ("loan repayment", LOAN_INSTALMENT),
+    ("loan payment", LOAN_INSTALMENT),
 
     # Cards.
     ("credit cards transactions", CARD_PAYMENT),
@@ -101,10 +105,14 @@ _RULES = [
     ("to customer account", INTERNAL_TRANSFER),
     ("from customer account", INTERNAL_TRANSFER),
 
-    # Directed local transfers. "outward"/"inward" first, so "Inward Local
-    # Payment Order" is a receipt rather than falling into the order rule below.
+    # Directed local transfers. The direction is in the wording itself, so the
+    # type does not depend on the debit/credit flag: Al Rajhi says
+    # "Outward/Inward", Bank Aljazira says "Outgoing/Incoming". Listed before the
+    # order/sarie rules so "Inward Local Payment Order" is a receipt.
     ("outward", TRANSFER_OUT),
+    ("outgoing", TRANSFER_OUT),
     ("inward", TRANSFER_IN),
+    ("incoming", TRANSFER_IN),
     # Sarie is the Saudi instant-payment rail; a "payment order" on it is money
     # being sent.
     ("payment order", TRANSFER_OUT),
@@ -116,6 +124,20 @@ _RULES = [
     ("international", PURCHASE_INTL),
     ("purchase", PURCHASE),
     ("pos ", PURCHASE),
+
+    # ── Bank-specific wording ──
+    # The types above are universal; these are phrasings unique to one bank that
+    # do not generalise. Kept distinctive enough not to collide with any other
+    # bank's words. As more banks are imported, add their words here, never a new
+    # type — the taxonomy is fixed, only the wording varies.
+    #
+    # Bank Aljazira: the two commodity legs of a murabaha loan settlement print
+    # as "Through Bank Aljazira" (confirmed by the account owner as part of the
+    # RBG EIR DINAR COMMODITY loan). NOTE this is fragile — "Through Bank
+    # Aljazira" is a generic descriptor, and it is trusted here only because it
+    # appears as a row's TYPE LINE solely on those loan legs. When Aljazira is
+    # imported for real this should become a bank-scoped rule rather than global.
+    ("through bank aljazira", LOAN_INSTALMENT),
 ]
 
 
