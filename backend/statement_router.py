@@ -921,6 +921,30 @@ def _unpost_impact(db: Session, statement_id: str) -> dict:
     }
 
 
+def _overlapping_posted_statements(db: Session, statement) -> list:
+    """Other POSTED statements on the same account whose period overlaps this one.
+
+    The ledger is protected from statement posting: a new statement may only add
+    a period the ledger does not already cover. Overlap would duplicate the
+    shared transactions and silently double the balance, so it is refused.
+    Two periods [a1,a2] and [b1,b2] overlap iff a1 <= b2 and b1 <= a2.
+    """
+    if not (statement.account_id and statement.statement_period_start and statement.statement_period_end):
+        return []
+    others = db.query(models.Statement).filter(
+        models.Statement.account_id == statement.account_id,
+        models.Statement.id != statement.id,
+        models.Statement.status == "posted",
+        models.Statement.statement_period_start.isnot(None),
+        models.Statement.statement_period_end.isnot(None),
+    ).all()
+    return [
+        s for s in others
+        if s.statement_period_start <= statement.statement_period_end
+        and statement.statement_period_start <= s.statement_period_end
+    ]
+
+
 def _remove_posted_transactions(db: Session, statement_id: str) -> dict:
     """Delete a statement's ledger transactions, unlinking everything first.
 
@@ -1058,6 +1082,35 @@ def post_statement_to_ledger(
             detail="Statement must be linked to an account before posting.",
         )
 
+    # ── Protect the ledger from statement posting ──
+    # Posting never overrides or replaces what is already on the ledger.
+
+    # 1. An already-posted statement is not re-posted. Re-posting would delete
+    #    and recreate its ledger rows — a replacement. To change a posted
+    #    statement, reverse it first (an explicit, deliberate action), then post.
+    if statement.status == "posted":
+        raise HTTPException(
+            status_code=409,
+            detail=("This statement is already posted to the ledger. To re-post it, "
+                    "reverse the posting first — the ledger is never silently replaced."),
+        )
+
+    # 2. A new statement may only cover a period the ledger does not already have.
+    #    Overlap would duplicate the shared transactions, so it is refused.
+    overlaps = _overlapping_posted_statements(db, statement)
+    if overlaps:
+        o = overlaps[0]
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"This statement ({statement.statement_period_start} to "
+                f"{statement.statement_period_end}) overlaps an already-posted statement "
+                f"({o.statement_period_start} to {o.statement_period_end}) on the same "
+                f"account. Posting is blocked to protect the ledger from duplicated "
+                f"entries. Reverse the existing statement first if you mean to replace it."
+            ),
+        )
+
     # Ensure lines are persisted (backfill for older statements)
     lines = db.query(models.StatementLine).filter(
         models.StatementLine.statement_id == statement_id
@@ -1072,9 +1125,10 @@ def post_statement_to_ledger(
     if not lines:
         raise HTTPException(status_code=400, detail="No parsed lines found in statement")
 
-    # Idempotency: remove this statement's own previously-posted transactions.
-    # Must go through the unlinking helper — a plain bulk delete here violated
-    # statement_lines' NO ACTION foreign key and made re-posting fail outright.
+    # Safety net only: a re-post is now blocked above, so a statement reaching
+    # here is a draft with nothing of its own on the ledger. This clears any
+    # orphan rows left by an interrupted post before it, and never touches
+    # another statement's entries.
     _remove_posted_transactions(db, statement_id)
 
     created = 0
@@ -1144,21 +1198,34 @@ def post_statement_to_ledger(
     statement.reconciliation_status = "reconciled"
     db.flush()
 
-    # Recalculate balance and compare against the statement's closing balance
+    # Recalculate the account balance, then check it against the closing balance
+    # of the NEWEST posted statement on the account — not necessarily the one
+    # just posted. The recalc replays every statement in period order, so the
+    # account balance equals the latest statement's closing; comparing it to an
+    # OLDER statement's closing produced a false "mismatch" when back-filling
+    # history.
     from main import _recalculate_account_balance
     recalc = _recalculate_account_balance(db, statement.account_id)
     new_balance = recalc.get("new_balance") if recalc else None
     db.commit()
 
+    newest = db.query(models.Statement).filter(
+        models.Statement.account_id == statement.account_id,
+        models.Statement.status == "posted",
+        models.Statement.statement_period_end.isnot(None),
+        models.Statement.closing_balance.isnot(None),
+    ).order_by(models.Statement.statement_period_end.desc()).first()
+    expected_closing = newest.closing_balance if newest else statement.closing_balance
+
     balance_matches = (
         new_balance is not None
-        and statement.closing_balance is not None
-        and round(new_balance, 2) == round(statement.closing_balance, 2)
+        and expected_closing is not None
+        and round(new_balance, 2) == round(expected_closing, 2)
     )
 
     logger.info(
         f"Posted statement {statement_id}: {created} transactions, {folded_fees} fees folded, "
-        f"balance={new_balance} vs closing={statement.closing_balance} match={balance_matches}"
+        f"balance={new_balance} vs expected_closing={expected_closing} match={balance_matches}"
     )
     return {
         "statement_id": statement.id,
@@ -1166,12 +1233,15 @@ def post_statement_to_ledger(
         "fees_folded": folded_fees,
         "account_id": statement.account_id,
         "new_balance": new_balance,
-        "statement_closing_balance": statement.closing_balance,
+        # The closing this balance was checked against — the newest posted
+        # statement's, which the account balance should equal.
+        "statement_closing_balance": expected_closing,
         "balance_matches_statement": balance_matches,
         "status": statement.status,
         "message": (
             f"{created} transactions posted from statement."
-            + ("" if balance_matches else " WARNING: balance does not match statement closing — review.")
+            + ("" if balance_matches else " WARNING: recalculated balance does not match the "
+               "latest statement's closing — review.")
         ),
     }
 

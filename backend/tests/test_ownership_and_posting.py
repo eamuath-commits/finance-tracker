@@ -17,9 +17,12 @@ def _user_id(db_session, username):
     return db_session.query(models.User).filter(models.User.username == username).first().id
 
 
-def _make_statement(db_session, user_id, account_id, lines):
+def _make_statement(db_session, user_id, account_id, lines, period=None, closing=None):
     stmt = models.Statement(id=str(uuid.uuid4()), user_id=user_id, account_id=account_id,
-                            status="draft", original_filename="test.pdf")
+                            status="draft", original_filename="test.pdf",
+                            statement_period_start=period[0] if period else None,
+                            statement_period_end=period[1] if period else None,
+                            closing_balance=closing)
     db_session.add(stmt)
     db_session.flush()
     for i, (amount, direction) in enumerate(lines):
@@ -87,19 +90,63 @@ class TestPostingLifecycle:
         assert db_session.query(models.Transaction).filter(
             models.Transaction.statement_id == stmt.id).count() == 2
 
-    def test_reposting_replaces_instead_of_raising(self, client, db_session):
-        # Regression: statement_lines.posted_transaction_id is a NO ACTION FK and
-        # posting always sets it, so the old bulk delete raised ForeignKeyViolation.
+    def test_reposting_a_posted_statement_is_blocked(self, client, db_session):
+        # The ledger is protected: a posted statement is never silently replaced.
+        # Re-posting is refused; you must reverse first.
         uid = _user_id(db_session, client.test_username)
         acct = client.post("/accounts/", json={"name": "Main", "account_type": "Checking"}).json()
         stmt = _make_statement(db_session, uid, acct["id"], [(100.0, "debit"), (250.0, "credit")])
 
         assert client.post(f"/api/statements/{stmt.id}/post").status_code == 200
         second = client.post(f"/api/statements/{stmt.id}/post")
-        assert second.status_code == 200, f"re-posting failed: {second.text}"
-        assert second.json()["posted"] == 2
+        assert second.status_code == 409, f"re-post should be blocked, got {second.text}"
+        # Untouched: still exactly the two original rows.
         assert db_session.query(models.Transaction).filter(
-            models.Transaction.statement_id == stmt.id).count() == 2, "re-posting duplicated the ledger"
+            models.Transaction.statement_id == stmt.id).count() == 2
+
+    def test_reverse_then_repost_is_allowed(self, client, db_session):
+        uid = _user_id(db_session, client.test_username)
+        acct = client.post("/accounts/", json={"name": "Main", "account_type": "Checking"}).json()
+        stmt = _make_statement(db_session, uid, acct["id"], [(100.0, "debit")])
+        client.post(f"/api/statements/{stmt.id}/post")
+        assert client.post(f"/api/statements/{stmt.id}/unpost").status_code == 200
+        assert client.post(f"/api/statements/{stmt.id}/post").status_code == 200
+
+    def test_overlapping_statement_is_blocked_and_ledger_untouched(self, client, db_session):
+        # A new statement may not cover a period the ledger already has — that
+        # would duplicate the shared rows. Refused; the ledger does not change.
+        uid = _user_id(db_session, client.test_username)
+        acct = client.post("/accounts/", json={"name": "Main", "account_type": "Checking"}).json()
+        first = _make_statement(db_session, uid, acct["id"], [(100.0, "debit")],
+                                period=(date(2026, 2, 1), date(2026, 2, 28)), closing=100.0)
+        assert client.post(f"/api/statements/{first.id}/post").status_code == 200
+        before = db_session.query(models.Transaction).filter(
+            models.Transaction.account_id == acct["id"]).count()
+
+        overlap = _make_statement(db_session, uid, acct["id"], [(50.0, "debit")],
+                                  period=(date(2026, 2, 20), date(2026, 3, 20)), closing=150.0)
+        res = client.post(f"/api/statements/{overlap.id}/post")
+        assert res.status_code == 409
+        assert "overlap" in res.json()["detail"].lower()
+        assert db_session.query(models.Transaction).filter(
+            models.Transaction.account_id == acct["id"]).count() == before, "overlap changed the ledger"
+        db_session.expire_all()
+        assert db_session.query(models.Statement).filter(
+            models.Statement.id == overlap.id).first().status == "draft"
+
+    def test_older_nonoverlapping_statement_posts_without_a_false_warning(self, client, db_session):
+        # Back-filling earlier history is allowed and must not falsely warn: the
+        # balance is checked against the newest statement's closing, not the older.
+        uid = _user_id(db_session, client.test_username)
+        acct = client.post("/accounts/", json={"name": "Main", "account_type": "Checking"}).json()
+        feb = _make_statement(db_session, uid, acct["id"], [(0.0, "credit")],
+                              period=(date(2026, 2, 1), date(2026, 2, 28)), closing=0.0)
+        client.post(f"/api/statements/{feb.id}/post")
+        jan = _make_statement(db_session, uid, acct["id"], [(0.0, "credit")],
+                              period=(date(2026, 1, 1), date(2026, 1, 31)), closing=0.0)
+        res = client.post(f"/api/statements/{jan.id}/post")
+        assert res.status_code == 200
+        assert res.json()["balance_matches_statement"] is True, res.json()
 
     def test_unpost_preview_changes_nothing(self, client, db_session):
         uid = _user_id(db_session, client.test_username)
