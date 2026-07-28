@@ -539,6 +539,21 @@ def get_statement(
             ).scalar()
             # Account balance before statement = current - credits + debits
             account_balance_before_stmt = round(acct.current_balance - stmt_credits + stmt_debits, 2)
+
+            # When the account has no posted history apart from this statement,
+            # the app has no independent anchor of its own — the account sits at
+            # 0 while the bank's statement opens at a real figure. Anchor the
+            # System Balance at the bank's stated opening so the column tracks the
+            # bank's balance and matches what posting would produce (the balance
+            # recalc baselines at the earliest statement's opening too). Without
+            # this, a draft first statement's System Balance is offset by the
+            # entire opening balance and looks broken.
+            prior_tx = db.query(models.Transaction).filter(
+                models.Transaction.account_id == statement.account_id,
+                models.Transaction.statement_id != statement_id,
+            ).count()
+            if prior_tx == 0 and statement.opening_balance is not None:
+                account_balance_before_stmt = round(statement.opening_balance, 2)
     
     return {
         "id": statement.id,
