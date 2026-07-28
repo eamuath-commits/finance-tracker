@@ -856,7 +856,13 @@ def extract_statement_rows(file_path: str) -> dict:
                 return {"header": None, "rows": [], "chain_valid": False,
                         "chain_mismatches": 0, "error": "PDF has no pages"}
 
-            header = asdict(parse_header(normalize_arabic(pdf.pages[0].extract_text() or "")))
+            _hdr = parse_header(normalize_arabic(pdf.pages[0].extract_text() or ""))
+            # Some banks (Bank Aljazira) print opening/closing in a last-page
+            # summary rather than the page-1 header. Without this, opening comes
+            # back None here, the chain validation below starts from 0, and every
+            # row is flagged as a mismatch even though the statement is correct.
+            _fill_summary_from_last_page(pdf, _hdr)
+            header = asdict(_hdr)
 
             cols = _document_columns(pdf)
             need = max(cols.values()) + 1
