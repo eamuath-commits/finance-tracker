@@ -773,6 +773,24 @@ def _detect_columns(row) -> Optional[dict]:
     return None
 
 
+def corrected_opening(prev, wd, dep, new):
+    """Reconcile a statement summary's four over-determined figures.
+
+    prev - withdrawals + deposits must equal new. Bank Aljazira sometimes prints
+    the Previous Balance as the balance AFTER the first same-day transaction (so
+    it equals row 0's balance), which is inconsistent with its own New Balance
+    and totals and breaks the balance chain + continuity with the prior
+    statement. The New Balance and the withdrawal/deposit totals are corroborated
+    by the transaction rows, so when the four disagree, derive the true opening
+    from them. Returns prev unchanged when the figures are already consistent.
+    """
+    if prev is None or wd is None or dep is None or new is None:
+        return prev
+    if abs((prev - wd + dep) - new) > 0.01:
+        return round(new + wd - dep, 2)
+    return prev
+
+
 def _fill_summary_from_last_page(pdf, header) -> None:
     """Fill balances from a closing summary table when the header block lacks them.
 
@@ -789,14 +807,16 @@ def _fill_summary_from_last_page(pdf, header) -> None:
                 if re.search(r'Previous\s+Balance', joined, re.I) and i + 1 < len(table):
                     vals = [v for v in (parse_amount(c) for c in table[i + 1]) if v is not None]
                     if len(vals) >= 4:
+                        wd, dep, new = vals[1], vals[2], vals[3]
+                        prev = corrected_opening(vals[0], wd, dep, new)
                         if header.opening_balance is None:
-                            header.opening_balance = vals[0]
+                            header.opening_balance = prev
                         if header.total_withdrawals is None:
-                            header.total_withdrawals = vals[1]
+                            header.total_withdrawals = wd
                         if header.total_deposits is None:
-                            header.total_deposits = vals[2]
+                            header.total_deposits = dep
                         if header.closing_balance is None:
-                            header.closing_balance = vals[3]
+                            header.closing_balance = new
                     return
     except Exception:  # a malformed summary must never fail the whole parse
         pass

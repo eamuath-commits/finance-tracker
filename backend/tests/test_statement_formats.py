@@ -28,6 +28,29 @@ class TestDateNormalisation:
             assert SP.normalize_date_cell(value) is None, f"{value!r} should not parse as a date"
 
 
+class TestSummaryReconciliation:
+    """A statement summary's four figures are over-determined; Bank Aljazira
+    sometimes prints the Previous Balance as the balance after the first
+    transaction, which must be corrected from the corroborated New + totals."""
+
+    def test_consistent_summary_is_left_alone(self):
+        # Al Rajhi / a clean Aljazira: prev - wd + dep == new.
+        assert SP.corrected_opening(284343.77, 387401.09, 322996.14, 219938.82) == 284343.77
+
+    def test_anomalous_previous_balance_is_corrected(self):
+        # The real case: printed prev 216,962.69 is off by the first txn (2,976.13);
+        # the true opening 219,938.82 = new + withdrawals - deposits.
+        assert SP.corrected_opening(216962.69, 73881.21, 0.0, 146057.61) == 219938.82
+
+    def test_derived_opening_makes_the_chain_close(self):
+        prev = SP.corrected_opening(216962.69, 73881.21, 0.0, 146057.61)
+        assert abs((prev - 73881.21 + 0.0) - 146057.61) < 0.01
+
+    def test_missing_figures_return_prev_unchanged(self):
+        assert SP.corrected_opening(None, 1.0, 2.0, 3.0) is None
+        assert SP.corrected_opening(100.0, None, 0.0, 100.0) == 100.0
+
+
 class TestBankDetection:
     """The issuing bank is identified by the account's own IBAN bank code, which
     a counterparty bank named in a transaction line cannot spoof."""
