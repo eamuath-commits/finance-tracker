@@ -30,12 +30,13 @@ TRANSFER_IN = "TRANSFER_IN"               # local transfer received
 BILL_PAYMENT = "BILL_PAYMENT"             # SADAD and friends
 LOAN_INSTALMENT = "LOAN_INSTALMENT"
 FEE = "FEE"                               # bank charges, FX markup
+INTEREST = "INTEREST"                     # credit-card profit/interest (EPP profit)
 REFUND = "REFUND"
 OTHER = "OTHER"                           # genuinely unrecognised — see below
 
 ALL_TYPES = [
     PURCHASE, PURCHASE_INTL, CARD_PAYMENT, ATM_WITHDRAWAL, INTERNAL_TRANSFER,
-    TRANSFER_OUT, TRANSFER_IN, BILL_PAYMENT, LOAN_INSTALMENT, FEE, REFUND, OTHER,
+    TRANSFER_OUT, TRANSFER_IN, BILL_PAYMENT, LOAN_INSTALMENT, FEE, INTEREST, REFUND, OTHER,
 ]
 
 # Types that are NOT spending. Money leaving one of your pockets for another is
@@ -55,6 +56,7 @@ TYPE_LABELS = {
     BILL_PAYMENT: "Bill Payment",
     LOAN_INSTALMENT: "Loan Instalment",
     FEE: "Fee",
+    INTEREST: "Interest",
     REFUND: "Refund",
     OTHER: "Other",
 }
