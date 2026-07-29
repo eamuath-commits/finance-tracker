@@ -90,6 +90,13 @@ def run_migrations(engine):
                 conn.execute(text("ALTER TABLE statements ADD COLUMN bank_key VARCHAR"))
                 conn.commit()
 
+        # A statement can target a credit card instead of a bank account.
+        if stmt_cols and 'credit_card_id' not in stmt_cols:
+            print("Migrating: Adding credit_card_id to statements")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE statements ADD COLUMN credit_card_id VARCHAR"))
+                conn.commit()
+
         # Links the two legs of one internal transfer without merging them.
         if 'transfer_group_id' not in columns:
             print("Migrating: Adding transfer_group_id to transactions")

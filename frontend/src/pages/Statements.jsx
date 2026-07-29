@@ -55,6 +55,7 @@ const Statements = () => {
     const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null });
     // Accounts for linking
     const [accounts, setAccounts] = useState([]);
+    const [creditCards, setCreditCards] = useState([]);
     // Duplicate detection state
     const [matchSummary, setMatchSummary] = useState(null);
     const [matchFilter, setMatchFilter] = useState('all'); // 'all' | 'new' | 'matched'
@@ -94,6 +95,7 @@ const Statements = () => {
         fetchStatements();
         // Fetch accounts for linking
         api.get('/accounts/').then(res => setAccounts(res.data)).catch(() => {});
+        api.get('/credit-cards/').then(res => setCreditCards(res.data)).catch(() => {});
         // Fetch learned categories for auto-suggestion
         fetchAutoCategories();
     }, [fetchStatements]);
@@ -683,8 +685,8 @@ const Statements = () => {
                                     <span className="text-sm text-blue-400 font-mono">****{statementDetail.account_number.slice(-4)}</span>
                                 </>
                             )}
-                            {!statementDetail?.account_id && (
-                                <span className="text-xs bg-amber-600/20 text-amber-400 px-2 py-0.5 rounded">⚠ No account linked</span>
+                            {!statementDetail?.account_id && !statementDetail?.credit_card_id && (
+                                <span className="text-xs bg-amber-600/20 text-amber-400 px-2 py-0.5 rounded">⚠ Not linked</span>
                             )}
                             {statementDetail?.account_name && (
                                 <>
@@ -692,32 +694,47 @@ const Statements = () => {
                                     <span className="text-sm text-emerald-400">{statementDetail.account_name}</span>
                                 </>
                             )}
+                            {statementDetail?.credit_card_name && (
+                                <>
+                                    <span className="text-gray-600">→</span>
+                                    <span className="text-sm text-purple-400">💳 {statementDetail.credit_card_name}</span>
+                                </>
+                            )}
                         </div>
-                        {/* Account Link Selector — shown when no account is linked */}
-                        {!statementDetail?.account_id && statementDetail?.status === 'draft' && (
+                        {/* Link selector — accounts AND credit cards, shown when neither is linked */}
+                        {!statementDetail?.account_id && !statementDetail?.credit_card_id && statementDetail?.status === 'draft' && (
                             <div className="flex items-center gap-2 mt-1">
                                 <Wallet size={14} className="text-amber-400" />
                                 <select
                                     className="bg-slate-800 border border-amber-600/50 text-amber-300 rounded px-2 py-1 text-xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500"
                                     defaultValue=""
                                     onChange={async (e) => {
-                                        const accountId = e.target.value;
-                                        if (!accountId) return;
+                                        const [kind, id] = e.target.value.split(':');
+                                        if (!id) return;
+                                        const payload = kind === 'card' ? { credit_card_id: id } : { account_id: id };
                                         try {
-                                            await api.patch(`/api/statements/${selectedStatement}`, { account_id: accountId });
-                                            // Refresh detail
+                                            await api.patch(`/api/statements/${selectedStatement}`, payload);
                                             const detailRes = await api.get(`/api/statements/${selectedStatement}`);
                                             setStatementDetail(detailRes.data);
                                             fetchStatements();
                                         } catch (err) {
-                                            setError(err.response?.data?.detail || 'Failed to link account');
+                                            setError(err.response?.data?.detail || 'Failed to link');
                                         }
                                     }}
                                 >
-                                    <option value="">Link to account...</option>
-                                    {accounts.map(a => (
-                                        <option key={a.id} value={a.id}>{a.name} {a.last_4_digits ? `•••• ${a.last_4_digits}` : ''}</option>
-                                    ))}
+                                    <option value="">Link to account or card...</option>
+                                    <optgroup label="Accounts">
+                                        {accounts.map(a => (
+                                            <option key={a.id} value={`acct:${a.id}`}>{a.name} {a.last_4_digits ? `•••• ${a.last_4_digits}` : ''}</option>
+                                        ))}
+                                    </optgroup>
+                                    {creditCards.length > 0 && (
+                                        <optgroup label="Credit Cards">
+                                            {creditCards.map(c => (
+                                                <option key={c.id} value={`card:${c.id}`}>💳 {c.name} {c.last_4_digits ? `•••• ${c.last_4_digits}` : ''}</option>
+                                            ))}
+                                        </optgroup>
+                                    )}
                                 </select>
                             </div>
                         )}

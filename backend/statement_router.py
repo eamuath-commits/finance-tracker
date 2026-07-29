@@ -356,13 +356,18 @@ def list_statements(
         .all()
     )
     
-    # Build account name lookup
+    # Build account + credit-card name lookups
     account_ids = {s.account_id for s in statements if s.account_id}
     accounts_map = {}
     if account_ids:
         accounts = db.query(models.Account).filter(models.Account.id.in_(account_ids)).all()
         accounts_map = {a.id: a for a in accounts}
-    
+    card_ids = {s.credit_card_id for s in statements if s.credit_card_id}
+    cards_map = {}
+    if card_ids:
+        cards = db.query(models.CreditCard).filter(models.CreditCard.id.in_(card_ids)).all()
+        cards_map = {c.id: c for c in cards}
+
     return [
         {
             "id": s.id,
@@ -372,6 +377,8 @@ def list_statements(
             "account_id": s.account_id,
             "account_name": accounts_map[s.account_id].name if s.account_id and s.account_id in accounts_map else None,
             "account_last4": accounts_map[s.account_id].last_4_digits if s.account_id and s.account_id in accounts_map else (s.account_number[-4:] if s.account_number else None),
+            "credit_card_id": s.credit_card_id,
+            "credit_card_name": cards_map[s.credit_card_id].name if s.credit_card_id and s.credit_card_id in cards_map else None,
             "statement_period_start": s.statement_period_start.isoformat() if s.statement_period_start else None,
             "statement_period_end": s.statement_period_end.isoformat() if s.statement_period_end else None,
             "opening_balance": s.opening_balance,
@@ -561,6 +568,11 @@ def get_statement(
         "original_filename": statement.original_filename,
         "account_id": statement.account_id,
         "account_name": account_name,
+        "credit_card_id": statement.credit_card_id,
+        "credit_card_name": (lambda cc: f"{cc.name} ****{cc.last_4_digits}" if cc else None)(
+            db.query(models.CreditCard).filter(models.CreditCard.id == statement.credit_card_id).first()
+            if statement.credit_card_id else None
+        ),
         "account_number": statement.account_number,
         "statement_period_start": statement.statement_period_start.isoformat() if statement.statement_period_start else None,
         "statement_period_end": statement.statement_period_end.isoformat() if statement.statement_period_end else None,
@@ -606,6 +618,7 @@ class StatementUpdateRequest(BaseModel):
     notes: Optional[str] = None
     status: Optional[str] = None
     account_id: Optional[str] = None
+    credit_card_id: Optional[str] = None
 
 
 @router.patch("/{statement_id}")
@@ -640,7 +653,18 @@ def update_statement(
         if not account:
             raise HTTPException(status_code=404, detail="Account not found or does not belong to you.")
         statement.account_id = body.account_id
-    
+        statement.credit_card_id = None  # a statement targets ONE of the two
+
+    if body.credit_card_id is not None:
+        card = db.query(models.CreditCard).filter(
+            models.CreditCard.id == body.credit_card_id,
+            models.CreditCard.user_id == current_user.id,
+        ).first()
+        if not card:
+            raise HTTPException(status_code=404, detail="Credit card not found or does not belong to you.")
+        statement.credit_card_id = body.credit_card_id
+        statement.account_id = None
+
     db.commit()
     return {"message": "Statement updated", "id": statement.id}
 
@@ -1091,10 +1115,22 @@ def post_statement_to_ledger(
     ).first()
     if not statement:
         raise HTTPException(status_code=404, detail="Statement not found")
+    if statement.credit_card_id:
+        # Card statements use inverted debt semantics (a purchase increases what
+        # you owe, a payment reduces it) and a different reconciliation. That
+        # pipeline is not built yet, so a card-linked statement is not posted
+        # through the account flow — it would write balances the wrong way.
+        raise HTTPException(
+            status_code=400,
+            detail=("This statement is linked to a credit card. Posting credit-card "
+                    "statements is not supported yet — the balance runs the opposite "
+                    "way (a purchase increases what you owe). You can link and review "
+                    "it, but not post it."),
+        )
     if not statement.account_id:
         raise HTTPException(
             status_code=400,
-            detail="Statement must be linked to an account before posting.",
+            detail="Statement must be linked to an account or credit card before posting.",
         )
 
     # ── Protect the ledger from statement posting ──

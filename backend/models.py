@@ -450,6 +450,11 @@ class Statement(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, ForeignKey("users.id"), nullable=True)
     account_id = Column(String, ForeignKey("accounts.id"), nullable=True)  # Resolved after parsing
+    # A statement targets EITHER a bank account or a credit card, never both. A
+    # card statement is a different document (balance = debt, purchases increase
+    # it, payments reduce it), so its posting/reconciliation is handled apart
+    # from the account flow.
+    credit_card_id = Column(String, ForeignKey("credit_cards.id"), nullable=True)
     bank_name = Column(String, nullable=True)  # e.g. "Al Rajhi" (display)
     bank_key = Column(String, nullable=True)   # canonical issuer id, scopes type rules
     original_filename = Column(String, nullable=True)
