@@ -100,6 +100,11 @@ def _classify(desc: str, note: str, direction: str) -> str:
     return transaction_types.PURCHASE
 
 
+def classify(desc: Optional[str], note: Optional[str], direction: Optional[str]) -> str:
+    """Public: classify a stored card line at post time from its text + direction."""
+    return _classify(desc or "", note or "", direction or "")
+
+
 def looks_like_credit_card(first_page_text: str) -> bool:
     """A credit-card statement is identified by markers a current account never
     prints: a brought-forward balance and the masked card-number header."""

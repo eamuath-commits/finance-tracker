@@ -261,13 +261,101 @@ def _parse_and_store(statement: models.Statement, db: Session, user_id: str = No
     return result
 
 
-def _store_statement_lines(statement: models.Statement, db: Session) -> dict:
-    """
-    Parse the statement PDF with the table extractor and (re)persist its rows
-    as StatementLine records. Idempotent: existing lines for the statement are
-    replaced. Returns the extractor result (header, rows, chain validity).
+def _first_page_text(file_path: str) -> str:
+    try:
+        import pdfplumber
+        with pdfplumber.open(file_path) as pdf:
+            return (pdf.pages[0].extract_text() or "") if pdf.pages else ""
+    except Exception:
+        return ""
+
+
+def _store_credit_card_lines(statement: models.Statement, db: Session) -> dict:
+    """Persist a credit-card statement's rows, and fill its card-specific header.
+
+    Auto-links the CreditCard by the printed last-4, and records the debt figures
+    (brought-forward as opening, computed closing) and a period derived from the
+    transaction dates so the ledger-protection overlap check has something to use.
     """
     from datetime import date as _date
+    import credit_card_parser
+
+    parsed = credit_card_parser.parse_credit_card_pdf(statement.file_path)
+    if parsed.get("error"):
+        return parsed
+    hdr = parsed.get("header") or {}
+    rows = parsed.get("transactions") or []
+
+    statement.bank_key = statement.bank_key or hdr.get("bank_key")
+    statement.bank_name = statement.bank_name or hdr.get("bank_name")
+    if hdr.get("brought_forward") is not None:
+        statement.opening_balance = hdr["brought_forward"]
+    if hdr.get("closing_balance") is not None:
+        statement.closing_balance = hdr["closing_balance"]
+
+    # Auto-link the card by its printed last-4 (unless already linked).
+    if not statement.credit_card_id and hdr.get("card_last4"):
+        card = db.query(models.CreditCard).filter(
+            models.CreditCard.user_id == statement.user_id,
+            models.CreditCard.last_4_digits == hdr["card_last4"],
+        ).first()
+        if card:
+            statement.credit_card_id = card.id
+            statement.account_id = None  # a statement targets ONE of the two
+
+    def _d(s):
+        try:
+            return _date.fromisoformat((s or "").replace("/", "-"))
+        except (ValueError, AttributeError):
+            return None
+
+    db.query(models.StatementLine).filter(
+        models.StatementLine.statement_id == statement.id
+    ).delete(synchronize_session=False)
+
+    dates = []
+    for r in rows:
+        d = _d(r.get("txn_date"))
+        if d:
+            dates.append(d)
+        db.add(models.StatementLine(
+            statement_id=statement.id,
+            row_index=r["row_index"],
+            txn_date=d,
+            type_line=r.get("type_line"),
+            note=r.get("note"),
+            debit=r["amount"] if r.get("direction") == "debit" else 0.0,
+            credit=r["amount"] if r.get("direction") == "credit" else 0.0,
+            balance=None,                       # cards print no running balance
+            direction=r.get("direction"),
+            amount=r.get("amount", 0.0),
+            is_fee=False,                       # card fees are their own rows
+            match_status="pending",
+        ))
+
+    # Period from the transaction dates — cards do not print a clean period line.
+    if dates:
+        statement.statement_period_start = min(dates)
+        statement.statement_period_end = _d(hdr.get("statement_date")) or max(dates)
+
+    statement.transaction_count = len(rows)
+    statement.reconciliation_status = "chain_ok"
+    db.commit()
+    logger.info(f"Stored {len(rows)} credit-card lines for {statement.id}, card={statement.credit_card_id}")
+    return parsed
+
+
+def _store_statement_lines(statement: models.Statement, db: Session) -> dict:
+    """
+    Parse the statement PDF and (re)persist its rows as StatementLine records.
+    Routes a credit-card statement to the card parser; otherwise uses the table
+    extractor. Idempotent: existing lines are replaced.
+    """
+    from datetime import date as _date
+    import credit_card_parser
+
+    if statement.file_path and credit_card_parser.looks_like_credit_card(_first_page_text(statement.file_path)):
+        return _store_credit_card_lines(statement, db)
 
     extracted = extract_statement_rows(statement.file_path)
     if extracted.get("error"):
@@ -968,20 +1056,60 @@ def _overlapping_posted_statements(db: Session, statement) -> list:
     shared transactions and silently double the balance, so it is refused.
     Two periods [a1,a2] and [b1,b2] overlap iff a1 <= b2 and b1 <= a2.
     """
-    if not (statement.account_id and statement.statement_period_start and statement.statement_period_end):
+    target = statement.account_id or statement.credit_card_id
+    if not (target and statement.statement_period_start and statement.statement_period_end):
         return []
-    others = db.query(models.Statement).filter(
-        models.Statement.account_id == statement.account_id,
+    q = db.query(models.Statement).filter(
         models.Statement.id != statement.id,
         models.Statement.status == "posted",
         models.Statement.statement_period_start.isnot(None),
         models.Statement.statement_period_end.isnot(None),
-    ).all()
+    )
+    # Overlap is per-target: the same account, or the same card.
+    if statement.account_id:
+        q = q.filter(models.Statement.account_id == statement.account_id)
+    else:
+        q = q.filter(models.Statement.credit_card_id == statement.credit_card_id)
+    others = q.all()
     return [
         s for s in others
         if s.statement_period_start <= statement.statement_period_end
         and statement.statement_period_start <= s.statement_period_end
     ]
+
+
+def _recalculate_card_debt(db: Session, credit_card_id: str):
+    """Set a credit card's balance to what is owed, from its posted statements.
+
+    Debt runs opposite to a cash account: a charge (debit) INCREASES what you
+    owe, a payment (credit) reduces it. Replaying from the earliest statement's
+    brought-forward:  debt = brought_forward + Σcharges − Σpayments. This equals
+    the newest statement's closing, and reconciles to the printed available
+    credit (limit − debt).
+    """
+    card = db.query(models.CreditCard).filter(models.CreditCard.id == credit_card_id).first()
+    if not card:
+        return None
+
+    earliest = db.query(models.Statement).filter(
+        models.Statement.credit_card_id == credit_card_id,
+        models.Statement.status == "posted",
+        models.Statement.statement_period_start.isnot(None),
+    ).order_by(models.Statement.statement_period_start.asc()).first()
+    opening = float(earliest.opening_balance or 0.0) if earliest else 0.0
+
+    txs = db.query(models.Transaction).filter(
+        models.Transaction.credit_card_id == credit_card_id,
+        models.Transaction.source == "statement",
+    ).all()
+    debt = opening
+    for t in txs:
+        amt = float(t.amount or 0.0)
+        debt += amt if str(t.type).lower() == "debit" else -amt
+    card.current_balance = round(debt, 2)
+    db.add(card)
+    db.flush()
+    return card.current_balance
 
 
 def _remove_posted_transactions(db: Session, statement_id: str) -> dict:
@@ -1066,7 +1194,19 @@ def unpost_statement_from_ledger(
     db.flush()
 
     new_balance = None
-    if statement.account_id:
+    if statement.credit_card_id:
+        # Reversing a card statement removes its transactions; recompute the debt
+        # from whatever card statements remain (0.0 if none).
+        card = db.query(models.CreditCard).filter(models.CreditCard.id == statement.credit_card_id).first()
+        if card and not db.query(models.Transaction).filter(
+            models.Transaction.credit_card_id == statement.credit_card_id,
+            models.Transaction.source == "statement").first():
+            card.current_balance = 0.0
+            db.add(card)
+            new_balance = 0.0
+        else:
+            new_balance = _recalculate_card_debt(db, statement.credit_card_id)
+    elif statement.account_id:
         from main import _recalculate_account_balance
         recalc = _recalculate_account_balance(db, statement.account_id)
         new_balance = recalc.get("new_balance") if recalc else None
@@ -1115,19 +1255,8 @@ def post_statement_to_ledger(
     ).first()
     if not statement:
         raise HTTPException(status_code=404, detail="Statement not found")
-    if statement.credit_card_id:
-        # Card statements use inverted debt semantics (a purchase increases what
-        # you owe, a payment reduces it) and a different reconciliation. That
-        # pipeline is not built yet, so a card-linked statement is not posted
-        # through the account flow — it would write balances the wrong way.
-        raise HTTPException(
-            status_code=400,
-            detail=("This statement is linked to a credit card. Posting credit-card "
-                    "statements is not supported yet — the balance runs the opposite "
-                    "way (a purchase increases what you owe). You can link and review "
-                    "it, but not post it."),
-        )
-    if not statement.account_id:
+    is_card = bool(statement.credit_card_id)
+    if not statement.account_id and not statement.credit_card_id:
         raise HTTPException(
             status_code=400,
             detail="Statement must be linked to an account or credit card before posting.",
@@ -1182,12 +1311,15 @@ def post_statement_to_ledger(
     # another statement's entries.
     _remove_posted_transactions(db, statement_id)
 
+    import credit_card_parser
+
     created = 0
     folded_fees = 0
     last_tx = None  # for fee folding
     for ln in lines:
-        # Fold fee rows into the preceding transaction's `fees`
-        if ln.is_fee and last_tx is not None:
+        # Fold fee rows into the preceding transaction's `fees` (account statements
+        # only — a card statement's fees are their own ledger rows).
+        if not is_card and ln.is_fee and last_tx is not None:
             last_tx.fees = round((last_tx.fees or 0.0) + (ln.amount or 0.0), 2)
             ln.match_status = "posted"
             ln.posted_transaction_id = last_tx.id
@@ -1217,20 +1349,27 @@ def post_statement_to_ledger(
         if ln.type_line:
             note_bits.append(ln.type_line)
 
+        # The bank's own operation type. A card statement has its own vocabulary
+        # (payments received, EPP profit, reversals), so it uses the card
+        # classifier; an account statement uses the bank-scoped type_line rules.
+        if is_card:
+            ttype = credit_card_parser.classify(ln.type_line, ln.note, ln.direction)
+        else:
+            ttype = transaction_types.classify_type_line(
+                ln.type_line, ln.direction, bank_key=statement.bank_key)
+
         tx = models.Transaction(
             id=str(uuid.uuid4()),
             user_id=current_user.id,
-            account_id=statement.account_id,
+            account_id=statement.account_id if not is_card else None,
+            credit_card_id=statement.credit_card_id if is_card else None,
             amount=round(ln.amount or 0.0, 2),
             merchant=ln.counterparty_name or ln.type_line,
             type=ln.direction,
             timestamp=ts,
             balance_after_transaction=ln.balance,
             category=ln.category,
-            # The bank's own operation type, taken from the statement's type_line
-            # rather than guessed. bank_key scopes any bank-specific wording.
-            transaction_type=transaction_types.classify_type_line(
-                ln.type_line, ln.direction, bank_key=statement.bank_key),
+            transaction_type=ttype,
             notes="\n".join(note_bits) if note_bits else None,
             source="statement",
             statement_id=statement.id,
@@ -1249,23 +1388,29 @@ def post_statement_to_ledger(
     statement.reconciliation_status = "reconciled"
     db.flush()
 
-    # Recalculate the account balance, then check it against the closing balance
-    # of the NEWEST posted statement on the account — not necessarily the one
-    # just posted. The recalc replays every statement in period order, so the
-    # account balance equals the latest statement's closing; comparing it to an
-    # OLDER statement's closing produced a false "mismatch" when back-filling
-    # history.
-    from main import _recalculate_account_balance
-    recalc = _recalculate_account_balance(db, statement.account_id)
-    new_balance = recalc.get("new_balance") if recalc else None
+    # Recalculate the balance, then check it against the closing of the NEWEST
+    # posted statement on this target (account or card) — not necessarily the one
+    # just posted, since the recalc replays every statement in period order.
+    if is_card:
+        new_balance = _recalculate_card_debt(db, statement.credit_card_id)
+        newest = db.query(models.Statement).filter(
+            models.Statement.credit_card_id == statement.credit_card_id,
+            models.Statement.status == "posted",
+            models.Statement.statement_period_end.isnot(None),
+            models.Statement.closing_balance.isnot(None),
+        ).order_by(models.Statement.statement_period_end.desc()).first()
+    else:
+        from main import _recalculate_account_balance
+        recalc = _recalculate_account_balance(db, statement.account_id)
+        new_balance = recalc.get("new_balance") if recalc else None
+        newest = db.query(models.Statement).filter(
+            models.Statement.account_id == statement.account_id,
+            models.Statement.status == "posted",
+            models.Statement.statement_period_end.isnot(None),
+            models.Statement.closing_balance.isnot(None),
+        ).order_by(models.Statement.statement_period_end.desc()).first()
     db.commit()
 
-    newest = db.query(models.Statement).filter(
-        models.Statement.account_id == statement.account_id,
-        models.Statement.status == "posted",
-        models.Statement.statement_period_end.isnot(None),
-        models.Statement.closing_balance.isnot(None),
-    ).order_by(models.Statement.statement_period_end.desc()).first()
     expected_closing = newest.closing_balance if newest else statement.closing_balance
 
     balance_matches = (
@@ -1283,6 +1428,7 @@ def post_statement_to_ledger(
         "posted": created,
         "fees_folded": folded_fees,
         "account_id": statement.account_id,
+        "credit_card_id": statement.credit_card_id,
         "new_balance": new_balance,
         # The closing this balance was checked against — the newest posted
         # statement's, which the account balance should equal.
@@ -1319,12 +1465,42 @@ def get_statement_transactions(
     # Parse the PDF to get raw transaction data
     if not statement.file_path or not os.path.exists(statement.file_path):
         raise HTTPException(status_code=404, detail="PDF file not found on server")
-    
+
+    import credit_card_parser
+    if statement.credit_card_id or credit_card_parser.looks_like_credit_card(_first_page_text(statement.file_path)):
+        # Credit-card statement: the table parser finds nothing here. Use the card
+        # parser and map its rows to the shape the review UI expects.
+        cc = credit_card_parser.parse_credit_card_pdf(statement.file_path)
+        if cc.get("error"):
+            raise HTTPException(status_code=500, detail=f"Parse failed: {cc['error']}")
+        transactions = [{
+            "row_index": r["row_index"],
+            "transaction_date": (r.get("txn_date") or "").replace("/", "-") or None,
+            "transaction_time": None,
+            "type_line": r.get("type_line"),
+            "raw_description": r.get("type_line"),
+            "debit_amount": r["amount"] if r.get("direction") == "debit" else 0.0,
+            "credit_amount": r["amount"] if r.get("direction") == "credit" else 0.0,
+            "amount": r.get("amount"),
+            "direction": r.get("direction"),
+            "balance": None,
+            "merchant_or_beneficiary": r.get("type_line"),
+            "transaction_type": r.get("transaction_type"),
+            "note_text": r.get("note"),
+        } for r in cc.get("transactions", [])]
+        return {
+            "statement_id": statement.id,
+            "credit_card_id": statement.credit_card_id,
+            "header": cc.get("header"),
+            "transactions": transactions,
+            "match_summary": {"total": len(transactions), "matched": 0, "new": len(transactions)},
+        }
+
     parsed = parse_statement_pdf(statement.file_path)
-    
+
     if parsed.get("error"):
         raise HTTPException(status_code=500, detail=f"Parse failed: {parsed['error']}")
-    
+
     transactions = parsed.get("transactions", [])
     
     # --- Duplicate Matching ---
