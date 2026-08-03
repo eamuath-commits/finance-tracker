@@ -134,3 +134,126 @@ class TestAmountParsing:
         # is fine for summing but it must not look like a parsed value.
         assert SP.parse_amount("") is None
         assert SP.parse_amount(None) is None
+
+
+class TestCreditCardStatement:
+    """A card statement is a different document: no transaction table, and the
+    balance is DEBT — a charge raises it, a CR line (payment) lowers it. These
+    lock the text-line parsing and the debt reconciliation without a PDF fixture.
+    Figures mirror the real Al Rajhi card statement (opening 54,682.10)."""
+
+    # Representative page text: brought-forward opening, a payment (CR), two
+    # charges (one with a wrapped location line), and trailing summary noise.
+    LINES = [
+        "TRANSACTIONS OF CARD NO 1234",
+        "BROUGHT FORWARD BALANCE 54,682.10",
+        "21/12/25 PAYMENT RECEIVED - THANK YOU 21/12/25 9,107.28CR",
+        "10/12/25 Tabby Riyadh SA 12/12/25 327.87",
+        "10/12/25 ETIHADAIR 6072413495257 WWW.ETIHAD 12/12/25 2,241.00",
+        "MOBILE PAYMENT",
+        "10/01/26 EPP Monthly Profit Amount 10/01/26 24.29",
+        "CREDIT LIMIT 75,000.00",
+        "MINIMUM PAYMENT DUE 22/07/25 100.00",
+    ]
+
+    def result(self):
+        return SP._parse_cc_lines(self.LINES)
+
+    def test_extracts_every_transaction_line(self):
+        rows = self.result()["rows"]
+        assert len(rows) == 4  # payment + 3 charges; summary lines are not rows
+
+    def test_cr_suffix_is_a_credit_that_reduces_debt(self):
+        pay = self.result()["rows"][0]
+        assert pay["direction"] == "credit"
+        assert pay["credit"] == 9107.28 and pay["debit"] == 0.0
+
+    def test_charge_is_a_debit_that_raises_debt(self):
+        charge = self.result()["rows"][1]
+        assert charge["direction"] == "debit"
+        assert charge["debit"] == 327.87 and charge["credit"] == 0.0
+
+    def test_wrapped_location_folds_into_description(self):
+        # "MOBILE PAYMENT" wraps under the Etihad charge — it must not be dropped
+        # or become a phantom row.
+        etihad = self.result()["rows"][2]
+        assert etihad["type_line"].endswith("MOBILE PAYMENT")
+
+    def test_summary_lines_are_not_folded_into_the_last_charge(self):
+        # CREDIT LIMIT / MINIMUM PAYMENT are section boundaries, not description.
+        last = self.result()["rows"][-1]
+        assert "CREDIT LIMIT" not in last["type_line"]
+        assert "MINIMUM" not in last["type_line"]
+
+    def test_dates_are_iso_day_first(self):
+        assert self.result()["rows"][0]["txn_date"] == "2025-12-21"
+
+    def test_opening_is_the_brought_forward_balance(self):
+        assert self.result()["header"]["opening_balance"] == 54682.10
+
+    def test_closing_debt_reconciles_opening_plus_charges_minus_payments(self):
+        h = self.result()["header"]
+        expected = round(54682.10 + h["total_withdrawals"] - h["total_deposits"], 2)
+        assert h["closing_balance"] == expected
+
+    def test_flagged_as_credit_card(self):
+        assert self.result()["header"]["is_credit_card"] is True
+
+
+class TestSTCLayout:
+    """STC current-account statements are a third layout: bilingual (Arabic+
+    English) column headers, ISO YYYY-MM-DD dates, and a right-to-left grid with
+    a varying number of empty spacer columns — so the money columns land at
+    different indices on different pages. These lock the handling that makes the
+    real statement reconcile (opening 13.04, 133 rows) without a PDF fixture."""
+
+    # Page-1 header row: money columns at even indices, blank spacers between.
+    HEADER = ["الرصيد\nBalance", "", "دائن\nCredit", "", "مدين\nDebit", "",
+              "تفاصيل العملية\nTransaction details", "التاريخ\nDate"]
+    # A deposit as it comes off page 1 (spacers at 1/3/5)...
+    ROW_P1 = ["4,813.04", "", "4,800.00", "", "-", "", "Incoming Local Transfer", "2026-01-25"]
+    # ...and the SAME shape shifted one column right on a later page (spacer first).
+    ROW_P2 = ["", "5,213.04", "", "400.00", "", "-", "Deposit - Apple Pay", "2026-01-27"]
+
+    def test_iso_dates_are_normalised_to_slash_shape(self):
+        assert SP.normalize_date_cell("2026-01-25") == "2026/01/25"
+        assert SP.normalize_date_cell("2026-08-03") == "2026/08/03"
+
+    def test_stc_detected_by_iban_code_78(self):
+        key, name = SP.detect_bank("", "SA1478000000001049410863")
+        assert (key, name) == ("stc", "STC Bank")
+
+    def test_bilingual_header_is_detected(self):
+        cols = SP._detect_columns(self.HEADER)
+        assert cols is not None
+        assert cols["date"] == 7 and cols["details"] == 6
+        assert cols["balance"] == 0 and cols["credit"] == 2 and cols["debit"] == 4
+
+    def test_spacer_columns_collapse_to_one_order_across_pages(self):
+        # Both the page-1 and the shifted page-2 row must read the SAME way once
+        # the blank spacers are dropped: balance, credit, debit, details, date.
+        for row in (self.ROW_P1, self.ROW_P2):
+            cells, cmap, bcol = SP._row_view(row, True, None, None)
+            assert cells[cmap["balance"]].startswith(("4,813", "5,213"))
+            assert cells[cmap["credit"]] in ("4,800.00", "400.00")  # the deposit
+            assert cells[cmap["debit"]] == "-"                       # unused side kept
+            assert SP._row_date(cells, cmap, True) in ("2026/01/25", "2026/01/27")
+
+    def test_dash_placeholder_is_kept_so_direction_survives(self):
+        # Dropping "-" would lose which of debit/credit is the used column.
+        cells, cmap, _ = SP._row_view(self.ROW_P1, True, None, None)
+        assert len(cells) == 5
+
+    def test_non_stc_rows_are_left_untouched(self):
+        cols = {"date": 0, "details": 1, "debit": 2, "credit": 3, "balance": 4}
+        cells, cmap, bcol = SP._row_view(["2026/01/25", "x", "1.00", "", "2.00"], False, cols, 4)
+        assert cmap is cols and len(cells) == 5
+
+    def test_watermark_date_is_recovered_from_a_later_line(self):
+        # The "Scan QR to Validate" watermark bleeds a fragment ahead of the date.
+        assert SP._date_any_line("R to Validate\n2026-02-01") == "2026/02/01"
+
+    def test_watermark_is_stripped_from_the_description(self):
+        assert SP._row_type_line("Scan QR to Validate\nMusaned", True) == "Musaned"
+        # A clean description is unchanged.
+        assert SP._row_type_line("Incoming Local Transfer", True) == "Incoming Local Transfer"

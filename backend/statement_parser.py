@@ -52,6 +52,7 @@ def normalize_arabic(text: str) -> str:
 _SAUDI_BANK_CODES = {
     "80": ("alrajhi", "Al Rajhi Bank"),
     "60": ("aljazira", "Bank Aljazira"),
+    "78": ("stc", "STC Bank"),
     # Extend as more banks are imported — a new code here, never a new type.
 }
 
@@ -60,6 +61,7 @@ _SAUDI_BANK_CODES = {
 _BANK_SIGNATURES = [
     ("alrajhi", "Al Rajhi Bank", ("al rajhi", "alrajhi", "rajhi", "الراجحي")),
     ("aljazira", "Bank Aljazira", ("aljazira", "al jazira", "jazira", "الجزيرة")),
+    ("stc", "STC Bank", ("stc bank", "stcbank")),
 ]
 
 
@@ -640,31 +642,32 @@ def parse_statement_pdf(file_path: str) -> dict:
             _fill_summary_from_last_page(pdf, header)
 
             cols = _document_columns(pdf)
-            need = max(cols.values()) + 1
             bal_i = cols.get("balance")
+            is_stc = (header.bank_key == "stc")
 
             transactions = []
             idx = 0
             for page in pdf.pages:
                 for table in (page.extract_tables() or []):
                     for cells in table:
-                        if not cells or len(cells) < need:
+                        cells, colmap, bcol = _row_view(cells, is_stc, cols, bal_i)
+                        if not cells or len(cells) < (max(colmap.values()) + 1):
                             continue
                         # Non-dates (header labels, footers, summary rows) drop out here.
-                        date_cell = normalize_date_cell(cells[cols["date"]])
+                        date_cell = _row_date(cells, colmap, is_stc)
                         if not date_cell:
                             continue
 
-                        details = normalize_arabic(cells[cols["details"]] or "")
-                        type_line = details.split("\n")[0].strip() or None
+                        details = normalize_arabic(cells[colmap["details"]] or "")
+                        type_line = _row_type_line(details, is_stc) or None
 
                         tm = _TIME_RE.search(details)
                         nm = _NOTE_SEP_RE.search(details)
                         note_text = re.sub(r"\s+", " ", nm.group(1)).strip() if nm else None
 
-                        debit = parse_amount(cells[cols["debit"]]) or 0.0
-                        credit = parse_amount(cells[cols["credit"]]) or 0.0
-                        balance = parse_amount(cells[bal_i]) if bal_i is not None else None
+                        debit = parse_amount(cells[colmap["debit"]]) or 0.0
+                        credit = parse_amount(cells[colmap["credit"]]) or 0.0
+                        balance = parse_amount(cells[bcol]) if bcol is not None else None
 
                         direction = "credit" if credit > 0 else "debit"
                         amount = credit if credit > 0 else debit
@@ -742,15 +745,19 @@ _DATE_CELL_RE = re.compile(r'^\d{4}/\d{2}/\d{2}$')
 # ─────────────────────────────────────────────────────────────────────
 
 _DATE_YMD_RE = re.compile(r'^(\d{4})/(\d{2})/(\d{2})$')   # Al Rajhi  2026/01/25
+_DATE_YMD_DASH_RE = re.compile(r'^(\d{4})-(\d{2})-(\d{2})$')  # STC Bank  2026-01-25
 _DATE_DMY_RE = re.compile(r'^(\d{2})/(\d{2})/(\d{2})$')   # Aljazira  26/01/26
 
+# Matched as whole words anywhere in the cell, not anchored: STC labels each
+# column bilingually ("التاريخ\nDate", "تفاصيل العملية\nTransaction details"), so
+# the English keyword sits after Arabic text rather than filling the cell.
 _COL_PATTERNS = {
     "value_date": re.compile(r'value\s*date', re.I),
-    "date":       re.compile(r'^date$', re.I),
-    "details":    re.compile(r'^(description|details|particulars|narration)$', re.I),
+    "date":       re.compile(r'\bdate\b', re.I),
+    "details":    re.compile(r'\b(description|details|particulars|narration|transaction)\b', re.I),
     "debit":      re.compile(r'withdraw|debit|\(dr\)', re.I),
     "credit":     re.compile(r'deposit|credit|\(cr\)', re.I),
-    "balance":    re.compile(r'^balance$', re.I),
+    "balance":    re.compile(r'\bbalance\b', re.I),
 }
 
 # Al Rajhi's layout, used when a statement has no labelled header row.
@@ -767,11 +774,62 @@ def normalize_date_cell(text: str) -> Optional[str]:
     t = (text or "").strip()
     if _DATE_YMD_RE.match(t):
         return t
+    m = _DATE_YMD_DASH_RE.match(t)   # STC prints ISO YYYY-MM-DD; slash-normalise
+    if m:
+        year, month, day = m.groups()
+        return f"{year}/{month}/{day}"
     m = _DATE_DMY_RE.match(t)
     if m:
         day, month, year = m.groups()
         return f"20{year}/{month}/{day}"
     return None
+
+
+# The QR-code watermark ("Scan QR to Validate") STC prints at the top of every
+# page bleeds into the first transaction row's cells; drop those fragments.
+_STC_FURNITURE_RE = re.compile(r'scan\s*q|to\s*validate|validate', re.I)
+
+
+def _date_any_line(text: str) -> Optional[str]:
+    """normalize_date_cell, but try each line — STC's watermark bleed can push a
+    stray fragment ahead of the real date inside one cell."""
+    for ln in (text or "").split('\n'):
+        d = normalize_date_cell(ln.strip())
+        if d:
+            return d
+    return None
+
+
+# After compaction STC's columns always read balance, credit, debit, details, date.
+_STC_MAP = {"balance": 0, "credit": 1, "debit": 2, "details": 3, "date": 4}
+
+
+def _row_view(cells, is_stc, cols, bal_i):
+    """One table row as (cells, colmap, balance_index).
+
+    STC lays the grid out right-to-left with a varying number of empty spacer
+    columns, so the money columns sit at different indices on different pages.
+    Dropping the blank spacers — but keeping the "-" placeholders that mark which
+    of debit/credit is unused — collapses every page to _STC_MAP's single order.
+    Other banks keep the header-detected map unchanged.
+    """
+    if is_stc:
+        cells = [c for c in cells if (c or "").strip() != ""]
+        return cells, _STC_MAP, _STC_MAP["balance"]
+    return cells, cols, bal_i
+
+
+def _row_date(cells, colmap, is_stc):
+    return _date_any_line(cells[colmap["date"]]) if is_stc \
+        else normalize_date_cell(cells[colmap["date"]])
+
+
+def _row_type_line(details, is_stc):
+    """First description line, dropping STC's 'Scan QR to Validate' watermark."""
+    lines = [ln.strip() for ln in (details or "").split('\n') if ln.strip()]
+    if is_stc:
+        lines = [ln for ln in lines if not _STC_FURNITURE_RE.search(ln)] or lines
+    return lines[0] if lines else ""
 
 
 def _detect_columns(row) -> Optional[dict]:
@@ -781,7 +839,10 @@ def _detect_columns(row) -> Optional[dict]:
     found = {}
     for i, cell in enumerate(row):
         text = re.sub(r'\s+', ' ', (cell or '')).strip()
-        if not text or len(text) > 24:
+        # Bilingual headers run longer than one word; still bounded so a wordy
+        # data cell can't be mistaken for a header. The all-four requirement
+        # below is the real guard.
+        if not text or len(text) > 48:
             continue
         if _COL_PATTERNS["value_date"].search(text):
             continue  # a second date column we deliberately ignore
@@ -912,29 +973,30 @@ def extract_statement_rows(file_path: str) -> dict:
             header = asdict(_hdr)
 
             cols = _document_columns(pdf)
-            need = max(cols.values()) + 1
             bal_i = cols.get("balance")
+            is_stc = header.get("bank_key") == "stc"
 
             rows = []
             idx = 0
             for page in pdf.pages:
                 for table in (page.extract_tables() or []):
                     for cells in table:
-                        if not cells or len(cells) < need:
+                        cells, colmap, bcol = _row_view(cells, is_stc, cols, bal_i)
+                        if not cells or len(cells) < (max(colmap.values()) + 1):
                             continue
-                        date = normalize_date_cell(cells[cols["date"]])
+                        date = _row_date(cells, colmap, is_stc)
                         if not date:
                             continue
 
-                        details = cells[cols["details"]] or ""
-                        first_line = details.split('\n')[0].strip()
+                        details = cells[colmap["details"]] or ""
+                        first_line = _row_type_line(details, is_stc)
                         tm = _TIME_RE.search(details)
                         _nm = _NOTE_SEP_RE.search(details)
                         note = re.sub(r'\s+', ' ', _nm.group(1)).strip() if _nm else ""
 
-                        debit = parse_amount(cells[cols["debit"]]) or 0.0
-                        credit = parse_amount(cells[cols["credit"]]) or 0.0
-                        balance = (parse_amount(cells[bal_i]) or 0.0) if bal_i is not None else 0.0
+                        debit = parse_amount(cells[colmap["debit"]]) or 0.0
+                        credit = parse_amount(cells[colmap["credit"]]) or 0.0
+                        balance = (parse_amount(cells[bcol]) or 0.0) if bcol is not None else 0.0
 
                         counterparty_account = counterparty_name = reference = None
                         am = _ACCT_RE.search(details)
@@ -965,6 +1027,18 @@ def extract_statement_rows(file_path: str) -> dict:
                             "category": map_type_to_category(first_line),
                         })
                         idx += 1
+
+            # STC prints opening/closing in a page-1 summary with RTL-split labels
+            # the header parser can't read. The transaction rows carry a running
+            # balance, so recover the opening from the first row (balance before it)
+            # and the closing from the last — only when the header left them blank,
+            # so Al Rajhi / Aljazira headers are untouched.
+            if header.get("opening_balance") is None and rows:
+                r0 = rows[0]
+                signed0 = r0["amount"] if r0["direction"] == "credit" else -r0["amount"]
+                header["opening_balance"] = round(r0["balance"] - signed0, 2)
+            if header.get("closing_balance") is None and rows:
+                header["closing_balance"] = rows[-1]["balance"]
 
             # Validate the running-balance chain in integer cents.
             chain_mismatches = 0

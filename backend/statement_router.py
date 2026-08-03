@@ -418,6 +418,30 @@ def _store_statement_lines(statement: models.Statement, db: Session) -> dict:
     else:
         statement.reconciliation_status = "chain_mismatch"
 
+    # Populate the statement's opening/closing and period from the parse. The
+    # upload-time header pass (_parse_and_store) misses these for STC, whose RTL
+    # summary/period text doesn't parse cleanly; here opening/closing come from
+    # the reconciling rows and the period is derived from the row dates when the
+    # header lacks it. Mirrors the credit-card path so overlap protection and the
+    # balance-reconciliation checks have real values to work with.
+    def _pd(s):
+        try:
+            return _date.fromisoformat(s) if s else None
+        except (ValueError, TypeError):
+            return None
+
+    if _hdr.get("opening_balance") is not None:
+        statement.opening_balance = _hdr["opening_balance"]
+    if _hdr.get("closing_balance") is not None:
+        statement.closing_balance = _hdr["closing_balance"]
+    row_dates = sorted(d for d in (_pd(r.get("txn_date")) for r in extracted.get("rows", [])) if d)
+    ps = _pd(_hdr.get("period_start")) or (row_dates[0] if row_dates else None)
+    pe = _pd(_hdr.get("period_end")) or (row_dates[-1] if row_dates else None)
+    if ps is not None:
+        statement.statement_period_start = ps
+    if pe is not None:
+        statement.statement_period_end = pe
+
     db.commit()
     logger.info(
         f"Stored {len(extracted.get('rows', []))} statement lines for {statement.id} "
