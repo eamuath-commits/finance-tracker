@@ -286,8 +286,6 @@ def _store_credit_card_lines(statement: models.Statement, db: Session) -> dict:
     hdr = parsed.get("header") or {}
     rows = parsed.get("transactions") or []
 
-    statement.bank_key = statement.bank_key or hdr.get("bank_key")
-    statement.bank_name = statement.bank_name or hdr.get("bank_name")
     if hdr.get("brought_forward") is not None:
         statement.opening_balance = hdr["brought_forward"]
     if hdr.get("closing_balance") is not None:
@@ -302,6 +300,17 @@ def _store_credit_card_lines(statement: models.Statement, db: Session) -> dict:
         if card:
             statement.credit_card_id = card.id
             statement.account_id = None  # a statement targets ONE of the two
+
+    # The issuing bank comes from the LINKED CARD, which the user set up — a CC
+    # statement rarely names its bank in extractable text, and it must never be
+    # guessed (it was wrongly hardcoded to Al Rajhi for an Aljazira card).
+    linked = (db.query(models.CreditCard).filter(models.CreditCard.id == statement.credit_card_id).first()
+              if statement.credit_card_id else None)
+    if linked and linked.bank_name:
+        statement.bank_name = linked.bank_name
+        import statement_parser
+        k, _ = statement_parser.detect_bank(linked.bank_name)
+        statement.bank_key = k
 
     def _d(s):
         try:

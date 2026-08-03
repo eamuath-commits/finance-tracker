@@ -135,7 +135,10 @@ def parse_credit_card_pdf(file_path: str) -> dict:
     for tp in pages:
         lines.extend(tp.split("\n"))
 
-    header = {"bank_key": "alrajhi", "bank_name": "Al Rajhi Bank",
+    # The issuing bank is NOT hardcoded and usually is not in the statement text
+    # (the letterhead is an image). It is taken from the linked credit card, which
+    # the user set up — see _store_credit_card_lines.
+    header = {"bank_key": None, "bank_name": None,
               "card_last4": None, "statement_date": None,
               "brought_forward": None, "credit_limit": None,
               "available_credit": None, "closing_balance": None,

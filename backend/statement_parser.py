@@ -58,8 +58,8 @@ _SAUDI_BANK_CODES = {
 # Fallback only. Scored by count so a single mention of another bank in a
 # transaction narrative cannot outweigh the issuer's own repeated branding.
 _BANK_SIGNATURES = [
-    ("alrajhi", "Al Rajhi Bank", ("al rajhi", "alrajhi", "الراجحي")),
-    ("aljazira", "Bank Aljazira", ("aljazira", "al jazira", "الجزيرة")),
+    ("alrajhi", "Al Rajhi Bank", ("al rajhi", "alrajhi", "rajhi", "الراجحي")),
+    ("aljazira", "Bank Aljazira", ("aljazira", "al jazira", "jazira", "الجزيرة")),
 ]
 
 
@@ -613,6 +613,28 @@ def parse_statement_pdf(file_path: str) -> dict:
                 return {"header": None, "transactions": [], "page_count": 0,
                         "error": "PDF has no pages"}
 
+            # Credit-card statements use the dedicated text-line parser; remap its
+            # rows into this entry point's {header, transactions} shape.
+            if detect_credit_card_statement(pdf):
+                cc = parse_credit_card_pdf(file_path)
+                txns = [{
+                    "row_index": r["row_index"],
+                    "transaction_date": r["txn_date"],
+                    "transaction_time": None,
+                    "type_line": r["type_line"],
+                    "raw_description": r["type_line"],
+                    "debit_amount": r["debit"] or None,
+                    "credit_amount": r["credit"] or None,
+                    "amount": r["amount"],
+                    "direction": r["direction"],
+                    "balance": None,
+                    "merchant_or_beneficiary": None,
+                    "reference_id": None,
+                    "note_text": r.get("note") or None,
+                } for r in cc.get("rows", [])]
+                return {"header": cc.get("header"), "transactions": txns,
+                        "page_count": page_count, "error": cc.get("error")}
+
             # Header comes from page 1's text (summary page)
             header = parse_header(normalize_arabic(pdf.pages[0].extract_text() or ""))
             _fill_summary_from_last_page(pdf, header)
@@ -876,6 +898,11 @@ def extract_statement_rows(file_path: str) -> dict:
                 return {"header": None, "rows": [], "chain_valid": False,
                         "chain_mismatches": 0, "error": "PDF has no pages"}
 
+            # A credit-card statement is a different document (text lines, debt
+            # balance) — hand it to the dedicated parser rather than the table logic.
+            if detect_credit_card_statement(pdf):
+                return parse_credit_card_pdf(file_path)
+
             _hdr = parse_header(normalize_arabic(pdf.pages[0].extract_text() or ""))
             # Some banks (Bank Aljazira) print opening/closing in a last-page
             # summary rather than the page-1 header. Without this, opening comes
@@ -960,5 +987,135 @@ def extract_statement_rows(file_path: str) -> dict:
 
     except Exception as e:
         logger.error(f"extract_statement_rows failed: {e}", exc_info=True)
+        return {"header": None, "rows": [], "chain_valid": False,
+                "chain_mismatches": 0, "error": str(e)}
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Credit-card statements
+#
+# A card statement is a different document from an account statement: no
+# transaction table (the rows are plain text lines), and the balance is DEBT —
+# a charge increases what you owe, a payment (marked "CR") reduces it. So it is
+# parsed separately and dispatched to from the two entry points below.
+#
+# Line shape:  DD/MM/YY  DESCRIPTION  DD/MM/YY  AMOUNT[CR]
+# with the location/type sometimes wrapping onto the following line. "CR" marks
+# a credit (payment or reversal); no suffix is a charge.
+# ─────────────────────────────────────────────────────────────────────
+
+_CC_TXN_RE = re.compile(
+    r'^(\d{2}/\d{2}/\d{2})\s+(.+?)\s+(\d{2}/\d{2}/\d{2})\s+([\d,]+\.\d{2})(CR)?\s*$'
+)
+_CC_BROUGHT_FWD_RE = re.compile(r'BROUGHT\s+FORWARD\s+BALANCE\s+([\d,]+\.\d{2})', re.I)
+# Lines that end a transaction's description — never fold these into it.
+_CC_STOP_RE = re.compile(
+    r'BROUGHT\s+FORWARD|TRANSACTIONS\s+OF|CARD\s+NO|TOTAL|MINIMUM|CREDIT\s+LIMIT|'
+    r'PAYMENT\s+DUE|STATEMENT\s+DATE|PAGE\s|www\.alrajhi', re.I)
+
+
+def detect_credit_card_statement(pdf) -> bool:
+    """True if this PDF is a credit-card statement (text-based, carries a
+    'BROUGHT FORWARD BALANCE' line and no transaction table)."""
+    try:
+        txt = normalize_arabic(pdf.pages[0].extract_text() or "")
+    except Exception:
+        return False
+    return bool(_CC_BROUGHT_FWD_RE.search(txt))
+
+
+def _cc_iso(d: str):
+    """DD/MM/YY -> YYYY-MM-DD."""
+    try:
+        dd, mm, yy = d.split("/")
+        return "20%s-%s-%s" % (yy, mm, dd)
+    except ValueError:
+        return None
+
+
+def _parse_cc_lines(lines: list) -> dict:
+    """Pure core of the card-statement parser: turn already-extracted text lines
+    into {header, rows}. Kept separate from PDF I/O so it can be unit-tested.
+    Direction follows the card's debt convention: a charge is a 'debit' (increases
+    what you owe), a CR line is a 'credit' (reduces it)."""
+    opening = None
+    for l in lines:
+        m = _CC_BROUGHT_FWD_RE.search(l)
+        if m:
+            opening = parse_amount(m.group(1))
+            break
+
+    rows = []
+    idx = 0
+    last = None
+    for raw in lines:
+        l = raw.strip()
+        if not l:
+            continue
+        m = _CC_TXN_RE.match(l)
+        if m:
+            txn_date, desc, post_date, amt, cr = m.groups()
+            amount = parse_amount(amt) or 0.0
+            is_credit = bool(cr)
+            rows.append({
+                "row_index": idx,
+                "txn_date": _cc_iso(txn_date),
+                "txn_time": None,
+                "type_line": desc.strip(),
+                "note": f"posted {_cc_iso(post_date)}" if post_date else "",
+                "debit": 0.0 if is_credit else round(amount, 2),
+                "credit": round(amount, 2) if is_credit else 0.0,
+                "balance": None,   # card statements carry no per-row running balance
+                "direction": "credit" if is_credit else "debit",
+                "amount": round(amount, 2),
+                "counterparty_account": None,
+                "counterparty_name": None,
+                "reference": None,
+                "is_fee": False,
+                "category": None,
+            })
+            last = rows[-1]
+            idx += 1
+        elif last is not None and not _CC_STOP_RE.search(l):
+            # A wrapped location/type continuation for the previous charge.
+            last["type_line"] = (last["type_line"] + " " + l).strip()[:255]
+        else:
+            last = None  # a section boundary — stop folding
+
+    charges = round(sum(r["debit"] for r in rows), 2)
+    payments = round(sum(r["credit"] for r in rows), 2)
+    # Debt closes higher by charges, lower by payments.
+    closing = round((opening or 0.0) + charges - payments, 2) if opening is not None else None
+
+    header = {
+        "bank_key": "alrajhi", "bank_name": "Al Rajhi Bank",
+        "account_number": None, "iban": None, "customer_name": None,
+        "opening_balance": opening, "closing_balance": closing,
+        "period_start": rows[0]["txn_date"] if rows else None,
+        "period_end": rows[-1]["txn_date"] if rows else None,
+        "total_deposits": payments, "total_withdrawals": charges,
+        "num_deposits": None, "num_withdrawals": None, "ref_no": None,
+        "is_credit_card": True,
+    }
+    return {"header": header, "rows": rows,
+            "chain_valid": True, "chain_mismatches": 0, "error": None}
+
+
+def parse_credit_card_pdf(file_path: str) -> dict:
+    """Extract a credit-card statement into the same {header, rows, ...} shape as
+    extract_statement_rows, so the review UI can show it."""
+    try:
+        import pdfplumber
+    except ImportError:
+        return {"header": None, "rows": [], "chain_valid": False,
+                "chain_mismatches": 0, "error": "pdfplumber not installed"}
+    try:
+        lines = []
+        with pdfplumber.open(file_path) as pdf:
+            for p in pdf.pages:
+                lines += normalize_arabic(p.extract_text() or "").split("\n")
+        return _parse_cc_lines(lines)
+    except Exception as e:
+        logger.error(f"parse_credit_card_pdf failed: {e}", exc_info=True)
         return {"header": None, "rows": [], "chain_valid": False,
                 "chain_mismatches": 0, "error": str(e)}
