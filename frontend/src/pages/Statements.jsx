@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api, { API_URL } from '../utils/api';
 import { FileUp, FileText, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle, Loader2, Upload, ArrowLeft, ArrowUpRight, ArrowDownLeft, ChevronRight, ChevronDown, RefreshCw, Filter, Wallet, Calendar, Search, X, Download, Edit3, Check, MoreVertical, Eye, ShieldCheck, Link2, GitBranch, BarChart3, TrendingUp, TrendingDown, LayoutGrid, List, FileSearch, MessageSquare, Repeat, Tag, FileSpreadsheet, Undo2 } from 'lucide-react';
 import { useConfirm } from '../components/ConfirmProvider';
 
 const Statements = () => {
     const confirm = useConfirm();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [statements, setStatements] = useState([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
@@ -136,6 +138,7 @@ const Statements = () => {
                 (s.original_filename || '').toLowerCase().includes(q) ||
                 (s.account_number || '').includes(q) ||
                 (s.account_name || '').toLowerCase().includes(q) ||
+                (s.credit_card_name || '').toLowerCase().includes(q) ||
                 (s.bank_name || '').toLowerCase().includes(q)
             );
         }
@@ -164,7 +167,7 @@ const Statements = () => {
             setUploadResult(res.data);
             fetchStatements();
             if (res.data.transaction_count > 0) {
-                openStatementDetail(res.data.id);
+                viewStatement(res.data.id);
             }
         } catch (err) {
             setError(err.response?.data?.detail || 'Upload failed');
@@ -234,6 +237,31 @@ const Statements = () => {
             setLoadingDetail(false);
         }
     };
+
+    // Open a statement by pushing ?view=<id> onto the URL. The effect below turns
+    // that into the loaded detail view, so the browser Back button (and swipe-back)
+    // returns to the list instead of leaving the Statements page entirely.
+    const viewStatement = (statementId) => setSearchParams({ view: statementId });
+
+    const closeStatementDetail = () => {
+        setSelectedStatement(null);
+        setStatementDetail(null);
+        setParsedTransactions([]);
+        clearTxFilters();
+    };
+
+    // The URL is the source of truth for which statement (if any) is open, so
+    // history navigation drives the view: a present ?view loads/keeps the detail,
+    // its removal (Back) closes it.
+    useEffect(() => {
+        const viewId = searchParams.get('view');
+        if (viewId) {
+            if (viewId !== selectedStatement) openStatementDetail(viewId);
+        } else if (selectedStatement) {
+            closeStatementDetail();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
 
     const handleReParse = async () => {
         if (!selectedStatement) return;
@@ -363,9 +391,9 @@ const Statements = () => {
                     await api.delete(`/api/statements/${id}`);
                     fetchStatements();
                     if (selectedStatement === id) {
-                        setSelectedStatement(null);
-                        setStatementDetail(null);
-                        setParsedTransactions([]);
+                        // Clearing the URL closes the detail via the sync effect and
+                        // leaves no stale ?view pointing at the now-deleted statement.
+                        setSearchParams({}, { replace: true });
                     }
                 } catch (err) {
                     setError(err.response?.data?.detail || 'Delete failed');
@@ -514,7 +542,7 @@ const Statements = () => {
             let aVal, bVal;
             switch (sortColumn) {
                 case 'filename': aVal = a.original_filename || ''; bVal = b.original_filename || ''; break;
-                case 'account': aVal = a.account_name || a.account_number || ''; bVal = b.account_name || b.account_number || ''; break;
+                case 'account': aVal = a.account_name || a.credit_card_name || a.account_number || ''; bVal = b.account_name || b.credit_card_name || b.account_number || ''; break;
                 case 'period': aVal = a.statement_period_start || ''; bVal = b.statement_period_start || ''; break;
                 case 'tx_count': aVal = a.transaction_count || 0; bVal = b.transaction_count || 0; break;
                 case 'status': aVal = a.status || ''; bVal = b.status || ''; break;
@@ -668,7 +696,7 @@ const Statements = () => {
                 {/* Back + Header */}
                 <div className="flex items-center gap-4">
                     <button
-                        onClick={() => { setSelectedStatement(null); setStatementDetail(null); setParsedTransactions([]); clearTxFilters(); }}
+                        onClick={() => setSearchParams({}, { replace: true })}
                         className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-gray-400 hover:text-white transition-colors"
                     >
                         <ArrowLeft size={18} />
@@ -1251,7 +1279,7 @@ const Statements = () => {
                                                         className={`flex-shrink-0 rounded-xl border-2 p-4 min-w-[180px] cursor-pointer transition-all hover:bg-slate-700/30 ${
                                                             isCurrent ? 'border-purple-500/60 bg-purple-500/10 ring-1 ring-purple-500/30' : statusColor
                                                         }`}
-                                                        onClick={() => { if (!isCurrent) openStatementDetail(block.statement_id); }}
+                                                        onClick={() => { if (!isCurrent) viewStatement(block.statement_id); }}
                                                     >
                                                         <div className="flex items-center gap-2 mb-2">
                                                             <FileText size={14} className={isCurrent ? 'text-purple-400' : 'text-gray-400'} />
@@ -2162,7 +2190,7 @@ const Statements = () => {
                                         <div
                                             key={s.id}
                                             className="px-5 py-3 hover:bg-slate-800/40 transition-colors cursor-pointer flex items-center gap-4"
-                                            onClick={() => openStatementDetail(s.id)}
+                                            onClick={() => viewStatement(s.id)}
                                         >
                                             <FileText size={16} className="text-blue-400 flex-shrink-0" />
                                             <div className="flex-1 min-w-0">
@@ -2171,12 +2199,17 @@ const Statements = () => {
                                                     {s.statement_period_start ? `${formatDate(s.statement_period_start)} — ${formatDate(s.statement_period_end)}` : 'No dates'}
                                                 </p>
                                             </div>
-                                            {(s.account_name || s.account_number) && (
+                                            {(s.account_name || s.account_number) ? (
                                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 text-[10px] text-gray-400 border border-slate-700">
                                                     <Wallet size={10} className="text-blue-400" />
                                                     {s.account_name || `****${s.account_number?.slice(-4)}`}
                                                 </span>
-                                            )}
+                                            ) : s.credit_card_name ? (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 text-[10px] text-gray-400 border border-slate-700">
+                                                    <span className="text-purple-400">💳</span>
+                                                    {s.credit_card_name}
+                                                </span>
+                                            ) : null}
                                             <span className="text-xs text-white font-mono">{s.transaction_count || 0} txs</span>
                                             {s.opening_balance != null && (
                                                 <span className="text-xs text-gray-400 font-mono">
@@ -2271,7 +2304,7 @@ const Statements = () => {
                                                         <button onClick={() => setEditingId(null)} className="text-gray-500 hover:text-gray-300"><X size={14} /></button>
                                                     </div>
                                                 ) : (
-                                                    <div className="flex items-center gap-2 cursor-pointer group/name" onClick={() => openStatementDetail(s.id)}>
+                                                    <div className="flex items-center gap-2 cursor-pointer group/name" onClick={() => viewStatement(s.id)}>
                                                         <FileText size={16} className="text-blue-400 flex-shrink-0" />
                                                         <div className="min-w-0">
                                                             <p className="text-white text-xs font-medium truncate max-w-[200px] group-hover/name:text-blue-400 transition-colors">{s.original_filename}</p>
@@ -2292,6 +2325,11 @@ const Statements = () => {
                                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 text-xs text-gray-300 border border-slate-700">
                                                         <Wallet size={10} className="text-blue-400" />
                                                         {s.account_name || `****${s.account_number?.slice(-4)}`}
+                                                    </span>
+                                                ) : s.credit_card_name ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 text-xs text-gray-300 border border-slate-700">
+                                                        <span className="text-purple-400">💳</span>
+                                                        {s.credit_card_name}
                                                     </span>
                                                 ) : (
                                                     <span className="text-xs text-gray-600">—</span>
@@ -2381,7 +2419,7 @@ const Statements = () => {
                                             </td>
                                             <td className="px-4 py-3 text-right">
                                                 <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition">
-                                                    <button onClick={() => openStatementDetail(s.id)} className="p-1.5 rounded text-gray-500 hover:text-blue-400 hover:bg-blue-500/10 transition" title="View transactions">
+                                                    <button onClick={() => viewStatement(s.id)} className="p-1.5 rounded text-gray-500 hover:text-blue-400 hover:bg-blue-500/10 transition" title="View transactions">
                                                         <Eye size={14} />
                                                     </button>
                                                     <button onClick={() => downloadPdf(s.id)} className="p-1.5 rounded text-gray-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition" title="Download PDF">
