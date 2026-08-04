@@ -134,6 +134,24 @@ class TestPostingLifecycle:
         assert db_session.query(models.Statement).filter(
             models.Statement.id == overlap.id).first().status == "draft"
 
+    def test_back_to_back_statements_touching_at_a_boundary_are_allowed(self, client, db_session):
+        # Consecutive statements tile the timeline: one's closing date is the
+        # next's opening date (a credit-card statement dated the 10th is followed
+        # by one from the 10th onward). Sharing only that single boundary day is
+        # not an overlap and must post — this was a false 409.
+        uid = _user_id(db_session, client.test_username)
+        acct = client.post("/accounts/", json={"name": "Main", "account_type": "Checking"}).json()
+        first = _make_statement(db_session, uid, acct["id"], [(100.0, "debit")],
+                                period=(date(2025, 12, 10), date(2026, 1, 10)), closing=100.0)
+        assert client.post(f"/api/statements/{first.id}/post").status_code == 200
+        second = _make_statement(db_session, uid, acct["id"], [(50.0, "debit")],
+                                 period=(date(2026, 1, 10), date(2026, 2, 10)), closing=150.0)
+        res = client.post(f"/api/statements/{second.id}/post")
+        assert res.status_code == 200, res.text
+        db_session.expire_all()
+        assert db_session.query(models.Statement).filter(
+            models.Statement.id == second.id).first().status == "posted"
+
     def test_older_nonoverlapping_statement_posts_without_a_false_warning(self, client, db_session):
         # Back-filling earlier history is allowed and must not falsely warn: the
         # balance is checked against the newest statement's closing, not the older.

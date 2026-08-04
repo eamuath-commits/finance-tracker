@@ -1087,7 +1087,13 @@ def _overlapping_posted_statements(db: Session, statement) -> list:
     The ledger is protected from statement posting: a new statement may only add
     a period the ledger does not already cover. Overlap would duplicate the
     shared transactions and silently double the balance, so it is refused.
-    Two periods [a1,a2] and [b1,b2] overlap iff a1 <= b2 and b1 <= a2.
+
+    Consecutive statements are back-to-back: one's closing date is the next's
+    opening date (a credit-card statement dated the 10th is followed by one from
+    the 10th to the 10th). Sharing only that single boundary day is NOT an
+    overlap, so the comparison is strict — [a1,a2] and [b1,b2] overlap iff
+    a1 < b2 and b1 < a2. A genuine shared *range* (identical or partly covering
+    periods) still fails and is refused.
     """
     target = statement.account_id or statement.credit_card_id
     if not (target and statement.statement_period_start and statement.statement_period_end):
@@ -1106,8 +1112,8 @@ def _overlapping_posted_statements(db: Session, statement) -> list:
     others = q.all()
     return [
         s for s in others
-        if s.statement_period_start <= statement.statement_period_end
-        and statement.statement_period_start <= s.statement_period_end
+        if s.statement_period_start < statement.statement_period_end
+        and statement.statement_period_start < s.statement_period_end
     ]
 
 
