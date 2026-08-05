@@ -11,6 +11,39 @@ import uuid
 from datetime import date, datetime
 
 import models
+from statement_router import _cc_statement_period
+
+
+class TestCreditCardStatementPeriod:
+    """A card statement's period is its billing cycle, keyed on POSTING date, not
+    purchase date — a purchase made on the 9th that posts on the 11th belongs to
+    the next cycle. Deriving from purchase dates dragged the period back before
+    the prior statement's close and produced a false overlap 409."""
+
+    def test_period_runs_on_posting_dates_not_purchase_dates(self):
+        rows = [
+            {"txn_date": "2026/02/09", "post_date": "2026/02/11"},  # posts into this cycle
+            {"txn_date": "2026/02/09", "post_date": "2026/02/11"},
+            {"txn_date": "2026/03/09", "post_date": "2026/03/09"},
+        ]
+        start, end = _cc_statement_period(rows, "2026/03/10")
+        assert start == date(2026, 2, 11), "must start at the earliest POST date, not 02-09"
+        assert end == date(2026, 3, 10), "ends at the printed statement date"
+
+    def test_end_falls_back_to_last_post_date_without_a_statement_date(self):
+        rows = [{"txn_date": "2026/02/09", "post_date": "2026/02/11"},
+                {"txn_date": "2026/03/09", "post_date": "2026/03/12"}]
+        start, end = _cc_statement_period(rows, None)
+        assert (start, end) == (date(2026, 2, 11), date(2026, 3, 12))
+
+    def test_falls_back_to_purchase_dates_when_no_post_dates(self):
+        rows = [{"txn_date": "2026/02/15", "post_date": None},
+                {"txn_date": "2026/02/20", "post_date": None}]
+        start, end = _cc_statement_period(rows, "2026/03/10")
+        assert (start, end) == (date(2026, 2, 15), date(2026, 3, 10))
+
+    def test_empty_rows_yield_no_period(self):
+        assert _cc_statement_period([], "2026/03/10") == (None, None)
 
 
 def _user_id(db_session, username):

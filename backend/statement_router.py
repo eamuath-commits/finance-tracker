@@ -270,12 +270,38 @@ def _first_page_text(file_path: str) -> str:
         return ""
 
 
+def _cc_statement_period(rows, statement_date):
+    """(period_start, period_end) for a credit-card statement's billing cycle.
+
+    A card assigns a transaction to a statement by its POSTING date, not the
+    purchase date: a purchase made on the 9th can post on the 11th and so belongs
+    to the *next* cycle. Deriving the period from purchase dates drags it back
+    before the prior statement's close and falsely flags an overlap — the real bug
+    behind "2026-02-09 to 2026-03-10 overlaps 2026-01-10 to 2026-02-10", where the
+    two Feb-09 purchases actually posted Feb-11. So the period runs on posting
+    dates, ending at the printed statement date. Falls back to purchase dates only
+    if a statement prints no posting dates at all.
+    """
+    def _d(s):
+        try:
+            return date.fromisoformat((s or "").replace("/", "-"))
+        except (ValueError, AttributeError):
+            return None
+    post = sorted(d for d in (_d(r.get("post_date")) for r in rows) if d)
+    txn = sorted(d for d in (_d(r.get("txn_date")) for r in rows) if d)
+    cycle = post or txn
+    if not cycle:
+        return None, None
+    return cycle[0], (_d(statement_date) or cycle[-1])
+
+
 def _store_credit_card_lines(statement: models.Statement, db: Session) -> dict:
     """Persist a credit-card statement's rows, and fill its card-specific header.
 
     Auto-links the CreditCard by the printed last-4, and records the debt figures
     (brought-forward as opening, computed closing) and a period derived from the
-    transaction dates so the ledger-protection overlap check has something to use.
+    POSTING dates (see _cc_statement_period) so the ledger-protection overlap
+    check has a correct billing cycle to use.
     """
     from datetime import date as _date
     import credit_card_parser
@@ -322,15 +348,11 @@ def _store_credit_card_lines(statement: models.Statement, db: Session) -> dict:
         models.StatementLine.statement_id == statement.id
     ).delete(synchronize_session=False)
 
-    dates = []
     for r in rows:
-        d = _d(r.get("txn_date"))
-        if d:
-            dates.append(d)
         db.add(models.StatementLine(
             statement_id=statement.id,
             row_index=r["row_index"],
-            txn_date=d,
+            txn_date=_d(r.get("txn_date")),
             type_line=r.get("type_line"),
             note=r.get("note"),
             debit=r["amount"] if r.get("direction") == "debit" else 0.0,
@@ -342,10 +364,12 @@ def _store_credit_card_lines(statement: models.Statement, db: Session) -> dict:
             match_status="pending",
         ))
 
-    # Period from the transaction dates — cards do not print a clean period line.
-    if dates:
-        statement.statement_period_start = min(dates)
-        statement.statement_period_end = _d(hdr.get("statement_date")) or max(dates)
+    # Period = the billing cycle, keyed on POSTING date (see _cc_statement_period)
+    # so a late-posting purchase can't drag the period into the prior statement.
+    start, end = _cc_statement_period(rows, hdr.get("statement_date"))
+    if start:
+        statement.statement_period_start = start
+        statement.statement_period_end = end
 
     statement.transaction_count = len(rows)
     statement.reconciliation_status = "chain_ok"
