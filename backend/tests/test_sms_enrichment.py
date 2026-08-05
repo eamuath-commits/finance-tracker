@@ -105,6 +105,53 @@ class TestLoanInstalmentRule:
         assert named.get("transfer") != "Loan Instalment"
 
 
+class TestInternationalSettlementLag:
+    """An international purchase is SMSed at the point of sale but settles onto the
+    statement a few days later (reported: SMS 28/6 -> statement 1/7), with a
+    different posting time-of-day. Like loans, the wider window applies ONLY
+    against International-labelled rows, and the SMS must precede the posting."""
+
+    INTL_SMS = _sms("2026-06-28 20:27:16",
+                    "PoS International Purchase\nBy:9365;mada\nAmount:SAR 1199.00\n"
+                    "Country:Saudi Arabia\nAt:Darkisa\n28/6/26 20:27")
+
+    def test_enriches_the_international_row_days_later(self):
+        txs = [_tx("intl", "2026-07-01 19:04:30", 1199.0, "debit",
+                   "Online purchase Apple pay (International)")]
+        res = E.match(E.parse_export(self.INTL_SMS), txs)
+        assert len(res.proposals) == 1
+        assert res.proposals[0].new_merchant == "Darkisa"
+
+    def test_does_not_write_onto_a_non_international_row_days_apart(self):
+        # The wide window is gated to International-labelled rows; a generic row
+        # three days away must be left alone (the 45s rule can't reach it either).
+        txs = [_tx("other", "2026-07-01 19:04:30", 1199.0, "debit",
+                   "POS purchase Apple pay (Domestic)")]
+        assert E.match(E.parse_export(self.INTL_SMS), txs).proposals == []
+
+    def test_ignores_a_same_amount_international_row_outside_the_window(self):
+        # >5 days after the SMS is beyond the settlement lag — not this purchase.
+        txs = [_tx("far", "2026-07-10 12:00:00", 1199.0, "debit",
+                   "Online purchase Apple pay (International)")]
+        assert E.match(E.parse_export(self.INTL_SMS), txs).proposals == []
+
+    def test_does_not_match_a_posting_dated_before_the_sms(self):
+        # Settlement only ever runs forward: a row BEFORE the point-of-sale SMS
+        # is a different transaction.
+        txs = [_tx("before", "2026-06-24 12:00:00", 1199.0, "debit",
+                   "Online purchase Apple pay (International)")]
+        assert E.match(E.parse_export(self.INTL_SMS), txs).proposals == []
+
+    def test_two_international_rows_in_the_window_are_refused(self):
+        # One SMS cannot decide between two equally-plausible International rows.
+        txs = [
+            _tx("i1", "2026-06-30 10:00:00", 1199.0, "debit", "Online purchase Apple pay (International)"),
+            _tx("i2", "2026-07-01 19:04:30", 1199.0, "debit", "Online purchase Apple pay (International)"),
+        ]
+        res = E.match(E.parse_export(self.INTL_SMS), txs)
+        assert len(res.proposals) == 0, "ambiguous same-amount pair must be skipped, not guessed"
+
+
 class TestAmbiguityIsRefused:
     def test_two_identical_transactions_are_left_alone(self):
         # One SMS cannot decide between two equally-plausible rows.

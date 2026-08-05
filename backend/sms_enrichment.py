@@ -64,6 +64,28 @@ def is_loan_label(merchant):
     installments', 'Loan Instalment')."""
     return bool(merchant and _LOAN_LABEL_RE.search(merchant))
 
+
+# International purchases are a SECOND measured exception, like loans. The card
+# authorises (and SMSes) at the point of sale, but the transaction SETTLES onto
+# the statement a few days later — a reported case is SMS 28/6 -> statement 1/7
+# (3 days), and the posting time-of-day differs from the SMS, so neither the 45s
+# window nor the same-time next-day rule reaches it. The lag is a property of
+# INTERNATIONAL-scheme transactions, which the statement labels "(International)",
+# so — exactly like loans — the wider window is only ever applied against rows
+# that are themselves International-labelled, and the bijection's uniqueness guard
+# still refuses any ambiguous same-amount pair rather than mis-assigning it.
+INTL_WINDOW = timedelta(days=5)
+_INTL_LABEL_RE = re.compile(r"international|دولي", re.I)
+# SMS purchase kinds that can settle internationally (a domestic PoS posts same
+# day and is never International-labelled, so it is deliberately excluded).
+_INTL_SHAPES = {"pos_international", "online_purchase", "online_purchase_ar"}
+
+
+def is_international_label(merchant):
+    """True if a statement label denotes an international-scheme purchase
+    ('Online purchase Apple pay (International)')."""
+    return bool(merchant and _INTL_LABEL_RE.search(merchant))
+
 # Currency tokens that mean Saudi Riyal and are therefore comparable to the
 # SAR-settled statement amount. "SR" is a spelling variant, not a foreign
 # currency (~160 records). "682" is the ISO-4217 numeric code for SAR.
@@ -441,6 +463,13 @@ def _candidate(ev: Event, tx: TxRow) -> bool:
         # row this SMS keeps the normal rule, so it still competes correctly for
         # near-simultaneous events without dragging in same-amount transfers.
         return dt <= LOAN_WINDOW.total_seconds()
+    if ev.shape in _INTL_SHAPES and is_international_label(tx.merchant):
+        # Settlement lag: the SMS (point of sale) PRECEDES the statement posting
+        # by up to a few days. Match on date within the lag, requiring the SMS to
+        # be the earlier of the pair (a small +45s slack covers same-instant
+        # posts). Only International-labelled rows get this window; against any
+        # other row this SMS falls through to the normal rule below.
+        return -INTL_WINDOW.total_seconds() <= signed <= TIME_WINDOW.total_seconds()
     if dt <= TIME_WINDOW.total_seconds():
         return True
 
