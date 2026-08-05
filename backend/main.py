@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Body, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import text, inspect, func
+from sqlalchemy import text, inspect, func, or_, cast, String
 from typing import List, Optional
 from datetime import datetime
 import os
@@ -4025,11 +4025,23 @@ def search_transactions(
     q = db.query(models.Transaction).filter(models.Transaction.user_id == current_user.id)
     
     if query:
-        q = q.filter(
-            (models.Transaction.merchant.ilike(f"%{query}%")) |
-            (models.Transaction.notes.ilike(f"%{query}%")) |
-            (models.Transaction.raw_sms_content.ilike(f"%{query}%"))
-        )
+        qs = query.strip()
+        conditions = [
+            models.Transaction.merchant.ilike(f"%{qs}%"),
+            models.Transaction.notes.ilike(f"%{qs}%"),
+            models.Transaction.raw_sms_content.ilike(f"%{qs}%"),
+            models.Transaction.category.ilike(f"%{qs}%"),
+        ]
+        # One search box for everything: a numeric query also matches the amount,
+        # since users type the amount there expecting it to work ("1,500" finds
+        # 1500.00). Match the value precisely — "1500" is 1500.xx, not 15000 —
+        # by anchoring on the amount's "N.NN" text: a whole number matches its
+        # integer part ("1500.%"), a decimal matches as a prefix ("1500.5%").
+        num = qs.replace(",", "")
+        if re.fullmatch(r"\d+(\.\d+)?", num):
+            pattern = f"{num}%" if "." in num else f"{num}.%"
+            conditions.append(cast(models.Transaction.amount, String).ilike(pattern))
+        q = q.filter(or_(*conditions))
 
     
     if account_id:
