@@ -20,6 +20,10 @@ const Obligations = () => {
     const [periodStartDay, setPeriodStartDay] = useState(1);
 
     const [loading, setLoading] = useState(true);
+    // True once the first fetch finishes. Refreshes (after linking/paying) keep the
+    // page mounted so child state — like the Payments tab's month filter — survives;
+    // the full-page loading screen is only for the very first load.
+    const [hasLoaded, setHasLoaded] = useState(false);
 
     // --- Obligations Data State ---
     const [obligations, setObligations] = useState([]);
@@ -140,6 +144,7 @@ const Obligations = () => {
             console.error("❌ CRITICAL ERROR fetching data:", error);
         } finally {
             setLoading(false);
+            setHasLoaded(true);
         }
     };
 
@@ -383,7 +388,7 @@ const Obligations = () => {
 
     const currentHistoryObligation = obligations.find(o => o.id === viewingHistoryId) || {};
 
-    if (loading) return <div className="p-10 text-white">Loading...</div>;
+    if (loading && !hasLoaded) return <div className="p-10 text-white">Loading...</div>;
 
     return (
         <div>
