@@ -242,3 +242,101 @@ class TestAmountParsing:
     def test_foreign_currency_is_flagged_not_silently_taken_as_sar(self):
         _, currency = E.parse_amount("Amount: USD 31.29")
         assert currency == "USD"
+
+
+def _sms_from(sender, ts, body):
+    return f"----------------------------------------------------\n{ts} from {sender}\n\n{body}\n"
+
+
+class TestSTCDialect:
+    """STC Bank uses different message templates from Al Rajhi; the sender selects
+    the dialect. Purchases carry the merchant in From:/At:, transfers the person."""
+
+    def test_outward_transfer_names_the_recipient(self):
+        body = "Internal outward transfer\nAmount:165.00SAR\nTo:ABDULLAH ALASIRI\nAcc:1048*\nAt:31/10/25 20:23"
+        assert E.classify(body, "STC Bank") == (E._MONEY_NAMED, "stc_transfer_out", "debit", "ABDULLAH ALASIRI")
+
+    def test_purchase_names_the_merchant(self):
+        body = "Apple Pay Purchase\nVia: *6070\nAmount: 39.91 SAR\nFrom: Absher 2\nAt: 08/07/25 01:21"
+        assert E.classify(body, "STC Bank")[1:] == ("stc_purchase", "debit", "Absher 2")
+
+    def test_incoming_transfer_names_the_sender(self):
+        body = "Inward transfer (SARIE)\n1.00 SAR\nFrom MUATH ALASIRI\nFrom AL RAJHI BANK\nAccount *863\n31-07-2025 10:43"
+        assert E.classify(body, "STC Bank")[1:] == ("stc_transfer_in", "credit", "MUATH ALASIRI")
+
+    def test_topup_is_money_but_unnamed(self):
+        k, s, d, n = E.classify("Adding money to account\nAmount: 153.45 SAR\nVia: *XXXX\nAt: 31/05/25 19:52", "STC Bank")
+        assert k == E._MONEY_UNNAMED and n is None
+
+
+class TestJaziraDialect:
+    def test_online_purchase_names_the_merchant(self):
+        body = ("Online Purchase Apple Pay Credit Card: 4897 at :SAUDI ELECTRICITY COMP of : 1095.43 SAR "
+                "on : 2026-01-15 21:58 Available Balance is: 23395.89 SAR")
+        assert E.classify(body, "Jazira Bank")[1:] == ("jazira_purchase", "debit", "SAUDI ELECTRICITY COMP")
+
+    def test_pos_purchase_names_the_merchant(self):
+        body = "POS Purchase (Apple Pay) \nCredit Card: 4897 \nat :The Cheese Cake Factory R \nof: 355.00 SAR"
+        assert E.classify(body, "Jazira Bank")[3] == "The Cheese Cake Factory R"
+
+    def test_outgoing_transfer_names_recipient(self):
+        body = "Outgoing Funds Transfer Approved\nDebited from Account: 8001\nTo: MUATH ALAS**\nAmount: SAR 2,500.00\nIBAN/Alias: 7772"
+        assert E.classify(body, "Jazira Bank")[1:] == ("jazira_transfer_out", "debit", "MUATH ALAS**")
+
+    def test_credit_transfer_names_the_sender_not_the_dest_account(self):
+        body = "Credit transfer Internal \nAmount: SAR 1.00\nTo: 8002\nSender Name: M.ALASIRI\nSender Account No.: 8001\nDate:2026-01-05 15:04"
+        assert E.classify(body, "Jazira Bank")[1:] == ("jazira_transfer_in", "credit", "M.ALASIRI")
+
+    def test_empty_sender_name_does_not_capture_the_date_line(self):
+        # Regression: the field regex used to cross the newline into 'Date: ...'.
+        body = "Credit transfer: Local\nVia: X\nAmount: SAR 5.00\nTo: 8001\nSender Name:\nDate: 2026-03-30 09:38"
+        assert (E.classify(body, "Jazira Bank")[3] or "") .find("Date") == -1
+
+    def test_loan_instalment_is_recognised(self):
+        body = "Debit transfer: Loan Instalment\nFrom: 8001\nInstalment: SAR 19,099.85\nFor: Personal Loan"
+        assert E.classify(body, "Jazira Bank")[1:] == ("loan_instalment", "debit", "Loan Instalment")
+
+
+class TestDateOnlyStatementMatching:
+    """STC / Aljazira statement rows carry no time-of-day (all 00:00:00), so the
+    45s window can never reach them. Match on calendar date + amount + direction,
+    gated to the same bank and disambiguated by the bijection."""
+
+    def _sms(self, ts):
+        return _sms_from("STC Bank", ts, "Internal outward transfer\nAmount:165.00SAR\nTo:ABDULLAH ALASIRI\nAt:x")
+
+    def _row(self, day, bank="stc", tid="r"):
+        return E.TxRow(id=tid, timestamp=datetime(2026, 1, day, 0, 0, 0), amount=165.0,
+                       type="debit", merchant="Internal transfer", bank=bank)
+
+    def test_same_day_date_only_row_is_named(self):
+        res = E.match(E.parse_export(self._sms("2026-01-10 14:30:00")), [self._row(10)])
+        assert len(res.proposals) == 1 and res.proposals[0].new_merchant == "ABDULLAH ALASIRI"
+
+    def test_different_day_is_not_matched(self):
+        assert E.match(E.parse_export(self._sms("2026-01-10 14:30:00")), [self._row(11)]).proposals == []
+
+    def test_a_different_banks_row_is_never_claimed(self):
+        assert E.match(E.parse_export(self._sms("2026-01-10 14:30:00")), [self._row(10, bank="alrajhi")]).proposals == []
+
+    def test_two_same_amount_rows_on_the_day_are_refused(self):
+        rows = [self._row(10, tid="a"), self._row(10, tid="b")]
+        assert E.match(E.parse_export(self._sms("2026-01-10 14:30:00")), rows).proposals == []
+
+
+class TestOwnAccountTransferNaming:
+    SMS = _sms_from("AlRajhiBank", "2026-04-24 12:21:57",
+                    "Transfer Between Your Accounts\nAmount: SR 3032.19\nTo: 5225\n26/4/24 12:21")
+
+    def _row(self):
+        return _tx("r", "2026-04-24 12:21:52", 3032.19, "debit", "معاذ")
+
+    def test_names_the_destination_account(self):
+        res = E.match(E.parse_export(self.SMS), [self._row()], account_names={"5225": "Auto Lease"})
+        assert len(res.proposals) == 1 and res.proposals[0].new_merchant == "Transfer → Auto Lease"
+
+    def test_unknown_destination_stays_nameless(self):
+        assert E.match(E.parse_export(self.SMS), [self._row()], account_names={"9999": "X"}).proposals == []
+
+    def test_no_account_map_stays_nameless_as_before(self):
+        assert E.match(E.parse_export(self.SMS), [self._row()]).proposals == []

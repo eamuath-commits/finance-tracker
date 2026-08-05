@@ -2290,6 +2290,16 @@ def _read_stored_sms(user_id: str):
     return raws, infos
 
 
+def _account_name_map(db: Session, user_id: str) -> dict:
+    """last-4 -> account name, so own-account transfers can be named after their
+    destination account."""
+    out = {}
+    for a in db.query(models.Account).filter(models.Account.user_id == user_id).all():
+        if a.last_4_digits:
+            out[str(a.last_4_digits)[-4:]] = a.name
+    return out
+
+
 def _statement_txrows(db: Session, user_id: str) -> List[sms_enrichment.TxRow]:
     """The user's statement-imported transactions, projected for the matcher."""
     rows = db.query(models.Transaction).filter(
@@ -2297,10 +2307,19 @@ def _statement_txrows(db: Session, user_id: str) -> List[sms_enrichment.TxRow]:
         models.Transaction.source == _GENERIC_STATEMENT_SOURCE,
         models.Transaction.timestamp.isnot(None),
     ).all()
+    # Bank per statement, so date-only rows only match same-bank SMS.
+    sids = {r.statement_id for r in rows if r.statement_id}
+    banks = {}
+    if sids:
+        for sid, bank in db.query(models.Statement.id, models.Statement.bank_key).filter(
+            models.Statement.id.in_(sids)
+        ).all():
+            banks[sid] = bank
     return [
         sms_enrichment.TxRow(
             id=r.id, timestamp=r.timestamp,
             amount=float(r.amount or 0), type=r.type, merchant=r.merchant,
+            bank=banks.get(r.statement_id),
         )
         for r in rows
     ]
@@ -2356,7 +2375,7 @@ def sms_enrich_rerun(
         raise HTTPException(status_code=400, detail="No stored SMS exports yet — upload one first.")
     events = sms_enrichment.parse_exports(raws)
     txs = _statement_txrows(db, current_user.id)
-    result = sms_enrichment.match(events, txs)
+    result = sms_enrichment.match(events, txs, account_names=_account_name_map(db, current_user.id))
     return _enrich_response(result, sources=infos)
 
 
@@ -2407,7 +2426,7 @@ async def sms_enrich_preview(
 
     events = sms_enrichment.parse_export(raw)
     txs = _statement_txrows(db, current_user.id)
-    result = sms_enrichment.match(events, txs)
+    result = sms_enrichment.match(events, txs, account_names=_account_name_map(db, current_user.id))
 
     return _enrich_response(result)
 
@@ -2505,7 +2524,8 @@ def sms_enrich_report(
             "stats": {},
             "skipped": {},
         }
-    result = sms_enrichment.match(sms_enrichment.parse_exports(raws), txs)
+    result = sms_enrichment.match(sms_enrichment.parse_exports(raws), txs,
+                                  account_names=_account_name_map(db, current_user.id))
     return {
         "has_sources": True,
         "sources": infos,

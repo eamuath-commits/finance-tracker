@@ -34,7 +34,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time as _time_cls
 from typing import Dict, List, Optional, Tuple
 
 # Matching tolerances — measured optima, do not change without re-measuring.
@@ -226,12 +226,83 @@ def _first(body: str, field_name: str) -> Optional[str]:
     return names[0] if names else None
 
 
-def classify(body: str) -> Tuple[str, str, Optional[str], Optional[str]]:
-    """Return (kind, shape, direction, name). Pure function of the body text.
+def _line_field(body: str, *labels: str) -> Optional[str]:
+    """Value after any of `labels` (each a regex fragment), tolerant of 'Label:',
+    'Label :' and one-line runs where the value ends at the next 'Word :' field.
+    Rejects bare account numbers and dates — the same guard as _to_names."""
+    for lab in labels:
+        # [ \t]* (not \s*) so an empty field ("Sender Name:\nDate: ...") does not
+        # let the value spill onto the next line and capture 'Date: ...'.
+        m = re.search(lab + r"[ \t]*:?[ \t]*(.+)", body, re.I)
+        if not m:
+            continue
+        v = m.group(1)
+        v = v.split("\n", 1)[0]                                  # stop at end of line
+        # or at the next KNOWN inline field label (a fixed list, so a multi-word
+        # merchant like "SAUDI ELECTRICITY COMP" is not itself read as a field).
+        v = re.split(r"(?i)\s+(?:of|on|at|from|to|via|amount|available|due|balance|"
+                     r"iban|ref|date|acc|card|sender|receiver|instalment|remaining|for)\b\s*:", v, 1)[0]
+        v = v.strip().strip(":").strip()
+        # reject empties, bare account numbers, dates, and stray field labels
+        if v and not _DIGITS4.match(v) and not _LOOKS_LIKE_DATE.match(v) \
+                and not re.match(r"(?i)(date|amount|available|due|ref|iban|acc|via)\b", v):
+            return v
+    return None
+
+
+def _classify_stc(body: str, first: str):
+    """STC Bank message shapes (see the export catalogue). Purchases carry the
+    merchant in From:/At:/For; transfers carry the person in To:/From."""
+    if re.match(r"^Adding money to account", first, re.I):
+        return _MONEY_UNNAMED, "stc_topup", "credit", None
+    if re.match(r"^(Inward|Internal incoming) transfer", first, re.I):
+        return _MONEY_NAMED, "stc_transfer_in", "credit", _line_field(body, r"From")
+    if re.match(r"^Transfer between my accounts", first, re.I):
+        return _MONEY_UNNAMED, "own_transfer", "debit", None
+    if re.match(r"^(Internal outward transfer|Internal transfer|Transfer via|"
+                r"Outcome Transfer|Debit Transfer)", first, re.I):
+        return _MONEY_NAMED, "stc_transfer_out", "debit", _line_field(body, r"To")
+    if re.match(r"^(Apple Pay Purchase|\*{2,}\d+\s+Purchase)", first, re.I):
+        return _MONEY_NAMED, "stc_purchase", "debit", _line_field(body, r"From")
+    if re.match(r"^Local Purchase", first, re.I):
+        return _MONEY_NAMED, "stc_purchase", "debit", _line_field(body, r"At")
+    if re.match(r"^Online Purchase", first, re.I):
+        return _MONEY_NAMED, "stc_online", "debit", _line_field(body, r"For")
+    if re.match(r"^Bill Payment", first, re.I):
+        return _MONEY_UNNAMED, "stc_bill", "debit", None
+    return _NOISE, "unknown", None, None
+
+
+def _classify_jazira(body: str, first: str):
+    """Bank Aljazira message shapes. Card purchases put the merchant after 'at :',
+    transfers put the person in To:/Sender Name."""
+    if re.match(r"^(POS Purchase|Online Purchase Apple Pay)", first, re.I):
+        return _MONEY_NAMED, "jazira_purchase", "debit", _line_field(body, r"at\s*:")
+    if re.match(r"^شراء\s+(عبر\s+نقاط|عبر\s+الانترنت|عبر\s+الإنترنت)", first):
+        return _MONEY_NAMED, "jazira_purchase_ar", "debit", _line_field(body, r"لدى", r"At")
+    if re.match(r"^Outgoing Funds Transfer Approved", first, re.I):
+        return _MONEY_NAMED, "jazira_transfer_out", "debit", _line_field(body, r"To")
+    if re.match(r"^Credit transfer\b", first, re.I):
+        return _MONEY_NAMED, "jazira_transfer_in", "credit", _line_field(body, r"Sender Name")
+    if re.match(r"^Debit transfer\s*:?\s*Loan Instalment", first, re.I):
+        return _MONEY_NAMED, "loan_instalment", "debit", "Loan Instalment"
+    if re.match(r"^Debit transfer Between Your Accounts", first, re.I):
+        return _MONEY_UNNAMED, "own_transfer", "debit", None
+    if re.match(r"^Debit transfer\b", first, re.I):
+        return _MONEY_UNNAMED, "jazira_transfer_out", "debit", None
+    if re.match(r"^Credit Card\s*:?\s*(Payment|Refund)", first, re.I):
+        return _MONEY_UNNAMED, "jazira_card_payment", "debit", None
+    return _NOISE, "unknown", None, None
+
+
+def classify(body: str, sender: Optional[str] = None) -> Tuple[str, str, Optional[str], Optional[str]]:
+    """Return (kind, shape, direction, name). Pure function of the body (+ sender).
 
     Direction/name are only meaningful for money kinds. The counterparty name
     is drawn from a fixed whitelist of fields; an operation-type label (OTP
     'Reason:', Arabic 'نوع العملية:') is deliberately never treated as a name.
+    The sender selects the bank dialect — STC and Aljazira use different message
+    templates from Al Rajhi (the default).
     """
     first = body.strip().split("\n", 1)[0].strip()
 
@@ -239,6 +310,13 @@ def classify(body: str) -> Tuple[str, str, Optional[str], Optional[str]]:
         if rx.search(body):
             return _NOISE, "noise", None, None
 
+    low_sender = (sender or "").lower()
+    if "stc" in low_sender:
+        return _classify_stc(body, first)
+    if "jazira" in low_sender or "جزيرة" in (sender or ""):
+        return _classify_jazira(body, first)
+
+    # --- Al Rajhi (default dialect) ---
     # --- card purchases: counterparty is At: ---
     if re.match(r"^(PoS International(\s+purchase)?)", first, re.I):
         return _MONEY_NAMED, "pos_international", "debit", _first(body, "At")
@@ -338,7 +416,7 @@ def parse_export(raw: str) -> List[Event]:
         body = chunk[hm.end():].strip()
 
         ev = Event(index=idx, timestamp=ts, sender=sender, body=body)
-        ev.kind, ev.shape, ev.direction, ev.name = classify(body)
+        ev.kind, ev.shape, ev.direction, ev.name = classify(body, sender)
         if ev.kind != _NOISE:
             ev.amount, ev.currency = parse_amount(body)
             ev.is_local = ev.currency in LOCAL_CURRENCIES
@@ -385,6 +463,9 @@ _GENERIC_PREFIXES = (
     "outward ips", "inward ips", "outward credit", "transfer from customer",
     "transfer to customer", "refund purchase", "local transfer",
     "internal transfer", "funds transfer", "e-channel", "quick transfer",
+    # STC / Aljazira account-statement transfer labels
+    "incoming local transfer", "outgoing local transfer", "through bank",
+    "own account transfer", "incoming transfer", "outgoing transfer",
 )
 _GENERIC_EXACT = {"transfer", "pos", "purchase", "payment", "withdrawal", "deposit"}
 # One bare Arabic token (a first name) — the statement's usual counterparty label.
@@ -425,6 +506,7 @@ class TxRow:
     amount: float
     type: str            # "debit" | "credit"
     merchant: Optional[str]
+    bank: Optional[str] = None   # bank_key of the row's statement, for same-bank gating
 
 
 @dataclass
@@ -453,9 +535,35 @@ class MatchResult:
 _DAY_SECONDS = 86400.0
 
 
+_MIDNIGHT = _time_cls(0, 0, 0)
+
+
+def _sender_bank(sender: Optional[str]) -> Optional[str]:
+    s = (sender or "").lower()
+    if "stc" in s:
+        return "stc"
+    if "jazira" in s:
+        return "aljazira"
+    if "rajhi" in s:
+        return "alrajhi"
+    return None
+
+
 def _candidate(ev: Event, tx: TxRow) -> bool:
     if ev.direction != tx.type or abs(ev.amount - tx.amount) > AMOUNT_EPS:
         return False
+    # Date-only statement rows (STC, Aljazira) carry no posting time — every row is
+    # stamped 00:00:00 — so the 45s window can never reach them. Match on calendar
+    # date instead: same date + amount + direction, disambiguated by the bijection
+    # (two same-amount rows on a day -> ambiguous -> skipped, never guessed). Gated
+    # to the SAME bank so an Al Rajhi SMS can't claim a Jazira row of equal amount.
+    # A real transaction is virtually never stamped exactly midnight, so this does
+    # not loosen Al Rajhi, whose rows carry real times.
+    if tx.timestamp.time() == _MIDNIGHT:
+        eb = _sender_bank(ev.sender)
+        if tx.bank and eb and tx.bank != eb:
+            return False
+        return ev.timestamp.date() == tx.timestamp.date()
     signed = (ev.timestamp - tx.timestamp).total_seconds()
     dt = abs(signed)
     if ev.shape == "loan_instalment" and is_loan_label(tx.merchant):
@@ -497,7 +605,30 @@ def _can_write(ev: Event, tx: TxRow) -> bool:
     return True
 
 
-def match(events: List[Event], txs: List[TxRow]) -> MatchResult:
+_OWN_TO_RE = re.compile(r"\bTo\s*:\s*\**\s*(\d{3,})")
+
+
+def _name_own_transfers(events: List[Event], account_names: Dict[str, str]) -> None:
+    """An own-account transfer names only a destination account NUMBER ('To: 5225').
+    When that resolves to one of the user's own accounts, name the (debit) side of
+    the transfer after the destination — 'Transfer → Auto Lease' — instead of
+    leaving it blank. Only fires when the number maps to a known account, so an
+    unknown destination stays nameless exactly as before."""
+    if not account_names:
+        return
+    for e in events:
+        if e.shape == "own_transfer" and e.kind == _MONEY_UNNAMED:
+            m = _OWN_TO_RE.search(e.body)
+            if not m:
+                continue
+            nm = account_names.get(m.group(1)[-4:])
+            if nm:
+                e.name = f"Transfer → {nm}"
+                e.kind = _MONEY_NAMED
+
+
+def match(events: List[Event], txs: List[TxRow],
+          account_names: Optional[Dict[str, str]] = None) -> MatchResult:
     """Core bijection matcher. Proposes a name overwrite for a transaction only
     when exactly one money SMS and exactly one transaction claim each other, the
     SMS is a named-allowlisted kind, and the current label is generic.
@@ -505,7 +636,11 @@ def match(events: List[Event], txs: List[TxRow]) -> MatchResult:
     The competitor pool is EVERY matchable money event (named or not): a card
     top-up that funded a purchase must be able to block the purchase's name from
     landing on the top-up row.
+
+    account_names maps a user's account last-4 to its name, letting own-account
+    transfers be named after their destination (see _name_own_transfers).
     """
+    _name_own_transfers(events, account_names or {})
     pool = [e for e in events if e.matchable]
 
     # Bidirectional candidate degree over the full pool.
