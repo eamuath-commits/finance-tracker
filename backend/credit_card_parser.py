@@ -29,9 +29,14 @@ import transaction_types
 logger = logging.getLogger("credit_card_parser")
 
 # A transaction row. Both dates are DD/MM/YY; a trailing CR flags a credit.
+# Some layouts (Aljazira "Visa Infinite") print an EXTRA running-total column
+# after the amount ("... 26/12/25 114.00 57"); the optional trailing group lets
+# those rows parse instead of being silently dropped. The amount is still the
+# figure right after the posting date — confirmed against the statement totals.
 _TX_RE = re.compile(
     r'^(?P<d1>\d{2}/\d{2}/\d{2})\s+(?P<desc>.+?)\s+(?P<d2>\d{2}/\d{2}/\d{2})\s+'
-    r'(?P<amt>[\d,]+\.\d{2})(?P<cr>CR)?\s*$'
+    r'(?P<amt>[\d,]+\.\d{2})(?P<cr>CR)?'
+    r'(?:\s+[\d,]+(?:\.\d+)?)?\s*$'
 )
 _BF_RE = re.compile(r'BROUGHT FORWARD BALANCE\s+([\d,]+\.\d{2})(CR)?', re.I)
 # Header: "... 4738 27XX XXXX 4897 ..." — the printed card number, last 4 = 4897.

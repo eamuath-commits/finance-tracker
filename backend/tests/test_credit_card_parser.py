@@ -40,6 +40,27 @@ class TestLineParsing:
                      "BROUGHT FORWARD BALANCE 54,682.10"):
             assert CC._TX_RE.match(junk.strip()) is None, junk
 
+    def test_trailing_running_total_column_is_ignored(self):
+        # Aljazira "Visa Infinite" prints a running-total column AFTER the amount.
+        # The amount is still the figure right after the posting date; the trailing
+        # number must not be taken as the amount (or the row silently dropped).
+        cases = [
+            ("22/12/25 never enough RIY 26/12/25 114.00 57", "114.00"),
+            ("22/12/25 SAR59.88 PAYPAL *STARSEKCE8 26/12/25 61.08 104.79", "61.08"),
+            ("23/12/25 mintaqat tarikhiat comRIY 25/12/25 6,438.02 8047.52", "6,438.02"),
+            ("08/01/26 GBP8.99 Amazon Prime*ZC6576HQ4 10/01/26 46.51 79.8", "46.51"),
+        ]
+        for line, expected_amt in cases:
+            rows = self._rows(line)
+            assert rows, f"row was dropped: {line}"
+            assert rows[0][2] == expected_amt, f"{line} -> {rows[0][2]}"
+            assert rows[0][3] is False  # these are charges, not credits
+
+    def test_amount_at_end_still_parses_without_a_trailing_column(self):
+        # The Ajwa layout has no trailing column — must still work.
+        rows = self._rows("10/12/25 Tabby 12/12/25 327.87")
+        assert rows[0][2] == "327.87"
+
 
 class TestHeaderRegexes:
     def test_card_last4(self):
