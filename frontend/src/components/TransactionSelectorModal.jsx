@@ -51,6 +51,18 @@ export default function TransactionSelectorModal({
         }
     }, [isOpen]);
 
+    // The modal stays mounted between openings, so reset per-payment state each
+    // time it opens — otherwise the previous obligation's selection (and search)
+    // carries over when you start linking a different payment.
+    useEffect(() => {
+        if (isOpen) {
+            setSelected(new Set(currentLinked));
+            setSearchQuery('');
+            setExpandedSms(null);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen]);
+
     const buildParams = (offset) => {
         const params = new URLSearchParams();
         if (searchQuery) params.set('query', searchQuery);
