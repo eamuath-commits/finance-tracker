@@ -651,6 +651,7 @@ class StatementUpdate(BaseModel):
 class EnrichItem(BaseModel):
     transaction_id: str
     new_merchant: str
+    raw_sms: Optional[str] = None   # source SMS body, for storing its reference fields in notes
 
 class EnrichApplyRequest(BaseModel):
     items: List[EnrichItem]

@@ -250,6 +250,31 @@ def _line_field(body: str, *labels: str) -> Optional[str]:
     return None
 
 
+# Reference-style fields worth keeping on the enriched transaction's note: a bill
+# number, the SADAD service/biller, a transfer reference/IBAN. Their values are
+# often digits, so this deliberately does NOT go through _line_field's name guard.
+_NOTE_FIELD_RE = re.compile(
+    r"(?im)^\s*(Bill(?:\s*No)?|Number|Invoice|Service|Biller|Ref(?:erence)?|IBAN(?:/Alias)?)"
+    r"\b\s*:\s*(.+?)\s*$")
+_NOTE_LABELS = {"bill": "Bill", "bill no": "Bill", "number": "Number", "invoice": "Invoice",
+                "service": "Service", "biller": "Biller", "ref": "Ref", "reference": "Ref",
+                "iban": "IBAN", "iban/alias": "IBAN"}
+
+
+def extract_sms_note(body: str) -> Optional[str]:
+    """A concise note of the reference fields an SMS carries — bill number, SADAD
+    service/biller, transfer reference/IBAN — so they survive on the enriched
+    transaction. Returns None when the SMS has none (e.g. a plain purchase)."""
+    seen = {}
+    for m in _NOTE_FIELD_RE.finditer(body or ""):
+        label = _NOTE_LABELS.get(m.group(1).lower().strip(), m.group(1).strip())
+        val = m.group(2).strip()
+        if not val or set(val) <= set("*-xX "):   # masked / blank value
+            continue
+        seen.setdefault(label, val)
+    return " · ".join(f"{k}: {v}" for k, v in seen.items()) or None
+
+
 def _classify_stc(body: str, first: str):
     """STC Bank message shapes (see the export catalogue). Purchases carry the
     merchant in From:/At:/For; transfers carry the person in To:/From."""

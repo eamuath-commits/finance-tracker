@@ -71,6 +71,14 @@ def run_migrations(engine):
                 conn.execute(text("ALTER TABLE transactions ADD COLUMN enrichment_batch_id VARCHAR"))
                 conn.commit()
 
+        # Enrichment also writes the SMS's reference fields into notes; keep the
+        # original note so undo restores it exactly.
+        if 'notes_original' not in columns:
+            print("Migrating: Adding notes_original to transactions")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE transactions ADD COLUMN notes_original VARCHAR"))
+                conn.commit()
+
         # The bank's own operation type (PURCHASE, INTERNAL_TRANSFER, FEE ...),
         # kept separate from the spending category. Backfilled from each row's
         # statement line by _backfill_transaction_types() below.
@@ -2470,9 +2478,23 @@ def sms_enrich_apply(
             failed.append({"transaction_id": item.transaction_id, "reason": "label no longer generic"})
             continue
         # Preserve the FIRST original only; a re-run must never clobber it.
-        if tx.merchant_original is None:
+        first_enrichment = tx.merchant_original is None
+        if first_enrichment:
             tx.merchant_original = tx.merchant
         tx.merchant = new_name
+        # Keep the SMS's reference fields (bill number, SADAD service, transfer
+        # ref/IBAN) on the transaction's note. notes_original is captured with the
+        # merchant on the first enrichment so undo restores it exactly.
+        sms_note = sms_enrichment.extract_sms_note(item.raw_sms or "")
+        if sms_note:
+            if first_enrichment:
+                # "" (not None) records "there was no note" so undo can tell a note
+                # it added apart from one it never touched.
+                tx.notes_original = tx.notes or ""
+            # Append to the statement's own note rather than replace it, so the
+            # counterparty/description it already carries is not lost.
+            base = (tx.notes or "").strip()
+            tx.notes = f"{base}\n{sms_note}" if base else sms_note
         tx.enrichment_batch_id = batch_id
         tx.enriched_at = applied_at
         applied += 1
@@ -2590,6 +2612,10 @@ def sms_enrich_undo(
         if tx.merchant_original is not None:
             tx.merchant = tx.merchant_original
             restored += 1
+        # Restore the note only if this batch changed it (notes_original set).
+        if tx.notes_original is not None:
+            tx.notes = tx.notes_original or None
+            tx.notes_original = None
         tx.enrichment_batch_id = None
         tx.enriched_at = None
     db.commit()

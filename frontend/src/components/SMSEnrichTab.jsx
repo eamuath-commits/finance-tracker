@@ -79,7 +79,7 @@ const BucketRows = ({ title, note, rows, onPick, picking }) => {
                                         {/* The matcher will not choose between these, but you can. */}
                                         {onPick && c.name && (
                                             <button
-                                                onClick={() => onPick(r.transaction_id, c.name)}
+                                                onClick={() => onPick(r.transaction_id, c.name, c.raw_sms)}
                                                 disabled={picking === r.transaction_id}
                                                 className="flex-shrink-0 text-[10px] font-semibold text-cyan-300 bg-cyan-600/15 hover:bg-cyan-600/30 disabled:opacity-50 border border-cyan-500/30 rounded px-1.5 py-0.5 transition"
                                             >
@@ -189,12 +189,12 @@ const SMSEnrichTab = ({ onApplied }) => {
     // matcher refuses to guess between them; you are allowed to. Goes through the
     // normal apply endpoint, so it re-validates server-side and lands in a batch
     // that can be reversed like any other.
-    const pickCandidate = async (transactionId, name) => {
+    const pickCandidate = async (transactionId, name, rawSms) => {
         setPicking(transactionId);
         setError(null);
         try {
             await api.post(`${API_URL}/api/sms/enrich/apply`, {
-                items: [{ transaction_id: transactionId, new_merchant: name }],
+                items: [{ transaction_id: transactionId, new_merchant: name, raw_sms: rawSms }],
             });
             await loadReport();
             loadBatches();
@@ -330,7 +330,7 @@ const SMSEnrichTab = ({ onApplied }) => {
     const apply = async () => {
         const items = proposals
             .filter(p => selected.has(p.transaction_id))
-            .map(p => ({ transaction_id: p.transaction_id, new_merchant: p.new_merchant }));
+            .map(p => ({ transaction_id: p.transaction_id, new_merchant: p.new_merchant, raw_sms: p.raw_sms }));
         if (items.length === 0) return;
         setLoading(true); setError(null);
         try {

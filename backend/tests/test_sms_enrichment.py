@@ -340,3 +340,32 @@ class TestOwnAccountTransferNaming:
 
     def test_no_account_map_stays_nameless_as_before(self):
         assert E.match(E.parse_export(self.SMS), [self._row()]).proposals == []
+
+
+class TestSmsNoteExtraction:
+    """When an SMS carries reference fields (bill number, SADAD service, transfer
+    ref/IBAN), enrichment keeps them on the transaction's note."""
+
+    def test_al_rajhi_bill_payment_keeps_the_bill_number(self):
+        body = "Bill Payment\nFrom:9384\nAmount:SAR 923.11\nBiller:001\nService:STC BILL\nBill:05064478739\nDate:23-11-4 15:04"
+        assert E.extract_sms_note(body) == "Biller: 001 · Service: STC BILL · Bill: 05064478739"
+
+    def test_stc_bill_payment_keeps_service_and_number(self):
+        body = "Bill Payment (SADAD)\nAmount: 100.00 SAR\nBiller: STC-001\nService: POST\nNumber: 6722162487\nFrom Account: ***0863\nOn: 30/04/26 22:00"
+        assert E.extract_sms_note(body) == "Biller: STC-001 · Service: POST · Number: 6722162487"
+
+    def test_transfer_keeps_iban_and_reference(self):
+        body = ("Outgoing Funds Transfer Approved\nDebited from Account: 8001\nTo: MUATH ALAS**\n"
+                "Amount: SAR 2,500.00\nIBAN/Alias: 7772\n[AlRajhi Bank]\nat 2025-12-21 15:50\nRef: 2BTMS11549789947")
+        assert E.extract_sms_note(body) == "IBAN: 7772 · Ref: 2BTMS11549789947"
+
+    def test_a_plain_purchase_has_no_note(self):
+        body = "Apple Pay Purchase\nVia: *6070\nAmount: 39.91 SAR\nFrom: Absher 2\nAt: 08/07/25 01:21"
+        assert E.extract_sms_note(body) is None
+
+    def test_masked_reference_value_is_skipped(self):
+        assert E.extract_sms_note("Bill Payment\nNumber: ****\nAmount: 1 SAR") is None
+
+    def test_card_number_line_is_not_taken_as_a_bill_number(self):
+        # 'Number' must be a line-start field, not part of 'Card Number:'.
+        assert E.extract_sms_note("POS Purchase\nCredit Card Number: 4897\nAmount: 5 SAR") is None
