@@ -491,6 +491,7 @@ _GENERIC_PREFIXES = (
     # STC / Aljazira account-statement transfer labels
     "incoming local transfer", "outgoing local transfer", "through bank",
     "own account transfer", "incoming transfer", "outgoing transfer",
+    "instant outgoing transfer", "instant incoming transfer", "instant transfer",
 )
 _GENERIC_EXACT = {"transfer", "pos", "purchase", "payment", "withdrawal", "deposit"}
 # One bare Arabic token (a first name) — the statement's usual counterparty label.
