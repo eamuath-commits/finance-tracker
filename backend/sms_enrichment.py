@@ -578,17 +578,21 @@ def _sender_bank(sender: Optional[str]) -> Optional[str]:
 def _candidate(ev: Event, tx: TxRow) -> bool:
     if ev.direction != tx.type or abs(ev.amount - tx.amount) > AMOUNT_EPS:
         return False
+    # An SMS is about a transaction at ITS OWN bank, so it must never match another
+    # bank's statement row of the same amount. Without this an STC transfer SMS
+    # could also match an Al Rajhi purchase of the same amount seconds away, making
+    # the SMS ambiguous so it enriches NOTHING. Applies to every window below.
+    # (Skipped only when a bank is unknown, so nothing is over-restricted.)
+    eb = _sender_bank(ev.sender)
+    if tx.bank and eb and tx.bank != eb:
+        return False
     # Date-only statement rows (STC, Aljazira) carry no posting time — every row is
     # stamped 00:00:00 — so the 45s window can never reach them. Match on calendar
     # date instead: same date + amount + direction, disambiguated by the bijection
-    # (two same-amount rows on a day -> ambiguous -> skipped, never guessed). Gated
-    # to the SAME bank so an Al Rajhi SMS can't claim a Jazira row of equal amount.
-    # A real transaction is virtually never stamped exactly midnight, so this does
-    # not loosen Al Rajhi, whose rows carry real times.
+    # (two same-amount rows on a day -> ambiguous -> skipped, never guessed). A real
+    # transaction is virtually never stamped exactly midnight, so this does not
+    # loosen Al Rajhi, whose rows carry real times.
     if tx.timestamp.time() == _MIDNIGHT:
-        eb = _sender_bank(ev.sender)
-        if tx.bank and eb and tx.bank != eb:
-            return False
         return ev.timestamp.date() == tx.timestamp.date()
     signed = (ev.timestamp - tx.timestamp).total_seconds()
     dt = abs(signed)

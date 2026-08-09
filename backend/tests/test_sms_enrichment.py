@@ -369,3 +369,28 @@ class TestSmsNoteExtraction:
     def test_card_number_line_is_not_taken_as_a_bill_number(self):
         # 'Number' must be a line-start field, not part of 'Card Number:'.
         assert E.extract_sms_note("POS Purchase\nCredit Card Number: 4897\nAmount: 5 SAR") is None
+
+
+class TestSameBankGating:
+    """An SMS is about a transaction at its OWN bank. It must never match another
+    bank's statement row of the same amount — that coincidence used to make the
+    SMS ambiguous (two candidates) so it enriched nothing."""
+
+    SMS = _sms_from("STC Bank", "2026-03-12 01:38:33",
+                    "Internal outward transfer\nAmount:485.00SAR\nTo:AJITH SIVANUNNI\nAcc:0404*\nAt:12/03/26 01:38")
+
+    def test_stc_sms_names_its_stc_row_despite_a_same_amount_rajhi_row_seconds_away(self):
+        stc = E.TxRow(id="stc", timestamp=datetime(2026, 3, 12, 0, 0, 0), amount=485.0,
+                      type="debit", merchant="Internal transfer", bank="stc")
+        rajhi = E.TxRow(id="rajhi", timestamp=datetime(2026, 3, 12, 1, 38, 25), amount=485.0,
+                        type="debit", merchant="Online purchase Apple pay (Domestic)", bank="alrajhi")
+        named = {p.transaction_id: p.new_merchant for p in E.match(E.parse_export(self.SMS), [stc, rajhi]).proposals}
+        assert named.get("stc") == "AJITH SIVANUNNI"
+        assert "rajhi" not in named
+
+    def test_bankless_row_still_matchable(self):
+        # When a row's bank is unknown, the gate must not over-restrict.
+        row = E.TxRow(id="x", timestamp=datetime(2026, 3, 12, 0, 0, 0), amount=485.0,
+                      type="debit", merchant="Internal transfer", bank=None)
+        named = {p.transaction_id: p.new_merchant for p in E.match(E.parse_export(self.SMS), [row]).proposals}
+        assert named.get("x") == "AJITH SIVANUNNI"
