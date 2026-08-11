@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Button, Input } from './UI';
 import { Search, X, Check, Link, Calendar, DollarSign, Filter, MessageSquare } from 'lucide-react';
 import api from '../utils/api';
@@ -28,14 +28,15 @@ export default function TransactionSelectorModal({
     const [searchQuery, setSearchQuery] = useState('');
     const [showFilters, setShowFilters] = useState(false);
     const [expandedSms, setExpandedSms] = useState(null);
-    const [filters, setFilters] = useState({
+    const seedFilters = () => ({
         accountId: defaultFilters.accountId || '',
-        minAmount: '',
-        maxAmount: '',
-        startDate: '',
-        endDate: '',
-        type: ''
+        minAmount: defaultFilters.minAmount || '',
+        maxAmount: defaultFilters.maxAmount || '',
+        startDate: defaultFilters.startDate || '',
+        endDate: defaultFilters.endDate || '',
+        type: defaultFilters.type || '',
     });
+    const [filters, setFilters] = useState(seedFilters);
     const [accounts, setAccounts] = useState([]);
     const [total, setTotal] = useState(0);          // full match count, not just this page
     const [loadingMore, setLoadingMore] = useState(false);
@@ -59,6 +60,12 @@ export default function TransactionSelectorModal({
             setSelected(new Set(currentLinked));
             setSearchQuery('');
             setExpandedSms(null);
+            // Pre-filter to the payment (debits, around its billing month) so the
+            // right transaction is already narrowed down instead of a full scroll.
+            setFilters(seedFilters());
+            if (defaultFilters.startDate || defaultFilters.type || defaultFilters.minAmount) {
+                setShowFilters(true);
+            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen]);
@@ -154,6 +161,15 @@ export default function TransactionSelectorModal({
     };
 
     const newSelections = Array.from(selected).filter(id => !currentLinked.includes(id));
+
+    // When linking to a payment, float the closest-amount transactions to the top
+    // so the exact match is the first thing you see, not buried by date order.
+    const displayTransactions = useMemo(() => {
+        if (expectedAmount == null) return transactions;
+        return [...transactions].sort(
+            (a, b) => Math.abs((a.amount || 0) - expectedAmount) - Math.abs((b.amount || 0) - expectedAmount)
+        );
+    }, [transactions, expectedAmount]);
 
     if (!isOpen) return null;
 
@@ -304,7 +320,7 @@ export default function TransactionSelectorModal({
                             No transactions found
                         </div>
                     ) : (
-                        transactions.map(tx => {
+                        displayTransactions.map(tx => {
                             const isSelected = selected.has(tx.id);
                             const isAlreadyLinked = currentLinked.includes(tx.id);
                             const hasOtherLink = tx.linked_to_payment_id || tx.linked_to_distribution_id;
