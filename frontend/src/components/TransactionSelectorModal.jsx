@@ -58,12 +58,12 @@ export default function TransactionSelectorModal({
     useEffect(() => {
         if (isOpen) {
             setSelected(new Set(currentLinked));
-            setSearchQuery('');
+            setSearchQuery(defaultFilters.search || '');
             setExpandedSms(null);
-            // Pre-filter to the payment (debits, around its billing month) so the
-            // right transaction is already narrowed down instead of a full scroll.
+            // Pre-filter to the payment (account/debits/text, around its billing
+            // month) so the right transaction is already narrowed down.
             setFilters(seedFilters());
-            if (defaultFilters.startDate || defaultFilters.type || defaultFilters.minAmount) {
+            if (defaultFilters.startDate || defaultFilters.type || defaultFilters.minAmount || defaultFilters.accountId) {
                 setShowFilters(true);
             }
         }

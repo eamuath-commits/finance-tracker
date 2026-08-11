@@ -284,6 +284,11 @@ class MonthlyObligation(Base):
     notes = Column(Text, nullable=True)
     display_order = Column(Integer, default=0) # For UI ordering
     target_account_id = Column(String, ForeignKey("accounts.id"), nullable=True)  # Envelope account for salary distribution
+    # Matching hints: help the system find the transaction that pays this obligation.
+    match_account_id = Column(String, ForeignKey("accounts.id"), nullable=True)  # only look in this account
+    match_text = Column(String, nullable=True)          # words / bill number that appear on the transaction
+    match_day_from = Column(Integer, nullable=True)     # earliest day-of-month it posts
+    match_day_to = Column(Integer, nullable=True)       # latest day-of-month it posts
 
     target_account = relationship("Account", foreign_keys=[target_account_id])
 

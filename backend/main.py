@@ -79,6 +79,19 @@ def run_migrations(engine):
                 conn.execute(text("ALTER TABLE transactions ADD COLUMN notes_original VARCHAR"))
                 conn.commit()
 
+        # Obligation match-hints (account / text / day window) for finding the
+        # transaction that pays an obligation.
+        obl_cols = [c["name"] for c in inspector.get_columns("obligations")]
+        for col, ddl in [
+            ("match_account_id", "VARCHAR"), ("match_text", "VARCHAR"),
+            ("match_day_from", "INTEGER"), ("match_day_to", "INTEGER"),
+        ]:
+            if col not in obl_cols:
+                print(f"Migrating: Adding {col} to obligations")
+                with engine.connect() as conn:
+                    conn.execute(text(f"ALTER TABLE obligations ADD COLUMN {col} {ddl}"))
+                    conn.commit()
+
         # The bank's own operation type (PURCHASE, INTERNAL_TRANSFER, FEE ...),
         # kept separate from the spending category. Backfilled from each row's
         # statement line by _backfill_transaction_types() below.
@@ -1134,6 +1147,36 @@ def get_obligations_forecast(months_ahead: int = 1, db: Session = Depends(get_db
     }
 
 
+def _has_match_hints(obl):
+    return bool(obl.match_account_id or obl.match_text or obl.match_day_from or obl.match_day_to)
+
+
+def _passes_match_hints(obl, tx):
+    """A transaction must satisfy every SET match hint to be a candidate for an
+    obligation that has them: same account, containing the match text (matched
+    against merchant / notes / SMS; any one term suffices), and within the
+    day-of-month window. Passing the hints is itself the qualifying evidence."""
+    if obl.match_account_id and tx.account_id != obl.match_account_id:
+        return False
+    if obl.match_text:
+        terms = [t.strip().lower() for t in re.split(r"[,\s]+", obl.match_text) if t.strip()]
+        hay = " ".join(x for x in (tx.merchant, tx.notes, tx.raw_sms_content) if x).lower()
+        if terms and not any(t in hay for t in terms):
+            return False
+    d = tx.timestamp.day if tx.timestamp else None
+    lo, hi = obl.match_day_from, obl.match_day_to
+    if d is not None:
+        if lo and hi:
+            in_window = (lo <= d <= hi) if lo <= hi else (d >= lo or d <= hi)
+            if not in_window:
+                return False
+        elif lo and d < lo:
+            return False
+        elif hi and d > hi:
+            return False
+    return True
+
+
 @app.get("/obligations/all-matches")
 def get_all_obligation_matches(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """
@@ -1190,6 +1233,7 @@ def get_all_obligation_matches(db: Session = Depends(get_db), current_user: mode
         keyword = obl.name.split(" ")[0].lower()
         provider_lower = (obl.provider or "").lower()
         note_keywords = [w.lower() for w in (obl.notes or "").split() if len(w) > 2]
+        has_hints = _has_match_hints(obl)
 
         matches = []
         for tx in candidates:
@@ -1201,41 +1245,49 @@ def get_all_obligation_matches(db: Session = Depends(get_db), current_user: mode
             merchant_lower = (tx.merchant or "").lower()
             notes_lower = (tx.notes or "").lower()
 
-            # Name/keyword match
-            if keyword in merchant_lower or keyword in notes_lower:
-                score += 50
-                reasons.append("name_match")
-
-            # Provider match
-            if provider_lower and len(provider_lower) > 2:
-                if provider_lower in merchant_lower or provider_lower in notes_lower:
-                    score += 40
-                    reasons.append("provider_match")
-
-            # Biller reference match
-            if tx.biller_id:
-                biller = tx.biller_ref
-                if biller:
-                    biller_name = (biller.display_name or biller.name or "").lower()
-                    if keyword in biller_name or (provider_lower and provider_lower in biller_name):
-                        score += 45
-                        reasons.append("biller_match")
-
-            # Notes/alias match
-            for k in note_keywords:
-                if k in merchant_lower or k in notes_lower:
+            if has_hints:
+                # Explicit match rule: the transaction must satisfy the obligation's
+                # account/text/day hints. Passing them IS the qualifying evidence.
+                if not _passes_match_hints(obl, tx):
+                    continue
+                score = 60
+                reasons.append("match_rule")
+            else:
+                # Name/keyword match
+                if keyword in merchant_lower or keyword in notes_lower:
                     score += 50
-                    reasons.append("notes_match")
-                    break
+                    reasons.append("name_match")
 
-            # ---- DESCRIPTION IS REQUIRED ----
-            # Everything above is description evidence. Amount is NOT a reliable
-            # signal here: a BUDGET figure is only an estimate of the last paid
-            # amount, so the real transaction routinely differs. Without any
-            # description evidence, an amount/date coincidence must never surface
-            # an unrelated transaction as a match. Amount only ranks from here.
-            if score == 0:
-                continue
+                # Provider match
+                if provider_lower and len(provider_lower) > 2:
+                    if provider_lower in merchant_lower or provider_lower in notes_lower:
+                        score += 40
+                        reasons.append("provider_match")
+
+                # Biller reference match
+                if tx.biller_id:
+                    biller = tx.biller_ref
+                    if biller:
+                        biller_name = (biller.display_name or biller.name or "").lower()
+                        if keyword in biller_name or (provider_lower and provider_lower in biller_name):
+                            score += 45
+                            reasons.append("biller_match")
+
+                # Notes/alias match
+                for k in note_keywords:
+                    if k in merchant_lower or k in notes_lower:
+                        score += 50
+                        reasons.append("notes_match")
+                        break
+
+                # ---- DESCRIPTION IS REQUIRED ----
+                # Everything above is description evidence. Amount is NOT a reliable
+                # signal here: a BUDGET figure is only an estimate of the last paid
+                # amount, so the real transaction routinely differs. Without any
+                # description evidence, an amount/date coincidence must never surface
+                # an unrelated transaction as a match. Amount only ranks from here.
+                if score == 0:
+                    continue
 
             # Amount match (ranking booster only — cannot qualify a match on its own)
             if obl.amount and tx.amount:
@@ -1736,33 +1788,43 @@ def get_suggested_transactions(payment_id: int, db: Session = Depends(get_db), c
     search_terms = [obligation.name.lower()]
     if obligation.provider:
         search_terms.append(obligation.provider.lower())
-    
+    has_hints = _has_match_hints(obligation)
+
     for tx in transactions:
         score = 0
         reasons = []
-
-        # Description matching FIRST — this is the primary signal. Also look in the
-        # transaction notes, which carry the statement's own description text.
         merchant_lower = (tx.merchant or "").lower()
         notes_lower = (tx.notes or "").lower()
-        for term in search_terms:
-            if term and (term in merchant_lower or term in notes_lower):
-                score += 40
-                reasons.append("name_match")
-                break
 
-        # ---- DESCRIPTION IS REQUIRED TO *QUALIFY* ----
-        # The payment amount is only an estimate (a BUDGET is derived from the last
-        # paid amount), so the real transaction routinely differs. A transaction
-        # whose amount merely looks close must never be treated as a real match —
-        # that is exactly how the wrong transaction gets auto-linked to a bill.
-        #
-        # But for many obligations the statement text is generic ("Loan Instalment",
-        # a bare first name), so nothing ever matches by description and the user is
-        # left with an empty list. Those still surface as UNQUALIFIED candidates:
-        # ranked below every real match, flagged for the UI, and — critically —
-        # never eligible for auto-linking (see `qualified` below).
-        qualified = score > 0
+        if has_hints:
+            # Explicit match rule (account / text / day window). Passing it is the
+            # qualifying evidence; a transaction that fails any set hint is excluded.
+            if not _passes_match_hints(obligation, tx):
+                continue
+            score = 60
+            reasons.append("match_rule")
+            qualified = True
+        else:
+            # Description matching FIRST — the primary signal. Also look in the
+            # transaction notes, which carry the statement's own description text.
+            for term in search_terms:
+                if term and (term in merchant_lower or term in notes_lower):
+                    score += 40
+                    reasons.append("name_match")
+                    break
+
+            # ---- DESCRIPTION IS REQUIRED TO *QUALIFY* ----
+            # The payment amount is only an estimate (a BUDGET is derived from the
+            # last paid amount), so the real transaction routinely differs. A
+            # transaction whose amount merely looks close must never be treated as a
+            # real match — that is how the wrong transaction gets auto-linked.
+            #
+            # But for many obligations the statement text is generic ("Loan
+            # Instalment", a bare first name), so nothing matches by description and
+            # the user is left with an empty list. Those still surface as UNQUALIFIED
+            # candidates: ranked below every real match, flagged for the UI, and —
+            # critically — never eligible for auto-linking (see `qualified` below).
+            qualified = score > 0
 
         # Amount matching (ranking booster only — cannot qualify on its own)
         if payment_amount > 0 and tx.amount:

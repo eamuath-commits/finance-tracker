@@ -313,6 +313,11 @@ class ObligationBase(BaseModel):
     notes: Optional[str] = None
     status: str = "ACTIVE"
     target_account_id: Optional[str] = None  # Envelope account for salary distribution
+    # Matching hints
+    match_account_id: Optional[str] = None
+    match_text: Optional[str] = None
+    match_day_from: Optional[int] = None
+    match_day_to: Optional[int] = None
 
 class ObligationCreate(ObligationBase):
     pass
@@ -327,6 +332,10 @@ class ObligationUpdate(BaseModel):
     status: Optional[str] = None
     display_order: Optional[int] = None
     target_account_id: Optional[str] = None  # Envelope account for salary distribution
+    match_account_id: Optional[str] = None
+    match_text: Optional[str] = None
+    match_day_from: Optional[int] = None
+    match_day_to: Optional[int] = None
 
 class Obligation(ObligationBase):
     id: str

@@ -71,7 +71,8 @@ const Obligations = () => {
     const [selectedHistory, setSelectedHistory] = useState([]);
     const [viewingHistoryId, setViewingHistoryId] = useState(null);
 
-    const [obligationForm, setObligationForm] = useState({ name: '', due_day: '', category: '', notes: '', provider: '' });
+    const EMPTY_OBLIGATION = { name: '', due_day: '', category: '', notes: '', provider: '', match_account_id: '', match_text: '', match_day_from: '', match_day_to: '' };
+    const [obligationForm, setObligationForm] = useState(EMPTY_OBLIGATION);
     const [paymentForm, setPaymentForm] = useState({ id: null, amount: '', note: '', billing_month: new Date().toISOString().split('T')[0] });
 
     // Confirmation Dialog State
@@ -222,7 +223,11 @@ const Obligations = () => {
             // category: obligationForm.category, // Redundant
             due_day: parseInt(obligationForm.due_day || 1),
             notes: obligationForm.notes,
-            provider: obligationForm.provider
+            provider: obligationForm.provider,
+            match_account_id: obligationForm.match_account_id || null,
+            match_text: obligationForm.match_text || null,
+            match_day_from: obligationForm.match_day_from ? parseInt(obligationForm.match_day_from) : null,
+            match_day_to: obligationForm.match_day_to ? parseInt(obligationForm.match_day_to) : null,
         };
 
         try {
@@ -233,7 +238,7 @@ const Obligations = () => {
             }
             setShowObligationModal(false);
             setEditingId(null);
-            setObligationForm({ name: '', due_day: '', category: '', notes: '' });
+            setObligationForm(EMPTY_OBLIGATION);
             fetchData();
         } catch (err) { alert('Error saving obligation'); }
     };
@@ -371,11 +376,13 @@ const Obligations = () => {
         if (obl) {
             setEditingId(obl.id);
             setObligationForm({
-                name: obl.name, due_day: obl.due_day, category: obl.category, notes: obl.notes || '', provider: obl.provider || ''
+                name: obl.name, due_day: obl.due_day, category: obl.category, notes: obl.notes || '', provider: obl.provider || '',
+                match_account_id: obl.match_account_id || '', match_text: obl.match_text || '',
+                match_day_from: obl.match_day_from || '', match_day_to: obl.match_day_to || ''
             });
         } else {
             setEditingId(null);
-            setObligationForm({ name: '', due_day: '', category: '', notes: '', provider: '' });
+            setObligationForm(EMPTY_OBLIGATION);
         }
         setShowObligationModal(true);
     };
@@ -564,6 +571,22 @@ const Obligations = () => {
                                 value={obligationForm.notes}
                                 onChange={e => setObligationForm({ ...obligationForm, notes: e.target.value })}
                             />
+                        </div>
+                        <div className="border-t border-slate-700 pt-3">
+                            <label className="text-gray-400 text-xs mb-2 block">Auto-match hints — help find the paying transaction (optional)</label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <select className={selectClass} value={obligationForm.match_account_id || ''} onChange={e => setObligationForm({ ...obligationForm, match_account_id: e.target.value })}>
+                                    <option value="">Any account</option>
+                                    {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                                </select>
+                                <input type="text" placeholder="Match text / bill no. (e.g. SEC, 05064478739)" className={inputClass}
+                                    value={obligationForm.match_text || ''} onChange={e => setObligationForm({ ...obligationForm, match_text: e.target.value })} />
+                                <input type="number" min="1" max="31" placeholder="Day from (1-31)" className={inputClass}
+                                    value={obligationForm.match_day_from || ''} onChange={e => setObligationForm({ ...obligationForm, match_day_from: e.target.value })} />
+                                <input type="number" min="1" max="31" placeholder="Day to (1-31)" className={inputClass}
+                                    value={obligationForm.match_day_to || ''} onChange={e => setObligationForm({ ...obligationForm, match_day_to: e.target.value })} />
+                            </div>
+                            <p className="text-[10px] text-slate-500 mt-1">When set, the match must be in that account AND contain the text, within the day window. Any word/bill number counts.</p>
                         </div>
                         <div className="flex gap-2 mt-6">
                             <button type="submit" className="flex-1 bg-blue-600 text-white p-3 rounded font-bold shadow-lg">{editingId ? "Save" : "Create"}</button>

@@ -329,18 +329,33 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
     // closest-amount-first ordering, the matching transaction is right at the top.
     const linkFilters = useMemo(() => {
         if (!linkingPayment) return {};
+        const obl = (obligations || []).find(o => o.id === linkingPayment.obligation_id) || {};
         const bm = (linkingPayment.billing_month || '').substring(0, 7);
         const mm = /^(\d{4})-(\d{2})$/.exec(bm);
+        const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         let startDate = '', endDate = '';
         if (mm) {
             const y = +mm[1], m = +mm[2];
-            const s = new Date(y, m - 1, 1); s.setDate(s.getDate() - 7);
-            const e = new Date(y, m, 0); e.setDate(e.getDate() + 20);
-            const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-            startDate = iso(s); endDate = iso(e);
+            const lastDay = new Date(y, m, 0).getDate();
+            const df = parseInt(obl.match_day_from) || 0, dt = parseInt(obl.match_day_to) || 0;
+            if (df && dt && df <= dt) {
+                // Obligation's day window -> tight range inside the billing month.
+                startDate = iso(new Date(y, m - 1, Math.max(1, df - 2)));
+                endDate = iso(new Date(y, m - 1, Math.min(lastDay, dt + 2)));
+            } else {
+                const s = new Date(y, m - 1, 1); s.setDate(s.getDate() - 7);
+                const e = new Date(y, m, 0); e.setDate(e.getDate() + 20);
+                startDate = iso(s); endDate = iso(e);
+            }
         }
-        return { type: 'debit', startDate, endDate };
-    }, [linkingPayment]);
+        // Obligation match-hints pre-applied: account + text (searched) + day window.
+        return {
+            type: 'debit',
+            accountId: obl.match_account_id || '',
+            search: obl.match_text || '',
+            startDate, endDate,
+        };
+    }, [linkingPayment, obligations]);
 
     const handleUnlinkTransaction = async (paymentId) => {
         if (!(await confirm({ title: 'Unlink Transaction', message: 'Remove the link to this transaction?', variant: 'danger', confirmText: 'Remove' }))) return;

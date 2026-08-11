@@ -828,6 +828,10 @@ def create_obligation(db: Session, obligation: schemas.ObligationCreate, user_id
         provider=obligation.provider,
         notes=obligation.notes,
         target_account_id=obligation.target_account_id,
+        match_account_id=obligation.match_account_id,
+        match_text=obligation.match_text,
+        match_day_from=obligation.match_day_from,
+        match_day_to=obligation.match_day_to,
         user_id=user_id
     )
     db.add(db_obj)
