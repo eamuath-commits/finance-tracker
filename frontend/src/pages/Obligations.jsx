@@ -243,6 +243,23 @@ const Obligations = () => {
         } catch (err) { alert('Error saving obligation'); }
     };
 
+    // Infer the match hints from the transactions already linked to this
+    // obligation's payments, and fill the form (the user reviews before saving).
+    const learnHints = async () => {
+        if (!editingId) return;
+        try {
+            const { data: h } = await api.get(`${API_URL}/obligations/${editingId}/suggest-hints`);
+            if (!h.sample_count) { alert('No linked transactions yet to learn from — link a payment first.'); return; }
+            setObligationForm(f => ({
+                ...f,
+                match_account_id: h.match_account_id || f.match_account_id || '',
+                match_text: h.match_text || f.match_text || '',
+                match_day_from: h.match_day_from || f.match_day_from || '',
+                match_day_to: h.match_day_to || f.match_day_to || '',
+            }));
+        } catch (err) { alert('Could not derive hints from history'); }
+    };
+
     const handleDeleteObligation = async () => {
         if (!editingId) return;
         showConfirm(
@@ -573,7 +590,15 @@ const Obligations = () => {
                             />
                         </div>
                         <div className="border-t border-slate-700 pt-3">
-                            <label className="text-gray-400 text-xs mb-2 block">Auto-match hints — help find the paying transaction (optional)</label>
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="text-gray-400 text-xs block">Auto-match hints — help find the paying transaction (optional)</label>
+                                {editingId && (
+                                    <button type="button" onClick={learnHints}
+                                        className="text-[11px] font-semibold text-purple-300 bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 rounded px-2 py-1 transition">
+                                        ✨ Learn from history
+                                    </button>
+                                )}
+                            </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <select className={selectClass} value={obligationForm.match_account_id || ''} onChange={e => setObligationForm({ ...obligationForm, match_account_id: e.target.value })}>
                                     <option value="">Any account</option>

@@ -902,6 +902,64 @@ def update_obligation(obligation_id: str, obligation_update: schemas.ObligationU
         raise HTTPException(status_code=404, detail="Obligation not found")
     return updated_obj
 
+_HINT_STOPWORDS = {"payment", "transfer", "the", "and", "for", "pos", "purchase",
+                   "apple", "pay", "bank", "local", "internal", "sar", "from",
+                   "bill", "credit", "card", "account", "debit", "com", "riy"}
+
+
+def _derive_match_hints(db, obligation, user_id):
+    """Infer match hints from the transactions already linked to this obligation's
+    payments — the account they share, the days they land on, and the words common
+    to their descriptions. A hint is only returned when the history clearly
+    supports it (strong account majority, a tight day range, repeated words), so a
+    noisy obligation doesn't get bad hints."""
+    from collections import Counter
+    ids = set()
+    for p in db.query(models.Payment).filter(models.Payment.obligation_id == obligation.id).all():
+        if p.transaction_id:
+            ids.add(p.transaction_id)
+        for j in db.query(models.PaymentTransaction).filter(models.PaymentTransaction.payment_id == p.id).all():
+            ids.add(j.transaction_id)
+    if not ids:
+        return {"match_account_id": None, "match_text": None, "match_day_from": None,
+                "match_day_to": None, "sample_count": 0}
+    txs = db.query(models.Transaction).filter(
+        models.Transaction.id.in_(ids), models.Transaction.user_id == user_id).all()
+    n = len(txs)
+
+    accts = Counter(t.account_id for t in txs if t.account_id)
+    match_account_id = None
+    if accts:
+        top, cnt = accts.most_common(1)[0]
+        if cnt >= max(2, 0.6 * n):          # clear majority in one account
+            match_account_id = top
+
+    days = [t.timestamp.day for t in txs if t.timestamp]
+    match_day_from = match_day_to = None
+    if days and (max(days) - min(days)) <= 12:   # a tight window is useful; a wide one isn't
+        match_day_from = max(1, min(days) - 2)
+        match_day_to = min(31, max(days) + 2)
+
+    toks = Counter()
+    for t in txs:
+        words = {w.lower() for w in re.split(r"[^A-Za-z0-9]+", (t.merchant or ""))
+                 if len(w) > 2 and not w.isdigit() and w.lower() not in _HINT_STOPWORDS}
+        toks.update(words)
+    common = [w for w, c in toks.most_common(4) if c >= max(2, n / 2)]
+    match_text = " ".join(common[:2]) or None
+
+    return {"match_account_id": match_account_id, "match_text": match_text,
+            "match_day_from": match_day_from, "match_day_to": match_day_to, "sample_count": n}
+
+
+@app.get("/obligations/{obligation_id}/suggest-hints")
+def suggest_obligation_hints(obligation_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    """Match hints inferred from this obligation's already-linked transactions."""
+    _require_owned(db, models.MonthlyObligation, obligation_id, current_user)
+    obl = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.id == obligation_id).first()
+    return _derive_match_hints(db, obl, current_user.id)
+
+
 @app.delete("/obligations/{obligation_id}", response_model=schemas.Obligation)
 def delete_obligation(obligation_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     _require_owned(db, models.MonthlyObligation, obligation_id, current_user)
