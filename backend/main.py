@@ -988,6 +988,22 @@ def get_obligations_monthly_status(month_offset: int = 0, db: Session = Depends(
     }
 
 
+# An obligation whose most recent payment is older than this many months is
+# treated as inactive: it is not carried into the forecast (so a subscription you
+# stopped paying, or a one-off, does not inflate next month's projected total).
+STALE_AFTER_MONTHS = 3
+
+
+def _months_since(billing_month, now):
+    """Whole months between a payment's billing_month ('YYYY-MM' or 'YYYY-MM-DD')
+    and now. Large/garbage values return a big number so they read as stale."""
+    try:
+        y, m = int(str(billing_month)[:4]), int(str(billing_month)[5:7])
+        return (now.year - y) * 12 + (now.month - m)
+    except (ValueError, TypeError):
+        return 999
+
+
 @app.get("/obligations/forecast")
 def get_obligations_forecast(months_ahead: int = 1, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """
@@ -1038,8 +1054,14 @@ def get_obligations_forecast(months_ahead: int = 1, db: Session = Depends(get_db
             last_paid = amounts[0]  # Most recent payment
             avg = sum(amounts) / len(amounts)
 
-            # Forecast = last paid amount (user requirement)
-            forecast_amount = round(last_paid, 2)
+            # Recency guard: if the last payment is older than STALE_AFTER_MONTHS,
+            # treat the obligation as inactive and do NOT carry it forward — a
+            # subscription you stopped, or a one-off, should not pad next month.
+            months_since = _months_since(sorted_payments[0].billing_month or "", now)
+            stale = months_since > STALE_AFTER_MONTHS
+
+            # Forecast = last paid amount (user requirement), unless stale -> 0.
+            forecast_amount = 0.0 if stale else round(last_paid, 2)
 
             if len(amounts) >= 3:
                 # Trend: compare first half avg vs second half avg (chronological order)
@@ -1077,6 +1099,8 @@ def get_obligations_forecast(months_ahead: int = 1, db: Session = Depends(get_db
             last_paid = None
             trend = "stable"
             confidence = "low" if obl.amount else "none"
+            stale = False
+            months_since = None
 
         total_forecast += forecast_amount
 
@@ -1097,6 +1121,8 @@ def get_obligations_forecast(months_ahead: int = 1, db: Session = Depends(get_db
             "last_paid": round(last_paid, 2) if last_paid else None,
             "trend": trend,
             "data_points": len(amounts),
+            "stale": stale,
+            "months_since_last": months_since,
         })
 
     return {
