@@ -1954,13 +1954,13 @@ def link_payment_to_transaction(payment_id: int, transaction_id: str, db: Sessio
     if payment.status not in (models.PaymentStatus.BUDGET, "BUDGET"):
         payment.status = models.PaymentStatus.PAID
 
-    # Optionally update amount if not set
-    if payment.amount is None or payment.amount == 0:
-        payment.amount = transaction.amount
-    
+    db.commit()
+    # The linked transaction is the actual money that moved, so make the payment
+    # amount reflect it (BUDGET plans keep their planned figure — see the helper).
+    _sync_payment_amount_from_links(db, payment_id)
     db.commit()
     db.refresh(payment)
-    
+
     return {
         "message": "Payment linked successfully",
         "payment_id": payment.id,
@@ -4056,6 +4056,29 @@ def get_payment_linked_transactions(payment_id: int, db: Session = Depends(get_d
     return transactions
 
 
+def _sync_payment_amount_from_links(db, payment_id):
+    """Set a payment's amount to the sum of its linked transactions — the actual
+    money that moved. A payment's own figure is otherwise only an estimate (or a
+    placeholder from quick-pay), so once real transactions are linked they are the
+    truth. BUDGET plans keep their planned amount; a payment with no links is left
+    unchanged."""
+    payment = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
+    if not payment:
+        return
+    status = str(payment.status.value if hasattr(payment.status, "value") else payment.status)
+    if status == "BUDGET":
+        return
+    ids = {j.transaction_id for j in db.query(models.PaymentTransaction).filter(
+        models.PaymentTransaction.payment_id == payment_id).all()}
+    if payment.transaction_id:
+        ids.add(payment.transaction_id)
+    if not ids:
+        return
+    total = sum(float(t.amount or 0) for t in db.query(models.Transaction).filter(
+        models.Transaction.id.in_(ids)).all())
+    payment.amount = round(total, 2)
+
+
 @app.post("/payments/{payment_id}/transactions")
 def link_transactions_to_payment(
     payment_id: int,
@@ -4085,7 +4108,10 @@ def link_transactions_to_payment(
             link = models.PaymentTransaction(payment_id=payment_id, transaction_id=tx_id, link_source=request.link_source)
             db.add(link)
             linked.append(tx_id)
-    
+
+    db.commit()
+    # Keep the payment amount in step with the transactions actually linked.
+    _sync_payment_amount_from_links(db, payment_id)
     db.commit()
     return {"linked": linked, "count": len(linked)}
 
@@ -4102,11 +4128,15 @@ def unlink_transaction_from_payment(payment_id: int, transaction_id: str, db: Se
     if link:
         db.delete(link)
         db.commit()
+        _sync_payment_amount_from_links(db, payment_id)  # re-sum the remaining links
+        db.commit()
         return {"status": "unlinked"}
-    
+
     payment = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
     if payment and payment.transaction_id == transaction_id:
         payment.transaction_id = None
+        db.commit()
+        _sync_payment_amount_from_links(db, payment_id)
         db.commit()
         return {"status": "unlinked"}
     
