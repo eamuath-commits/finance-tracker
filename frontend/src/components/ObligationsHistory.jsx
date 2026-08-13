@@ -4,7 +4,7 @@ import { formatCurrency, selectClass, Modal } from '../components/UI';
 import TransactionDetailModal from '../components/TransactionDetailModal';
 import TransactionSelectorModal from '../components/TransactionSelectorModal';
 import { CATEGORY_ICONS, CATEGORY_COLORS, CategoryHeader, CategorySectionWrapper } from './categoryStyles';
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Eye, List, LayoutGrid, PlusCircle, ArrowUpRight, Clock, DollarSign, MessageSquare, Box } from 'lucide-react';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Eye, List, LayoutGrid, PlusCircle, ArrowUpRight, Clock, DollarSign, MessageSquare, Box, AlertTriangle, Calendar } from 'lucide-react';
 import { exportToCSV } from '../utils/csvExport';
 import { useConfirm } from './ConfirmProvider';
 
@@ -378,7 +378,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
             if (onRefresh) onRefresh();
         } catch (err) {
             console.error("Error unlinking transaction:", err);
-            alert("Failed to unlink transaction");
+            alert(err.response?.data?.detail || 'Failed to unlink transaction');
         }
     };
 
@@ -730,6 +730,19 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                 {group.items.map((item, idx) => {
                                                     const isPaid = item.type === 'payment';
                                                     const isPlanned = item.type === 'planned';
+                                                    const oblForRow = obligations?.find(o => o.id === item.obligation_id);
+                                                    // The obligation's due date for this billing month.
+                                                    const bmKey = (item.billing_month || '').substring(0, 7);
+                                                    const mmMatch = /^(\d{4})-(\d{2})$/.exec(bmKey);
+                                                    let dueDateStr = '';
+                                                    if (mmMatch && oblForRow?.due_day) {
+                                                        const dd = String(oblForRow.due_day).padStart(2, '0');
+                                                        dueDateStr = new Date(`${bmKey}-${dd}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+                                                    }
+                                                    // Warn when the linked transactions don't add up to the payment.
+                                                    const linkedSum = (item.linked_transactions || []).reduce((s, t) => s + (t.amount || 0), 0);
+                                                    const amountMismatch = isPaid && (item.linked_transactions || []).length > 0
+                                                        && Math.abs(linkedSum - (item.amount || 0)) > 0.01;
 
                                                     return (
                                                         <tr key={`${item.id}-${idx}`} className={`border-b border-slate-700/20 hover:bg-slate-800/50 transition-colors group ${isPlanned ? 'bg-amber-900/5' : ''}`}>
@@ -738,6 +751,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                                 <div className="flex items-center gap-1.5">
                                                                     <span className="font-medium text-white text-[12px] truncate">{item.oblName}</span>
                                                                 </div>
+                                                                {dueDateStr && <div className="text-[9px] text-slate-500 flex items-center gap-1"><Calendar size={8} /> Due {dueDateStr}</div>}
                                                                 {item.note && <div className="text-[9px] text-slate-500 italic truncate max-w-[200px]">{item.note}</div>}
                                                             </td>
 
@@ -767,7 +781,14 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
 
                                                             {/* Amount */}
                                                             <td className={`px-3 py-2 text-right font-mono text-[12px] font-medium ${isPaid ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                                                {item.amount > 0 ? formatCurrency(item.amount) : '—'}
+                                                                <span className="inline-flex items-center gap-1 justify-end">
+                                                                    {amountMismatch && (
+                                                                        <span title={`Linked transactions total ${formatCurrency(linkedSum)}, which doesn't match this payment — check the links`}>
+                                                                            <AlertTriangle size={11} className="text-amber-400" />
+                                                                        </span>
+                                                                    )}
+                                                                    {item.amount > 0 ? formatCurrency(item.amount) : '—'}
+                                                                </span>
                                                             </td>
 
                                                             {/* Transaction */}
@@ -809,6 +830,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                                                     <Eye size={10} />
                                                                                     <span className="font-medium">{tx.merchant?.substring(0, 25) || 'Unknown'}</span>
                                                                                     <span className="text-purple-300/60 font-mono text-[8px]">{formatCurrency(tx.amount)}</span>
+                                                                                    {tx.timestamp && <span className="text-purple-300/40 text-[8px]">· {new Date(tx.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</span>}
                                                                                 </button>
                                                                                 <button
                                                                                     onClick={() => handleUnlinkSingleTransaction(item.id, tx.id)}

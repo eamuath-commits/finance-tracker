@@ -1975,7 +1975,9 @@ def unlink_payment_transaction(payment_id: int, db: Session = Depends(get_db), c
 
     payment.transaction_id = None
     db.commit()
-    
+    _sync_payment_amount_from_links(db, payment_id)  # re-sum any remaining links
+    db.commit()
+
     return {"message": "Transaction unlinked"}
 
 # --- Transaction Endpoints ---
