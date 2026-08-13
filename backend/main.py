@@ -580,11 +580,86 @@ def _backfill_statement_banks(engine):
         logger.warning(f"bank_key backfill skipped: {exc}")
 
 
+def _backfill_statement_times(engine):
+    """Stamp the posting time onto statement rows imported before the per-row time
+    was captured. Bank Aljazira prints each transaction's time on a continuation
+    line ("Date ..(H) Time 02.26.40") that the table extractor drops, so those
+    rows were posted at midnight; statement_parser now recovers the time from the
+    page text (see _time_by_balance).
+
+    Best-effort and idempotent: considers ONLY rows still stamped at exactly
+    midnight, re-parses the statement, and matches each recovered time back to its
+    row by the stored running balance — so a time can never land on the wrong
+    transaction. ONLY the time-of-day is written; the date, the name/links, and
+    the balance chain (ordered by statement_row_index, never by timestamp — see
+    _recalculate_account_balance) are all untouched. Gated to Aljazira ACCOUNT
+    statements (credit_card_id IS NULL), the only place a time hides on a dropped
+    line, so once healed the query matches nothing and later startups re-parse
+    nothing.
+    """
+    import statement_parser as _sp
+    from sqlalchemy import text as _text
+    from datetime import datetime as _datetime, time as _time
+    try:
+        import pdfplumber  # noqa: F401
+    except ImportError:
+        return
+    midnight = _time(0, 0, 0)
+    try:
+        with engine.connect() as conn:
+            stmts = conn.execute(_text(
+                "SELECT DISTINCT s.id, s.file_path FROM statements s "
+                "JOIN transactions t ON t.statement_id = s.id "
+                "WHERE s.bank_key = 'aljazira' AND s.credit_card_id IS NULL "
+                "AND t.source = 'statement' AND t.timestamp IS NOT NULL "
+                "AND CAST(t.timestamp AS time) = :mid"
+            ), {"mid": midnight}).fetchall()
+            done = 0
+            for sid, path in stmts:
+                if not path or not os.path.exists(path):
+                    continue
+                try:
+                    parsed = _sp.extract_statement_rows(path)
+                except Exception:
+                    continue
+                # running-balance (cents) -> time, only rows that actually carry one
+                bal_time = {
+                    round(r["balance"] * 100): r["txn_time"]
+                    for r in parsed.get("rows", [])
+                    if r.get("txn_time") and r.get("balance") is not None
+                }
+                if not bal_time:
+                    continue
+                trows = conn.execute(_text(
+                    "SELECT id, timestamp, balance_after_transaction FROM transactions "
+                    "WHERE statement_id = :sid AND source = 'statement' "
+                    "AND CAST(timestamp AS time) = :mid"
+                ), {"sid": sid, "mid": midnight}).fetchall()
+                for tid, ts, bal in trows:
+                    if bal is None:
+                        continue
+                    hhmmss = bal_time.get(round(float(bal) * 100))
+                    if not hhmmss:
+                        continue
+                    hh, mm, ss = (int(x) for x in hhmmss.split(":"))
+                    conn.execute(
+                        _text("UPDATE transactions SET timestamp = :ts WHERE id = :id"),
+                        {"ts": _datetime.combine(ts.date(), _time(hh, mm, ss)), "id": tid},
+                    )
+                    done += 1
+            if done:
+                conn.commit()
+                print(f"Backfilled transaction time for {done} statement rows")
+    except Exception as exc:
+        logger.warning(f"transaction-time backfill skipped: {exc}")
+
+
 # Run here rather than beside run_migrations() because the module executes top to
 # bottom and these functions are defined above this point. Banks first, so the
 # transaction-type backfill below can scope wording by bank.
 _backfill_statement_banks(engine)
 _backfill_transaction_types(engine)
+_backfill_statement_times(engine)
 
 
 def _recalculate_account_balance(db: Session, account_id: str):
