@@ -205,6 +205,7 @@ class Transaction(Base):
     merchant = Column(String)
     merchant_original = Column(String, nullable=True)  # statement label before SMS enrichment (for undo)
     notes_original = Column(String, nullable=True)     # note before SMS enrichment (for undo)
+    timestamp_original = Column(DateTime, nullable=True)  # midnight ts before SMS-time adoption (for undo)
     enrichment_batch_id = Column(String, nullable=True)  # batch that renamed this row, if any
     enriched_at = Column(DateTime, nullable=True)        # when that batch was applied
     raw_sms_content = Column(Text)

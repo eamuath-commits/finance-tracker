@@ -226,6 +226,33 @@ class TestGenericLabelGate:
         assert not E.is_loan_label("HUNGERSTA")
 
 
+class TestSmsTimeAdoption:
+    """A date-only statement row (stamped midnight) may take its matched SMS's
+    time-of-day, but enrichment must never move it to another calendar date."""
+    @staticmethod
+    def _dt(s):
+        return datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
+
+    def test_midnight_row_adopts_the_sms_time(self):
+        assert self._dt("2026-08-02 11:12:10") == E.adopted_time(
+            self._dt("2026-08-02 00:00:00"), self._dt("2026-08-02 11:12:10"))
+
+    def test_a_row_with_a_real_time_is_left_alone(self):
+        # Al Rajhi rows carry a real posting time; never overwrite it.
+        assert E.adopted_time(
+            self._dt("2026-08-02 14:38:22"), self._dt("2026-08-02 11:12:10")) is None
+
+    def test_never_moves_to_another_date(self):
+        # Same time-of-day but a different day must be refused, so a transaction is
+        # never relocated to another date by enrichment.
+        assert E.adopted_time(
+            self._dt("2026-08-02 00:00:00"), self._dt("2026-08-03 11:12:10")) is None
+
+    def test_missing_inputs_change_nothing(self):
+        assert E.adopted_time(None, self._dt("2026-08-02 11:12:10")) is None
+        assert E.adopted_time(self._dt("2026-08-02 00:00:00"), None) is None
+
+
 class TestAmountParsing:
     def test_handles_every_currency_form_in_the_export(self):
         # A SAR-only regex silently dropped 56% of money events.

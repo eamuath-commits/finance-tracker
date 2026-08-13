@@ -79,6 +79,14 @@ def run_migrations(engine):
                 conn.execute(text("ALTER TABLE transactions ADD COLUMN notes_original VARCHAR"))
                 conn.commit()
 
+        # Enrichment may also adopt the SMS's time onto a date-only (midnight)
+        # statement row; keep the original timestamp so undo restores it.
+        if 'timestamp_original' not in columns:
+            print("Migrating: Adding timestamp_original to transactions")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE transactions ADD COLUMN timestamp_original TIMESTAMP"))
+                conn.commit()
+
         # Obligation match-hints (account / text / day window) for finding the
         # transaction that pays an obligation.
         obl_cols = [c["name"] for c in inspector.get_columns("obligations")]
@@ -2660,6 +2668,17 @@ async def sms_enrich_preview(
     return _enrich_response(result)
 
 
+def _parse_sms_ts(value):
+    """Parse an ISO SMS timestamp ('2026-08-02T11:12:10', space-separated too) to a
+    naive datetime, or None. Tolerant of a trailing 'Z' the client might send."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "").strip())
+    except ValueError:
+        return None
+
+
 @app.post("/api/sms/enrich/apply")
 def sms_enrich_apply(
     payload: schemas.EnrichApplyRequest,
@@ -2716,6 +2735,16 @@ def sms_enrich_apply(
             # counterparty/description it already carries is not lost.
             base = (tx.notes or "").strip()
             tx.notes = f"{base}\n{sms_note}" if base else sms_note
+        # Adopt the SMS's time when the statement row carried none (see
+        # sms_enrichment.adopted_time — midnight-only, same-date, never moves the
+        # date). timestamp_original is kept for undo, like merchant_original.
+        # Display-only: the balance chain orders statement rows by row_index, not
+        # time (see _recalculate_account_balance), so no balance ever shifts.
+        new_ts = sms_enrichment.adopted_time(tx.timestamp, _parse_sms_ts(item.sms_timestamp))
+        if new_ts is not None:
+            if tx.timestamp_original is None:
+                tx.timestamp_original = tx.timestamp
+            tx.timestamp = new_ts
         tx.enrichment_batch_id = batch_id
         tx.enriched_at = applied_at
         applied += 1
@@ -2837,6 +2866,10 @@ def sms_enrich_undo(
         if tx.notes_original is not None:
             tx.notes = tx.notes_original or None
             tx.notes_original = None
+        # Restore the midnight timestamp only if this batch adopted an SMS time.
+        if tx.timestamp_original is not None:
+            tx.timestamp = tx.timestamp_original
+            tx.timestamp_original = None
         tx.enrichment_batch_id = None
         tx.enriched_at = None
     db.commit()

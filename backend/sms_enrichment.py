@@ -542,6 +542,24 @@ def is_generic_label(merchant: Optional[str]) -> bool:
     return False
 
 
+def adopted_time(tx_timestamp, sms_timestamp):
+    """The timestamp to write when a date-only (midnight) statement row adopts the
+    time from its matched SMS, or None to leave the row unchanged.
+
+    STC/Aljazira statement rows carry no posting time — every one is stamped
+    exactly 00:00:00 — but the matched SMS knows it. Take the SMS's time-of-day,
+    but ONLY for a row stamped exactly midnight and ONLY from an SMS on the SAME
+    calendar date, so enrichment can put a time on a row yet never move a
+    transaction to another day. A row that already has a real time is left as is."""
+    if tx_timestamp is None or sms_timestamp is None:
+        return None
+    if tx_timestamp.hour or tx_timestamp.minute or tx_timestamp.second:
+        return None
+    if sms_timestamp.date() != tx_timestamp.date():
+        return None
+    return datetime.combine(tx_timestamp.date(), sms_timestamp.time())
+
+
 # ---------------------------------------------------------------------------
 # Matching
 # ---------------------------------------------------------------------------
