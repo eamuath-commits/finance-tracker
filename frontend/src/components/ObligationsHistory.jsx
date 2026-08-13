@@ -830,7 +830,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                                                     <Eye size={10} />
                                                                                     <span className="font-medium">{tx.merchant?.substring(0, 25) || 'Unknown'}</span>
                                                                                     <span className="text-purple-300/60 font-mono text-[8px]">{formatCurrency(tx.amount)}</span>
-                                                                                    {tx.timestamp && <span className="text-purple-300/40 text-[8px]">· {new Date(tx.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</span>}
+                                                                                    {tx.timestamp && <span className="text-cyan-300 text-[9px] whitespace-nowrap">· {new Date(tx.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}</span>}
                                                                                 </button>
                                                                                 <button
                                                                                     onClick={() => handleUnlinkSingleTransaction(item.id, tx.id)}
@@ -855,6 +855,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                                             {item.linked_transaction?.amount && (
                                                                                 <span className="text-purple-300/60 font-mono text-[8px]">{formatCurrency(item.linked_transaction.amount)}</span>
                                                                             )}
+                                                                            {item.linked_transaction?.timestamp && <span className="text-cyan-300 text-[9px] whitespace-nowrap">· {new Date(item.linked_transaction.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}</span>}
                                                                         </button>
                                                                         <button onClick={() => handleUnlinkTransaction(item.id)} className="text-slate-500/50 hover:text-red-400 transition" title="Unlink">
                                                                             <Unlink size={10} />
