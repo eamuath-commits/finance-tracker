@@ -136,6 +136,36 @@ class TestAmountParsing:
         assert SP.parse_amount(None) is None
 
 
+class TestTransactionTime:
+    def test_extracts_both_bank_time_formats(self):
+        assert SP._extract_time("blah Time:14:38:22 rest") == "14:38:22"   # Al Rajhi colons
+        assert SP._extract_time("Date 19-02-1448(H) Time 02.26.40") == "02:26:40"  # Aljazira dots
+        assert SP._extract_time("Time 2.05.09") == "02:05:09"              # single-digit hour
+        assert SP._extract_time("no time on this line") is None
+
+    def test_recovers_aljazira_time_from_page_text_by_balance(self):
+        # Aljazira puts the per-row time on a continuation line the table drops;
+        # the running balance (unique per row) ties it back to the transaction.
+        page = (
+            "02/08/26 Credit Card Payment 02/08/26 25,210.78 120,846.83\n"
+            "Card 124674897\n"
+            "Through Bank Aljazira\n"
+            "ONLINE BANKING -Jeddah\n"
+            "Date 19-02-1448(H) Time 02.26.40\n"
+            "02/08/26 Credit Card Payment 02/08/26 1,560.74 119,286.09\n"
+            "Date 19-02-1448(H) Time 02.26.59\n"
+            "120,846.83 26,771.52 0.00 119,286.09\n"   # summary row: not a header
+        )
+        m = SP._time_by_balance(page)
+        assert m[SP._bal_cents(120846.83)] == "02:26:40"
+        assert m[SP._bal_cents(119286.09)] == "02:26:59"
+
+    def test_period_line_without_a_balance_does_not_capture_a_time(self):
+        # A date-led line that carries no money token must not claim the next time.
+        page = "01/07/26 to 31/07/26 Statement Period\nTime 09.09.09\n"
+        assert SP._time_by_balance(page) == {}
+
+
 class TestCreditCardStatement:
     """A card statement is a different document: no transaction table, and the
     balance is DEBT — a charge raises it, a CR line (payment) lowers it. These

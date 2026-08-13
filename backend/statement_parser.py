@@ -648,6 +648,7 @@ def parse_statement_pdf(file_path: str) -> dict:
             transactions = []
             idx = 0
             for page in pdf.pages:
+                time_by_bal = _time_by_balance(page.extract_text() or "")
                 for table in (page.extract_tables() or []):
                     for cells in table:
                         cells, colmap, bcol = _row_view(cells, is_stc, cols, bal_i)
@@ -661,13 +662,17 @@ def parse_statement_pdf(file_path: str) -> dict:
                         details = normalize_arabic(cells[colmap["details"]] or "")
                         type_line = _row_type_line(details, is_stc) or None
 
-                        tm = _TIME_RE.search(details)
+                        txn_time = _extract_time(details)
                         nm = _NOTE_SEP_RE.search(details)
                         note_text = re.sub(r"\s+", " ", nm.group(1)).strip() if nm else None
 
                         debit = parse_amount(cells[colmap["debit"]]) or 0.0
                         credit = parse_amount(cells[colmap["credit"]]) or 0.0
                         balance = parse_amount(cells[bcol]) if bcol is not None else None
+                        # Aljazira's per-row time is on a dropped continuation line;
+                        # recover it from the page text, keyed on the running balance.
+                        if txn_time is None:
+                            txn_time = time_by_bal.get(_bal_cents(balance))
 
                         direction = "credit" if credit > 0 else "debit"
                         amount = credit if credit > 0 else debit
@@ -677,7 +682,7 @@ def parse_statement_pdf(file_path: str) -> dict:
                         transactions.append(RawTransaction(
                             row_index=idx,
                             transaction_date=date_cell,
-                            transaction_time=tm.group(1) if tm else None,
+                            transaction_time=txn_time,
                             type_line=type_line,
                             raw_description=details,
                             debit_amount=debit,
@@ -721,7 +726,59 @@ def parse_statement_pdf(file_path: str) -> dict:
 # running-balance chain in integer cents.
 # ─────────────────────────────────────────────────────────────────────
 
-_TIME_RE = re.compile(r'Time:(\d{1,2}:\d{2}:\d{2})')
+# Al Rajhi prints "Time:14:38:22" (colons); Bank Aljazira prints "Time 02.26.40"
+# (space + dots). Capture the components so both normalise to HH:MM:SS.
+_TIME_RE = re.compile(r'Time[:\s]+(\d{1,2})[:.](\d{2})[:.](\d{2})', re.I)
+
+
+def _extract_time(text):
+    """Transaction time as HH:MM:SS, or None — handles Al Rajhi (colons) and
+    Bank Aljazira (space + dots) formats."""
+    m = _TIME_RE.search(text or "")
+    if not m:
+        return None
+    h, mi, s = m.groups()
+    return f"{int(h):02d}:{mi}:{s}"
+
+
+_ROW_HEADER_RE = re.compile(r'^\s*\d{2}/\d{2}/\d{2}\b')
+_MONEY_TOKEN_RE = re.compile(r'\d[\d,]*\.\d{2}')
+
+
+def _bal_cents(value):
+    """A balance amount (float, or a comma-grouped string) as integer cents."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        try:
+            value = float(value.replace(",", ""))
+        except ValueError:
+            return None
+    return round(value * 100)
+
+
+def _time_by_balance(page_text):
+    """Map a row's running balance (integer cents) -> posting time 'HH:MM:SS'.
+
+    Bank Aljazira prints each transaction's time on a continuation line
+    ('Date 19-02-1448(H) Time 02.26.40') that the table extractor drops, so it
+    never reaches the details cell. In the page TEXT, though, every transaction
+    opens with a header line ending in its unique running balance and carries
+    that Time line a few rows below — the balance ties the two together. Used
+    only as a fallback when the details cell has no time, and keyed on the exact
+    running balance, so it cannot mis-attribute a time to the wrong row."""
+    out = {}
+    cur = None
+    for ln in (page_text or "").splitlines():
+        if _ROW_HEADER_RE.match(ln):
+            nums = _MONEY_TOKEN_RE.findall(ln)
+            cur = _bal_cents(nums[-1]) if nums else None
+        elif cur is not None:
+            t = _extract_time(ln)
+            if t:
+                out.setdefault(cur, t)
+                cur = None
+    return out
 # Statements differ in how the note is introduced: "Time:..**Note:x" vs
 # "Time:.., Notes:x". Accept both so the note/merchant is never lost.
 _NOTE_SEP_RE = re.compile(r'(?:\*\*Notes?:|,\s*Notes?:)\s*(.*)', re.S)
@@ -979,6 +1036,7 @@ def extract_statement_rows(file_path: str) -> dict:
             rows = []
             idx = 0
             for page in pdf.pages:
+                time_by_bal = _time_by_balance(page.extract_text() or "")
                 for table in (page.extract_tables() or []):
                     for cells in table:
                         cells, colmap, bcol = _row_view(cells, is_stc, cols, bal_i)
@@ -990,13 +1048,17 @@ def extract_statement_rows(file_path: str) -> dict:
 
                         details = cells[colmap["details"]] or ""
                         first_line = _row_type_line(details, is_stc)
-                        tm = _TIME_RE.search(details)
+                        txn_time = _extract_time(details)
                         _nm = _NOTE_SEP_RE.search(details)
                         note = re.sub(r'\s+', ' ', _nm.group(1)).strip() if _nm else ""
 
                         debit = parse_amount(cells[colmap["debit"]]) or 0.0
                         credit = parse_amount(cells[colmap["credit"]]) or 0.0
                         balance = (parse_amount(cells[bcol]) or 0.0) if bcol is not None else 0.0
+                        # Aljazira's per-row time is on a dropped continuation line;
+                        # recover it from the page text, keyed on the running balance.
+                        if txn_time is None:
+                            txn_time = time_by_bal.get(_bal_cents(balance))
 
                         counterparty_account = counterparty_name = reference = None
                         am = _ACCT_RE.search(details)
@@ -1012,7 +1074,7 @@ def extract_statement_rows(file_path: str) -> dict:
                         rows.append({
                             "row_index": idx,
                             "txn_date": date.replace('/', '-'),
-                            "txn_time": tm.group(1) if tm else None,
+                            "txn_time": txn_time,
                             "type_line": first_line,
                             "note": note,
                             "debit": round(debit, 2),
