@@ -1975,8 +1975,6 @@ def unlink_payment_transaction(payment_id: int, db: Session = Depends(get_db), c
 
     payment.transaction_id = None
     db.commit()
-    _sync_payment_amount_from_links(db, payment_id)  # re-sum any remaining links
-    db.commit()
 
     return {"message": "Transaction unlinked"}
 
@@ -4130,15 +4128,11 @@ def unlink_transaction_from_payment(payment_id: int, transaction_id: str, db: Se
     if link:
         db.delete(link)
         db.commit()
-        _sync_payment_amount_from_links(db, payment_id)  # re-sum the remaining links
-        db.commit()
         return {"status": "unlinked"}
 
     payment = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
     if payment and payment.transaction_id == transaction_id:
         payment.transaction_id = None
-        db.commit()
-        _sync_payment_amount_from_links(db, payment_id)
         db.commit()
         return {"status": "unlinked"}
     
