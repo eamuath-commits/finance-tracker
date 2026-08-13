@@ -211,7 +211,9 @@ class TestIdempotency:
 class TestGenericLabelGate:
     def test_statement_type_labels_are_replaceable(self):
         for label in ("POS purchase Apple pay (Domestic)", "Online purchase (International)",
-                      "Debit - Credit Cards Transactions", "Debit T & F installments", "معاذ"):
+                      "Debit - Credit Cards Transactions", "Debit T & F installments", "معاذ",
+                      # Musaned is the pay PLATFORM, not the payee — the SMS names the worker.
+                      "Musaned"):
             assert E.is_generic_label(label), f"{label!r} should be replaceable"
 
     def test_a_real_name_is_protected(self):
@@ -255,6 +257,13 @@ class TestSTCDialect:
     def test_outward_transfer_names_the_recipient(self):
         body = "Internal outward transfer\nAmount:165.00SAR\nTo:ABDULLAH ALASIRI\nAcc:1048*\nAt:31/10/25 20:23"
         assert E.classify(body, "STC Bank") == (E._MONEY_NAMED, "stc_transfer_out", "debit", "ABDULLAH ALASIRI")
+
+    def test_outcome_transfer_reads_the_to_field_not_the_description(self):
+        # "Outcome Transfer to Sponsored" has a lowercase "to" in the description
+        # line; the recipient is the To: FIELD ("M BARQUILLA"), which must win over
+        # the stray mid-sentence "to Sponsored".
+        body = "Outcome Transfer to Sponsored\nAmount:1000 SAR\nTo:M BARQUILLA\nAcc:195\nAt:02/08/26 11:12"
+        assert E.classify(body, "STC Bank") == (E._MONEY_NAMED, "stc_transfer_out", "debit", "M BARQUILLA")
 
     def test_purchase_names_the_merchant(self):
         body = "Apple Pay Purchase\nVia: *6070\nAmount: 39.91 SAR\nFrom: Absher 2\nAt: 08/07/25 01:21"

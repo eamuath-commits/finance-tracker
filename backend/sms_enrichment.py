@@ -229,13 +229,14 @@ def _first(body: str, field_name: str) -> Optional[str]:
 def _line_field(body: str, *labels: str) -> Optional[str]:
     """Value after any of `labels` (each a regex fragment), tolerant of 'Label:',
     'Label :' and one-line runs where the value ends at the next 'Word :' field.
-    Rejects bare account numbers and dates — the same guard as _to_names."""
-    for lab in labels:
-        # [ \t]* (not \s*) so an empty field ("Sender Name:\nDate: ...") does not
-        # let the value spill onto the next line and capture 'Date: ...'.
-        m = re.search(lab + r"[ \t]*:?[ \t]*(.+)", body, re.I)
-        if not m:
-            continue
+    Rejects bare account numbers and dates — the same guard as _to_names.
+
+    A label written as its OWN line ('To:NAME') is matched first, so a stray
+    lowercase word mid-sentence ('Outcome Transfer to Sponsored' -> the field is
+    'To:M BARQUILLA', not the description's 'to Sponsored') is never mistaken for
+    the field. Only when no line-anchored field exists does it fall back to a
+    loose search anywhere in the body."""
+    def _value(m):
         v = m.group(1)
         v = v.split("\n", 1)[0]                                  # stop at end of line
         # or at the next KNOWN inline field label (a fixed list, so a multi-word
@@ -247,6 +248,24 @@ def _line_field(body: str, *labels: str) -> Optional[str]:
         if v and not _DIGITS4.match(v) and not _LOOKS_LIKE_DATE.match(v) \
                 and not re.match(r"(?i)(date|amount|available|due|ref|iban|acc|via)\b", v):
             return v
+        return None
+    # [ \t]* (not \s*) so an empty field ("Sender Name:\nDate: ...") does not
+    # let the value spill onto the next line and capture 'Date: ...'.
+    # Pass 1 — label at the START of a line ('To:NAME'): the high-confidence form
+    # that ignores a stray 'to'/'from'/'at' inside a description line.
+    for lab in labels:
+        m = re.search(r"(?im)^[ \t]*" + lab + r"[ \t]*:?[ \t]*(.+)", body)
+        if m:
+            v = _value(m)
+            if v:
+                return v
+    # Pass 2 — legacy loose search, label anywhere in the body.
+    for lab in labels:
+        m = re.search(lab + r"[ \t]*:?[ \t]*(.+)", body, re.I)
+        if m:
+            v = _value(m)
+            if v:
+                return v
     return None
 
 
@@ -492,6 +511,10 @@ _GENERIC_PREFIXES = (
     "incoming local transfer", "outgoing local transfer", "through bank",
     "own account transfer", "incoming transfer", "outgoing transfer",
     "instant outgoing transfer", "instant incoming transfer", "instant transfer",
+    # Musaned is the domestic-worker PAY PLATFORM, not the payee — the statement
+    # labels every sponsored-worker salary "Musaned", so the SMS beneficiary name
+    # ("To: <worker>") is the real counterparty and may overwrite it.
+    "musaned",
 )
 _GENERIC_EXACT = {"transfer", "pos", "purchase", "payment", "withdrawal", "deposit"}
 # One bare Arabic token (a first name) — the statement's usual counterparty label.
