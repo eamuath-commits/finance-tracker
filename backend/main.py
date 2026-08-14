@@ -1293,17 +1293,24 @@ def _has_match_hints(obl):
 
 
 def _passes_match_hints(obl, tx):
-    """A transaction must satisfy every SET match hint to be a candidate for an
-    obligation that has them: same account, containing the match text (matched
-    against merchant / notes / SMS; any one term suffices), and within the
-    day-of-month window. Passing the hints is itself the qualifying evidence."""
+    """Whether a transaction qualifies for an obligation's match hints.
+
+    - account: structural, always required when set.
+    - text (a bill number / name): AUTHORITATIVE. When set, a transaction
+      qualifies by CONTAINING it (matched against merchant / notes / SMS; any one
+      term suffices), and the day-of-month window no longer has to hold. A precise
+      identifier finds the payment even when it landed late — a bill paid on the
+      18th when it usually falls on the 4th–10th — which the day window would
+      otherwise wrongly exclude.
+    - day-of-month window: the filter ONLY when there is no text hint.
+    """
     if obl.match_account_id and tx.account_id != obl.match_account_id:
         return False
-    if obl.match_text:
-        terms = [t.strip().lower() for t in re.split(r"[,\s]+", obl.match_text) if t.strip()]
+    terms = [t.strip().lower() for t in re.split(r"[,\s]+", obl.match_text or "") if t.strip()]
+    if terms:
         hay = " ".join(x for x in (tx.merchant, tx.notes, tx.raw_sms_content) if x).lower()
-        if terms and not any(t in hay for t in terms):
-            return False
+        return any(t in hay for t in terms)
+    # No text hint — fall back to the day-of-month window as the qualifying rule.
     d = tx.timestamp.day if tx.timestamp else None
     lo, hi = obl.match_day_from, obl.match_day_to
     if d is not None:
@@ -1870,6 +1877,31 @@ def auto_match_obligations(db: Session = Depends(get_db), current_user: models.U
     }
 
 # --- Payment-Transaction Linking Endpoints ---
+def _txns_linked_to_other_payments(db, user_id, payment_id):
+    """Transaction ids already linked to a payment OTHER than payment_id (single
+    link or junction), scoped to this user. Lets the picker avoid offering a
+    transaction that already settles a different month — important once the search
+    window is widened enough to span several of the same biller's bills."""
+    single = {
+        tid for (tid,) in db.query(models.Payment.transaction_id).join(
+            models.Transaction, models.Payment.transaction_id == models.Transaction.id
+        ).filter(
+            models.Payment.transaction_id.isnot(None),
+            models.Payment.id != payment_id,
+            models.Transaction.user_id == user_id,
+        ).all()
+    }
+    junction = {
+        tid for (tid,) in db.query(models.PaymentTransaction.transaction_id).join(
+            models.Transaction, models.PaymentTransaction.transaction_id == models.Transaction.id
+        ).filter(
+            models.PaymentTransaction.payment_id != payment_id,
+            models.Transaction.user_id == user_id,
+        ).all()
+    }
+    return single | junction
+
+
 @app.get("/payments/{payment_id}/suggested-transactions")
 def get_suggested_transactions(payment_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """
@@ -1911,10 +1943,30 @@ def get_suggested_transactions(payment_id: int, db: Session = Depends(get_db), c
         last_day = calendar.monthrange(billing_date.year, billing_date.month)[1]
         target_date = billing_date.replace(day=min(due_day, last_day))
     
-    # Search window: ±15 days around due date
-    start_date = target_date - timedelta(days=15)
-    end_date = target_date + timedelta(days=15)
-    
+    has_hints = _has_match_hints(obligation)
+
+    # Search window. A bill is often paid in ARREARS — the transaction for a
+    # billing month can land a month or more later (a "July" phone bill, billed
+    # for a period that runs into August, paid in early August). When the
+    # obligation carries explicit match hints, widen the window well forward from
+    # the billing-month start and let the hints pinpoint the row; otherwise keep
+    # the tight ±15 days around the due date.
+    if has_hints:
+        start_date = billing_date - timedelta(days=7)
+        end_date = billing_date + timedelta(days=62)
+    else:
+        start_date = target_date - timedelta(days=15)
+        end_date = target_date + timedelta(days=15)
+
+    # A transaction already settling a different month must not be offered here.
+    linked_other = _txns_linked_to_other_payments(db, current_user.id, payment_id)
+    # THIS payment's own links still show, flagged, so re-linking is clear.
+    own_linked = {payment.transaction_id} if payment.transaction_id else set()
+    own_linked |= {
+        tid for (tid,) in db.query(models.PaymentTransaction.transaction_id).filter(
+            models.PaymentTransaction.payment_id == payment_id).all()
+    }
+
     # Query transactions in date range (scoped to caller's transactions)
     transactions = db.query(models.Transaction).filter(
         models.Transaction.user_id == current_user.id,
@@ -1922,16 +1974,17 @@ def get_suggested_transactions(payment_id: int, db: Session = Depends(get_db), c
         models.Transaction.timestamp <= end_date,
         models.Transaction.type == "debit"  # Payments are typically debits
     ).order_by(models.Transaction.timestamp.desc()).all()
-    
+
     # Score and filter suggestions
     suggestions = []
     payment_amount = payment.amount or 0
     search_terms = [obligation.name.lower()]
     if obligation.provider:
         search_terms.append(obligation.provider.lower())
-    has_hints = _has_match_hints(obligation)
 
     for tx in transactions:
+        if tx.id in linked_other:
+            continue
         score = 0
         reasons = []
         merchant_lower = (tx.merchant or "").lower()
@@ -2006,7 +2059,7 @@ def get_suggested_transactions(payment_id: int, db: Session = Depends(get_db), c
             # amount+date alone, and auto-linking it is the exact failure mode
             # this gate exists to prevent.
             "qualified": qualified,
-            "already_linked": tx.id == payment.transaction_id,
+            "already_linked": tx.id in own_linked,
             "raw_sms_content": tx.raw_sms_content
         })
 

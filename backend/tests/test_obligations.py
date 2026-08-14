@@ -11,6 +11,10 @@ Routes:
 """
 import pytest
 import uuid
+from datetime import datetime
+from types import SimpleNamespace
+
+import main
 
 
 def get_unique_name():
@@ -200,4 +204,42 @@ class TestObligationsAPI:
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, dict)
+
+
+class TestMatchHints:
+    """_passes_match_hints: a text hint (bill number / name) is authoritative — it
+    finds the paying transaction even when it lands outside the usual day window;
+    the day-of-month window filters only when there is no text hint. This is what
+    lets a bill paid late (or in arrears, a month after its label) still link."""
+
+    @staticmethod
+    def _obl(**kw):
+        base = dict(match_account_id=None, match_text=None, match_day_from=None, match_day_to=None)
+        base.update(kw)
+        return SimpleNamespace(**base)
+
+    @staticmethod
+    def _tx(day, merchant="", notes="", raw="", account_id=None):
+        return SimpleNamespace(timestamp=datetime(2026, 8, day, 12, 0, 0), merchant=merchant,
+                               notes=notes, raw_sms_content=raw, account_id=account_id)
+
+    def test_text_hint_matches_even_outside_the_day_window(self):
+        obl = self._obl(match_text="05064478739", match_day_from=4, match_day_to=10)
+        # bill number present, but paid on the 18th (outside 4-10) -> still qualifies
+        assert main._passes_match_hints(obl, self._tx(18, notes="Sadad · Bill: 05064478739")) is True
+
+    def test_text_hint_required_when_set(self):
+        obl = self._obl(match_text="05064478739", match_day_from=4, match_day_to=10)
+        # in the day window but without the number -> rejected (text is required)
+        assert main._passes_match_hints(obl, self._tx(5, merchant="SOME OTHER BILL")) is False
+
+    def test_day_window_filters_only_when_no_text_hint(self):
+        obl = self._obl(match_day_from=4, match_day_to=10)
+        assert main._passes_match_hints(obl, self._tx(6)) is True
+        assert main._passes_match_hints(obl, self._tx(18)) is False
+
+    def test_account_hint_is_always_required(self):
+        obl = self._obl(match_account_id="acc-1", match_text="05064478739")
+        assert main._passes_match_hints(obl, self._tx(5, notes="05064478739", account_id="acc-2")) is False
+        assert main._passes_match_hints(obl, self._tx(5, notes="05064478739", account_id="acc-1")) is True
 
