@@ -735,9 +735,21 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                     const bmKey = (item.billing_month || '').substring(0, 7);
                                                     const mmMatch = /^(\d{4})-(\d{2})$/.exec(bmKey);
                                                     let dueDateStr = '';
-                                                    if (mmMatch && oblForRow?.due_day) {
-                                                        const dd = String(oblForRow.due_day).padStart(2, '0');
-                                                        dueDateStr = new Date(`${bmKey}-${dd}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+                                                    if (mmMatch && oblForRow) {
+                                                        // A bill paid in arrears posts billing_offset_months after
+                                                        // its service month, so show the due date in that PAYMENT
+                                                        // month. Prefer the configured match-day window as a range
+                                                        // ("10–20 Jun"), else the single due day.
+                                                        const off = oblForRow.billing_offset_months || 0;
+                                                        const payDate = new Date(Number(mmMatch[1]), Number(mmMatch[2]) - 1 + off, 1);
+                                                        const df = oblForRow.match_day_from, dt = oblForRow.match_day_to;
+                                                        if (df && dt) {
+                                                            const mon = payDate.toLocaleDateString('en-GB', { month: 'short' });
+                                                            dueDateStr = `${df}–${dt} ${mon}`;
+                                                        } else if (oblForRow.due_day) {
+                                                            const d = new Date(payDate.getFullYear(), payDate.getMonth(), oblForRow.due_day);
+                                                            dueDateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+                                                        }
                                                     }
                                                     // Warn when the linked transactions don't add up to the payment.
                                                     const linkedSum = (item.linked_transactions || []).reduce((s, t) => s + (t.amount || 0), 0);

@@ -93,6 +93,7 @@ def run_migrations(engine):
         for col, ddl in [
             ("match_account_id", "VARCHAR"), ("match_text", "VARCHAR"),
             ("match_day_from", "INTEGER"), ("match_day_to", "INTEGER"),
+            ("billing_offset_months", "INTEGER DEFAULT 0"),
         ]:
             if col not in obl_cols:
                 print(f"Migrating: Adding {col} to obligations")
@@ -1877,6 +1878,14 @@ def auto_match_obligations(db: Session = Depends(get_db), current_user: models.U
     }
 
 # --- Payment-Transaction Linking Endpoints ---
+def _add_months(d, months):
+    """First-of-month `months` after date d's own month, handling year rollover
+    (Dec + 1 -> Jan next year). Used to shift a billing month to its payment month
+    when a bill is paid in arrears."""
+    m0 = d.month - 1 + months
+    return d.replace(year=d.year + m0 // 12, month=m0 % 12 + 1, day=1)
+
+
 def _txns_linked_to_other_payments(db, user_id, payment_id):
     """Transaction ids already linked to a payment OTHER than payment_id (single
     link or junction), scoped to this user. Lets the picker avoid offering a
@@ -1933,27 +1942,25 @@ def get_suggested_transactions(payment_id: int, db: Session = Depends(get_db), c
     except:
         return []
     
-    # Calculate the target due date for this billing month
+    # A bill can be paid in ARREARS — billed for a service month but paid a month
+    # or more later (electricity for May usage is billed and paid in June). The
+    # obligation's billing_offset_months captures that lag, so the whole search is
+    # anchored on the actual PAYMENT month, not the (service) billing month.
+    import calendar
     due_day = obligation.due_day or 1
-    try:
-        target_date = billing_date.replace(day=due_day)
-    except ValueError:
-        # Handle months with fewer days
-        import calendar
-        last_day = calendar.monthrange(billing_date.year, billing_date.month)[1]
-        target_date = billing_date.replace(day=min(due_day, last_day))
-    
+    offset = obligation.billing_offset_months or 0
+    pay_anchor = _add_months(billing_date, offset)
+    _last = calendar.monthrange(pay_anchor.year, pay_anchor.month)[1]
+    target_date = pay_anchor.replace(day=min(due_day, _last))
+
     has_hints = _has_match_hints(obligation)
 
-    # Search window. A bill is often paid in ARREARS — the transaction for a
-    # billing month can land a month or more later (a "July" phone bill, billed
-    # for a period that runs into August, paid in early August). When the
-    # obligation carries explicit match hints, widen the window well forward from
-    # the billing-month start and let the hints pinpoint the row; otherwise keep
-    # the tight ±15 days around the due date.
+    # When the obligation carries explicit match hints, span the whole payment
+    # month generously and let the hints pinpoint the row; otherwise keep the
+    # tight ±15 days around the due date.
     if has_hints:
-        start_date = billing_date - timedelta(days=7)
-        end_date = billing_date + timedelta(days=62)
+        start_date = pay_anchor - timedelta(days=12)
+        end_date = pay_anchor + timedelta(days=46)
     else:
         start_date = target_date - timedelta(days=15)
         end_date = target_date + timedelta(days=15)

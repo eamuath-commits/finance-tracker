@@ -318,6 +318,7 @@ class ObligationBase(BaseModel):
     match_text: Optional[str] = None
     match_day_from: Optional[int] = None
     match_day_to: Optional[int] = None
+    billing_offset_months: Optional[int] = 0  # months the payment lags the service month (arrears)
 
 class ObligationCreate(ObligationBase):
     pass
@@ -336,6 +337,7 @@ class ObligationUpdate(BaseModel):
     match_text: Optional[str] = None
     match_day_from: Optional[int] = None
     match_day_to: Optional[int] = None
+    billing_offset_months: Optional[int] = None
 
 class Obligation(ObligationBase):
     id: str

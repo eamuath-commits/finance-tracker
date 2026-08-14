@@ -290,6 +290,7 @@ class MonthlyObligation(Base):
     match_text = Column(String, nullable=True)          # words / bill number that appear on the transaction
     match_day_from = Column(Integer, nullable=True)     # earliest day-of-month it posts
     match_day_to = Column(Integer, nullable=True)       # latest day-of-month it posts
+    billing_offset_months = Column(Integer, default=0)  # months between the service month and when it's billed/paid (arrears)
 
     target_account = relationship("Account", foreign_keys=[target_account_id])
 

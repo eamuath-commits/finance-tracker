@@ -71,7 +71,7 @@ const Obligations = () => {
     const [selectedHistory, setSelectedHistory] = useState([]);
     const [viewingHistoryId, setViewingHistoryId] = useState(null);
 
-    const EMPTY_OBLIGATION = { name: '', due_day: '', category: '', notes: '', provider: '', match_account_id: '', match_text: '', match_day_from: '', match_day_to: '' };
+    const EMPTY_OBLIGATION = { name: '', due_day: '', category: '', notes: '', provider: '', match_account_id: '', match_text: '', match_day_from: '', match_day_to: '', billing_offset_months: '' };
     const [obligationForm, setObligationForm] = useState(EMPTY_OBLIGATION);
     const [paymentForm, setPaymentForm] = useState({ id: null, amount: '', note: '', billing_month: new Date().toISOString().split('T')[0] });
 
@@ -228,6 +228,7 @@ const Obligations = () => {
             match_text: obligationForm.match_text || null,
             match_day_from: obligationForm.match_day_from ? parseInt(obligationForm.match_day_from) : null,
             match_day_to: obligationForm.match_day_to ? parseInt(obligationForm.match_day_to) : null,
+            billing_offset_months: obligationForm.billing_offset_months ? parseInt(obligationForm.billing_offset_months) : 0,
         };
 
         try {
@@ -395,7 +396,8 @@ const Obligations = () => {
             setObligationForm({
                 name: obl.name, due_day: obl.due_day, category: obl.category, notes: obl.notes || '', provider: obl.provider || '',
                 match_account_id: obl.match_account_id || '', match_text: obl.match_text || '',
-                match_day_from: obl.match_day_from || '', match_day_to: obl.match_day_to || ''
+                match_day_from: obl.match_day_from || '', match_day_to: obl.match_day_to || '',
+                billing_offset_months: obl.billing_offset_months ?? ''
             });
         } else {
             setEditingId(null);
@@ -610,8 +612,10 @@ const Obligations = () => {
                                     value={obligationForm.match_day_from || ''} onChange={e => setObligationForm({ ...obligationForm, match_day_from: e.target.value })} />
                                 <input type="number" min="1" max="31" placeholder="Day to (1-31)" className={inputClass}
                                     value={obligationForm.match_day_to || ''} onChange={e => setObligationForm({ ...obligationForm, match_day_to: e.target.value })} />
+                                <input type="number" min="0" max="6" placeholder="Paid N months later (0)" className={inputClass}
+                                    value={obligationForm.billing_offset_months ?? ''} onChange={e => setObligationForm({ ...obligationForm, billing_offset_months: e.target.value })} />
                             </div>
-                            <p className="text-[10px] text-slate-500 mt-1">When set, the match must be in that account AND contain the text, within the day window. Any word/bill number counts.</p>
+                            <p className="text-[10px] text-slate-500 mt-1">Must be in that account. A bill number / name finds the payment on its own — even outside the day window (used when there's no text). "Paid N months later" handles bills in arrears: May usage billed &amp; paid in June = 1.</p>
                         </div>
                         <div className="flex gap-2 mt-6">
                             <button type="submit" className="flex-1 bg-blue-600 text-white p-3 rounded font-bold shadow-lg">{editingId ? "Save" : "Create"}</button>

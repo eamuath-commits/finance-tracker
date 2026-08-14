@@ -832,6 +832,7 @@ def create_obligation(db: Session, obligation: schemas.ObligationCreate, user_id
         match_text=obligation.match_text,
         match_day_from=obligation.match_day_from,
         match_day_to=obligation.match_day_to,
+        billing_offset_months=obligation.billing_offset_months or 0,
         user_id=user_id
     )
     db.add(db_obj)

@@ -243,3 +243,19 @@ class TestMatchHints:
         assert main._passes_match_hints(obl, self._tx(5, notes="05064478739", account_id="acc-2")) is False
         assert main._passes_match_hints(obl, self._tx(5, notes="05064478739", account_id="acc-1")) is True
 
+
+class TestBillingArrearsOffset:
+    """A bill paid in arrears posts N months after its service month; the picker
+    shifts its whole search to that PAYMENT month via _add_months."""
+
+    def test_same_month_when_offset_zero(self):
+        assert main._add_months(datetime(2026, 7, 15), 0) == datetime(2026, 7, 1)
+
+    def test_shifts_forward_within_the_year(self):
+        # May service month, paid one month later -> anchor on June.
+        assert main._add_months(datetime(2026, 5, 1), 1) == datetime(2026, 6, 1)
+
+    def test_rolls_over_the_year_boundary(self):
+        assert main._add_months(datetime(2026, 12, 10), 1) == datetime(2027, 1, 1)
+        assert main._add_months(datetime(2026, 11, 3), 3) == datetime(2027, 2, 1)
+
