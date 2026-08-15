@@ -512,6 +512,7 @@ class StatementLine(Base):
     direction = Column(String, nullable=True)     # 'debit' | 'credit'
     amount = Column(Money(), default=0.0)           # the non-zero side
     category = Column(String, nullable=True)
+    currency = Column(String, nullable=True)        # wallet currency (SAR default; USD/EUR on a travel card)
 
     # Reconciliation signals extracted from the note
     counterparty_account = Column(String, nullable=True)

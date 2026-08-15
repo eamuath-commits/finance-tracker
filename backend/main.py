@@ -101,6 +101,16 @@ def run_migrations(engine):
                     conn.execute(text(f"ALTER TABLE obligations ADD COLUMN {col} {ddl}"))
                     conn.commit()
 
+        # Wallet currency of a draft statement row (SAR default; USD/EUR on a
+        # multi-currency travel credit card).
+        if 'statement_lines' in inspector.get_table_names():
+            sl_cols = [c["name"] for c in inspector.get_columns("statement_lines")]
+            if 'currency' not in sl_cols:
+                print("Migrating: Adding currency to statement_lines")
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE statement_lines ADD COLUMN currency VARCHAR"))
+                    conn.commit()
+
         # The bank's own operation type (PURCHASE, INTERNAL_TRANSFER, FEE ...),
         # kept separate from the spending category. Backfilled from each row's
         # statement line by _backfill_transaction_types() below.

@@ -360,6 +360,7 @@ def _store_credit_card_lines(statement: models.Statement, db: Session) -> dict:
             balance=None,                       # cards print no running balance
             direction=r.get("direction"),
             amount=r.get("amount", 0.0),
+            currency=r.get("currency"),         # SAR default; USD/EUR on a travel card
             is_fee=False,                       # card fees are their own rows
             match_status="pending",
         ))
@@ -1421,6 +1422,11 @@ def post_statement_to_ledger(
             ttype = transaction_types.classify_type_line(
                 ln.type_line, ln.direction, bank_key=statement.bank_key)
 
+        # A foreign-wallet row (travel card USD/EUR) records its own currency so
+        # the ledger shows the real figure; a SAR row leaves it unset.
+        _ccy = getattr(ln, "currency", None)
+        _foreign = bool(_ccy) and _ccy != "SAR"
+
         tx = models.Transaction(
             id=str(uuid.uuid4()),
             user_id=current_user.id,
@@ -1439,6 +1445,8 @@ def post_statement_to_ledger(
             statement_row_index=ln.row_index,
             status="completed",
             fees=0.0,
+            original_currency=_ccy if _foreign else None,
+            original_amount=round(ln.amount or 0.0, 2) if _foreign else None,
         )
         db.add(tx)
         db.flush()  # assign tx.id
