@@ -2129,8 +2129,18 @@ def unlink_payment_transaction(payment_id: int, db: Session = Depends(get_db), c
 
 # --- Transaction Endpoints ---
 @app.get("/transactions/")
-def read_transactions(skip: int = 0, limit: int = 1000, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    txs = db.query(models.Transaction).filter(models.Transaction.user_id == current_user.id).order_by(models.Transaction.timestamp.desc()).offset(skip).limit(limit).all()
+def read_transactions(skip: int = 0, limit: Optional[int] = None, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # The ledger loads the whole set and filters/searches client-side, so return
+    # everything by default. A previous default of 1000 (newest-first) silently
+    # hid a user's older rows once they passed 1000 transactions — an old statement
+    # row then read as "in the statement but not in the ledger". Callers that want
+    # a page can still pass limit.
+    q = db.query(models.Transaction).filter(
+        models.Transaction.user_id == current_user.id
+    ).order_by(models.Transaction.timestamp.desc()).offset(skip)
+    if limit is not None:
+        q = q.limit(limit)
+    txs = q.all()
     result = []
     for tx in txs:
         tx_dict = {c.name: getattr(tx, c.name) for c in tx.__table__.columns}
