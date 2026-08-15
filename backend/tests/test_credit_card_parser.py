@@ -122,3 +122,38 @@ class TestDocumentDetection:
 
     def test_a_current_account_statement_is_not(self):
         assert CC.looks_like_credit_card("ACCOUNT e-STATEMENT\nIBAN SA80...\nInternal Transfer") is False
+
+
+class TestAlRajhiRTL:
+    """The newer Al Rajhi (Travel Plus) layout is RTL + multi-currency. Rows are
+    reconstructed from word coordinates, so these lock the reversed-column row
+    regex and the wallet detection that reconciled all five real statements."""
+
+    def test_matches_a_sar_charge_row(self):
+        m = CC._RJ_TX_RE.match("550.79 10.80 Amount: 539.99 539.99 SAR 01/03/26 27/02/26")
+        assert m and m.group("cr") is None
+        assert m.group("billing") == "550.79" and m.group("fees") == "10.80"
+        assert m.group("amt") == "539.99" and m.group("ccy") == "SAR"
+        assert m.group("post") == "01/03/26" and m.group("txn") == "27/02/26"
+
+    def test_matches_a_cr_credit_row(self):
+        m = CC._RJ_TX_RE.match("CR 146.00 0.00 Advance Payment 2026-03-11 146.00 SAR 11/03/26 11/03/26")
+        assert m and m.group("cr") is not None
+        assert m.group("billing") == "146.00" and "Advance Payment" in m.group("desc")
+
+    def test_matches_a_foreign_wallet_row(self):
+        m = CC._RJ_TX_RE.match("23.00 0.00 23.00 USD 03/04/26 01/04/26")
+        assert m and m.group("ccy") == "USD" and m.group("billing") == "23.00"
+
+    def test_a_bare_amount_row_has_empty_desc(self):
+        m = CC._RJ_TX_RE.match("102.33 0.00 102.33 SAR 03/03/26 01/03/26")
+        assert m and m.group("desc") == "" and m.group("amt") == "102.33"
+
+    def test_wallet_section_maps_to_currency(self):
+        assert CC._WALLET_MAP["SAUDI RIYAL"] == "SAR"
+        assert CC._WALLET_MAP["US DOLLAR"] == "USD"
+        assert CC._RJ_WALLET_RE.search("Transaction Details US DOLLAR Wallet").group(1).upper() == "US DOLLAR"
+
+    def test_looks_like_detects_the_rtl_row(self):
+        assert CC._rj_looks_like(["550.79 10.80 Amount: 539.99 539.99 SAR 01/03/26 27/02/26"]) is True
+        assert CC._rj_looks_like(["10/12/25 Tabby 12/12/25 327.87"]) is False  # legacy row

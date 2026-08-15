@@ -64,6 +64,7 @@ class CardTransaction:
     amount: Optional[float] = None
     direction: Optional[str] = None    # "debit" (charge) | "credit" (payment/refund)
     transaction_type: Optional[str] = None
+    currency: Optional[str] = None     # wallet currency (SAR default; USD/AED/... on a travel card)
 
 
 def _amt(s: str) -> float:
@@ -117,6 +118,153 @@ def looks_like_credit_card(first_page_text: str) -> bool:
     return bool(_BF_RE.search(t) or _CARD_RE.search(t))
 
 
+# ---------------------------------------------------------------------------
+# Al Rajhi bilingual (Arabic/English, right-to-left) credit-card layout
+# ---------------------------------------------------------------------------
+# A newer Al Rajhi credit-card statement is RTL, so pdfplumber emits each
+# transaction row with its columns REVERSED:
+#
+#     [CR] <billing> <fees> [<desc>] <amount> SAR <posting DD/MM/YY> <txn DD/MM/YY>
+#
+# The merchant name sits on the line(s) ABOVE the amount row; "Markup Fee:" / "VAT:"
+# detail lines sit below it. A leading CR marks a credit (the "Advance Payment" card
+# payments and refunds). The BILLING amount (transaction + fees) is what hits the
+# card — summing the billing column reproduces the printed Total Debits/Credits and
+# the closing balance exactly.
+_RJ_TX_RE = re.compile(
+    r'^(?P<cr>CR\s+)?(?P<billing>[\d,]+\.\d{2})\s+(?P<fees>[\d,]+\.\d{2})\s+'
+    r'(?P<desc>.*?)\s*(?P<amt>[\d,]+\.\d{2})\s+(?P<ccy>SAR|USD|AED|BHD|EUR|GBP|KWD)\s+'
+    r'(?P<post>\d{2}/\d{2}/\d{2})\s+(?P<txn>\d{2}/\d{2}/\d{2})\s*$'
+)
+_RJ_WALLET_RE = re.compile(
+    r'(SAUDI RIYAL|US DOLLAR|UAE DIRHAM|EMIRATI|BAHRAINI|KUWAITI|EURO|POUND)', re.I)
+_WALLET_MAP = {
+    "SAUDI RIYAL": "SAR", "US DOLLAR": "USD", "UAE DIRHAM": "AED", "EMIRATI": "AED",
+    "BAHRAINI": "BHD", "KUWAITI": "KWD", "EURO": "EUR", "POUND": "GBP",
+}
+_RJ_FEE_RE = re.compile(r'^(Markup Fee|VAT)\b', re.I)
+_RJ_SKIP_RE = re.compile(
+    r'^(credit card statement|Page no\.|Transaction Details|Billing Amount|'
+    r'Card Balance Details|Total (Payments|Credits|Spend|Debits)|Message|'
+    r'For more information|alrajhi|Card Details|Card Statement Summary|'
+    r'Payment Due Date|SADAD|Opening Balance|Closing Balance|.*Statement Month|.*Wallet)', re.I)
+_LATIN_RE = re.compile(r'[A-Za-z]')
+_SIGNED_NUM_RE = re.compile(r'-?[\d,]+\.\d{2,3}')
+
+
+def _rj_looks_like(lines) -> bool:
+    """True if any text line is an RTL Al Rajhi credit-card transaction row."""
+    return any(_RJ_TX_RE.match(l.strip()) for l in lines)
+
+
+def _rj_nums(line: str):
+    return [float(x.replace(",", "")) for x in _SIGNED_NUM_RE.findall(line)]
+
+
+def _rj_rows(page, tol: float = 3.0):
+    """Reconstruct a page's visual rows from WORD COORDINATES: group words whose
+    top-y is within `tol`, then order each row left-to-right by x. Robust to the
+    RTL line-merging that plain text extraction suffers from on this layout."""
+    words = page.extract_words(use_text_flow=False)
+    if not words:
+        return []
+    words.sort(key=lambda w: (w["top"], w["x0"]))
+    rows, cur, top0 = [], [], words[0]["top"]
+    for w in words:
+        if abs(w["top"] - top0) <= tol:
+            cur.append(w)
+        else:
+            rows.append(cur)
+            cur, top0 = [w], w["top"]
+    if cur:
+        rows.append(cur)
+    return [" ".join(x["text"] for x in sorted(r, key=lambda w: w["x0"])) for r in rows]
+
+
+def _parse_alrajhi_cc_words(pages):
+    """Transactions (each tagged with its wallet currency) + the SAR opening
+    balance for the RTL, MULTI-CURRENCY Al Rajhi credit-card layout.
+
+    Rows come from word coordinates (merges/reversed columns handled). Each
+    transaction's wallet is the "Transaction Details | <X> Wallet" section it sits
+    under — NOT the trailing currency label, which on a foreign purchase is the
+    SAR-equivalent. Classified directly (never through _classify) so a purchase
+    carrying a markup fee is not mistaken for a standalone fee transaction."""
+    rows = []
+    for pg in pages:
+        rows.extend(_rj_rows(pg))
+
+    txs: List[CardTransaction] = []
+    buffer: List[str] = []
+    wallet = "SAR"
+    opening = None                # SAR opening balance (first summary block)
+    want_opening = False
+    idx = 0
+    for r in rows:
+        rs = r.strip()
+        if not rs:
+            continue
+        # SAR opening sits on the row AFTER the first "Opening Balance" summary label.
+        if want_opening:
+            nums = _rj_nums(rs)
+            if nums:
+                opening = nums[-1]
+            want_opening = False
+        if opening is None and "Opening Balance" in rs and "Total" in rs:
+            want_opening = True
+            continue
+
+        if re.search(r'Transaction Details', rs, re.I):
+            cm = _RJ_WALLET_RE.search(rs)
+            if cm:
+                wallet = _WALLET_MAP.get(cm.group(1).upper(), "SAR")
+            buffer = []
+            continue
+
+        m = _RJ_TX_RE.match(rs)
+        if m:
+            direction = "credit" if m.group("cr") else "debit"
+            inline = (m.group("desc") or "").strip()
+            merchant = " ".join(buffer).strip()
+            if not merchant:
+                merchant = inline or ("Advance Payment" if direction == "credit" else "Card Transaction")
+            fee = _amt(m.group("fees"))
+            note = []
+            if inline and inline != merchant:
+                note.append(inline)
+            if m.group("ccy") != wallet:
+                note.append(f"={m.group('amt')} {m.group('ccy')}")   # printed SAR-equivalent
+            if fee:
+                note.append(f"incl. fee {fee:.2f}")
+            if direction == "credit":
+                ttype = (transaction_types.CARD_PAYMENT
+                         if "advance payment" in (merchant + " " + inline).lower()
+                         else transaction_types.REFUND)
+            else:
+                ttype = transaction_types.PURCHASE_INTL if (fee or wallet != "SAR") else transaction_types.PURCHASE
+            txs.append(CardTransaction(
+                row_index=idx,
+                txn_date=_norm_date(m.group("txn")),
+                post_date=_norm_date(m.group("post")),
+                type_line=merchant[:120],
+                note="; ".join(note) or None,
+                amount=_amt(m.group("billing")),     # billing, in the WALLET currency -> reconciles
+                direction=direction,
+                transaction_type=ttype,
+                currency=wallet,
+            ))
+            idx += 1
+            buffer = []
+            continue
+
+        if _RJ_FEE_RE.match(rs):
+            continue
+        if _RJ_SKIP_RE.match(rs) or not _LATIN_RE.search(rs):
+            continue
+        buffer.append(rs)
+    return txs, opening
+
+
 def parse_credit_card_pdf(file_path: str) -> dict:
     """Parse a credit-card statement into header + transactions.
 
@@ -132,14 +280,49 @@ def parse_credit_card_pdf(file_path: str) -> dict:
         with pdfplumber.open(file_path) as pdf:
             page_count = len(pdf.pages)
             pages = [p.extract_text() or "" for p in pdf.pages]
+            lines: List[str] = []
+            for tp in pages:
+                lines.extend(tp.split("\n"))
+            # The RTL, multi-currency Al Rajhi credit-card layout is a different
+            # document from the legacy (Aljazira) one — reversed columns, merchant
+            # above the amount row, per-currency wallets. Parse it from WORD
+            # coordinates while the page objects are still open.
+            if _rj_looks_like(lines):
+                header = {"bank_key": None, "bank_name": None,
+                          "card_last4": None, "statement_date": None,
+                          "brought_forward": None, "credit_limit": None,
+                          "available_credit": None, "closing_balance": None,
+                          "period_start": None, "period_end": None}
+                for l in lines:
+                    m = _CARD_RE.search(l)
+                    if m:
+                        header["card_last4"] = m.group(1)
+                        break
+                txs, opening = _parse_alrajhi_cc_words(pdf.pages)
+                # Reconcile the SAR wallet — foreign wallets settle in their own
+                # currency, so only SAR rows move the printed SAR balance.
+                sar = [t for t in txs if t.currency == "SAR"]
+                charges = round(sum(t.amount for t in sar if t.direction == "debit"), 2)
+                credits = round(sum(t.amount for t in sar if t.direction == "credit"), 2)
+                posts = sorted(t.post_date for t in txs if t.post_date)
+                header["brought_forward"] = opening
+                header["closing_balance"] = round(opening + charges - credits, 2) if opening is not None else None
+                header["period_start"] = header["statement_period_start"] = posts[0] if posts else None
+                header["period_end"] = header["statement_period_end"] = posts[-1] if posts else None
+                header["statement_date"] = posts[-1] if posts else None
+                return {
+                    "header": header,
+                    "transactions": [asdict(t) for t in txs],
+                    "charges_total": charges,
+                    "credits_total": credits,
+                    "page_count": page_count,
+                    "error": None,
+                }
     except Exception as e:
         logger.error(f"Failed to open credit-card PDF: {e}", exc_info=True)
         return {"header": None, "transactions": [], "page_count": 0, "error": str(e)}
 
-    lines: List[str] = []
-    for tp in pages:
-        lines.extend(tp.split("\n"))
-
+    # --- legacy (Aljazira) credit-card layout ---
     # The issuing bank is NOT hardcoded and usually is not in the statement text
     # (the letterhead is an image). It is taken from the linked credit card, which
     # the user set up — see _store_credit_card_lines.
