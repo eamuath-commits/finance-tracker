@@ -344,6 +344,7 @@ const ObligationsTable = ({ obligations, getMonthStatus, monthOffset, openPaymen
 
     let totalBudget = 0;
     let totalPaid = 0;
+    let unpaidExpected = 0;
     let paidCount = 0;
     let unpaidCount = 0;
 
@@ -351,13 +352,18 @@ const ObligationsTable = ({ obligations, getMonthStatus, monthOffset, openPaymen
         const prevStatus = getMonthStatus(obl, monthOffset - 1);
         const currStatus = getMonthStatus(obl, monthOffset);
 
-        // Budget = expected expense for this month
-        // Priority: current month BUDGET entry → previous month amount → 0
+        // Budget = expected expense for this month.
+        // Priority: current-month BUDGET entry → previous month's amount → the
+        // obligation's configured amount → its paid amount. The configured amount
+        // matters so an obligation not paid recently still counts (otherwise it
+        // reads as 0 owed and vanishes from the totals).
         let expectedAmount = 0;
         if (currStatus.status === 'BUDGET' && currStatus.amount) {
             expectedAmount = currStatus.amount;
         } else if (prevStatus.amount) {
             expectedAmount = prevStatus.amount;
+        } else if (obl.amount) {
+            expectedAmount = obl.amount;
         } else if (currStatus.isPaid && currStatus.amount) {
             // Only use paid amount as estimate if no other reference exists
             expectedAmount = currStatus.amount;
@@ -369,12 +375,17 @@ const ObligationsTable = ({ obligations, getMonthStatus, monthOffset, openPaymen
             totalPaid += currStatus.amount;
             paidCount++;
         } else {
+            // Left to pay is the sum of what's still OWED — the expected amount of
+            // each UNPAID obligation. Never total_budget − total_paid: one
+            // obligation overpaid (a credit card cleared in full) would otherwise
+            // mask the ones still unpaid and wrongly show "0 left to pay".
+            unpaidExpected += expectedAmount;
             unpaidCount++;
         }
     });
 
     const progress = totalBudget > 0 ? (totalPaid / totalBudget) * 100 : 0;
-    const remaining = totalBudget - totalPaid;
+    const remaining = unpaidExpected;
     const isOverBudget = totalPaid > totalBudget;
 
     return (
@@ -404,9 +415,9 @@ const ObligationsTable = ({ obligations, getMonthStatus, monthOffset, openPaymen
                             <p className="text-lg font-bold text-emerald-400 font-mono">{formatCurrency(totalPaid)}</p>
                         </div>
                         <div className="text-center min-w-[80px]">
-                            <p className="text-[10px] text-slate-500 uppercase">{isOverBudget ? 'Over' : 'Remaining'}</p>
-                            <p className={`text-lg font-bold font-mono ${isOverBudget ? 'text-red-400' : 'text-amber-400'}`}>
-                                {isOverBudget ? '+' : ''}{formatCurrency(Math.abs(remaining))}
+                            <p className="text-[10px] text-slate-500 uppercase">Remaining</p>
+                            <p className="text-lg font-bold font-mono text-amber-400">
+                                {formatCurrency(remaining)}
                             </p>
                         </div>
                     </div>

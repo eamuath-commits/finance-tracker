@@ -1087,6 +1087,7 @@ def get_obligations_monthly_status(month_offset: int = 0, db: Session = Depends(
     overdue_count = 0
     total_expected = 0.0
     total_paid = 0.0
+    remaining_expected = 0.0   # sum of expected for the UNPAID obligations
 
     for obl in obligations:
         expected = obl.amount or 0.0
@@ -1101,6 +1102,7 @@ def get_obligations_monthly_status(month_offset: int = 0, db: Session = Depends(
         elif payment and payment.status in (models.PaymentStatus.BUDGET, "BUDGET"):
             status = "BUDGET"
             unpaid_count += 1
+            remaining_expected += expected
         else:
             # Check if overdue: due_day has passed in current/past month
             is_past_month = (year < now.year) or (year == now.year and month < now.month)
@@ -1109,6 +1111,7 @@ def get_obligations_monthly_status(month_offset: int = 0, db: Session = Depends(
             if is_overdue:
                 overdue_count += 1
             unpaid_count += 1
+            remaining_expected += expected
 
         result_obligations.append({
             "id": obl.id,
@@ -1138,7 +1141,10 @@ def get_obligations_monthly_status(month_offset: int = 0, db: Session = Depends(
         "overdue_count": overdue_count,
         "total_expected": round(total_expected, 2),
         "total_paid": round(total_paid, 2),
-        "remaining": round(total_expected - total_paid, 2),
+        # Left to pay = expected for the still-unpaid obligations, NOT
+        # total_expected − total_paid (an overpaid row, e.g. a credit card cleared
+        # in full, would otherwise mask the ones still unpaid).
+        "remaining": round(remaining_expected, 2),
         "obligations": result_obligations,
     }
 
