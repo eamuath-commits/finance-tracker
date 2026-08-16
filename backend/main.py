@@ -2643,6 +2643,7 @@ def _statement_txrows(db: Session, user_id: str) -> List[sms_enrichment.TxRow]:
             id=r.id, timestamp=r.timestamp,
             amount=float(r.amount or 0), type=r.type, merchant=r.merchant,
             bank=banks.get(r.statement_id),
+            row_index=r.statement_row_index,
         )
         for r in rows
     ]

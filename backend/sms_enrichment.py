@@ -574,6 +574,7 @@ class TxRow:
     type: str            # "debit" | "credit"
     merchant: Optional[str]
     bank: Optional[str] = None   # bank_key of the row's statement, for same-bank gating
+    row_index: Optional[int] = None  # statement print order (= chronological), to order a same-day cluster
 
 
 @dataclass
@@ -781,6 +782,56 @@ def match(events: List[Event], txs: List[TxRow],
             truncated=_is_truncated(name, e.shape),
             raw_sms=e.body,
         ))
+
+    # ── Order-based cluster disambiguation ──
+    # A block of N date-only rows and N named SMS that all share amount + date +
+    # direction + bank mutually match, so the bijection above rightly leaves them
+    # ambiguous (two 1500 "Musaned" rows on a day — one to a maid, one to a cafe).
+    # When the block is a clean, ISOLATED N-to-N cluster, pair by CHRONOLOGICAL
+    # order: the statement lists rows in balance-chain order and the SMS arrive in
+    # time order, so the i-th row is the i-th message. Fires only on midnight
+    # (time-less) rows — a real posting time would have disambiguated already —
+    # and never reaches outside the cluster, so it can mislabel nothing else.
+    tx_clusters: Dict = {}
+    for t in txs:
+        if (t.timestamp and t.timestamp.time() == _MIDNIGHT and is_generic_label(t.merchant)
+                and t.id not in seen_tx and len(tx_cands[t.id]) > 1 and t.row_index is not None):
+            tx_clusters.setdefault((round(t.amount, 2), t.timestamp.date(), t.type, t.bank), []).append(t)
+    sms_clusters: Dict = {}
+    for e in pool:
+        if e.kind == _MONEY_NAMED and e.name and len(ev_cands[id(e)]) > 1:
+            sms_clusters.setdefault(
+                (round(e.amount, 2), e.timestamp.date(), e.direction, _sender_bank(e.sender)), []).append(e)
+
+    for key, tcl in tx_clusters.items():
+        scl = sms_clusters.get(key, [])
+        n = len(tcl)
+        if n < 2 or len(scl) != n:
+            continue
+        tids, sids = {t.id for t in tcl}, {id(e) for e in scl}
+        # Isolated K(n,n): every row matches EXACTLY these SMS and every SMS
+        # matches EXACTLY these rows — nothing bleeds in or out of the cluster.
+        if not all({id(x) for x in tx_cands[t.id]} == sids for t in tcl):
+            continue
+        if not all({x.id for x in ev_cands[id(e)]} == tids for e in scl):
+            continue
+        # Distinct SMS times and distinct row order, so the pairing is well-defined.
+        if len({e.timestamp for e in scl}) != n or len({t.row_index for t in tcl}) != n:
+            continue
+        for t, e in zip(sorted(tcl, key=lambda t: t.row_index),
+                        sorted(scl, key=lambda e: e.timestamp)):
+            name = (e.name or "").strip()
+            if not name or (t.merchant or "").strip().lower() == name.lower():
+                continue
+            seen_tx.add(t.id)
+            skipped["ambiguous_sms"] = max(0, skipped["ambiguous_sms"] - 1)
+            skipped["ordered_cluster"] = skipped.get("ordered_cluster", 0) + 1
+            res.proposals.append(Proposal(
+                transaction_id=t.id, old_merchant=t.merchant, new_merchant=name,
+                amount=t.amount, direction=t.type, tx_timestamp=t.timestamp,
+                sms_timestamp=e.timestamp, delta_seconds=(e.timestamp - t.timestamp).total_seconds(),
+                shape=e.shape, truncated=_is_truncated(name, e.shape), raw_sms=e.body,
+            ))
 
     res.skipped = skipped
     res.stats = {

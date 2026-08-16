@@ -173,6 +173,53 @@ class TestAmbiguityIsRefused:
         assert len({p.transaction_id for p in res.proposals}) == len(res.proposals)
 
 
+class TestOrderedClusterDisambiguation:
+    """Two same-amount, same-day, date-only (midnight) rows matched by two named
+    SMS: the bijection cannot tell them apart, so an ISOLATED N-to-N cluster is
+    paired by chronological order — statement row order <-> SMS time order. Guarded
+    so it only fires with row_index present and equal counts."""
+
+    @staticmethod
+    def _stc(ts, name, amount="1500.00"):
+        body = f"Debit Transfer Sponsored\nAmount:{amount}SAR\nto:{name}\nAcc:7195*\nAt:01/02/26 03:17"
+        return f"----------------------------------------------------\n{ts} from STC Bank\n\n{body}\n"
+
+    @staticmethod
+    def _tx(tid, row_index, merchant="Musaned"):
+        return E.TxRow(id=tid, timestamp=datetime(2026, 2, 1, 0, 0, 0), amount=1500.0,
+                       type="debit", merchant=merchant, bank="stc", row_index=row_index)
+
+    def test_pairs_by_chronological_order(self):
+        evs = E.parse_exports([self._stc("2026-02-01 03:17:20", "MAE CLAIRE BARQUILLA"),
+                               self._stc("2026-02-01 03:17:55", "NORMA CAFE")])
+        res = E.match(evs, [self._tx("A", 3), self._tx("B", 4)])
+        got = {p.transaction_id: p.new_merchant for p in res.proposals}
+        # earlier row (3) <- earlier SMS (03:17:20); later row (4) <- later SMS
+        assert got == {"A": "MAE CLAIRE BARQUILLA", "B": "NORMA CAFE"}
+
+    def test_needs_equal_counts(self):
+        evs = E.parse_exports([self._stc("2026-02-01 03:17:20", "MAE CLAIRE BARQUILLA")])
+        assert E.match(evs, [self._tx("A", 3), self._tx("B", 4)]).proposals == []
+
+    def test_not_applied_without_row_index(self):
+        # No row order to pair on -> stays ambiguous (the safe default).
+        evs = E.parse_exports([self._stc("2026-02-01 03:17:20", "MAE CLAIRE BARQUILLA"),
+                               self._stc("2026-02-01 03:17:55", "NORMA CAFE")])
+        txs = [E.TxRow(id="A", timestamp=datetime(2026, 2, 1), amount=1500.0, type="debit",
+                       merchant="Musaned", bank="stc"),
+               E.TxRow(id="B", timestamp=datetime(2026, 2, 1), amount=1500.0, type="debit",
+                       merchant="Musaned", bank="stc")]
+        assert E.match(evs, txs).proposals == []
+
+    def test_an_already_named_row_breaks_the_cluster(self):
+        # If one of the two rows already carries a real name the cluster is no
+        # longer a clean N-to-N, so nothing is guessed.
+        evs = E.parse_exports([self._stc("2026-02-01 03:17:20", "MAE CLAIRE BARQUILLA"),
+                               self._stc("2026-02-01 03:17:55", "NORMA CAFE")])
+        res = E.match(evs, [self._tx("A", 3, merchant="ALREADY REAL"), self._tx("B", 4)])
+        assert res.proposals == []
+
+
 class TestDedupeAcrossExports:
     """Phone exports overlap heavily. Without de-duplication two identical SMS
     both claim the same row, it looks contested, and NOTHING is enriched."""
