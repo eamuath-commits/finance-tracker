@@ -2703,6 +2703,78 @@ def sms_enrich_rerun(
     return _enrich_response(result, sources=infos)
 
 
+@app.get("/api/sms/enrich/state")
+def sms_enrich_state(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    """Live enrichment state for the persistent review dashboard, in four buckets:
+    - ready:     one confident SMS match -> one-click apply
+    - review:    ambiguous (>1 candidate SMS) -> pick one
+    - no_match:  a generic-labelled row with no usable SMS (clears when one is added)
+    - enriched:  already SMS-enriched (undoable)
+    Recomputed from the stored SMS each call — deterministic, so no state to persist."""
+    raws, infos = _read_stored_sms(current_user.id)
+
+    _eq = db.query(models.Transaction).filter(
+        models.Transaction.user_id == current_user.id,
+        models.Transaction.enriched_at.isnot(None))
+    enriched_count = _eq.count()
+    enriched = [{
+        "transaction_id": t.id, "merchant": t.merchant, "was": t.merchant_original,
+        "amount": float(t.amount or 0),
+        "timestamp": t.timestamp.isoformat() if t.timestamp else None,
+        "batch_id": t.enrichment_batch_id,
+    } for t in _eq.order_by(models.Transaction.enriched_at.desc()).limit(300).all()]
+
+    if not raws:
+        return {"has_sources": False, "sources": infos, "ready": [], "review": [],
+                "no_match": [], "enriched": enriched, "coverage": {},
+                "counts": {"ready": 0, "review": 0, "no_match": 0, "enriched": enriched_count}}
+
+    result = sms_enrichment.match(sms_enrichment.parse_exports(raws),
+                                  _statement_txrows(db, current_user.id),
+                                  account_names=_account_name_map(db, current_user.id))
+    payload = _enrich_response(result)
+    cov = result.coverage
+    details = cov.get("details", {})
+    no_match = details.get("no_sms_found", []) + details.get("sms_has_no_name", [])
+    review = details.get("contested", [])
+    return {
+        "has_sources": True, "sources": infos,
+        "ready": payload["proposals"], "review": review, "no_match": no_match,
+        "enriched": enriched, "coverage": cov,
+        # full counts (bucket lists above are capped at 300 for the payload)
+        "counts": {"ready": len(payload["proposals"]),
+                   "review": cov.get("contested", 0),
+                   "no_match": cov.get("no_sms_found", 0) + cov.get("sms_has_no_name", 0),
+                   "enriched": enriched_count},
+    }
+
+
+@app.post("/api/sms/enrich/undo-transaction/{transaction_id}")
+def sms_enrich_undo_transaction(transaction_id: str, db: Session = Depends(get_db),
+                                current_user: models.User = Depends(get_current_user)):
+    """Revert ONE row's SMS enrichment — restore its original label, note and
+    (adopted) timestamp, and clear the enrichment marks. Mirrors the batch undo."""
+    tx = db.query(models.Transaction).filter(
+        models.Transaction.id == transaction_id,
+        models.Transaction.user_id == current_user.id).first()
+    if tx is None:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    if tx.enriched_at is None:
+        raise HTTPException(status_code=400, detail="Transaction is not SMS-enriched")
+    if tx.merchant_original is not None:
+        tx.merchant = tx.merchant_original
+    if tx.notes_original is not None:
+        tx.notes = tx.notes_original or None
+        tx.notes_original = None
+    if tx.timestamp_original is not None:
+        tx.timestamp = tx.timestamp_original
+        tx.timestamp_original = None
+    tx.enrichment_batch_id = None
+    tx.enriched_at = None
+    db.commit()
+    return {"reverted": tx.id, "merchant": tx.merchant}
+
+
 @app.delete("/api/sms/enrich/sources/{source_id}")
 def sms_enrich_delete_source(
     source_id: str,
