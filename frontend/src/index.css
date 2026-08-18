@@ -2,11 +2,89 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════
+   QAYD "NOCTURNE" THEME TOKENS
+   Channel triplets ("R G B") consumed by tailwind.config.js as
+   rgb(var(--c-x) / <alpha-value>). The bare :root block is the dark
+   palette (the app's historical default); [data-theme="light"] flips it.
+   ═══════════════════════════════════════════ */
+:root {
+  color-scheme: dark;
+
+  --c-white: 244 246 250;      /* strong text */
+
+  --c-slate-950: 9 11 15;
+  --c-slate-900: 14 17 23;     /* app background */
+  --c-slate-800: 22 26 34;     /* card / surface */
+  --c-slate-700: 36 42 53;     /* border / elevated / secondary bg */
+  --c-slate-600: 52 60 74;     /* strong border */
+  --c-slate-500: 104 112 125;  /* faint text / icons */
+  --c-slate-400: 154 161 174;  /* soft text */
+  --c-slate-300: 197 202 212;  /* bright text */
+  --c-slate-200: 222 226 233;
+
+  --c-gray-700: 36 42 53;
+  --c-gray-600: 52 60 74;
+  --c-gray-500: 128 135 149;
+  --c-gray-400: 154 161 174;   /* soft text */
+  --c-gray-300: 197 202 212;
+  --c-gray-200: 222 226 233;
+
+  --c-blue-900: 26 33 66;      /* accent tint (deep) */
+  --c-blue-800: 37 47 104;
+  --c-blue-700: 52 70 196;
+  --c-blue-600: 79 107 255;    /* primary accent / buttons */
+  --c-blue-500: 91 116 255;    /* accent */
+  --c-blue-400: 122 140 255;   /* links / active on dark */
+  --c-blue-300: 157 170 255;
+  --c-blue-200: 194 203 255;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --c-white: 18 21 28;         /* strong text → ink */
+
+  --c-slate-950: 255 255 255;
+  --c-slate-900: 246 247 249;  /* app background → paper */
+  --c-slate-800: 255 255 255;  /* card / surface → white */
+  --c-slate-700: 232 235 240;  /* border / subtle bg → line */
+  --c-slate-600: 213 218 226;  /* strong border */
+  --c-slate-500: 132 139 151;  /* faint text */
+  --c-slate-400: 96 103 116;   /* soft text */
+  --c-slate-300: 62 69 82;     /* bright text → darker */
+  --c-slate-200: 34 39 48;
+
+  --c-gray-700: 232 235 240;
+  --c-gray-600: 213 218 226;
+  --c-gray-500: 120 127 139;
+  --c-gray-400: 96 103 116;    /* soft text */
+  --c-gray-300: 62 69 82;
+  --c-gray-200: 34 39 48;
+
+  --c-blue-900: 228 232 255;   /* accent tint (light) */
+  --c-blue-800: 208 216 255;
+  --c-blue-700: 74 95 224;
+  --c-blue-600: 67 86 232;     /* primary accent / buttons (deeper on white) */
+  --c-blue-500: 79 107 255;    /* accent */
+  --c-blue-400: 58 80 224;     /* links / active on light (deeper for contrast) */
+  --c-blue-300: 110 130 255;
+  --c-blue-200: 169 180 255;
+}
+
 body {
-  background-color: #020617;
+  background-color: rgb(var(--c-slate-900));
+  color: rgb(var(--c-white));
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color .3s ease, color .3s ease;
   /* Prevent overscroll bounce on iOS Safari */
   overscroll-behavior: none;
   -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body { transition: none; }
 }
 
 /* Safe area padding for notched devices (iPhone X+) */

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Wallet, CreditCard, Receipt, FileBarChart, Settings, TrendingDown, Layers, Tags, ClipboardCheck, Store, FileSearch, LogOut, Users, User, ChevronDown, Key, FileUp } from 'lucide-react';
 import { authUtils } from '../utils/api';
+import ThemeToggle from './ThemeToggle';
 
 const Sidebar = () => {
     const [profileOpen, setProfileOpen] = useState(false);
@@ -57,6 +58,7 @@ const Sidebar = () => {
             </nav>
 
             <div className="p-4 border-t border-slate-800 space-y-2">
+                <ThemeToggle />
                 {user?.username === 'admin' && (
                     <NavLink
                         to="/users"
