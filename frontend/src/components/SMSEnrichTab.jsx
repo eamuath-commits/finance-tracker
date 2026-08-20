@@ -14,11 +14,16 @@ import {
 
 const money = (v) => Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const shortDate = (iso) => (iso ? new Date(iso).toLocaleDateString(undefined, { year: "2-digit", month: "short", day: "numeric" }) : "—");
-const fmtDelta = (s) => {
+// How far the SMS sits from the transaction, in words (delta = sms − tx).
+const humanTiming = (s) => {
     if (s == null) return "";
     const a = Math.abs(s);
-    if (Math.abs(a - 86400) <= 120) return s < 0 ? "1 day earlier" : "1 day later";
-    return `${s > 0 ? "+" : ""}${Math.round(s)}s`;
+    if (a <= 120) return "~same time";
+    const dir = s < 0 ? "earlier" : "later";
+    if (a < 3600) return `${Math.round(a / 60)} min ${dir}`;
+    if (a < 86400) return `${Math.round(a / 3600)} h ${dir}`;
+    const d = Math.round(a / 86400);
+    return `${d} day${d > 1 ? "s" : ""} ${dir}`;
 };
 
 const Amount = ({ amount, direction }) => (
@@ -206,33 +211,58 @@ const SMSEnrichTab = ({ onApplied }) => {
                 </Section>
             )}
 
-            {/* Needs review */}
+            {/* Needs review — one readable card per ambiguous row */}
             {(st?.review || []).length > 0 && (
                 <Section icon={<HelpCircle size={14} className="text-amber-400" />} title="Needs review — pick a name" count={st.review.length} tone="text-amber-300">
-                    <div className="px-3 pb-2 max-h-80 overflow-y-auto space-y-1">
-                        {st.review.map((r) => (
-                            <div key={r.transaction_id} className="text-[11px] border-b border-slate-800/60 last:border-b-0 pb-1">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-gray-500 w-14 flex-shrink-0">{shortDate(r.timestamp)}</span>
-                                    <Amount amount={r.amount} direction={r.direction} />
-                                    <span className="text-gray-400 truncate flex-1">{r.label}</span>
+                    <div className="px-3 pb-3 max-h-[30rem] overflow-y-auto space-y-2">
+                        {st.review.map((r) => {
+                            // Named candidates first, then closest SMS to the transaction.
+                            const cands = [...(r.candidates || [])].sort((a, b) =>
+                                (a.name ? 0 : 1) - (b.name ? 0 : 1) ||
+                                Math.abs(a.delta_seconds ?? 1e12) - Math.abs(b.delta_seconds ?? 1e12));
+                            return (
+                                <div key={r.transaction_id} className="rounded-lg border border-slate-700/50 bg-slate-900/40 p-2.5">
+                                    {/* Transaction being named */}
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="text-[11px] text-gray-500 flex-shrink-0">{shortDate(r.timestamp)}</span>
+                                        <Amount amount={r.amount} direction={r.direction} />
+                                        <span className="text-[11px] text-gray-400 truncate flex-1" title={r.label}>
+                                            was <span className="italic text-gray-500">{r.label || "—"}</span>
+                                        </span>
+                                    </div>
+
+                                    {/* Candidate names to choose from */}
+                                    <div className="space-y-1.5">
+                                        {cands.map((cd, i) => {
+                                            const best = i === 0 && !!cd.name;
+                                            return (
+                                                <div key={i} className={`rounded-md border px-2 py-1.5 ${best ? "border-amber-500/40 bg-amber-600/10" : "border-slate-700/40 bg-slate-800/30"}`}>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${best ? "bg-amber-400" : "border border-gray-600"}`} />
+                                                        <span className="text-[12px] font-medium text-gray-200 flex-1 min-w-0 break-words">
+                                                            {cd.name || <span className="italic text-gray-500">this SMS carries no name</span>}
+                                                        </span>
+                                                        <span className="text-[10px] text-gray-500 flex-shrink-0 whitespace-nowrap">{humanTiming(cd.delta_seconds)}</span>
+                                                        {cd.name && (
+                                                            <button onClick={() => pick(r.transaction_id, cd.name, cd.raw_sms, cd.timestamp)} disabled={busy === r.transaction_id}
+                                                                className="flex-shrink-0 text-[10px] font-semibold text-white bg-amber-600 hover:bg-amber-500 disabled:opacity-50 rounded px-2.5 py-0.5 transition">
+                                                                {busy === r.transaction_id ? "…" : "Use"}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    {cd.raw_sms && (
+                                                        <p className="text-[10px] text-gray-500 mt-1 ml-4 truncate" title={cd.raw_sms}>
+                                                            {(cd.raw_sms || "").replace(/\s+/g, " ").trim()}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    <p className="text-[10px] text-gray-600 mt-1.5">None fit? Leave it — it clears when a better SMS export is added.</p>
                                 </div>
-                                <div className="ml-16 mt-0.5 space-y-0.5">
-                                    {(r.candidates || []).map((cd, i) => (
-                                        <div key={i} className="flex items-center gap-2 text-[10px]">
-                                            <span className="text-gray-300 truncate flex-1">{cd.name || "(names no one)"}</span>
-                                            <span className="text-gray-600 flex-shrink-0">{fmtDelta(cd.delta_seconds)}</span>
-                                            {cd.name && (
-                                                <button onClick={() => pick(r.transaction_id, cd.name, cd.raw_sms, cd.timestamp)} disabled={busy === r.transaction_id}
-                                                    className="flex-shrink-0 text-[10px] font-semibold text-amber-300 bg-amber-600/15 hover:bg-amber-600/30 disabled:opacity-50 border border-amber-500/30 rounded px-1.5 py-0.5 transition">
-                                                    {busy === r.transaction_id ? "…" : "use this"}
-                                                </button>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </Section>
             )}
