@@ -109,14 +109,14 @@
   --c-slate-800: 255 255 255;  /* card / surface → white */
   --c-slate-700: 232 235 240;  /* border / subtle bg → line */
   --c-slate-600: 213 218 226;  /* strong border */
-  --c-slate-500: 132 139 151;  /* faint text */
+  --c-slate-500: 107 114 128;  /* faint text (darkened for AA on white) */
   --c-slate-400: 96 103 116;   /* soft text */
   --c-slate-300: 62 69 82;     /* bright text → darker */
   --c-slate-200: 34 39 48;
 
   --c-gray-700: 232 235 240;
   --c-gray-600: 213 218 226;
-  --c-gray-500: 120 127 139;
+  --c-gray-500: 107 114 128;   /* faint text (darkened for AA on white) */
   --c-gray-400: 96 103 116;    /* soft text */
   --c-gray-300: 62 69 82;
   --c-gray-200: 34 39 48;
@@ -127,66 +127,66 @@
   --c-blue-600: 67 86 232;     /* primary accent / buttons (deeper on white) */
   --c-blue-500: 79 107 255;    /* accent */
   --c-blue-400: 58 80 224;     /* links / active on light (deeper for contrast) */
-  --c-blue-300: 110 130 255;
-  --c-blue-200: 169 180 255;
+  --c-blue-300: 74 95 224;     /* accent text → darker for AA on white */
+  --c-blue-200: 110 130 255;
 
   /* Semantic (light: bright text shades → deeper for contrast on white;
      dark bg-tint shades (800/900) → pale tints) */
-  --c-emerald-300: 5 150 105;
-  --c-emerald-400: 5 150 105;
+  --c-emerald-300: 4 120 87;
+  --c-emerald-400: 4 120 87;
   --c-emerald-500: 4 120 87;
   --c-emerald-600: 4 120 87;
   --c-emerald-700: 6 95 70;
   --c-emerald-800: 209 250 229;
   --c-emerald-900: 209 250 229;
-  --c-green-300: 22 163 74;
-  --c-green-400: 22 163 74;
+  --c-green-300: 21 128 61;
+  --c-green-400: 21 128 61;
   --c-green-500: 21 128 61;
   --c-green-600: 21 128 61;
   --c-green-900: 220 252 231;
-  --c-red-200: 185 28 28;
-  --c-red-300: 220 38 38;
-  --c-red-400: 220 38 38;
+  --c-red-200: 153 27 27;
+  --c-red-300: 185 28 28;
+  --c-red-400: 185 28 28;
   --c-red-500: 185 28 28;
   --c-red-600: 185 28 28;
   --c-red-700: 153 27 27;
   --c-red-800: 254 226 226;
   --c-red-900: 254 226 226;
-  --c-rose-400: 225 29 72;
+  --c-rose-400: 190 18 60;
   --c-rose-500: 190 18 60;
   --c-rose-900: 255 228 230;
-  --c-amber-300: 217 119 6;
-  --c-amber-400: 217 119 6;
+  --c-amber-300: 180 83 9;
+  --c-amber-400: 180 83 9;
   --c-amber-500: 180 83 9;
   --c-amber-600: 180 83 9;
   --c-amber-900: 254 243 199;
-  --c-yellow-400: 202 138 4;
+  --c-yellow-400: 161 98 7;
   --c-yellow-500: 161 98 7;
   --c-yellow-600: 161 98 7;
   --c-yellow-700: 133 77 14;
   --c-yellow-900: 254 249 195;
-  --c-orange-300: 234 88 12;
-  --c-orange-400: 234 88 12;
+  --c-orange-300: 194 65 12;
+  --c-orange-400: 194 65 12;
   --c-orange-500: 194 65 12;
   --c-orange-900: 255 237 213;
-  --c-purple-200: 126 34 206;
-  --c-purple-300: 147 51 234;
-  --c-purple-400: 147 51 234;
+  --c-purple-200: 107 33 168;
+  --c-purple-300: 126 34 206;
+  --c-purple-400: 126 34 206;
   --c-purple-500: 126 34 206;
   --c-purple-600: 126 34 206;
   --c-purple-700: 107 33 168;
   --c-purple-800: 243 232 255;
   --c-purple-900: 243 232 255;
-  --c-indigo-300: 79 70 229;
-  --c-indigo-400: 79 70 229;
+  --c-indigo-300: 67 56 202;
+  --c-indigo-400: 67 56 202;
   --c-indigo-500: 67 56 202;
   --c-indigo-600: 67 56 202;
   --c-indigo-900: 224 231 255;
-  --c-cyan-300: 8 145 178;
-  --c-cyan-400: 8 145 178;
+  --c-cyan-300: 14 116 144;
+  --c-cyan-400: 14 116 144;
   --c-cyan-500: 14 116 144;
   --c-cyan-600: 14 116 144;
-  --c-pink-400: 219 39 119;
+  --c-pink-400: 190 24 93;
   --c-pink-500: 190 24 93;
   --c-pink-900: 252 231 243;
 }
@@ -224,7 +224,11 @@ body {
   .bg-green-500, .bg-green-600,
   .bg-red-500, .bg-red-600,
   .bg-indigo-500, .bg-indigo-600,
-  .bg-purple-500, .bg-purple-600
+  .bg-purple-500, .bg-purple-600,
+  .bg-cyan-500, .bg-cyan-600,
+  .bg-amber-500, .bg-amber-600,
+  .bg-rose-500, .bg-rose-600,
+  .bg-pink-500, .bg-pink-600
 ).text-white {
   color: #fff;
 }
