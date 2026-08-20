@@ -336,15 +336,22 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
         let startDate = '', endDate = '';
         if (mm) {
             const y = +mm[1], m = +mm[2];
-            const lastDay = new Date(y, m, 0).getDate();
+            // A bill paid in arrears posts billing_offset_months AFTER its service
+            // (billing) month, so anchor the window on the PAYMENT month — matching
+            // the backend suggestion window and the displayed due date. Without this
+            // the picker filtered the service month and missed the real transaction.
+            const off = parseInt(obl.billing_offset_months) || 0;
+            const anchor = new Date(y, (m - 1) + off, 1);
+            const ay = anchor.getFullYear(), am = anchor.getMonth();
+            const lastDay = new Date(ay, am + 1, 0).getDate();
             const df = parseInt(obl.match_day_from) || 0, dt = parseInt(obl.match_day_to) || 0;
             if (df && dt && df <= dt) {
-                // Obligation's day window -> tight range inside the billing month.
-                startDate = iso(new Date(y, m - 1, Math.max(1, df - 2)));
-                endDate = iso(new Date(y, m - 1, Math.min(lastDay, dt + 2)));
+                // Obligation's day window -> tight range inside the payment month.
+                startDate = iso(new Date(ay, am, Math.max(1, df - 2)));
+                endDate = iso(new Date(ay, am, Math.min(lastDay, dt + 2)));
             } else {
-                const s = new Date(y, m - 1, 1); s.setDate(s.getDate() - 7);
-                const e = new Date(y, m, 0); e.setDate(e.getDate() + 20);
+                const s = new Date(ay, am, 1); s.setDate(s.getDate() - 7);
+                const e = new Date(ay, am + 1, 0); e.setDate(e.getDate() + 20);
                 startDate = iso(s); endDate = iso(e);
             }
         }
