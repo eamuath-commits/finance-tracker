@@ -102,7 +102,7 @@ const AccountCard = ({ acc, onEdit = null, onClick = null }) => {
     return (
         <div className="relative w-full" style={{ paddingBottom: '63.05%' }}>
             <div
-                className={`absolute inset-0 rounded-xl p-5 shadow-lg text-white overflow-hidden group hover:scale-[1.02] transition-all duration-300 border border-white/10 ${onClick ? 'cursor-pointer' : ''}`}
+                className={`account-card-face absolute inset-0 rounded-xl p-5 shadow-lg text-white overflow-hidden group hover:scale-[1.02] transition-all duration-300 border border-white/10 ${onClick ? 'cursor-pointer' : ''}`}
                 style={{
                     // Background styling
                     backgroundImage: hasCustomBackground

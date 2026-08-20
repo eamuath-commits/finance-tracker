@@ -229,14 +229,17 @@ body {
   color: #fff;
 }
 
-/* The credit-card face is a fixed "dark card" visual (bank artwork or a dark
-   gradient). Keep its text white in BOTH themes — the global text-white → ink
-   flip in light mode would otherwise render dark text on the dark card.
-   Unlayered so it wins over the utility; utilization colors (red/amber/emerald)
-   set their own class and are left untouched. */
+/* Credit-card and account card faces are fixed "dark card" visuals (bank artwork
+   or a literal dark gradient). Keep their text white in BOTH themes — the global
+   text-white → ink flip in light mode would otherwise render dark text on the
+   dark card. Unlayered so it wins over the utility; utilization colors
+   (red/amber/emerald) set their own class and are left untouched. */
 .credit-card-aspect,
 .credit-card-aspect .text-white,
-.credit-card-aspect [class*="text-white/"] {
+.credit-card-aspect [class*="text-white/"],
+.account-card-face,
+.account-card-face .text-white,
+.account-card-face [class*="text-white/"] {
   color: #fff;
 }
 
