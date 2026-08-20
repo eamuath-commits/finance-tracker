@@ -594,10 +594,14 @@ const Statements = () => {
         return Array.from(groups.values()).sort((a, b) => b.key.localeCompare(a.key));
     }, [sortedFilteredStatements]);
 
-    // Coverage months for calendar
+    // Coverage months for calendar — scoped to the active account filter so the
+    // coverage view reflects the selected account, not every account at once.
     const coverageMonths = useMemo(() => {
         const months = new Set();
-        statements.forEach(s => {
+        const scoped = accountFilter === 'all'
+            ? statements
+            : statements.filter(s => s.account_number && s.account_number.endsWith(accountFilter));
+        scoped.forEach(s => {
             if (!s.statement_period_start || !s.statement_period_end) return;
             const start = new Date(s.statement_period_start);
             const end = new Date(s.statement_period_end);
@@ -608,7 +612,7 @@ const Statements = () => {
             }
         });
         return months;
-    }, [statements]);
+    }, [statements, accountFilter]);
 
     // ─────────────── SHARED HELPERS ───────────────
 
@@ -2012,66 +2016,6 @@ const Statements = () => {
                 </div>
             )}
 
-            {/* Coverage Calendar */}
-            {statements.length > 0 && coverageMonths.size > 0 && (
-                <div className="bg-slate-900/60 rounded-xl border border-slate-800 p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                        <Calendar size={14} className="text-blue-400" />
-                        <span className="text-[11px] text-gray-500 uppercase tracking-wider">Statement Coverage</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                        {(() => {
-                            const allMonths = [];
-                            const sorted = Array.from(coverageMonths).sort();
-                            if (sorted.length === 0) return null;
-                            const first = new Date(sorted[0] + '-01');
-                            const last = new Date(sorted[sorted.length - 1] + '-01');
-                            const cursor = new Date(first);
-                            while (cursor <= last) {
-                                const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
-                                allMonths.push({
-                                    key,
-                                    label: cursor.toLocaleDateString('en-US', { month: 'short' }),
-                                    year: cursor.getFullYear(),
-                                    covered: coverageMonths.has(key),
-                                });
-                                cursor.setMonth(cursor.getMonth() + 1);
-                            }
-                            let currentYear = null;
-                            return allMonths.map(m => {
-                                const showYear = m.year !== currentYear;
-                                currentYear = m.year;
-                                return (
-                                    <React.Fragment key={m.key}>
-                                        {showYear && <span className="text-[10px] text-gray-600 mr-1 self-center">{m.year}</span>}
-                                        <div
-                                            className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
-                                                m.covered
-                                                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
-                                                    : 'bg-slate-800/50 text-gray-600 border border-slate-800'
-                                            }`}
-                                            title={m.covered ? 'Statement covers this month' : 'No statement coverage'}
-                                        >
-                                            {m.label}
-                                        </div>
-                                    </React.Fragment>
-                                );
-                            });
-                        })()}
-                    </div>
-                    <div className="flex items-center gap-4 mt-2">
-                        <div className="flex items-center gap-1.5 text-[10px] text-gray-600">
-                            <div className="w-2.5 h-2.5 rounded bg-emerald-500/15 border border-emerald-500/20"></div>
-                            Covered
-                        </div>
-                        <div className="flex items-center gap-1.5 text-[10px] text-gray-600">
-                            <div className="w-2.5 h-2.5 rounded bg-slate-800/50 border border-slate-800"></div>
-                            Gap
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {/* Filters Bar */}
             {statements.length > 0 && (
                 <div className="flex items-center gap-3 flex-wrap">
@@ -2137,6 +2081,66 @@ const Statements = () => {
                         >
                             <LayoutGrid size={16} />
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Coverage Calendar */}
+            {statements.length > 0 && coverageMonths.size > 0 && (
+                <div className="bg-slate-900/60 rounded-xl border border-slate-800 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Calendar size={14} className="text-blue-400" />
+                        <span className="text-[11px] text-gray-500 uppercase tracking-wider">Statement Coverage</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                        {(() => {
+                            const allMonths = [];
+                            const sorted = Array.from(coverageMonths).sort();
+                            if (sorted.length === 0) return null;
+                            const first = new Date(sorted[0] + '-01');
+                            const last = new Date(sorted[sorted.length - 1] + '-01');
+                            const cursor = new Date(first);
+                            while (cursor <= last) {
+                                const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
+                                allMonths.push({
+                                    key,
+                                    label: cursor.toLocaleDateString('en-US', { month: 'short' }),
+                                    year: cursor.getFullYear(),
+                                    covered: coverageMonths.has(key),
+                                });
+                                cursor.setMonth(cursor.getMonth() + 1);
+                            }
+                            let currentYear = null;
+                            return allMonths.map(m => {
+                                const showYear = m.year !== currentYear;
+                                currentYear = m.year;
+                                return (
+                                    <React.Fragment key={m.key}>
+                                        {showYear && <span className="text-[10px] text-gray-600 mr-1 self-center">{m.year}</span>}
+                                        <div
+                                            className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
+                                                m.covered
+                                                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                                                    : 'bg-slate-800/50 text-gray-600 border border-slate-800'
+                                            }`}
+                                            title={m.covered ? 'Statement covers this month' : 'No statement coverage'}
+                                        >
+                                            {m.label}
+                                        </div>
+                                    </React.Fragment>
+                                );
+                            });
+                        })()}
+                    </div>
+                    <div className="flex items-center gap-4 mt-2">
+                        <div className="flex items-center gap-1.5 text-[10px] text-gray-600">
+                            <div className="w-2.5 h-2.5 rounded bg-emerald-500/15 border border-emerald-500/20"></div>
+                            Covered
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[10px] text-gray-600">
+                            <div className="w-2.5 h-2.5 rounded bg-slate-800/50 border border-slate-800"></div>
+                            Gap
+                        </div>
                     </div>
                 </div>
             )}

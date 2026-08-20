@@ -41,7 +41,7 @@ const CreditCardVisual = ({ card, onEdit, onPayment, onDelete, onClick }) => {
 
     return (
         <div
-            className={`credit-card-aspect rounded-xl shadow-lg text-white overflow-hidden group hover:scale-[1.02] transition-all duration-300 border border-white/10 cursor-pointer ${!hasCustomBackground ? 'bg-gradient-to-br from-violet-600 to-purple-900' : ''}`}
+            className={`credit-card-aspect rounded-xl shadow-lg text-white overflow-hidden group hover:scale-[1.02] transition-all duration-300 border border-white/10 cursor-pointer ${!hasCustomBackground ? 'bg-gradient-to-br from-[#7c3aed] to-[#4c1d95]' : ''}`}
             style={hasCustomBackground ? {
                 backgroundImage: `url(${bankTheme.backgroundImage})`,
                 backgroundSize: 'cover',

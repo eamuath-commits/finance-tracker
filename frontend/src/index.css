@@ -229,6 +229,17 @@ body {
   color: #fff;
 }
 
+/* The credit-card face is a fixed "dark card" visual (bank artwork or a dark
+   gradient). Keep its text white in BOTH themes — the global text-white → ink
+   flip in light mode would otherwise render dark text on the dark card.
+   Unlayered so it wins over the utility; utilization colors (red/amber/emerald)
+   set their own class and are left untouched. */
+.credit-card-aspect,
+.credit-card-aspect .text-white,
+.credit-card-aspect [class*="text-white/"] {
+  color: #fff;
+}
+
 /* Safe area padding for notched devices (iPhone X+) */
 .safe-area-top { padding-top: env(safe-area-inset-top); }
 .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
