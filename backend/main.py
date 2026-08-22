@@ -2638,12 +2638,44 @@ def _statement_txrows(db: Session, user_id: str) -> List[sms_enrichment.TxRow]:
             models.Statement.id.in_(sids)
         ).all():
             banks[sid] = bank
+
+    # Instrument last-4 per row (account own last-4 + associated card aliases, or
+    # the credit card's last-4), so a card SMS only names a row on that card.
+    def _l4(v):
+        v = str(v or "").strip()
+        return v[-4:] if v else None
+
+    acct_l4 = {}   # account_id -> set(last4)
+    for a in db.query(models.Account).filter(models.Account.user_id == user_id).all():
+        s = set()
+        if _l4(a.last_4_digits):
+            s.add(_l4(a.last_4_digits))
+        acct_l4[a.id] = s
+    for al in db.query(models.AccountAlias).join(
+        models.Account, models.AccountAlias.account_id == models.Account.id
+    ).filter(models.Account.user_id == user_id).all():
+        if _l4(al.last_4_digits):
+            acct_l4.setdefault(al.account_id, set()).add(_l4(al.last_4_digits))
+    card_l4 = {}   # credit_card_id -> set(last4)
+    for c in db.query(models.CreditCard).filter(models.CreditCard.user_id == user_id).all():
+        if _l4(c.last_4_digits):
+            card_l4[c.id] = {_l4(c.last_4_digits)}
+
+    def _refs(r):
+        s = set()
+        if r.account_id:
+            s |= acct_l4.get(r.account_id, set())
+        if r.credit_card_id:
+            s |= card_l4.get(r.credit_card_id, set())
+        return frozenset(s)
+
     return [
         sms_enrichment.TxRow(
             id=r.id, timestamp=r.timestamp,
             amount=float(r.amount or 0), type=r.type, merchant=r.merchant,
             bank=banks.get(r.statement_id),
             row_index=r.statement_row_index,
+            acct_refs=_refs(r),
         )
         for r in rows
     ]

@@ -196,6 +196,7 @@ class Event:
     direction: Optional[str] = None   # "debit" | "credit"
     name: Optional[str] = None
     is_local: bool = False      # amount comparable to a SAR statement row
+    card_ref: Optional[str] = None    # last-4 of the CARD this SMS moved money on
 
     @property
     def matchable(self) -> bool:
@@ -440,6 +441,30 @@ def classify(body: str, sender: Optional[str] = None) -> Tuple[str, str, Optiona
 # Parsing a whole export
 # ---------------------------------------------------------------------------
 
+# The card/instrument the SMS moved money on. Real AlRajhi shapes:
+#   "Credit Card: 4897", "Credit card: 1645" (mid-line),
+#   "Card:Visa 7868", "Card: 4897;Credit Card" (line-leading, digits may follow a
+#   network word), and purchases that name the instrument as "By:7868 ;Visa" /
+#   "By:9365;mada-Apple Pay". This is the USER's own instrument — NEVER From:/To:/
+#   Acc:, which are the funding account or the counterparty.
+_NET = r"(?:visa|mada|master(?:card)?|gcc|amex)?"
+_INSTR_RES = (
+    re.compile(r"(?i)credit\s+card\s*[:#]?\s*" + _NET + r"\s*(\d{3,4})\b"),
+    re.compile(r"(?im)^\s*card\s*[:#]?\s*" + _NET + r"\s*(\d{3,4})\b"),
+    re.compile(r"(?i)\bby\s*:\s*(\d{3,4})\b"),
+)
+
+
+def _card_ref(body: str) -> Optional[str]:
+    """Last-4 of the card/instrument this message is about, or None (transfers,
+    account SMS). Used only to EXCLUDE a row on a different instrument."""
+    for rx in _INSTR_RES:
+        m = rx.search(body)
+        if m:
+            return m.group(1)[-4:]
+    return None
+
+
 def parse_export(raw: str) -> List[Event]:
     """Parse a bulk SMS text export into a list of Events (any encoding of the
     AlRajhi phone export). Never raises on a malformed record — it is skipped."""
@@ -461,6 +486,7 @@ def parse_export(raw: str) -> List[Event]:
 
         ev = Event(index=idx, timestamp=ts, sender=sender, body=body)
         ev.kind, ev.shape, ev.direction, ev.name = classify(body, sender)
+        ev.card_ref = _card_ref(body)
         if ev.kind != _NOISE:
             ev.amount, ev.currency = parse_amount(body)
             ev.is_local = ev.currency in LOCAL_CURRENCIES
@@ -575,6 +601,7 @@ class TxRow:
     merchant: Optional[str]
     bank: Optional[str] = None   # bank_key of the row's statement, for same-bank gating
     row_index: Optional[int] = None  # statement print order (= chronological), to order a same-day cluster
+    acct_refs: frozenset = frozenset()  # last-4 of this row's account/card (+aliases), for instrument gating
 
 
 @dataclass
@@ -627,6 +654,14 @@ def _candidate(ev: Event, tx: TxRow) -> bool:
     # (Skipped only when a bank is unknown, so nothing is over-restricted.)
     eb = _sender_bank(ev.sender)
     if tx.bank and eb and tx.bank != eb:
+        return False
+    # Instrument gate: a card SMS names the card it moved money on. If this row
+    # carries a known account/card last-4 set and the card is not among them, the
+    # SMS belongs to a different instrument and must never name this row — even at
+    # the same amount and instant. Fail-open when either side is unknown, so no
+    # match that works today is lost (the account was originally dropped only
+    # because it did not resolve; associated card last-4s now make it resolvable).
+    if ev.card_ref and tx.acct_refs and ev.card_ref not in tx.acct_refs:
         return False
     # Date-only statement rows (STC, Aljazira) carry no posting time — every row is
     # stamped 00:00:00 — so the 45s window can never reach them. Match on calendar

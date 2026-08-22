@@ -477,3 +477,75 @@ class TestSameBankGating:
                       type="debit", merchant="Internal transfer", bank=None)
         named = {p.transaction_id: p.new_merchant for p in E.match(E.parse_export(self.SMS), [row]).proposals}
         assert named.get("x") == "AJITH SIVANUNNI"
+
+
+class TestInstrumentGate:
+    """A card SMS names the card it moved money on — it must never name a row on
+    a different account/card, even at the same amount and instant. Fail-open when
+    the row carries no known last-4 (nothing that matches today is lost)."""
+
+    # A credit-card purchase: card_ref -> 4897, names HUNGERSTA.
+    CARD_SMS = ("Online Purchase\nCredit Card: 4897\nFrom:1505\n"
+                "Amount:SAR 88.74\nAt:HUNGERSTA\n1/3/26 02:08")
+    TS = "2026-03-01 02:08:31"
+
+    def _row(self, refs, merchant="Debit - Credit Cards Transactions", tid="t1"):
+        return E.TxRow(id=tid, timestamp=datetime.strptime(self.TS, "%Y-%m-%d %H:%M:%S"),
+                       amount=88.74, type="debit", merchant=merchant,
+                       acct_refs=frozenset(refs))
+
+    def test_card_sms_excluded_from_unrelated_account_row(self):
+        # Row belongs to an account whose last-4s do not include the card 4897.
+        res = E.match(E.parse_export(_sms(self.TS, self.CARD_SMS)), [self._row({"1111"})])
+        assert res.proposals == []
+
+    def test_card_sms_matches_a_row_on_that_card(self):
+        res = E.match(E.parse_export(_sms(self.TS, self.CARD_SMS)), [self._row({"4897"})])
+        assert len(res.proposals) == 1
+        assert res.proposals[0].new_merchant == "HUNGERSTA"
+
+    def test_fail_open_when_row_has_no_known_last4(self):
+        # Default rows (no acct_refs) must behave exactly as before the gate.
+        res = E.match(E.parse_export(_sms(self.TS, self.CARD_SMS)),
+                      [_tx("t1", self.TS, 88.74, "debit", "Debit - Credit Cards Transactions")])
+        assert len(res.proposals) == 1
+
+    def test_card_sms_routes_to_the_card_row_not_the_account_row(self):
+        # The reported case: an account row and the card's own row share amount+time.
+        # The gate removes the account row as a candidate, so instead of a refused
+        # contest the SMS cleanly names the card row.
+        rows = [self._row({"1111"}, tid="acct"), self._row({"4897"}, tid="card")]
+        res = E.match(E.parse_export(_sms(self.TS, self.CARD_SMS)), rows)
+        assert len(res.proposals) == 1
+        assert res.proposals[0].transaction_id == "card"
+
+    def test_non_card_sms_is_unaffected_by_the_gate(self):
+        # A transfer SMS has no card_ref, so a row's last-4 set never excludes it.
+        raw = _sms("2026-03-01 01:19:01",
+                   "Debit Internal Transfer\nFrom:1505\nAmount:SAR 440\nTo:MOHAMMED ISLAM\nTo:0477\n26/3/1 01:18")
+        row = E.TxRow(id="t1", timestamp=datetime.strptime("2026-03-01 01:19:01", "%Y-%m-%d %H:%M:%S"),
+                      amount=440.0, type="debit", merchant="محمد", acct_refs=frozenset({"9999"}))
+        res = E.match(E.parse_export(raw), [row])
+        assert len(res.proposals) == 1
+        assert res.proposals[0].new_merchant == "MOHAMMED ISLAM"
+
+
+class TestCardRefExtraction:
+    """Locks the instrument last-4 parsing across the real AlRajhi shapes."""
+
+    def test_extracts_from_every_card_shape(self):
+        cases = {
+            "Internet Purchase Credit card: 1645 of: 8.99 GBP": "1645",
+            "POS Purchase (Apple Pay)\nCredit Card: 4897\nof: 355 SAR": "4897",
+            "Credit Card: Payment\nCard: 4897;Credit Card\nFrom: 8001": "4897",
+            "Credit Card:Payment\nCard:Visa 7868\nAmount:SR 80": "7868",
+            "Online Purchase\nBy:7868 ;Visa\nAt:Amazon SA": "7868",
+            "Online Purchase\nBy:9365;mada-Apple Pay\nFrom:1505": "9365",
+        }
+        for body, expected in cases.items():
+            assert E._card_ref(body) == expected, body
+
+    def test_never_reads_account_or_counterparty(self):
+        # From:/To:/Acc: are the funding account or the counterparty, never the instrument.
+        assert E._card_ref("Debit Transfer Sponsored\nAmount:200SAR\nto:AJITH\nAcc:0404*") is None
+        assert E._card_ref("Debit Internal Transfer\nFrom:1505\nTo:MOHAMMED\nTo:0477") is None
