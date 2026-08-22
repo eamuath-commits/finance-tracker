@@ -2737,6 +2737,33 @@ def sms_enrich_state(db: Session = Depends(get_db), current_user: models.User = 
     details = cov.get("details", {})
     no_match = details.get("no_sms_found", []) + details.get("sms_has_no_name", [])
     review = details.get("contested", [])
+
+    # Attach ledger detail to each ambiguous row so the reviewer has enough
+    # context (account, category, the statement's own row text, notes, FX) to
+    # decide which candidate name is correct — the matcher only carries amount,
+    # date and the generic label.
+    rev_ids = [r.get("transaction_id") for r in review if isinstance(r, dict) and r.get("transaction_id")]
+    if rev_ids:
+        name_by_id = {a.id: a.name for a in db.query(models.Account).filter(
+            models.Account.user_id == current_user.id).all()}
+        for cc in db.query(models.CreditCard).filter(models.CreditCard.user_id == current_user.id).all():
+            name_by_id[cc.id] = getattr(cc, "name", None) or "Credit card"
+        tx_by_id = {t.id: t for t in db.query(models.Transaction).filter(
+            models.Transaction.id.in_(rev_ids)).all()}
+        for r in review:
+            t = tx_by_id.get(r.get("transaction_id")) if isinstance(r, dict) else None
+            if not t:
+                continue
+            r["detail"] = {
+                "account_name": name_by_id.get(t.account_id) or name_by_id.get(t.credit_card_id),
+                "category": t.category,
+                "notes": t.notes,
+                "description": t.raw_sms_content,
+                "type": t.type,
+                "original_amount": float(t.original_amount) if t.original_amount is not None else None,
+                "original_currency": t.original_currency,
+            }
+
     return {
         "has_sources": True, "sources": infos,
         "ready": payload["proposals"], "review": review, "no_match": no_match,

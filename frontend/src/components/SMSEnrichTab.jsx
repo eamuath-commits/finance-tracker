@@ -32,6 +32,31 @@ const Amount = ({ amount, direction }) => (
     </span>
 );
 
+const DetailRow = ({ label, children }) => (
+    <div className="flex gap-2 text-[10px]">
+        <span className="text-gray-500 w-20 flex-shrink-0">{label}</span>
+        <span className="text-gray-300 flex-1 min-w-0 break-words">{children}</span>
+    </div>
+);
+
+// Ledger context for an ambiguous row, so the reviewer can decide which name fits.
+const DetailPanel = ({ d }) => {
+    if (!d) return null;
+    const fx = d.original_amount != null && d.original_currency
+        ? `${money(d.original_amount)} ${d.original_currency}` : null;
+    const empty = !d.account_name && !d.category && !fx && !d.description && !d.notes;
+    return (
+        <div className="rounded-md border border-slate-700/40 bg-slate-800/30 px-2 py-1.5 mb-2 space-y-0.5">
+            {d.account_name && <DetailRow label="Account">{d.account_name}</DetailRow>}
+            {d.category && <DetailRow label="Category">{d.category}</DetailRow>}
+            {fx && <DetailRow label="Original">{fx}</DetailRow>}
+            {d.description && <DetailRow label="Statement">{d.description}</DetailRow>}
+            {d.notes && <DetailRow label="Notes">{d.notes}</DetailRow>}
+            {empty && <p className="text-[10px] text-gray-500">No extra detail recorded for this row.</p>}
+        </div>
+    );
+};
+
 const Count = ({ n, label, color }) => (
     <div className="flex-1 bg-slate-900/40 border border-slate-700/40 rounded-lg px-2 py-2 text-center">
         <p className={`text-xl font-bold font-mono ${color}`}>{n ?? 0}</p>
@@ -59,6 +84,7 @@ const SMSEnrichTab = ({ onApplied }) => {
     const [error, setError] = useState(null);
     const [busy, setBusy] = useState(null);   // key of the row/action in flight
     const [open, setOpen] = useState({ no_match: false, enriched: false });
+    const [openDetail, setOpenDetail] = useState({});   // review tx_id -> details expanded
 
     const load = useCallback(async () => {
         setLoading(true); setError(null);
@@ -166,7 +192,7 @@ const SMSEnrichTab = ({ onApplied }) => {
                                 <FileText size={12} className="text-gray-500 flex-shrink-0" />
                                 <span className="truncate flex-1">{s.filename}</span>
                                 <button onClick={() => removeSource(s.id)} disabled={busy === `src-${s.id}`}
-                                    className="text-gray-600 hover:text-red-400 p-0.5 transition" title="Remove">
+                                    className="text-gray-500 hover:text-red-400 p-0.5 transition" title="Remove">
                                     {busy === `src-${s.id}` ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                                 </button>
                             </div>
@@ -198,7 +224,7 @@ const SMSEnrichTab = ({ onApplied }) => {
                                     <span className="text-gray-500 w-14 flex-shrink-0">{shortDate(p.tx_timestamp)}</span>
                                     <Amount amount={p.amount} direction={p.direction} />
                                     <span className="text-gray-500 line-through truncate max-w-[90px]">{p.old_merchant || "—"}</span>
-                                    <ArrowRight size={11} className="text-gray-600 flex-shrink-0" />
+                                    <ArrowRight size={11} className="text-gray-500 flex-shrink-0" />
                                     <span className="text-cyan-200 font-medium truncate flex-1">{p.new_merchant}</span>
                                     <button onClick={() => applyOne(p)} disabled={busy === p.transaction_id}
                                         className="flex-shrink-0 text-[10px] font-semibold text-cyan-300 bg-cyan-600/15 hover:bg-cyan-600/30 disabled:opacity-50 border border-cyan-500/30 rounded px-1.5 py-0.5 transition">
@@ -229,7 +255,16 @@ const SMSEnrichTab = ({ onApplied }) => {
                                         <span className="text-[11px] text-gray-400 truncate flex-1" title={r.label}>
                                             was <span className="italic text-gray-500">{r.label || "—"}</span>
                                         </span>
+                                        {r.detail && (
+                                            <button type="button"
+                                                onClick={() => setOpenDetail((o) => ({ ...o, [r.transaction_id]: !o[r.transaction_id] }))}
+                                                className="flex-shrink-0 text-[10px] font-medium text-gray-400 hover:text-white flex items-center gap-0.5 transition">
+                                                {openDetail[r.transaction_id] ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Details
+                                            </button>
+                                        )}
                                     </div>
+
+                                    {openDetail[r.transaction_id] && <DetailPanel d={r.detail} />}
 
                                     {/* Candidate names to choose from */}
                                     <div className="space-y-1.5">
@@ -259,7 +294,7 @@ const SMSEnrichTab = ({ onApplied }) => {
                                             );
                                         })}
                                     </div>
-                                    <p className="text-[10px] text-gray-600 mt-1.5">None fit? Leave it — it clears when a better SMS export is added.</p>
+                                    <p className="text-[10px] text-gray-500 mt-1.5">None fit? Leave it — it clears when a better SMS export is added.</p>
                                 </div>
                             );
                         })}
@@ -272,7 +307,7 @@ const SMSEnrichTab = ({ onApplied }) => {
                 <Section collapsible open={open.no_match} onToggle={() => setOpen((o) => ({ ...o, no_match: !o.no_match }))}
                     icon={<XCircle size={14} className="text-gray-500" />} title="No matching SMS" count={c.no_match} tone="text-gray-400">
                     <div className="px-3 pb-2 max-h-72 overflow-y-auto space-y-1">
-                        <p className="text-[10px] text-gray-600 mb-1">No SMS names these rows. They clear on their own once you add an SMS export that covers them.</p>
+                        <p className="text-[10px] text-gray-500 mb-1">No SMS names these rows. They clear on their own once you add an SMS export that covers them.</p>
                         {st.no_match.map((r) => (
                             <div key={r.transaction_id} className="flex items-center gap-2 text-[11px] border-b border-slate-800/60 last:border-b-0 py-1">
                                 <span className="text-gray-500 w-14 flex-shrink-0">{shortDate(r.timestamp)}</span>
@@ -294,7 +329,7 @@ const SMSEnrichTab = ({ onApplied }) => {
                                 <span className="text-gray-500 w-14 flex-shrink-0">{shortDate(r.timestamp)}</span>
                                 <span className="font-mono w-24 text-right flex-shrink-0 text-gray-400">{money(r.amount)}</span>
                                 <span className="text-emerald-200 truncate flex-1">{r.merchant}</span>
-                                {r.was && <span className="text-gray-600 line-through truncate max-w-[90px] hidden sm:inline">{r.was}</span>}
+                                {r.was && <span className="text-gray-500 line-through truncate max-w-[90px] hidden sm:inline">{r.was}</span>}
                                 <button onClick={() => undo(r.transaction_id)} disabled={busy === r.transaction_id}
                                     className="flex-shrink-0 text-gray-500 hover:text-amber-300 p-0.5 transition" title="Undo">
                                     {busy === r.transaction_id ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />}
