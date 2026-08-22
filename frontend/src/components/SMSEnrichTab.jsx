@@ -14,6 +14,7 @@ import {
 
 const money = (v) => Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const shortDate = (iso) => (iso ? new Date(iso).toLocaleDateString(undefined, { year: "2-digit", month: "short", day: "numeric" }) : "—");
+const shortDateTime = (iso) => (iso ? new Date(iso).toLocaleString(undefined, { year: "2-digit", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
 // How far the SMS sits from the transaction, in words (delta = sms − tx).
 const humanTiming = (s) => {
     if (s == null) return "";
@@ -84,7 +85,8 @@ const SMSEnrichTab = ({ onApplied }) => {
     const [error, setError] = useState(null);
     const [busy, setBusy] = useState(null);   // key of the row/action in flight
     const [open, setOpen] = useState({ no_match: false, enriched: false });
-    const [openDetail, setOpenDetail] = useState({});   // review tx_id -> details expanded
+    const [openDetail, setOpenDetail] = useState({});   // review tx_id -> ledger details expanded
+    const [openSms, setOpenSms] = useState({});         // "tx_id:i" -> full SMS expanded
 
     const load = useCallback(async () => {
         setLoading(true); setError(null);
@@ -285,11 +287,25 @@ const SMSEnrichTab = ({ onApplied }) => {
                                                             </button>
                                                         )}
                                                     </div>
-                                                    {cd.raw_sms && (
-                                                        <p className="text-[10px] text-gray-500 mt-1 ml-4 truncate" title={cd.raw_sms}>
-                                                            {(cd.raw_sms || "").replace(/\s+/g, " ").trim()}
-                                                        </p>
-                                                    )}
+                                                    {cd.raw_sms && (() => {
+                                                        const k = `${r.transaction_id}:${i}`;
+                                                        const on = openSms[k];
+                                                        return (
+                                                            <div className="mt-1 ml-4">
+                                                                <button type="button"
+                                                                    onClick={() => setOpenSms((o) => ({ ...o, [k]: !o[k] }))}
+                                                                    className="flex items-start gap-1 w-full text-left text-[10px] text-gray-500 hover:text-gray-300 transition">
+                                                                    {on ? <ChevronDown size={11} className="mt-px flex-shrink-0" /> : <ChevronRight size={11} className="mt-px flex-shrink-0" />}
+                                                                    <span className={on ? "whitespace-pre-wrap break-words flex-1" : "truncate flex-1"}>
+                                                                        {on ? cd.raw_sms.trim() : cd.raw_sms.replace(/\s+/g, " ").trim()}
+                                                                    </span>
+                                                                </button>
+                                                                {on && cd.timestamp && (
+                                                                    <span className="block ml-4 mt-0.5 text-[10px] text-gray-500">SMS sent {shortDateTime(cd.timestamp)}</span>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </div>
                                             );
                                         })}
