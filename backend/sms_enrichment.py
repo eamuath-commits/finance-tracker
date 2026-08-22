@@ -906,6 +906,7 @@ def match(events: List[Event], txs: List[TxRow],
                         "timestamp": e.timestamp.isoformat(),
                         "amount": e.amount,
                         "delta_seconds": round((e.timestamp - t.timestamp).total_seconds(), 1),
+                        "raw_sms": e.body,   # the full message, so the SMS can be read in review
                     }
                     for e in tx_cands.get(t.id, [])[:6]
                 ]
