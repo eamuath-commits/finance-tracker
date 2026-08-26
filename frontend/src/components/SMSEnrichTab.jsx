@@ -87,6 +87,7 @@ const SMSEnrichTab = ({ onApplied }) => {
     const [open, setOpen] = useState({ no_match: false, enriched: false });
     const [openDetail, setOpenDetail] = useState({});   // review tx_id -> ledger details expanded
     const [openSms, setOpenSms] = useState({});         // "tx_id:i" -> full SMS expanded
+    const [acctFilter, setAcctFilter] = useState("all"); // account label to scope the view
 
     const load = useCallback(async () => {
         setLoading(true); setError(null);
@@ -118,7 +119,8 @@ const SMSEnrichTab = ({ onApplied }) => {
         raw_sms: p.raw_sms, sms_timestamp: p.sms_timestamp,
     });
     const applyOne = (p) => applyItems([asItem(p)], p.transaction_id);
-    const applyAll = () => applyItems((st?.ready || []).map((p) => asItem(p)), "all");
+    const inAcct = (it) => acctFilter === "all" || (it.account || "Unassigned") === acctFilter;
+    const applyAll = () => applyItems((st?.ready || []).filter(inAcct).map((p) => asItem(p)), "all");
     const pick = (txId, name, rawSms, smsTs) => applyItems(
         [{ transaction_id: txId, new_merchant: name, raw_sms: rawSms, sms_timestamp: smsTs }], txId);
 
@@ -162,6 +164,25 @@ const SMSEnrichTab = ({ onApplied }) => {
 
     const c = st?.counts || {};
     const sources = st?.sources || [];
+
+    // Per-account filtering — matching runs across all accounts; this only scopes
+    // what the page shows, so managing one account at a time is easier.
+    const acctOf = (it) => it.account || "Unassigned";
+    const acctList = (() => {
+        const m = new Map();
+        ["ready", "review", "no_match", "enriched"].forEach((k) =>
+            (st?.[k] || []).forEach((it) => m.set(acctOf(it), (m.get(acctOf(it)) || 0) + 1)));
+        return [...m.entries()].sort((a, b) => b[1] - a[1]);
+    })();
+    const fReady = (st?.ready || []).filter(inAcct);
+    const fReview = (st?.review || []).filter(inAcct);
+    const fNoMatch = (st?.no_match || []).filter(inAcct);
+    const fEnriched = (st?.enriched || []).filter(inAcct);
+    const filtered = acctFilter !== "all";
+    const counts = filtered
+        ? { ready: fReady.length, review: fReview.length, no_match: fNoMatch.length, enriched: fEnriched.length }
+        : c;
+
     return (
         <div className="animate-fade-in-up">
             {/* Header */}
@@ -202,26 +223,41 @@ const SMSEnrichTab = ({ onApplied }) => {
                     </div>}
             </div>
 
+            {/* Account filter */}
+            {acctList.length > 1 && (
+                <div className="flex items-center gap-2 mt-3">
+                    <span className="text-[11px] text-gray-400 flex-shrink-0">Account</span>
+                    <select value={acctFilter} onChange={(e) => setAcctFilter(e.target.value)}
+                        className="flex-1 min-w-0 bg-slate-800 border border-slate-600 rounded-lg px-2.5 py-1.5 text-[12px] text-gray-200 outline-none focus:border-cyan-500 cursor-pointer">
+                        <option value="all">All accounts</option>
+                        {acctList.map(([name, n]) => <option key={name} value={name}>{name} ({n})</option>)}
+                    </select>
+                    {filtered && (
+                        <button onClick={() => setAcctFilter("all")} className="text-[11px] text-gray-400 hover:text-white flex-shrink-0">Clear</button>
+                    )}
+                </div>
+            )}
+
             {/* Bucket counts */}
             <div className="flex gap-2 mt-3">
-                <Count n={c.ready} label="Ready" color="text-cyan-300" />
-                <Count n={c.review} label="Needs review" color="text-amber-300" />
-                <Count n={c.no_match} label="No match" color="text-gray-400" />
-                <Count n={c.enriched} label="Enriched" color="text-emerald-300" />
+                <Count n={counts.ready} label="Ready" color="text-cyan-300" />
+                <Count n={counts.review} label="Needs review" color="text-amber-300" />
+                <Count n={counts.no_match} label="No match" color="text-gray-400" />
+                <Count n={counts.enriched} label="Enriched" color="text-emerald-300" />
             </div>
 
             {/* Ready */}
-            {(st?.ready || []).length > 0 && (
-                <Section icon={<Sparkles size={14} className="text-cyan-400" />} title="Ready to name" count={st.ready.length} tone="text-cyan-300">
+            {fReady.length > 0 && (
+                <Section icon={<Sparkles size={14} className="text-cyan-400" />} title="Ready to name" count={fReady.length} tone="text-cyan-300">
                     <div className="px-3 pb-2">
                         <div className="flex justify-end mb-1">
                             <button onClick={applyAll} disabled={busy === "all"}
                                 className="text-[11px] font-semibold text-white bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 rounded px-2.5 py-1 transition">
-                                {busy === "all" ? "Applying…" : `Apply all ${st.ready.length}`}
+                                {busy === "all" ? "Applying…" : `Apply all ${fReady.length}`}
                             </button>
                         </div>
                         <div className="max-h-80 overflow-y-auto space-y-1">
-                            {st.ready.map((p) => (
+                            {fReady.map((p) => (
                                 <div key={p.transaction_id} className="flex items-center gap-2 text-[11px] border-b border-slate-800/60 last:border-b-0 py-1">
                                     <span className="text-gray-500 w-14 flex-shrink-0">{shortDate(p.tx_timestamp)}</span>
                                     <Amount amount={p.amount} direction={p.direction} />
@@ -240,10 +276,10 @@ const SMSEnrichTab = ({ onApplied }) => {
             )}
 
             {/* Needs review — one readable card per ambiguous row */}
-            {(st?.review || []).length > 0 && (
-                <Section icon={<HelpCircle size={14} className="text-amber-400" />} title="Needs review — pick a name" count={st.review.length} tone="text-amber-300">
+            {fReview.length > 0 && (
+                <Section icon={<HelpCircle size={14} className="text-amber-400" />} title="Needs review — pick a name" count={fReview.length} tone="text-amber-300">
                     <div className="px-3 pb-3 max-h-[30rem] overflow-y-auto space-y-2">
-                        {st.review.map((r) => {
+                        {fReview.map((r) => {
                             // Named candidates first, then closest SMS to the transaction.
                             const cands = [...(r.candidates || [])].sort((a, b) =>
                                 (a.name ? 0 : 1) - (b.name ? 0 : 1) ||
@@ -319,12 +355,12 @@ const SMSEnrichTab = ({ onApplied }) => {
             )}
 
             {/* No match */}
-            {(st?.no_match || []).length > 0 && (
+            {fNoMatch.length > 0 && (
                 <Section collapsible open={open.no_match} onToggle={() => setOpen((o) => ({ ...o, no_match: !o.no_match }))}
-                    icon={<XCircle size={14} className="text-gray-500" />} title="No matching SMS" count={c.no_match} tone="text-gray-400">
+                    icon={<XCircle size={14} className="text-gray-500" />} title="No matching SMS" count={counts.no_match} tone="text-gray-400">
                     <div className="px-3 pb-2 max-h-72 overflow-y-auto space-y-1">
                         <p className="text-[10px] text-gray-500 mb-1">No SMS names these rows. They clear on their own once you add an SMS export that covers them.</p>
-                        {st.no_match.map((r) => (
+                        {fNoMatch.map((r) => (
                             <div key={r.transaction_id} className="flex items-center gap-2 text-[11px] border-b border-slate-800/60 last:border-b-0 py-1">
                                 <span className="text-gray-500 w-14 flex-shrink-0">{shortDate(r.timestamp)}</span>
                                 <Amount amount={r.amount} direction={r.direction} />
@@ -336,11 +372,11 @@ const SMSEnrichTab = ({ onApplied }) => {
             )}
 
             {/* Enriched */}
-            {(st?.enriched || []).length > 0 && (
+            {fEnriched.length > 0 && (
                 <Section collapsible open={open.enriched} onToggle={() => setOpen((o) => ({ ...o, enriched: !o.enriched }))}
-                    icon={<CheckCircle2 size={14} className="text-emerald-400" />} title="Enriched" count={c.enriched} tone="text-emerald-300">
+                    icon={<CheckCircle2 size={14} className="text-emerald-400" />} title="Enriched" count={counts.enriched} tone="text-emerald-300">
                     <div className="px-3 pb-2 max-h-72 overflow-y-auto space-y-1">
-                        {st.enriched.map((r) => (
+                        {fEnriched.map((r) => (
                             <div key={r.transaction_id} className="flex items-center gap-2 text-[11px] border-b border-slate-800/60 last:border-b-0 py-1">
                                 <span className="text-gray-500 w-14 flex-shrink-0">{shortDate(r.timestamp)}</span>
                                 <span className="font-mono w-24 text-right flex-shrink-0 text-gray-400">{money(r.amount)}</span>

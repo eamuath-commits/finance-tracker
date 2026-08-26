@@ -2735,6 +2735,36 @@ def sms_enrich_rerun(
     return _enrich_response(result, sources=infos)
 
 
+def _attach_account_labels(db: Session, user_id: str, *buckets):
+    """Tag each enrichment bucket item with its account/card display name + id, so
+    the UI can filter the view per account. Matching still runs across all rows."""
+    ids = [it["transaction_id"] for b in buckets for it in b
+           if isinstance(it, dict) and it.get("transaction_id")]
+    if not ids:
+        return
+    accts = {a.id: a for a in db.query(models.Account).filter(models.Account.user_id == user_id).all()}
+    cards = {c.id: c for c in db.query(models.CreditCard).filter(models.CreditCard.user_id == user_id).all()}
+
+    def _label(aid, cid):
+        obj = accts.get(aid) or cards.get(cid)
+        if not obj:
+            return None, None
+        l4 = str(getattr(obj, "last_4_digits", "") or "")[-4:]
+        return (aid if aid in accts else cid), (obj.name + (f" ···{l4}" if l4 else ""))
+
+    tmap = {t.id: (t.account_id, t.credit_card_id) for t in db.query(
+        models.Transaction.id, models.Transaction.account_id, models.Transaction.credit_card_id
+    ).filter(models.Transaction.id.in_(ids)).all()}
+    for b in buckets:
+        for it in b:
+            if not isinstance(it, dict):
+                continue
+            aid, cid = tmap.get(it.get("transaction_id"), (None, None))
+            k, n = _label(aid, cid)
+            it["account_id"] = k
+            it["account"] = n or "Unassigned"
+
+
 @app.get("/api/sms/enrich/state")
 def sms_enrich_state(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Live enrichment state for the persistent review dashboard, in four buckets:
@@ -2757,6 +2787,7 @@ def sms_enrich_state(db: Session = Depends(get_db), current_user: models.User = 
     } for t in _eq.order_by(models.Transaction.enriched_at.desc()).limit(300).all()]
 
     if not raws:
+        _attach_account_labels(db, current_user.id, enriched)
         return {"has_sources": False, "sources": infos, "ready": [], "review": [],
                 "no_match": [], "enriched": enriched, "coverage": {},
                 "counts": {"ready": 0, "review": 0, "no_match": 0, "enriched": enriched_count}}
@@ -2795,6 +2826,8 @@ def sms_enrich_state(db: Session = Depends(get_db), current_user: models.User = 
                 "original_amount": float(t.original_amount) if t.original_amount is not None else None,
                 "original_currency": t.original_currency,
             }
+
+    _attach_account_labels(db, current_user.id, payload["proposals"], review, no_match, enriched)
 
     return {
         "has_sources": True, "sources": infos,
