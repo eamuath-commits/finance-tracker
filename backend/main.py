@@ -1219,6 +1219,36 @@ def get_obligations_forecast(months_ahead: int = 1, db: Session = Depends(get_db
     for p in all_history:
         history_by_obl.setdefault(p.obligation_id, []).append(p)
 
+    # Effective paid = the sum of a payment's LINKED transactions when it has any
+    # (the real money that moved), else the recorded payment.amount. The recorded
+    # amount can drift from reality — a payment entered/quick-paid at 12,000 then
+    # linked to a 15,000 transfer keeps amount=12,000 — and the forecast should
+    # follow what actually moved. Recorded amounts are left untouched.
+    _pay_ids = [p.id for p in all_history]
+    _linked_by_pay = {}   # payment_id -> set(transaction_id)
+    if _pay_ids:
+        for pid, tid in db.query(
+            models.PaymentTransaction.payment_id, models.PaymentTransaction.transaction_id
+        ).filter(models.PaymentTransaction.payment_id.in_(_pay_ids)).all():
+            _linked_by_pay.setdefault(pid, set()).add(tid)
+    for p in all_history:
+        if getattr(p, "transaction_id", None):
+            _linked_by_pay.setdefault(p.id, set()).add(p.transaction_id)
+    _all_tx_ids = {t for s in _linked_by_pay.values() for t in s}
+    _tx_amt = {}
+    if _all_tx_ids:
+        _tx_amt = {tid: (amt or 0) for tid, amt in db.query(
+            models.Transaction.id, models.Transaction.amount
+        ).filter(models.Transaction.id.in_(_all_tx_ids)).all()}
+
+    def _effective_paid(p):
+        ids = _linked_by_pay.get(p.id)
+        if ids:
+            s = sum(_tx_amt.get(t, 0) for t in ids)
+            if s:
+                return round(s, 2)
+        return p.amount
+
     result_obligations = []
     total_forecast = 0.0
     by_category = {}
@@ -1227,7 +1257,7 @@ def get_obligations_forecast(months_ahead: int = 1, db: Session = Depends(get_db
         payments = history_by_obl.get(obl.id, [])
         # Sort by billing_month descending to get most recent first
         sorted_payments = sorted(payments, key=lambda p: p.billing_month or "", reverse=True)
-        amounts = [p.amount for p in sorted_payments if p.amount]
+        amounts = [a for p in sorted_payments if (a := _effective_paid(p))]
 
         if len(amounts) >= 1:
             last_paid = amounts[0]  # Most recent payment
