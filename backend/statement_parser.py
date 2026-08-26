@@ -783,7 +783,10 @@ def _time_by_balance(page_text):
 # "Time:.., Notes:x". Accept both so the note/merchant is never lost.
 _NOTE_SEP_RE = re.compile(r'(?:\*\*Notes?:|,\s*Notes?:)\s*(.*)', re.S)
 _ACCT_RE = re.compile(r'(FRACCT|TOACCT)/(\d+)(?:(?:FR|TO))?([^/\d-]+)?')
-_IPS_RE = re.compile(r'([A-Z0-9]{10,})\/([A-Z][A-Za-z .]+)')
+# <10+ char ref>/<beneficiary name>. The trailing negative lookahead rejects a
+# name glued to digits (e.g. "…288/GBOUEO03"), which is a Sarie reference CODE,
+# not a beneficiary — otherwise "GBOUEO" was stored as the merchant.
+_IPS_RE = re.compile(r'([A-Z0-9]{10,})\/([A-Z][A-Za-z .]+)(?![A-Za-z0-9])')
 _DATE_CELL_RE = re.compile(r'^\d{4}/\d{2}/\d{2}$')
 
 # ─────────────────────────────────────────────────────────────────────

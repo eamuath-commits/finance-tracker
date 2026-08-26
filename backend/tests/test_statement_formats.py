@@ -287,3 +287,19 @@ class TestSTCLayout:
         assert SP._row_type_line("Scan QR to Validate\nMusaned", True) == "Musaned"
         # A clean description is unchanged.
         assert SP._row_type_line("Incoming Local Transfer", True) == "Incoming Local Transfer"
+
+
+class TestSarieCounterpartyIsNotACode:
+    """A Sarie Payment Order note is all reference codes with NO beneficiary name,
+    e.g. 'W - ER- .../.../000000000000288/GBOUEO03'. The IPS name pattern must not
+    read the trailing code fragment ('GBOUEO03' -> 'GBOUEO') as the merchant."""
+
+    def test_sarie_code_fragment_is_not_taken_as_a_name(self):
+        note = "W - ER- 000005327980/0000058/000000000000288/GBOUEO03"
+        assert SP._IPS_RE.search(note) is None
+
+    def test_real_ips_beneficiary_names_still_parse(self):
+        assert SP._IPS_RE.search("SA9912345678901/JOHN SMITH").group(2) == "JOHN SMITH"
+        assert SP._IPS_RE.search("REF1234567890/ACME TRADING CO").group(2) == "ACME TRADING CO"
+        # A real name followed by a separate trailing code keeps just the name.
+        assert SP._IPS_RE.search("REF1234567890/MARIA GARCIA 03").group(2) == "MARIA GARCIA"
