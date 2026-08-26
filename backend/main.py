@@ -2773,6 +2773,47 @@ def sms_enrich_rerun(
     return _enrich_response(result, sources=infos)
 
 
+_ACCT_IN_NOTE_RE = re.compile(r'Acct[:\s]*([0-9]{4,})', re.I)
+
+
+def _statement_transfer_proposals(db: Session, user_id: str, stuck_ids, account_names: dict):
+    """Name internal transfers from the statement's OWN counterparty account, no SMS
+    needed: the row's notes carry 'Acct: …1505' and 1505 maps to a known account
+    (Expense), so it becomes 'Transfer → Expense' directly. Fires ONLY when the
+    counterparty last-4 resolves to one of the user's accounts (the safety gate) and
+    the row reads as an internal transfer — never inventing a name for anything else.
+    Returns {transaction_id: proposal_dict} shaped like an SMS proposal."""
+    if not stuck_ids:
+        return {}
+    props = {}
+    txs = db.query(models.Transaction).filter(
+        models.Transaction.id.in_(list(stuck_ids)),
+        models.Transaction.user_id == user_id,
+    ).all()
+    for t in txs:
+        if not sms_enrichment.is_generic_label(t.merchant):
+            continue
+        blob = f"{t.transaction_type or ''} {t.notes or ''} {t.merchant or ''}"
+        if not re.search(r'transfer', blob, re.I):
+            continue
+        m = _ACCT_IN_NOTE_RE.search(t.notes or "")
+        if not m:
+            continue
+        name = account_names.get(m.group(1)[-4:])
+        if not name:
+            continue
+        new_name = f"Transfer {'→' if t.type == 'debit' else '←'} {name}"
+        if (t.merchant or "").strip() == new_name:
+            continue
+        props[t.id] = {
+            "transaction_id": t.id, "new_merchant": new_name, "old_merchant": t.merchant,
+            "amount": float(t.amount or 0), "direction": t.type,
+            "tx_timestamp": t.timestamp.isoformat() if t.timestamp else None,
+            "raw_sms": "", "sms_timestamp": None,
+        }
+    return props
+
+
 def _attach_account_labels(db: Session, user_id: str, *buckets):
     """Tag each enrichment bucket item with its account/card display name + id, so
     the UI can filter the view per account. Matching still runs across all rows."""
@@ -2887,6 +2928,19 @@ def sms_enrich_state(db: Session = Depends(get_db), current_user: models.User = 
                     "timestamp": t.timestamp.isoformat() if t.timestamp else None,
                     "amount": float(t.amount or 0), "direction": t.type, "label": t.merchant}
                    for t in ig_rows]
+
+    # Recognize internal transfers straight from the statement's own counterparty
+    # account (no SMS needed) and move them from review/no-match into ready.
+    stuck_ids = {r.get("transaction_id") for r in review} | {r.get("transaction_id") for r in no_match}
+    xfer_props = _statement_transfer_proposals(
+        db, current_user.id, stuck_ids, _account_name_map(db, current_user.id))
+    if xfer_props:
+        n_rev2, n_nm2 = len(review), len(no_match)
+        review = [r for r in review if r.get("transaction_id") not in xfer_props]
+        no_match = [r for r in no_match if r.get("transaction_id") not in xfer_props]
+        rev_removed += n_rev2 - len(review)
+        nm_removed += n_nm2 - len(no_match)
+        payload["proposals"] = list(xfer_props.values()) + payload["proposals"]
 
     _attach_account_labels(db, current_user.id, payload["proposals"], review, no_match, enriched, ignored)
 
