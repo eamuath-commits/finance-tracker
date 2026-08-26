@@ -208,6 +208,7 @@ class Transaction(Base):
     timestamp_original = Column(DateTime, nullable=True)  # midnight ts before SMS-time adoption (for undo)
     enrichment_batch_id = Column(String, nullable=True)  # batch that renamed this row, if any
     enriched_at = Column(DateTime, nullable=True)        # when that batch was applied
+    enrichment_ignored = Column(Boolean, default=False)  # user dismissed this row from enrichment review
     raw_sms_content = Column(Text)
     timestamp = Column(DateTime)
     category = Column(String, nullable=True)              # what it was FOR (Groceries, Fuel)

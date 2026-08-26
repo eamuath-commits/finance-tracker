@@ -161,6 +161,14 @@ def run_migrations(engine):
                 conn.execute(text("ALTER TABLE transactions ADD COLUMN enriched_at TIMESTAMP"))
                 conn.commit()
 
+        # User-dismissed enrichment rows — kept out of the review bucket (reversible
+        # via the Ignored bucket) so ambiguous rows can be cleared from the worklist.
+        if 'enrichment_ignored' not in columns:
+            print("Migrating: Adding enrichment_ignored to transactions")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE transactions ADD COLUMN enrichment_ignored BOOLEAN DEFAULT FALSE"))
+                conn.commit()
+
         # Check for table rename (obligation_history -> payments)
         table_names = inspector.get_table_names()
         if 'obligation_history' in table_names and 'payments' not in table_names:
@@ -2789,8 +2797,8 @@ def sms_enrich_state(db: Session = Depends(get_db), current_user: models.User = 
     if not raws:
         _attach_account_labels(db, current_user.id, enriched)
         return {"has_sources": False, "sources": infos, "ready": [], "review": [],
-                "no_match": [], "enriched": enriched, "coverage": {},
-                "counts": {"ready": 0, "review": 0, "no_match": 0, "enriched": enriched_count}}
+                "no_match": [], "enriched": enriched, "ignored": [], "coverage": {},
+                "counts": {"ready": 0, "review": 0, "no_match": 0, "enriched": enriched_count, "ignored": 0}}
 
     result = sms_enrichment.match(sms_enrichment.parse_exports(raws),
                                   _statement_txrows(db, current_user.id),
@@ -2827,18 +2835,69 @@ def sms_enrich_state(db: Session = Depends(get_db), current_user: models.User = 
                 "original_currency": t.original_currency,
             }
 
-    _attach_account_labels(db, current_user.id, payload["proposals"], review, no_match, enriched)
+    # User-ignored rows are kept out of the active buckets and listed separately
+    # (reversible via un-ignore), so the review worklist can be cleared down.
+    ignored_ids = {row[0] for row in db.query(models.Transaction.id).filter(
+        models.Transaction.user_id == current_user.id,
+        models.Transaction.enrichment_ignored.is_(True)).all()}
+    ignored = []
+    rev_removed = nm_removed = 0
+    if ignored_ids:
+        n_rev, n_nm = len(review), len(no_match)
+        review = [r for r in review if r.get("transaction_id") not in ignored_ids]
+        no_match = [r for r in no_match if r.get("transaction_id") not in ignored_ids]
+        payload["proposals"] = [p for p in payload["proposals"] if p.get("transaction_id") not in ignored_ids]
+        rev_removed, nm_removed = n_rev - len(review), n_nm - len(no_match)
+        ig_rows = db.query(models.Transaction).filter(
+            models.Transaction.user_id == current_user.id,
+            models.Transaction.enrichment_ignored.is_(True),
+            models.Transaction.source == _GENERIC_STATEMENT_SOURCE,
+        ).order_by(models.Transaction.timestamp.desc()).limit(300).all()
+        ignored = [{"transaction_id": t.id,
+                    "timestamp": t.timestamp.isoformat() if t.timestamp else None,
+                    "amount": float(t.amount or 0), "direction": t.type, "label": t.merchant}
+                   for t in ig_rows]
+
+    _attach_account_labels(db, current_user.id, payload["proposals"], review, no_match, enriched, ignored)
 
     return {
         "has_sources": True, "sources": infos,
         "ready": payload["proposals"], "review": review, "no_match": no_match,
-        "enriched": enriched, "coverage": cov,
+        "enriched": enriched, "ignored": ignored, "coverage": cov,
         # full counts (bucket lists above are capped at 300 for the payload)
         "counts": {"ready": len(payload["proposals"]),
-                   "review": cov.get("contested", 0),
-                   "no_match": cov.get("no_sms_found", 0) + cov.get("sms_has_no_name", 0),
-                   "enriched": enriched_count},
+                   "review": max(0, cov.get("contested", 0) - rev_removed),
+                   "no_match": max(0, cov.get("no_sms_found", 0) + cov.get("sms_has_no_name", 0) - nm_removed),
+                   "enriched": enriched_count,
+                   "ignored": len(ignored_ids)},
     }
+
+
+def _set_enrichment_ignored(db, user_id, ids, value):
+    if not ids:
+        return 0
+    n = db.query(models.Transaction).filter(
+        models.Transaction.user_id == user_id,
+        models.Transaction.id.in_(ids),
+    ).update({models.Transaction.enrichment_ignored: value}, synchronize_session=False)
+    db.commit()
+    return n
+
+
+@app.post("/api/sms/enrich/ignore")
+def sms_enrich_ignore(body: dict, db: Session = Depends(get_db),
+                      current_user: models.User = Depends(get_current_user)):
+    """Dismiss one or more rows from the enrichment review worklist (reversible)."""
+    n = _set_enrichment_ignored(db, current_user.id, body.get("transaction_ids") or [], True)
+    return {"ignored": n}
+
+
+@app.post("/api/sms/enrich/unignore")
+def sms_enrich_unignore(body: dict, db: Session = Depends(get_db),
+                        current_user: models.User = Depends(get_current_user)):
+    """Restore one or more previously ignored rows to the review worklist."""
+    n = _set_enrichment_ignored(db, current_user.id, body.get("transaction_ids") or [], False)
+    return {"unignored": n}
 
 
 @app.post("/api/sms/enrich/undo-transaction/{transaction_id}")

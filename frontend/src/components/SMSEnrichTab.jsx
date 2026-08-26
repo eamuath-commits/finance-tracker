@@ -84,7 +84,8 @@ const SMSEnrichTab = ({ onApplied }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [busy, setBusy] = useState(null);   // key of the row/action in flight
-    const [open, setOpen] = useState({ no_match: false, enriched: false });
+    const [open, setOpen] = useState({ no_match: false, enriched: false, ignored: false });
+    const [selected, setSelected] = useState(new Set());  // review tx_ids checked for bulk ignore
     const [openDetail, setOpenDetail] = useState({});   // review tx_id -> ledger details expanded
     const [openSms, setOpenSms] = useState({});         // "tx_id:i" -> full SMS expanded
     const [acctFilter, setAcctFilter] = useState("all"); // account label to scope the view
@@ -134,6 +135,31 @@ const SMSEnrichTab = ({ onApplied }) => {
         } finally { setBusy(null); }
     };
 
+    const toggleSel = (id) => setSelected((s) => {
+        const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n;
+    });
+    const ignore = async (ids, key) => {
+        if (!ids.length) return;
+        setBusy(key); setError(null);
+        try {
+            await api.post(`${API_URL}/api/sms/enrich/ignore`, { transaction_ids: ids });
+            setSelected(new Set());
+            await refresh();
+        } catch (e) {
+            setError(e.response?.data?.detail || "Failed to ignore.");
+        } finally { setBusy(null); }
+    };
+    const unignore = async (ids, key) => {
+        if (!ids.length) return;
+        setBusy(key); setError(null);
+        try {
+            await api.post(`${API_URL}/api/sms/enrich/unignore`, { transaction_ids: ids });
+            await refresh();
+        } catch (e) {
+            setError(e.response?.data?.detail || "Failed to un-ignore.");
+        } finally { setBusy(null); }
+    };
+
     const upload = async (ev) => {
         const file = ev.target.files?.[0];
         ev.target.value = "";
@@ -170,7 +196,7 @@ const SMSEnrichTab = ({ onApplied }) => {
     const acctOf = (it) => it.account || "Unassigned";
     const acctList = (() => {
         const m = new Map();
-        ["ready", "review", "no_match", "enriched"].forEach((k) =>
+        ["ready", "review", "no_match", "enriched", "ignored"].forEach((k) =>
             (st?.[k] || []).forEach((it) => m.set(acctOf(it), (m.get(acctOf(it)) || 0) + 1)));
         return [...m.entries()].sort((a, b) => b[1] - a[1]);
     })();
@@ -178,10 +204,18 @@ const SMSEnrichTab = ({ onApplied }) => {
     const fReview = (st?.review || []).filter(inAcct);
     const fNoMatch = (st?.no_match || []).filter(inAcct);
     const fEnriched = (st?.enriched || []).filter(inAcct);
+    const fIgnored = (st?.ignored || []).filter(inAcct);
     const filtered = acctFilter !== "all";
     const counts = filtered
-        ? { ready: fReady.length, review: fReview.length, no_match: fNoMatch.length, enriched: fEnriched.length }
+        ? { ready: fReady.length, review: fReview.length, no_match: fNoMatch.length, enriched: fEnriched.length, ignored: fIgnored.length }
         : c;
+    const allReviewSelected = fReview.length > 0 && fReview.every((r) => selected.has(r.transaction_id));
+    const toggleSelectAll = () => setSelected((s) => {
+        const n = new Set(s);
+        if (allReviewSelected) fReview.forEach((r) => n.delete(r.transaction_id));
+        else fReview.forEach((r) => n.add(r.transaction_id));
+        return n;
+    });
 
     return (
         <div className="animate-fade-in-up">
@@ -278,6 +312,23 @@ const SMSEnrichTab = ({ onApplied }) => {
             {/* Needs review — one readable card per ambiguous row */}
             {fReview.length > 0 && (
                 <Section icon={<HelpCircle size={14} className="text-amber-400" />} title="Needs review — pick a name" count={fReview.length} tone="text-amber-300">
+                    <div className="flex items-center gap-2 px-3 pt-1 pb-2 text-[11px]">
+                        <label className="flex items-center gap-1.5 text-gray-400 cursor-pointer select-none">
+                            <input type="checkbox" checked={allReviewSelected} onChange={toggleSelectAll} className="accent-amber-500" />
+                            Select all
+                        </label>
+                        <span className="flex-1" />
+                        {selected.size > 0 && (
+                            <>
+                                <span className="text-gray-400">{selected.size} selected</span>
+                                <button onClick={() => ignore([...selected], "ignore-bulk")} disabled={busy === "ignore-bulk"}
+                                    className="inline-flex items-center gap-1 font-semibold text-white bg-slate-600 hover:bg-slate-500 disabled:opacity-50 rounded px-2 py-0.5 transition">
+                                    <XCircle size={11} /> {busy === "ignore-bulk" ? "…" : "Ignore"}
+                                </button>
+                                <button onClick={() => setSelected(new Set())} className="text-gray-400 hover:text-white">Clear</button>
+                            </>
+                        )}
+                    </div>
                     <div className="px-3 pb-3 max-h-[30rem] overflow-y-auto space-y-2">
                         {fReview.map((r) => {
                             // Named candidates first, then closest SMS to the transaction.
@@ -288,6 +339,8 @@ const SMSEnrichTab = ({ onApplied }) => {
                                 <div key={r.transaction_id} className="rounded-lg border border-slate-700/50 bg-slate-900/40 p-2.5">
                                     {/* Transaction being named */}
                                     <div className="flex items-center gap-2 mb-2">
+                                        <input type="checkbox" checked={selected.has(r.transaction_id)} onChange={() => toggleSel(r.transaction_id)}
+                                            className="accent-amber-500 flex-shrink-0" />
                                         <span className="text-[11px] text-gray-500 flex-shrink-0">{shortDate(r.timestamp)}</span>
                                         <Amount amount={r.amount} direction={r.direction} />
                                         <span className="text-[11px] text-gray-400 truncate flex-1" title={r.label}>
@@ -300,6 +353,10 @@ const SMSEnrichTab = ({ onApplied }) => {
                                                 {openDetail[r.transaction_id] ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Details
                                             </button>
                                         )}
+                                        <button type="button" onClick={() => ignore([r.transaction_id], r.transaction_id)} disabled={busy === r.transaction_id}
+                                            className="flex-shrink-0 text-gray-500 hover:text-gray-200 disabled:opacity-50 p-0.5 transition" title="Ignore this row">
+                                            {busy === r.transaction_id ? <Loader2 size={12} className="animate-spin" /> : <XCircle size={13} />}
+                                        </button>
                                     </div>
 
                                     {openDetail[r.transaction_id] && <DetailPanel d={r.detail} />}
@@ -385,6 +442,27 @@ const SMSEnrichTab = ({ onApplied }) => {
                                 <button onClick={() => undo(r.transaction_id)} disabled={busy === r.transaction_id}
                                     className="flex-shrink-0 text-gray-500 hover:text-amber-300 p-0.5 transition" title="Undo">
                                     {busy === r.transaction_id ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </Section>
+            )}
+
+            {/* Ignored — dismissed rows, reversible */}
+            {fIgnored.length > 0 && (
+                <Section collapsible open={open.ignored} onToggle={() => setOpen((o) => ({ ...o, ignored: !o.ignored }))}
+                    icon={<XCircle size={14} className="text-gray-500" />} title="Ignored" count={counts.ignored} tone="text-gray-400">
+                    <div className="px-3 pb-2 max-h-72 overflow-y-auto space-y-1">
+                        <p className="text-[10px] text-gray-500 mb-1">Dismissed from review. Restore any to bring it back to the worklist.</p>
+                        {fIgnored.map((r) => (
+                            <div key={r.transaction_id} className="flex items-center gap-2 text-[11px] border-b border-slate-800/60 last:border-b-0 py-1">
+                                <span className="text-gray-500 w-14 flex-shrink-0">{shortDate(r.timestamp)}</span>
+                                <Amount amount={r.amount} direction={r.direction} />
+                                <span className="text-gray-500 truncate flex-1">{r.label}</span>
+                                <button onClick={() => unignore([r.transaction_id], `unig-${r.transaction_id}`)} disabled={busy === `unig-${r.transaction_id}`}
+                                    className="flex-shrink-0 inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-white disabled:opacity-50 transition" title="Restore to review">
+                                    {busy === `unig-${r.transaction_id}` ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />} Restore
                                 </button>
                             </div>
                         ))}
