@@ -1200,77 +1200,26 @@ def get_obligations_forecast(months_ahead: int = 1, db: Session = Depends(get_db
 
     obligations = db.query(models.MonthlyObligation).filter(models.MonthlyObligation.user_id == current_user.id).order_by(models.MonthlyObligation.display_order).all()
 
-    # Get last 6 months of payments using LIKE to match both YYYY-MM and YYYY-MM-DD formats
-    history_months = []
-    for i in range(1, 7):  # 1 to 6 months back
-        hy = now.year + ((now.month - 1 - i) // 12)
-        hm = ((now.month - 1 - i) % 12) + 1
-        history_months.append(f"{hy}-{str(hm).zfill(2)}")
-
-    from sqlalchemy import or_
-    month_filters = [models.Payment.billing_month.like(f"{m}%") for m in history_months]
-    all_history = db.query(models.Payment).filter(
-        or_(*month_filters),
-        models.Payment.status.in_([models.PaymentStatus.PAID, "PAID"])
-    ).all()
-
-    # Group by obligation_id
-    history_by_obl = {}
-    for p in all_history:
-        history_by_obl.setdefault(p.obligation_id, []).append(p)
-
-    # Effective paid = the sum of a payment's LINKED transactions when it has any
-    # (the real money that moved), else the recorded payment.amount. The recorded
-    # amount can drift from reality — a payment entered/quick-paid at 12,000 then
-    # linked to a 15,000 transfer keeps amount=12,000 — and the forecast should
-    # follow what actually moved. Recorded amounts are left untouched.
-    _pay_ids = [p.id for p in all_history]
-    _linked_by_pay = {}   # payment_id -> set(transaction_id)
-    if _pay_ids:
-        for pid, tid in db.query(
-            models.PaymentTransaction.payment_id, models.PaymentTransaction.transaction_id
-        ).filter(models.PaymentTransaction.payment_id.in_(_pay_ids)).all():
-            _linked_by_pay.setdefault(pid, set()).add(tid)
-    for p in all_history:
-        if getattr(p, "transaction_id", None):
-            _linked_by_pay.setdefault(p.id, set()).add(p.transaction_id)
-    _all_tx_ids = {t for s in _linked_by_pay.values() for t in s}
-    _tx_amt = {}
-    if _all_tx_ids:
-        _tx_amt = {tid: (amt or 0) for tid, amt in db.query(
-            models.Transaction.id, models.Transaction.amount
-        ).filter(models.Transaction.id.in_(_all_tx_ids)).all()}
-
-    def _effective_paid(p):
-        ids = _linked_by_pay.get(p.id)
-        if ids:
-            s = sum(_tx_amt.get(t, 0) for t in ids)
-            if s:
-                return round(s, 2)
-        return p.amount
+    # Single source of truth (shared with the allocation planner): per-obligation
+    # expected amount for the forecast month, using effective linked-transaction
+    # amounts and the actual -> budget -> predict rule. The forecast keeps its own
+    # trend/confidence, computed from the effective history it returns.
+    expected = crud.obligation_expected_amounts(db, current_user.id, forecast_month, now=now)
 
     result_obligations = []
     total_forecast = 0.0
     by_category = {}
 
     for obl in obligations:
-        payments = history_by_obl.get(obl.id, [])
-        # Sort by billing_month descending to get most recent first
-        sorted_payments = sorted(payments, key=lambda p: p.billing_month or "", reverse=True)
-        amounts = [a for p in sorted_payments if (a := _effective_paid(p))]
+        info = expected.get(obl.id) or {"amount": 0.0, "basis": "none", "history": []}
+        amounts = info["history"]          # effective amounts, most-recent first
+        forecast_amount = info["amount"]   # already stale-guarded by the shared fn
+        stale = info["basis"] == "stale"
+        months_since = None
 
-        if len(amounts) >= 1:
-            last_paid = amounts[0]  # Most recent payment
+        if amounts:
+            last_paid = amounts[0]
             avg = sum(amounts) / len(amounts)
-
-            # Recency guard: if the last payment is older than STALE_AFTER_MONTHS,
-            # treat the obligation as inactive and do NOT carry it forward — a
-            # subscription you stopped, or a one-off, should not pad next month.
-            months_since = _months_since(sorted_payments[0].billing_month or "", now)
-            stale = months_since > STALE_AFTER_MONTHS
-
-            # Forecast = last paid amount (user requirement), unless stale -> 0.
-            forecast_amount = 0.0 if stale else round(last_paid, 2)
 
             if len(amounts) >= 3:
                 # Trend: compare first half avg vs second half avg (chronological order)
@@ -1302,14 +1251,11 @@ def get_obligations_forecast(months_ahead: int = 1, db: Session = Depends(get_db
                 trend = "stable"
                 confidence = "low"
         else:
-            # No history — use obligation.amount as fallback
-            forecast_amount = round(obl.amount or 0, 2)
+            # No payment history — forecast_amount came from obligation.amount (or 0).
             avg = forecast_amount
             last_paid = None
             trend = "stable"
-            confidence = "low" if obl.amount else "none"
-            stale = False
-            months_since = None
+            confidence = "low" if forecast_amount else "none"
 
         total_forecast += forecast_amount
 

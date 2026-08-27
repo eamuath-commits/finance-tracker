@@ -1848,6 +1848,109 @@ def get_random_training_examples(db: Session, limit: int = 3):
     return db.query(models.TrainingExample).order_by(func.random()).limit(limit).all()
 
 
+STALE_AFTER_MONTHS = 3
+
+
+def _months_between(billing_month, now):
+    """Whole months from a 'YYYY-MM[-DD]' billing_month up to `now` (>=0)."""
+    try:
+        y, m = int(str(billing_month)[:4]), int(str(billing_month)[5:7])
+    except (ValueError, IndexError):
+        return 0
+    return (now.year - y) * 12 + (now.month - m)
+
+
+def _payment_effective_amounts(db: Session, payments):
+    """{payment_id: effective amount} — the sum of a payment's LINKED transactions
+    (junction + legacy scalar) when it has any, else the recorded payment.amount.
+    The linked transactions are the real money that moved; the recorded amount can
+    drift (entered 12,000 then linked to a 15,000 transfer)."""
+    pay_ids = [p.id for p in payments]
+    linked = {}
+    if pay_ids:
+        for pid, tid in db.query(
+            models.PaymentTransaction.payment_id, models.PaymentTransaction.transaction_id
+        ).filter(models.PaymentTransaction.payment_id.in_(pay_ids)).all():
+            linked.setdefault(pid, set()).add(tid)
+    for p in payments:
+        if getattr(p, "transaction_id", None):
+            linked.setdefault(p.id, set()).add(p.transaction_id)
+    all_tx = {t for s in linked.values() for t in s}
+    tx_amt = {}
+    if all_tx:
+        tx_amt = {tid: (amt or 0) for tid, amt in db.query(
+            models.Transaction.id, models.Transaction.amount
+        ).filter(models.Transaction.id.in_(all_tx)).all()}
+    out = {}
+    for p in payments:
+        ids = linked.get(p.id)
+        s = sum(tx_amt.get(t, 0) for t in ids) if ids else 0
+        out[p.id] = round(s, 2) if s else (p.amount or 0)
+    return out
+
+
+def _is_status(p, name):
+    return p.status == getattr(models.PaymentStatus, name, name) or p.status == name
+
+
+def obligation_expected_amounts(db: Session, user_id: str, month_str: str, now=None, months_back: int = 6):
+    """Single source of truth for 'what does each obligation cost in month M', used
+    by BOTH the forecast and the allocation planner so the two never disagree.
+    Per obligation:
+      actual  = this month's PAID payments (effective, linked-tx aware), else
+      budget  = this month's BUDGET entries (effective), else
+      predict = the most-recent effective payment over the trailing months, dropped
+                to 0 if older than STALE_AFTER_MONTHS, else obligation.amount.
+    Returns {obligation_id: {"amount": float, "basis": str, "history": [eff desc]}}."""
+    now = now or datetime.now()
+    obl_q = db.query(models.MonthlyObligation)
+    if user_id:
+        obl_q = obl_q.filter(models.MonthlyObligation.user_id == user_id)
+    obls = obl_q.all()
+    obl_ids = [o.id for o in obls] or [None]
+
+    try:
+        my, mm = int(month_str[:4]), int(month_str[5:7])
+    except (ValueError, IndexError):
+        my, mm = now.year, now.month
+    window = []
+    for i in range(0, months_back + 1):
+        yy = my + ((mm - 1 - i) // 12)
+        mo = ((mm - 1 - i) % 12) + 1
+        window.append(f"{yy}-{str(mo).zfill(2)}")
+    like = [models.Payment.billing_month.like(f"{m}%") for m in window]
+    payments = db.query(models.Payment).filter(
+        models.Payment.obligation_id.in_(obl_ids), or_(*like)).all()
+    eff = _payment_effective_amounts(db, payments)
+
+    by_obl = {}
+    for p in payments:
+        by_obl.setdefault(p.obligation_id, []).append(p)
+
+    result = {}
+    for o in obls:
+        ps = by_obl.get(o.id, [])
+        this_month = [p for p in ps if (p.billing_month or "")[:7] == month_str]
+        actual = sum(eff[p.id] for p in this_month if _is_status(p, "PAID"))
+        budget = sum(eff[p.id] for p in this_month if _is_status(p, "BUDGET"))
+        if actual > 0:
+            result[o.id] = {"amount": round(actual, 2), "basis": "actual", "history": []}
+        elif budget > 0:
+            result[o.id] = {"amount": round(budget, 2), "basis": "budget", "history": []}
+        else:
+            paid = sorted([p for p in ps if _is_status(p, "PAID")],
+                          key=lambda p: p.billing_month or "", reverse=True)
+            hist = [eff[p.id] for p in paid if eff[p.id]]
+            if hist:
+                stale = _months_between(paid[0].billing_month or "", now) > STALE_AFTER_MONTHS
+                result[o.id] = {"amount": 0.0 if stale else round(hist[0], 2),
+                                "basis": "stale" if stale else "predicted", "history": hist}
+            else:
+                result[o.id] = {"amount": round(o.amount or 0, 2),
+                                "basis": "obligation" if o.amount else "none", "history": []}
+    return result
+
+
 def calculate_allocation_preview(db: Session, source_account_id: str, month_offset: int = 0, user_id: str = None):
     """
     Calculate allocation preview for salary distribution planning.
@@ -1912,38 +2015,6 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
         else:
             transferred_by_envelope[d.target_account_id] = transferred_by_envelope.get(d.target_account_id, 0) + d.amount
     
-    # Get all payments for target month
-    target_payments = db.query(models.Payment).filter(
-        models.Payment.billing_month.like(f"{target_month_str}%"),
-        models.Payment.obligation_id.in_(obl_ids)
-    ).all()
-    target_payment_amounts = {}
-    target_budget_amounts = {}
-    for p in target_payments:
-        if p.status == models.PaymentStatus.PAID:
-            target_payment_amounts[p.obligation_id] = target_payment_amounts.get(p.obligation_id, 0) + p.amount
-        elif p.status == models.PaymentStatus.BUDGET:
-            target_budget_amounts[p.obligation_id] = target_budget_amounts.get(p.obligation_id, 0) + p.amount
-    
-    # Get previous month payments for Smart Default amounts
-    prev_payments = db.query(models.Payment).filter(
-        models.Payment.billing_month.like(f"{prev_month_str}%"),
-        models.Payment.obligation_id.in_(obl_ids)
-    ).all()
-    prev_amounts_by_obl = {}
-    for p in prev_payments:
-        prev_amounts_by_obl[p.obligation_id] = p.amount
-
-    # Get previous month distributions for fallback amounts
-    prev_distributions = db.query(models.Distribution).filter(
-        models.Distribution.billing_month == prev_month_str,
-        models.Distribution.source_account_id.in_(user_acct_ids)
-    ).all()
-    prev_dist_by_obl = {}
-    for d in prev_distributions:
-        if d.obligation_id:
-            prev_dist_by_obl[d.obligation_id] = prev_dist_by_obl.get(d.obligation_id, 0) + d.amount
-    
     # Build per-obligation allocation items
     allocations = []
     unassigned_items = []
@@ -1964,20 +2035,13 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     cat_rule_map = {r.identifier: r.target_account_id for r in _rules if r.rule_type == 'CATEGORY'}
     loan_rule_map = {r.identifier: r.target_account_id for r in _rules if r.rule_type == 'LOAN'}
 
+    # Single source of truth: identical expected-amount rule as the obligation
+    # forecast (effective linked-transaction amounts; actual -> budget -> predict),
+    # so the allocation planner and the forecast can never disagree.
+    expected_map = obligation_expected_amounts(db, user_id, target_month_str)
+
     for obl in obligations:
-        # Determine expected amount: PAID > BUDGET > prev payment > prev distribution > obligation.amount
-        if obl.id in target_payment_amounts:
-            expected_amount = target_payment_amounts[obl.id]
-        elif obl.id in target_budget_amounts:
-            expected_amount = target_budget_amounts[obl.id]
-        elif obl.id in prev_amounts_by_obl:
-            expected_amount = prev_amounts_by_obl[obl.id]
-        elif obl.id in prev_dist_by_obl:
-            expected_amount = prev_dist_by_obl[obl.id]
-        elif obl.amount and obl.amount > 0:
-            expected_amount = obl.amount
-        else:
-            expected_amount = 0
+        expected_amount = (expected_map.get(obl.id) or {}).get("amount", 0) or 0
         
         if expected_amount <= 0:
             continue
