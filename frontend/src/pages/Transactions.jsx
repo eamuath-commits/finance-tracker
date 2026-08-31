@@ -6,6 +6,7 @@ import { Search, Edit3, Trash2, Plus, User, Calendar, Filter, X, MessageSquare, 
 import { Modal, formatCurrency, inputClass, selectClass } from "../components/UI";
 import SMSIngestTab from "../components/SMSIngestTab";
 import SMSEnrichTab from "../components/SMSEnrichTab";
+import CategorySuggestions from "../components/CategorySuggestions";
 import { useConfirm } from "../components/ConfirmProvider";
 
 
@@ -64,6 +65,7 @@ function Transactions() {
 
     // Modal State
     const [showTxModal, setShowTxModal] = useState(false);
+    const [showCatSuggest, setShowCatSuggest] = useState(false);
     const [editingTx, setEditingTx] = useState(null);
     const [txForm, setTxForm] = useState({
         source_type: 'account', // 'account' or 'credit_card'
@@ -798,11 +800,17 @@ function Transactions() {
                             >
                                 {isSelectionMode ? 'Cancel' : 'Select'}
                             </button>
+                            <button onClick={() => setShowCatSuggest(true)} title="Suggest categories for uncategorized transactions"
+                                className="bg-slate-700 hover:bg-slate-600 text-gray-200 px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm transition shadow border border-slate-600">
+                                <Sparkles size={16} /> Suggest categories
+                            </button>
                             <button onClick={() => openTxModal(null)} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm transition shadow border border-blue-500">
                                 <Plus size={16} /> Add Transaction
                             </button>
                         </div>
                     </div>
+
+                    <CategorySuggestions isOpen={showCatSuggest} onClose={() => setShowCatSuggest(false)} onApplied={fetchData} />
 
                     {/* Month Navigation */}
                     <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700 mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">

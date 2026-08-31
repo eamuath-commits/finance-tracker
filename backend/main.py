@@ -23,6 +23,8 @@ import sms_agent
 import analysis
 import analysis_schema
 import sms_enrichment
+import categorizer
+import ai_client
 import transfer_linking
 import queue_processor
 from rate_limiter import RateLimitMiddleware
@@ -2309,6 +2311,64 @@ def create_transaction(transaction: schemas.TransactionCreate, db: Session = Dep
         raise HTTPException(status_code=400, detail="Either account_id or credit_card_id is required")
     transaction.user_id = current_user.id
     return crud.create_transaction(db=db, transaction=transaction)
+
+
+@app.post("/transactions/categorize")
+def categorize_transactions(body: dict, db: Session = Depends(get_db),
+                            current_user: models.User = Depends(get_current_user)):
+    """Suggest a category per transaction: deterministic rules first (confident),
+    then the local AI (only if OLLAMA_URL is set and reachable) for the rest.
+    NEVER writes — the user reviews and applies. Pass {"transaction_ids": [...]}
+    or {"scope": "uncategorized"}."""
+    ids = body.get("transaction_ids") or []
+    q = db.query(models.Transaction).filter(models.Transaction.user_id == current_user.id)
+    if ids:
+        q = q.filter(models.Transaction.id.in_(ids))
+    elif body.get("scope") == "uncategorized":
+        q = q.filter((models.Transaction.category.is_(None)) | (models.Transaction.category == "")
+                     | (models.Transaction.category.in_(["Other", "Uncategorized"])))
+    else:
+        raise HTTPException(status_code=400, detail="Provide transaction_ids or scope='uncategorized'")
+    txs = q.order_by(models.Transaction.timestamp.desc()).limit(int(body.get("limit") or 200)).all()
+
+    suggestions, ai_used = [], 0
+    for t in txs:
+        r = categorizer.categorize_rules(t.merchant, t.notes, t.transaction_type, t.type)
+        if r:
+            cat, source = r
+        else:
+            cat = ai_client.suggest_category(t.merchant, t.notes, float(t.amount or 0), t.type)
+            source = "ai" if cat else None
+            ai_used += 1 if cat else 0
+        if not cat:
+            continue
+        suggestions.append({
+            "transaction_id": t.id, "category": cat, "source": source,
+            "merchant": t.merchant, "amount": float(t.amount or 0), "direction": t.type,
+            "timestamp": t.timestamp.isoformat() if t.timestamp else None,
+            "current_category": t.category,
+        })
+    return {"suggestions": suggestions, "count": len(suggestions),
+            "ai_available": ai_client.available(), "ai_used": ai_used,
+            "categories": categorizer.CATEGORIES}
+
+
+@app.post("/transactions/categorize/apply")
+def apply_categories(body: dict, db: Session = Depends(get_db),
+                     current_user: models.User = Depends(get_current_user)):
+    """Write accepted categories — targeted column update (no balance recompute)."""
+    applied = 0
+    for it in body.get("items") or []:
+        tid, cat = it.get("transaction_id"), (it.get("category") or "").strip()
+        if not tid or not cat:
+            continue
+        applied += db.query(models.Transaction).filter(
+            models.Transaction.user_id == current_user.id,
+            models.Transaction.id == tid,
+        ).update({models.Transaction.category: cat}, synchronize_session=False)
+    db.commit()
+    return {"applied": applied}
+
 
 @app.delete("/transactions/{transaction_id}")
 def delete_transaction(transaction_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
