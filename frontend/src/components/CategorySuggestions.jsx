@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import api, { API_URL } from "../utils/api";
-import { Modal, formatCurrency } from "./UI";
+import { Modal } from "./UI";
+
+const money = (v) => Math.abs(Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 import { Loader2, Sparkles, CheckCircle2, Cpu, ListChecks } from "lucide-react";
 
 // Review-and-confirm categorization. Fetches suggestions (deterministic rules +
@@ -74,7 +76,7 @@ const CategorySuggestions = ({ isOpen, onClose, onApplied }) => {
                                 <div key={r.transaction_id} className="flex items-center gap-2 text-[11px] border-b border-slate-800/60 last:border-b-0 py-1.5">
                                     <input type="checkbox" checked={r.selected} onChange={() => setRow(r.transaction_id, { selected: !r.selected })} className="accent-blue-500 flex-shrink-0" />
                                     <span className={`font-mono w-20 text-right flex-shrink-0 ${r.direction === "credit" ? "text-emerald-400" : "text-red-400"}`}>
-                                        {r.direction === "credit" ? "+" : "−"}{formatCurrency(Math.abs(r.amount)).replace("SAR", "").trim()}
+                                        {r.direction === "credit" ? "+" : "−"}{money(r.amount)}
                                     </span>
                                     <span className="text-gray-300 truncate flex-1 min-w-0" title={r.merchant}>{r.merchant || "—"}</span>
                                     <span className={`flex-shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded ${r.source === "ai" ? "text-cyan-300 bg-cyan-600/15" : "text-blue-300 bg-blue-600/15"}`}>
