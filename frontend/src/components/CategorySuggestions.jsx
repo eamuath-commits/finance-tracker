@@ -19,7 +19,7 @@ const CategorySuggestions = ({ isOpen, onClose, onApplied }) => {
     useEffect(() => {
         if (!isOpen) return;
         setLoading(true); setError(null); setRows([]);
-        api.post(`${API_URL}/transactions/categorize`, { scope: "uncategorized", limit: 300 })
+        api.post(`${API_URL}/transactions/categorize`, { scope: "uncategorized", limit: 60 })
             .then((res) => {
                 setCats(res.data.categories || []);
                 setMeta({ ai_available: res.data.ai_available, ai_used: res.data.ai_used, count: res.data.count });
@@ -62,7 +62,7 @@ const CategorySuggestions = ({ isOpen, onClose, onApplied }) => {
                 {error && <div className="text-[11px] text-red-300 bg-red-900/20 border border-red-800/40 rounded px-2 py-1">{error}</div>}
 
                 {loading ? (
-                    <div className="py-10 text-center text-gray-500"><Loader2 className="animate-spin inline mr-2" size={16} />Categorizing…</div>
+                    <div className="py-10 text-center text-gray-500"><Loader2 className="animate-spin inline mr-2" size={16} />Categorizing… (a moment while the AI reviews new merchants)</div>
                 ) : rows.length === 0 ? (
                     <div className="py-10 text-center text-gray-500 text-sm">Nothing to suggest — everything's categorized. 🎉</div>
                 ) : (
