@@ -45,3 +45,11 @@ class TestRules:
     def test_curated_list_is_stable(self):
         assert "Telecom" in C.CATEGORIES and "Transfer" in C.CATEGORIES
         assert len(C.CATEGORIES) == 14
+
+
+class TestMerchantKey:
+    def test_normalizes_variants_together(self):
+        assert C.merchant_key("Amazon SA  ") == "amazon sa"
+        assert C.merchant_key("MOONYCOZY* MOONY-29332") == "moonycozy"
+        assert C.merchant_key("STARBUCKS #1234") == "starbucks"
+        assert C.merchant_key(None) == ""

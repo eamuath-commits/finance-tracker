@@ -79,8 +79,8 @@ const CategorySuggestions = ({ isOpen, onClose, onApplied }) => {
                                         {r.direction === "credit" ? "+" : "−"}{money(r.amount)}
                                     </span>
                                     <span className="text-gray-300 truncate flex-1 min-w-0" title={r.merchant}>{r.merchant || "—"}</span>
-                                    <span className={`flex-shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded ${r.source === "ai" ? "text-cyan-300 bg-cyan-600/15" : "text-blue-300 bg-blue-600/15"}`}>
-                                        {r.source === "ai" ? "AI" : "rule"}
+                                    <span className={`flex-shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded ${r.source === "learned" ? "text-emerald-300 bg-emerald-600/15" : r.source === "ai" ? "text-cyan-300 bg-cyan-600/15" : "text-blue-300 bg-blue-600/15"}`}>
+                                        {r.source === "learned" ? "learned" : r.source === "ai" ? "AI" : "rule"}
                                     </span>
                                     <select value={r.chosen} onChange={(e) => setRow(r.transaction_id, { chosen: e.target.value })}
                                         className="flex-shrink-0 bg-slate-800 border border-slate-600 rounded px-1.5 py-1 text-[11px] text-gray-200 outline-none focus:border-blue-500 w-36">

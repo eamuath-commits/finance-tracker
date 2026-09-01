@@ -2288,6 +2288,10 @@ def update_transaction(transaction_id: str, transaction_update: schemas.Transact
     updated_tx = crud.update_transaction(db, transaction_id, transaction_update)
     if not updated_tx:
         raise HTTPException(status_code=404, detail="Transaction not found")
+    # Learn from a manual category edit too, so the choice sticks for this merchant.
+    if getattr(transaction_update, "category", None):
+        crud.learn_category(db, current_user.id, updated_tx.merchant, updated_tx.category)
+        db.commit()
     return updated_tx
 
 @app.post("/transactions/", response_model=schemas.Transaction)
@@ -2331,15 +2335,20 @@ def categorize_transactions(body: dict, db: Session = Depends(get_db),
         raise HTTPException(status_code=400, detail="Provide transaction_ids or scope='uncategorized'")
     txs = q.order_by(models.Transaction.timestamp.desc()).limit(int(body.get("limit") or 200)).all()
 
+    learned = crud.learned_category_map(db, current_user.id)   # merchants you've taught it
     suggestions, ai_used = [], 0
     for t in txs:
-        r = categorizer.categorize_rules(t.merchant, t.notes, t.transaction_type, t.type)
-        if r:
-            cat, source = r
+        key = categorizer.merchant_key(t.merchant)
+        if key in learned:
+            cat, source = learned[key], "learned"
         else:
-            cat = ai_client.suggest_category(t.merchant, t.notes, float(t.amount or 0), t.type)
-            source = "ai" if cat else None
-            ai_used += 1 if cat else 0
+            r = categorizer.categorize_rules(t.merchant, t.notes, t.transaction_type, t.type)
+            if r:
+                cat, source = r
+            else:
+                cat = ai_client.suggest_category(t.merchant, t.notes, float(t.amount or 0), t.type)
+                source = "ai" if cat else None
+                ai_used += 1 if cat else 0
         if not cat:
             continue
         suggestions.append({
@@ -2356,16 +2365,20 @@ def categorize_transactions(body: dict, db: Session = Depends(get_db),
 @app.post("/transactions/categorize/apply")
 def apply_categories(body: dict, db: Session = Depends(get_db),
                      current_user: models.User = Depends(get_current_user)):
-    """Write accepted categories — targeted column update (no balance recompute)."""
+    """Write accepted categories (targeted column update, no balance recompute) and
+    LEARN each merchant -> category so it's auto-suggested next time."""
     applied = 0
     for it in body.get("items") or []:
         tid, cat = it.get("transaction_id"), (it.get("category") or "").strip()
         if not tid or not cat:
             continue
-        applied += db.query(models.Transaction).filter(
-            models.Transaction.user_id == current_user.id,
-            models.Transaction.id == tid,
-        ).update({models.Transaction.category: cat}, synchronize_session=False)
+        tx = db.query(models.Transaction).filter(
+            models.Transaction.user_id == current_user.id, models.Transaction.id == tid).first()
+        if not tx:
+            continue
+        tx.category = cat
+        crud.learn_category(db, current_user.id, tx.merchant, cat)
+        applied += 1
     db.commit()
     return {"applied": applied}
 

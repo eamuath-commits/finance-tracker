@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 import models
 import schemas
+import categorizer
 from typing import List, Optional
 from datetime import datetime, timedelta
 import re
@@ -881,6 +882,27 @@ def delete_obligation(db: Session, obligation_id: str):
 
 def get_transactions(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Transaction).order_by(models.Transaction.timestamp.desc()).offset(skip).limit(limit).all()
+
+
+def learn_category(db: Session, user_id: str, merchant: str, category: str):
+    """Remember 'this merchant -> this category' for the user (upsert). Caller
+    commits. Skips generic categories so we don't learn 'Other' as a preference."""
+    key = categorizer.merchant_key(merchant)
+    if not key or not category or category in ("Other", "Uncategorized", ""):
+        return
+    row = db.query(models.MerchantCategory).filter_by(user_id=user_id, merchant_key=key).first()
+    if row:
+        row.category = category
+        row.hits = (row.hits or 0) + 1
+        row.updated_at = datetime.utcnow()
+    else:
+        db.add(models.MerchantCategory(user_id=user_id, merchant_key=key, category=category))
+
+
+def learned_category_map(db: Session, user_id: str) -> dict:
+    """{merchant_key: category} the user has confirmed before."""
+    return {r.merchant_key: r.category
+            for r in db.query(models.MerchantCategory).filter_by(user_id=user_id).all()}
 
 def update_transaction(db: Session, transaction_id: str, transaction_update: schemas.TransactionUpdate):
     db_tx = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()

@@ -25,6 +25,15 @@ def _has(text: str, *terms: str) -> bool:
     return any(t in text for t in terms)
 
 
+def merchant_key(merchant: Optional[str]) -> str:
+    """Normalize a merchant for the learned-category memory, so small variations
+    ('MOONYCOZY* MOONY-29332', 'Amazon SA  ') collapse to one key."""
+    m = (merchant or "").strip().lower()
+    m = re.sub(r"[\*#].*$", "", m)        # drop trailing "*ref" / "#ref"
+    m = re.sub(r"\s+\d{3,}\S*$", "", m)   # drop trailing numeric reference tokens
+    return re.sub(r"\s+", " ", m).strip()
+
+
 # "STC Bank / STC Pay / STC Wallet" is a bank/digital wallet — NOT the telecom
 # operator. A transaction there is categorized by what it actually is, never as
 # Telecom. (The operator STC — recharge/postpaid/internet — IS Telecom.)

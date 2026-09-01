@@ -374,6 +374,23 @@ class AllocationRule(Base):
     identifier = Column(String, nullable=False)  # Category name or Loan name
     target_account_id = Column(String, ForeignKey("accounts.id"), nullable=False)  # Target envelope account
 
+class MerchantCategory(Base):
+    """Learned merchant -> category memory. Grows from the user's confirmations
+    (Suggest-categories applies + manual category edits): once a merchant is
+    categorized, the same category is auto-suggested next time. This is the
+    practical "it learns from me" — a per-user lookup, not model fine-tuning."""
+    __tablename__ = "merchant_categories"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)
+    merchant_key = Column(String, nullable=False, index=True)  # normalized merchant
+    category = Column(String, nullable=False)
+    hits = Column(Integer, default=1)                          # times confirmed
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint('user_id', 'merchant_key', name='uq_merchant_cat_user_key'),)
+
+
 # (AllocationHistory model removed — dead 50/30/20 snapshot table, never written or read)
 
 class Distribution(Base):
