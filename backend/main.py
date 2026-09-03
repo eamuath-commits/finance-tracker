@@ -2776,6 +2776,7 @@ def _enrich_response(result, sources=None):
                 "shape": p.shape,
                 "truncated": p.truncated,
                 "raw_sms": p.raw_sms,
+                "sms_guid": p.sms_guid,
             }
             for p in result.proposals
         ],
@@ -2882,6 +2883,41 @@ def _attach_account_labels(db: Session, user_id: str, *buckets):
             it["account"] = n or "Unassigned"
 
 
+def _attach_ledger_detail(db: Session, user_id: str, *buckets):
+    """Attach the row's full ledger detail (account, category, notes, the
+    statement's own row text, balance, bank action, FX) to each bucket item, so
+    the reviewer/approver can see the whole transaction before naming it — the
+    matcher itself only carries amount, date and the generic label."""
+    ids = [it["transaction_id"] for b in buckets for it in b
+           if isinstance(it, dict) and it.get("transaction_id")]
+    if not ids:
+        return
+    name_by_id = {a.id: a.name for a in db.query(models.Account).filter(
+        models.Account.user_id == user_id).all()}
+    for cc in db.query(models.CreditCard).filter(models.CreditCard.user_id == user_id).all():
+        name_by_id[cc.id] = getattr(cc, "name", None) or "Credit card"
+    tx_by_id = {t.id: t for t in db.query(models.Transaction).filter(
+        models.Transaction.id.in_(ids)).all()}
+    for b in buckets:
+        for it in b:
+            if not isinstance(it, dict):
+                continue
+            t = tx_by_id.get(it.get("transaction_id"))
+            if not t:
+                continue
+            it["detail"] = {
+                "account_name": name_by_id.get(t.account_id) or name_by_id.get(t.credit_card_id),
+                "category": t.category,
+                "notes": t.notes,
+                "description": t.raw_sms_content,
+                "type": t.type,
+                "balance_after": float(t.balance_after_transaction) if t.balance_after_transaction is not None else None,
+                "txn_type": t.transaction_type,
+                "original_amount": float(t.original_amount) if t.original_amount is not None else None,
+                "original_currency": t.original_currency,
+            }
+
+
 @app.get("/api/sms/enrich/state")
 def sms_enrich_state(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Live enrichment state for the persistent review dashboard, in four buckets:
@@ -2918,31 +2954,10 @@ def sms_enrich_state(db: Session = Depends(get_db), current_user: models.User = 
     no_match = details.get("no_sms_found", []) + details.get("sms_has_no_name", [])
     review = details.get("contested", [])
 
-    # Attach ledger detail to each ambiguous row so the reviewer has enough
-    # context (account, category, the statement's own row text, notes, FX) to
-    # decide which candidate name is correct — the matcher only carries amount,
-    # date and the generic label.
-    rev_ids = [r.get("transaction_id") for r in review if isinstance(r, dict) and r.get("transaction_id")]
-    if rev_ids:
-        name_by_id = {a.id: a.name for a in db.query(models.Account).filter(
-            models.Account.user_id == current_user.id).all()}
-        for cc in db.query(models.CreditCard).filter(models.CreditCard.user_id == current_user.id).all():
-            name_by_id[cc.id] = getattr(cc, "name", None) or "Credit card"
-        tx_by_id = {t.id: t for t in db.query(models.Transaction).filter(
-            models.Transaction.id.in_(rev_ids)).all()}
-        for r in review:
-            t = tx_by_id.get(r.get("transaction_id")) if isinstance(r, dict) else None
-            if not t:
-                continue
-            r["detail"] = {
-                "account_name": name_by_id.get(t.account_id) or name_by_id.get(t.credit_card_id),
-                "category": t.category,
-                "notes": t.notes,
-                "description": t.raw_sms_content,
-                "type": t.type,
-                "original_amount": float(t.original_amount) if t.original_amount is not None else None,
-                "original_currency": t.original_currency,
-            }
+    # Attach the full ledger detail to each ambiguous row (and, further down, each
+    # ready proposal) so the reviewer/approver can see the whole transaction —
+    # account, category, statement text, notes, balance, FX — before naming it.
+    _attach_ledger_detail(db, current_user.id, review)
 
     # User-ignored rows are kept out of the active buckets and listed separately
     # (reversible via un-ignore), so the review worklist can be cleared down.
@@ -2980,6 +2995,9 @@ def sms_enrich_state(db: Session = Depends(get_db), current_user: models.User = 
         nm_removed += n_nm2 - len(no_match)
         payload["proposals"] = list(xfer_props.values()) + payload["proposals"]
 
+    # Ready proposals get the same full detail, so a name can be approved with the
+    # transaction and the naming SMS in view (never blind).
+    _attach_ledger_detail(db, current_user.id, payload["proposals"])
     _attach_account_labels(db, current_user.id, payload["proposals"], review, no_match, enriched, ignored)
 
     return {

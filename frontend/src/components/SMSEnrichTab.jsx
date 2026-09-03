@@ -45,14 +45,18 @@ const DetailPanel = ({ d }) => {
     if (!d) return null;
     const fx = d.original_amount != null && d.original_currency
         ? `${money(d.original_amount)} ${d.original_currency}` : null;
-    const empty = !d.account_name && !d.category && !fx && !d.description && !d.notes;
+    const bal = d.balance_after != null ? money(d.balance_after) : null;
+    const empty = !d.account_name && !d.category && !fx && !d.description && !d.notes
+        && !bal && !d.txn_type;
     return (
         <div className="rounded-md border border-slate-700/40 bg-slate-800/30 px-2 py-1.5 mb-2 space-y-0.5">
             {d.account_name && <DetailRow label="Account">{d.account_name}</DetailRow>}
             {d.category && <DetailRow label="Category">{d.category}</DetailRow>}
+            {d.txn_type && <DetailRow label="Bank action">{d.txn_type}</DetailRow>}
+            {bal && <DetailRow label="Balance after">{bal}</DetailRow>}
             {fx && <DetailRow label="Original">{fx}</DetailRow>}
-            {d.description && <DetailRow label="Statement">{d.description}</DetailRow>}
             {d.notes && <DetailRow label="Notes">{d.notes}</DetailRow>}
+            {d.description && <DetailRow label="Statement">{d.description}</DetailRow>}
             {empty && <p className="text-[10px] text-gray-500">No extra detail recorded for this row.</p>}
         </div>
     );
@@ -87,6 +91,7 @@ const SMSEnrichTab = ({ onApplied }) => {
     const [open, setOpen] = useState({ no_match: false, enriched: false, ignored: false });
     const [selected, setSelected] = useState(new Set());  // review tx_ids checked for bulk ignore
     const [openDetail, setOpenDetail] = useState({});   // review tx_id -> ledger details expanded
+    const [openReady, setOpenReady] = useState({});     // ready tx_id -> proposal details expanded
     const [openSms, setOpenSms] = useState({});         // "tx_id:i" -> full SMS expanded
     const [acctFilter, setAcctFilter] = useState("all"); // account label to scope the view
 
@@ -292,16 +297,40 @@ const SMSEnrichTab = ({ onApplied }) => {
                         </div>
                         <div className="max-h-80 overflow-y-auto space-y-1">
                             {fReady.map((p) => (
-                                <div key={p.transaction_id} className="flex items-center gap-2 text-[11px] border-b border-slate-800/60 last:border-b-0 py-1">
-                                    <span className="text-gray-500 w-14 flex-shrink-0">{shortDate(p.tx_timestamp)}</span>
-                                    <Amount amount={p.amount} direction={p.direction} />
-                                    <span className="text-gray-500 line-through truncate max-w-[90px]">{p.old_merchant || "—"}</span>
-                                    <ArrowRight size={11} className="text-gray-500 flex-shrink-0" />
-                                    <span className="text-cyan-200 font-medium truncate flex-1">{p.new_merchant}</span>
-                                    <button onClick={() => applyOne(p)} disabled={busy === p.transaction_id}
-                                        className="flex-shrink-0 text-[10px] font-semibold text-cyan-300 bg-cyan-600/15 hover:bg-cyan-600/30 disabled:opacity-50 border border-cyan-500/30 rounded px-1.5 py-0.5 transition">
-                                        {busy === p.transaction_id ? "…" : "Apply"}
-                                    </button>
+                                <div key={p.transaction_id} className="border-b border-slate-800/60 last:border-b-0 py-1">
+                                    <div className="flex items-center gap-2 text-[11px]">
+                                        <span className="text-gray-500 w-14 flex-shrink-0">{shortDate(p.tx_timestamp)}</span>
+                                        <Amount amount={p.amount} direction={p.direction} />
+                                        <span className="text-gray-500 line-through truncate max-w-[90px]" title={p.old_merchant}>{p.old_merchant || "—"}</span>
+                                        <ArrowRight size={11} className="text-gray-500 flex-shrink-0" />
+                                        <span className="text-cyan-200 font-medium truncate flex-1" title={p.new_merchant}>{p.new_merchant}</span>
+                                        <button type="button" onClick={() => setOpenReady((o) => ({ ...o, [p.transaction_id]: !o[p.transaction_id] }))}
+                                            className="flex-shrink-0 text-[10px] font-medium text-gray-400 hover:text-white flex items-center gap-0.5 transition">
+                                            {openReady[p.transaction_id] ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Details
+                                        </button>
+                                        <button onClick={() => applyOne(p)} disabled={busy === p.transaction_id}
+                                            className="flex-shrink-0 text-[10px] font-semibold text-cyan-300 bg-cyan-600/15 hover:bg-cyan-600/30 disabled:opacity-50 border border-cyan-500/30 rounded px-1.5 py-0.5 transition">
+                                            {busy === p.transaction_id ? "…" : "Apply"}
+                                        </button>
+                                    </div>
+                                    {openReady[p.transaction_id] && (
+                                        <div className="mt-1.5 ml-16 mr-1">
+                                            {p.account && <div className="text-[10px] text-gray-500 mb-1">On account: <span className="text-gray-300">{p.account}</span></div>}
+                                            <DetailPanel d={p.detail} />
+                                            {p.raw_sms ? (
+                                                <div className="rounded-md border border-slate-700/40 bg-slate-800/30 px-2 py-1.5 space-y-1">
+                                                    <div className="text-[9px] uppercase tracking-wide text-gray-600">SMS that named it</div>
+                                                    <div className="text-[10.5px] text-gray-300 whitespace-pre-wrap break-words max-h-40 overflow-y-auto leading-relaxed">{p.raw_sms.trim()}</div>
+                                                    {p.sms_timestamp && (
+                                                        <div className="text-[10px] text-gray-500">SMS sent {shortDateTime(p.sms_timestamp)}{p.delta_seconds != null ? ` · ${humanTiming(p.delta_seconds)}` : ""}</div>
+                                                    )}
+                                                    {p.sms_guid && <div className="text-[9px] text-gray-600 font-mono break-all">id {p.sms_guid}</div>}
+                                                </div>
+                                            ) : (
+                                                <div className="text-[10px] text-gray-500 italic px-1">Named from the statement's own counterparty account (no SMS needed).</div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
