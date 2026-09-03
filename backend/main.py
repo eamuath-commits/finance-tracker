@@ -2737,6 +2737,13 @@ def _statement_txrows(db: Session, user_id: str) -> List[sms_enrichment.TxRow]:
             s |= card_l4.get(r.credit_card_id, set())
         return frozenset(s)
 
+    def _cpref(r):
+        # The counterparty account the statement recorded for this row ("Acct: …"),
+        # reduced to last-4, so a transfer SMS to a specific account matches only
+        # the row that went to that same account.
+        m = _ACCT_IN_NOTE_RE.search(r.notes or "")
+        return m.group(1)[-4:] if m else None
+
     return [
         sms_enrichment.TxRow(
             id=r.id, timestamp=r.timestamp,
@@ -2744,6 +2751,7 @@ def _statement_txrows(db: Session, user_id: str) -> List[sms_enrichment.TxRow]:
             bank=banks.get(r.statement_id),
             row_index=r.statement_row_index,
             acct_refs=_refs(r),
+            counterparty_ref=_cpref(r),
         )
         for r in rows
     ]

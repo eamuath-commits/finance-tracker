@@ -553,3 +553,63 @@ class TestCardRefExtraction:
         # From:/To:/Acc: are the funding account or the counterparty, never the instrument.
         assert E._card_ref("Debit Transfer Sponsored\nAmount:200SAR\nto:AJITH\nAcc:0404*") is None
         assert E._card_ref("Debit Internal Transfer\nFrom:1505\nTo:MOHAMMED\nTo:0477") is None
+
+
+class TestCounterpartyAccountGate:
+    """Two same-amount, same-minute transfers that differ only by DESTINATION
+    account must be told apart by that account — never cross-named, and no manual
+    pick. The real case: SR2000 to an external account 6948 and SR2000 to the own
+    'Grocery' account 2104, both at 19:42, both naming SARAH ALALMAEE."""
+
+    def _row(self, tid, ts, cpref, merchant):
+        return E.TxRow(id=tid, timestamp=datetime.strptime(ts, "%Y-%m-%d %H:%M:%S"),
+                       amount=2000.0, type="debit", merchant=merchant, counterparty_ref=cpref)
+
+    def test_transfer_matches_only_the_row_with_the_same_counterparty_account(self):
+        a = _sms("2026-03-19 19:42:22", "Debit Internal Transfer\nFrom:3264\nAmount:SAR 2000\nTo:SARAH ALALMAEE\nTo:6948\n26/3/19 19:42")
+        b = _sms("2026-03-19 19:42:41", "Debit Internal Transfer\nFrom:3264\nAmount:SAR 2000\nTo:SARAH ALALMAEE\nTo:2104\n26/3/19 19:42")
+        rows = [self._row("ext", "2026-03-19 19:42:22", "6948", "ساره"),                   # external leg (generic)
+                self._row("own", "2026-03-19 19:42:41", "2104", "Transfer → Grocery")]     # own leg (already named)
+        res = E.match(E.parse_exports([a, b]), rows)
+        by_id = {p.transaction_id: p.new_merchant for p in res.proposals}
+        assert by_id.get("ext") == "SARAH ALALMAEE"    # named by the 6948 SMS, cleanly
+        assert "own" not in by_id                       # already named, left untouched
+        assert res.coverage["contested"] == 0           # the account splits them — no manual pick
+
+    def test_gate_fails_open_when_the_row_has_no_counterparty_account(self):
+        a = _sms("2026-03-19 19:42:22", "Debit Internal Transfer\nFrom:3264\nAmount:SAR 2000\nTo:MOHAMMED\nTo:6948\n26/3/19 19:42")
+        rows = [_tx("t1", "2026-03-19 19:42:22", 2000.0, "debit", "محمد")]   # no Acct: note -> counterparty_ref None
+        res = E.match(E.parse_export(a), rows)
+        assert len(res.proposals) == 1 and res.proposals[0].new_merchant == "MOHAMMED"
+
+
+class TestMessageId:
+    """Newer exports prefix each record with a stable per-message id; it is
+    captured, adopted across id-less duplicates, and never collapses two genuinely
+    different messages."""
+
+    def _sms_id(self, guid, ts, body):
+        return f"----------------------------------------------------\n{guid}\n{ts} from AlRajhiBank\n\n{body}\n"
+
+    def test_guid_captured_when_present(self):
+        raw = self._sms_id("B16DD99E-1061-C13F-99F0-7515A9FEBBC4", "2026-08-25 12:46:24",
+                           "Credit Transfer Local\nAmount:SR 100\nFrom:DELL TECHNOLOGIES SINGLE LLC\n25/8/26 12:46")
+        assert E.parse_export(raw)[0].guid == "B16DD99E-1061-C13F-99F0-7515A9FEBBC4"
+
+    def test_guid_absent_is_none(self):
+        assert E.parse_export(_sms("2026-08-25 12:46:24", "Credit Transfer Local\nAmount:SR 100\nFrom:X\n"))[0].guid is None
+
+    def test_id_backfilled_from_the_copy_that_has_it(self):
+        body = "Credit Transfer Local\nAmount:SR 100\nFrom:DELL TECHNOLOGIES SINGLE LLC\n25/8/26 12:46"
+        old = _sms("2026-08-25 12:46:24", body)                                    # older, id-less export
+        new = self._sms_id("B16DD99E-1061-C13F-99F0-7515A9FEBBC4", "2026-08-25 12:46:24", body)
+        evs = E.parse_exports([old, new])
+        assert len(evs) == 1                                                        # same message collapses
+        assert evs[0].guid == "B16DD99E-1061-C13F-99F0-7515A9FEBBC4"               # id adopted from the copy that has it
+
+    def test_different_messages_keep_distinct_ids(self):
+        a = self._sms_id("EF473A23-942A-D1FF-D191-372FD00DBF9C", "2026-03-19 19:42:22",
+                         "Debit Internal Transfer\nAmount:SAR 2000\nTo:SARAH ALALMAEE\nTo:6948\n26/3/19 19:42")
+        b = self._sms_id("438F2635-7F23-8133-D605-2372AA7C9874", "2026-03-19 19:42:41",
+                         "Debit Internal Transfer\nAmount:SAR 2000\nTo:SARAH ALALMAEE\nTo:2104\n26/3/19 19:42")
+        assert len({e.guid for e in E.parse_exports([a, b])}) == 2                 # distinct messages, not deduped

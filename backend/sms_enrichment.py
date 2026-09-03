@@ -108,6 +108,12 @@ _HEADER = re.compile(
     r"^(?P<ts>\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})\s+from\s+(?P<sender>.+?)\s*$",
     re.MULTILINE,
 )
+# Newer exports prefix each record with a stable per-message id (the iOS message
+# GUID, e.g. "B16DD99E-1061-C13F-99F0-7515A9FEBBC4") on the line above the header.
+# It is the same id every time the same message is exported, so it is a reliable
+# de-dup / provenance key. Older exports lack it (guid stays None then).
+_GUID = re.compile(r"^\s*([0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
+                   r"[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})\s*$", re.MULTILINE)
 
 # Amount: currency may lead or trail the number, with or without a space, and an
 # Arabic tatweel ("بـSR") may precede the code — hence a non-alphanumeric
@@ -197,6 +203,8 @@ class Event:
     name: Optional[str] = None
     is_local: bool = False      # amount comparable to a SAR statement row
     card_ref: Optional[str] = None    # last-4 of the CARD this SMS moved money on
+    dest_ref: Optional[str] = None    # last-4 of the COUNTERPARTY account this transfer moved to/from
+    guid: Optional[str] = None        # stable per-message id from the export (newer exports only)
 
     @property
     def matchable(self) -> bool:
@@ -465,6 +473,19 @@ def _card_ref(body: str) -> Optional[str]:
     return None
 
 
+def _counterparty_ref(body: str, direction: Optional[str]) -> Optional[str]:
+    """Last-4 of the OTHER account a transfer moves money to/from — the numeric
+    'To:1234' on an outgoing transfer, the 'From:1234' on an incoming one. This is
+    the counterparty account (what the statement records as the row's 'Acct:'),
+    NEVER the user's own funding side. Used only to EXCLUDE a row whose known
+    counterparty account differs — so two same-amount, same-minute transfers that
+    differ only by destination (one to an own account, one external) can be told
+    apart. Returns None when the field carries only a name (fail-open)."""
+    field = "From" if direction == "credit" else "To"
+    m = re.search(r"(?im)^\s*" + field + r"\s*:\s*\**\s*(\d{3,})\s*$", body)
+    return m.group(1)[-4:] if m else None
+
+
 def parse_export(raw: str) -> List[Event]:
     """Parse a bulk SMS text export into a list of Events (any encoding of the
     AlRajhi phone export). Never raises on a malformed record — it is skipped."""
@@ -483,10 +504,15 @@ def parse_export(raw: str) -> List[Event]:
             ts = None
         sender = hm.group("sender").strip()
         body = chunk[hm.end():].strip()
+        # The per-message id, if this export carries one, sits on its own line
+        # above the header (in the pre-header slice) — never inside the body.
+        gm = _GUID.search(chunk[:hm.start()])
 
-        ev = Event(index=idx, timestamp=ts, sender=sender, body=body)
+        ev = Event(index=idx, timestamp=ts, sender=sender, body=body,
+                   guid=gm.group(1).upper() if gm else None)
         ev.kind, ev.shape, ev.direction, ev.name = classify(body, sender)
         ev.card_ref = _card_ref(body)
+        ev.dest_ref = _counterparty_ref(body, ev.direction)
         if ev.kind != _NOISE:
             ev.amount, ev.currency = parse_amount(body)
             ev.is_local = ev.currency in LOCAL_CURRENCIES
@@ -507,15 +533,31 @@ def parse_exports(raws: List[str]) -> List[Event]:
     both claim the same transaction, the row would look contested, and the
     bijection would correctly refuse to enrich it. So identical messages
     (same header timestamp + same body) collapse to one.
+
+    The message-id, when the export carries one, is an additional collapse key:
+    it survives whitespace/format drift that (timestamp, body) would not. It only
+    ever collapses the SAME message across exports — genuinely different messages
+    carry different ids, so two SR2000 transfers to the same person stay distinct.
     """
-    seen = set()
+    by_body: Dict = {}       # body_key -> the kept Event
+    seen_guid = set()
     out: List[Event] = []
     for raw in raws:
         for ev in parse_export(raw):
-            key = (ev.timestamp, ev.body.strip())
-            if key in seen:
+            body_key = (ev.timestamp, ev.body.strip())
+            kept = by_body.get(body_key)
+            if kept is not None:
+                # Same message seen before (usually from an older, id-less export):
+                # keep the original, but adopt the id if this copy carries one.
+                if kept.guid is None and ev.guid:
+                    kept.guid = ev.guid
+                    seen_guid.add(ev.guid)
                 continue
-            seen.add(key)
+            if ev.guid and ev.guid in seen_guid:
+                continue
+            by_body[body_key] = ev
+            if ev.guid:
+                seen_guid.add(ev.guid)
             out.append(ev)
     return out
 
@@ -611,6 +653,7 @@ class TxRow:
     bank: Optional[str] = None   # bank_key of the row's statement, for same-bank gating
     row_index: Optional[int] = None  # statement print order (= chronological), to order a same-day cluster
     acct_refs: frozenset = frozenset()  # last-4 of this row's account/card (+aliases), for instrument gating
+    counterparty_ref: Optional[str] = None  # last-4 of the row's counterparty account (from statement notes)
 
 
 @dataclass
@@ -626,6 +669,7 @@ class Proposal:
     shape: str
     truncated: bool          # bank-truncated ~9-char fragment
     raw_sms: str
+    sms_guid: Optional[str] = None   # id of the SMS that named this row (provenance)
 
 
 @dataclass
@@ -671,6 +715,15 @@ def _candidate(ev: Event, tx: TxRow) -> bool:
     # match that works today is lost (the account was originally dropped only
     # because it did not resolve; associated card last-4s now make it resolvable).
     if ev.card_ref and tx.acct_refs and ev.card_ref not in tx.acct_refs:
+        return False
+    # Counterparty-account gate: a transfer names a SPECIFIC other account. When
+    # the SMS's counterparty account and the row's counterparty account are both
+    # known and differ, they are different transfers — exclude, even at the same
+    # amount and instant. This is what splits two same-amount, same-minute
+    # transfers that differ only by destination (one to an own account, one
+    # external). Fail-open when either side is unknown, so nothing that matches
+    # today is lost.
+    if ev.dest_ref and tx.counterparty_ref and ev.dest_ref != tx.counterparty_ref:
         return False
     # Date-only statement rows (STC, Aljazira) carry no posting time — every row is
     # stamped 00:00:00 — so the 45s window can never reach them. Match on calendar
@@ -825,6 +878,7 @@ def match(events: List[Event], txs: List[TxRow],
             shape=e.shape,
             truncated=_is_truncated(name, e.shape),
             raw_sms=e.body,
+            sms_guid=e.guid,
         ))
 
     # ── Order-based cluster disambiguation ──
@@ -875,6 +929,7 @@ def match(events: List[Event], txs: List[TxRow],
                 amount=t.amount, direction=t.type, tx_timestamp=t.timestamp,
                 sms_timestamp=e.timestamp, delta_seconds=(e.timestamp - t.timestamp).total_seconds(),
                 shape=e.shape, truncated=_is_truncated(name, e.shape), raw_sms=e.body,
+                sms_guid=e.guid,
             ))
 
     res.skipped = skipped
