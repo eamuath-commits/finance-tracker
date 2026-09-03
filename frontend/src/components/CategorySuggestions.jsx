@@ -3,6 +3,7 @@ import api, { API_URL } from "../utils/api";
 import { Modal } from "./UI";
 
 const money = (v) => Math.abs(Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const shortDate = (iso) => (iso ? new Date(iso).toLocaleDateString(undefined, { year: "2-digit", month: "short", day: "numeric" }) : "—");
 import { Loader2, Sparkles, CheckCircle2, Cpu, ListChecks } from "lucide-react";
 
 // Review-and-confirm categorization. Fetches suggestions (deterministic rules +
@@ -48,7 +49,7 @@ const CategorySuggestions = ({ isOpen, onClose, onApplied }) => {
 
     if (!isOpen) return null;
     return (
-        <Modal isOpen={true} title="Suggested categories" onClose={onClose}>
+        <Modal isOpen={true} title="Suggested categories" onClose={onClose} size="xl">
             <div className="space-y-3">
                 <div className="flex items-center gap-2 text-[12px] text-gray-400">
                     <ListChecks size={15} className="text-blue-400" />
@@ -71,21 +72,36 @@ const CategorySuggestions = ({ isOpen, onClose, onApplied }) => {
                             <input type="checkbox" checked={allSel} onChange={() => setRows((rs) => rs.map((r) => ({ ...r, selected: !allSel })))} className="accent-blue-500" />
                             Select all
                         </label>
-                        <div className="max-h-[26rem] overflow-y-auto space-y-1 pr-1">
+                        <div className="max-h-[30rem] overflow-y-auto space-y-2 pr-1">
                             {rows.map((r) => (
-                                <div key={r.transaction_id} className="flex items-center gap-2 text-[11px] border-b border-slate-800/60 last:border-b-0 py-1.5">
-                                    <input type="checkbox" checked={r.selected} onChange={() => setRow(r.transaction_id, { selected: !r.selected })} className="accent-blue-500 flex-shrink-0" />
-                                    <span className={`font-mono w-20 text-right flex-shrink-0 ${r.direction === "credit" ? "text-emerald-400" : "text-red-400"}`}>
-                                        {r.direction === "credit" ? "+" : "−"}{money(r.amount)}
-                                    </span>
-                                    <span className="text-gray-300 truncate flex-1 min-w-0" title={r.merchant}>{r.merchant || "—"}</span>
-                                    <span className={`flex-shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded ${r.source === "learned" ? "text-emerald-300 bg-emerald-600/15" : r.source === "ai" ? "text-cyan-300 bg-cyan-600/15" : "text-blue-300 bg-blue-600/15"}`}>
-                                        {r.source === "learned" ? "learned" : r.source === "ai" ? "AI" : "rule"}
-                                    </span>
-                                    <select value={r.chosen} onChange={(e) => setRow(r.transaction_id, { chosen: e.target.value })}
-                                        className="flex-shrink-0 bg-slate-800 border border-slate-600 rounded px-1.5 py-1 text-[11px] text-gray-200 outline-none focus:border-blue-500 w-36">
-                                        {cats.map((c) => <option key={c} value={c}>{c}</option>)}
-                                    </select>
+                                <div key={r.transaction_id} className="rounded-lg border border-slate-700/50 bg-slate-900/40 p-2.5">
+                                    {/* Full transaction context so you can decide */}
+                                    <div className="flex items-start gap-2">
+                                        <input type="checkbox" checked={r.selected} onChange={() => setRow(r.transaction_id, { selected: !r.selected })}
+                                            className="accent-blue-500 flex-shrink-0 mt-1" />
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 text-[11px]">
+                                                <span className="text-gray-500 flex-shrink-0">{shortDate(r.timestamp)}</span>
+                                                <span className={`font-mono font-semibold ${r.direction === "credit" ? "text-emerald-400" : "text-red-400"}`}>
+                                                    {r.direction === "credit" ? "+" : "−"}{money(r.amount)}
+                                                </span>
+                                                {r.account && <span className="text-gray-500 truncate">· {r.account}</span>}
+                                            </div>
+                                            <div className="text-[12.5px] font-medium text-gray-200 break-words mt-0.5">{r.merchant || "—"}</div>
+                                            {r.notes && <div className="text-[10px] text-gray-500 break-words mt-0.5 whitespace-pre-wrap">{r.notes}</div>}
+                                        </div>
+                                    </div>
+                                    {/* Decision row */}
+                                    <div className="flex items-center gap-2 mt-2 ml-6 flex-wrap">
+                                        {r.current_category && <span className="text-[10px] text-gray-500">now: {r.current_category} →</span>}
+                                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${r.source === "learned" ? "text-emerald-300 bg-emerald-600/15" : r.source === "ai" ? "text-cyan-300 bg-cyan-600/15" : "text-blue-300 bg-blue-600/15"}`}>
+                                            {r.source === "learned" ? "learned" : r.source === "ai" ? "AI" : "rule"}
+                                        </span>
+                                        <select value={r.chosen} onChange={(e) => setRow(r.transaction_id, { chosen: e.target.value })}
+                                            className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-[11px] text-gray-200 outline-none focus:border-blue-500 w-40">
+                                            {cats.map((c) => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
                                 </div>
                             ))}
                         </div>

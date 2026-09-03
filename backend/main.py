@@ -2336,6 +2336,9 @@ def categorize_transactions(body: dict, db: Session = Depends(get_db),
     txs = q.order_by(models.Transaction.timestamp.desc()).limit(int(body.get("limit") or 200)).all()
 
     learned = crud.learned_category_map(db, current_user.id)   # merchants you've taught it
+    acct_name = {a.id: a.name for a in db.query(models.Account).filter(models.Account.user_id == current_user.id).all()}
+    for cc in db.query(models.CreditCard).filter(models.CreditCard.user_id == current_user.id).all():
+        acct_name[cc.id] = getattr(cc, "name", None) or "Credit card"
     suggestions, ai_used = [], 0
     for t in txs:
         key = categorizer.merchant_key(t.merchant)
@@ -2356,6 +2359,8 @@ def categorize_transactions(body: dict, db: Session = Depends(get_db),
             "merchant": t.merchant, "amount": float(t.amount or 0), "direction": t.type,
             "timestamp": t.timestamp.isoformat() if t.timestamp else None,
             "current_category": t.category,
+            "notes": (t.notes or "")[:220],
+            "account": acct_name.get(t.account_id) or acct_name.get(t.credit_card_id),
         })
     return {"suggestions": suggestions, "count": len(suggestions),
             "ai_available": ai_client.available(), "ai_used": ai_used,
