@@ -3,8 +3,10 @@ import api, { API_URL } from "../utils/api";
 import { Modal } from "./UI";
 
 const money = (v) => Math.abs(Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const signed = (v) => (Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const shortDate = (iso) => (iso ? new Date(iso).toLocaleDateString(undefined, { year: "2-digit", month: "short", day: "numeric" }) : "—");
-import { Loader2, Sparkles, CheckCircle2, Cpu, ListChecks } from "lucide-react";
+const longDateTime = (iso) => (iso ? new Date(iso).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
+import { Loader2, Sparkles, CheckCircle2, Cpu, ListChecks, ChevronRight } from "lucide-react";
 
 // Review-and-confirm categorization. Fetches suggestions (deterministic rules +
 // optional local AI), lets the user tweak/deselect, and applies on confirm.
@@ -16,10 +18,14 @@ const CategorySuggestions = ({ isOpen, onClose, onApplied }) => {
     const [cats, setCats] = useState([]);
     const [meta, setMeta] = useState({});
     const [applying, setApplying] = useState(false);
+    const [expanded, setExpanded] = useState(() => new Set());  // rows showing full detail
+    const toggleExpand = (id) => setExpanded((s) => {
+        const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n;
+    });
 
     useEffect(() => {
         if (!isOpen) return;
-        setLoading(true); setError(null); setRows([]);
+        setLoading(true); setError(null); setRows([]); setExpanded(new Set());
         api.post(`${API_URL}/transactions/categorize`, { scope: "uncategorized", limit: 60 })
             .then((res) => {
                 setCats(res.data.categories || []);
@@ -87,8 +93,35 @@ const CategorySuggestions = ({ isOpen, onClose, onApplied }) => {
                                                 </span>
                                                 {r.account && <span className="text-gray-500 truncate">· {r.account}</span>}
                                             </div>
-                                            <div className="text-[12.5px] font-medium text-gray-200 break-words mt-0.5">{r.merchant || "—"}</div>
+                                            <div className="flex items-start gap-1.5 mt-0.5">
+                                                <div className="text-[12.5px] font-medium text-gray-200 break-words flex-1 min-w-0">{r.merchant || "—"}</div>
+                                                <button type="button" onClick={() => toggleExpand(r.transaction_id)}
+                                                    className="flex-shrink-0 inline-flex items-center gap-0.5 text-[10px] text-gray-400 hover:text-blue-300 transition">
+                                                    <ChevronRight size={12} className={`transition-transform ${expanded.has(r.transaction_id) ? "rotate-90" : ""}`} />
+                                                    Details
+                                                </button>
+                                            </div>
                                             {r.notes && <div className="text-[10px] text-gray-500 break-words mt-0.5 whitespace-pre-wrap">{r.notes}</div>}
+                                            {expanded.has(r.transaction_id) && (
+                                                <div className="mt-2 rounded-md border border-slate-700/60 bg-slate-950/40 p-2 space-y-1.5 text-[10.5px]">
+                                                    {r.raw_sms ? (
+                                                        <div>
+                                                            <div className="text-[9px] uppercase tracking-wide text-gray-600 mb-0.5">Full text</div>
+                                                            <div className="text-gray-300 whitespace-pre-wrap break-words max-h-40 overflow-y-auto leading-relaxed">{r.raw_sms}</div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-gray-600 italic">No original message stored for this row.</div>
+                                                    )}
+                                                    <div className="grid grid-cols-2 gap-x-3 gap-y-1 pt-1 border-t border-slate-800/60">
+                                                        <div><span className="text-gray-600">When: </span><span className="text-gray-300">{longDateTime(r.timestamp)}</span></div>
+                                                        <div><span className="text-gray-600">Account: </span><span className="text-gray-300">{r.account || "—"}</span></div>
+                                                        {r.balance_after != null && <div><span className="text-gray-600">Balance after: </span><span className="text-gray-300 font-mono">{signed(r.balance_after)}</span></div>}
+                                                        {r.txn_type && <div><span className="text-gray-600">Bank action: </span><span className="text-gray-300">{r.txn_type}</span></div>}
+                                                        {r.origin && <div><span className="text-gray-600">Source: </span><span className="text-gray-300">{r.origin}</span></div>}
+                                                        {r.current_category && <div><span className="text-gray-600">Current: </span><span className="text-gray-300">{r.current_category}</span></div>}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     {/* Decision row */}

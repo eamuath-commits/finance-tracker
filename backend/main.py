@@ -2361,6 +2361,12 @@ def categorize_transactions(body: dict, db: Session = Depends(get_db),
             "current_category": t.category,
             "notes": (t.notes or "")[:220],
             "account": acct_name.get(t.account_id) or acct_name.get(t.credit_card_id),
+            # Full-detail fields (shown when the user expands a row to decide)
+            "raw_sms": (t.raw_sms_content or "")[:1500],
+            "balance_after": (float(t.balance_after_transaction)
+                              if t.balance_after_transaction is not None else None),
+            "txn_type": t.transaction_type,
+            "origin": t.source,
         })
     return {"suggestions": suggestions, "count": len(suggestions),
             "ai_available": ai_client.available(), "ai_used": ai_used,
