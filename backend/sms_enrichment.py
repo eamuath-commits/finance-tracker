@@ -545,6 +545,12 @@ _GENERIC_PREFIXES = (
 _GENERIC_EXACT = {"transfer", "pos", "purchase", "payment", "withdrawal", "deposit"}
 # One bare Arabic token (a first name) — the statement's usual counterparty label.
 _ARABIC_SINGLE = re.compile(r"^[؀-ۿ]+$")
+# SARIE — the Saudi instant-payment rail. The statement labels the RAIL plus a
+# payment-type word ("Sariee Inward Payments", "Sarie Payment Order", "Sariee
+# Outward Payments"), never the payer/payee — the real counterparty is only in
+# the matched SMS (From:/To:), so these placeholders may be overwritten. Anchored
+# to the rail's type-words so a real name that merely starts with "Sarie" is safe.
+_SARIE_RAIL = re.compile(r"^sarie{1,2}\s+(inward|outward|payment|order|credit|debit|transfer)")
 
 
 def is_generic_label(merchant: Optional[str]) -> bool:
@@ -561,6 +567,9 @@ def is_generic_label(merchant: Optional[str]) -> bool:
         return True
     # A single bare Arabic token is a first-name-only statement label.
     if _ARABIC_SINGLE.match(m):
+        return True
+    # SARIE instant-payment rail placeholder ("Sariee Inward Payments" etc.).
+    if _SARIE_RAIL.match(low):
         return True
     # "Debit T & F installments" and friends — a loan-instalment type label.
     if is_loan_label(m):

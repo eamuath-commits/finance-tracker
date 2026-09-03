@@ -260,11 +260,15 @@ class TestGenericLabelGate:
         for label in ("POS purchase Apple pay (Domestic)", "Online purchase (International)",
                       "Debit - Credit Cards Transactions", "Debit T & F installments", "معاذ",
                       # Musaned is the pay PLATFORM, not the payee — the SMS names the worker.
-                      "Musaned"):
+                      "Musaned",
+                      # SARIE instant-payment RAIL — labels the rail, not the counterparty.
+                      "Sariee Inward Payments", "Sarie Payment Order", "Sariee Outward Payments"):
             assert E.is_generic_label(label), f"{label!r} should be replaceable"
 
     def test_a_real_name_is_protected(self):
-        for label in ("HUNGERSTA", "MOHAMMED ISLAM", "SAUDI ELECTRIC COMPANY"):
+        for label in ("HUNGERSTA", "MOHAMMED ISLAM", "SAUDI ELECTRIC COMPANY",
+                      # a real name that merely STARTS with "Sarie" is not the rail.
+                      "SARIE ABDULLAH"):
             assert not E.is_generic_label(label), f"{label!r} must be protected"
 
     def test_loan_labels_are_recognised(self):
