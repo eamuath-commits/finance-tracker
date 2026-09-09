@@ -587,6 +587,19 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
 
     // --- Group allItems by category for the category-section view ---
     const groupedAllItems = useMemo(() => {
+        const oblMap = {};
+        obligations.forEach(o => { oblMap[o.id] = o; });
+        // Sort key = the obligation's effective DUE DATE within its payment month:
+        // arrears bills (billing_offset_months) fall a month later, and a match-day
+        // window uses its start day. Same order the row shows as "Due …". Undated
+        // obligations sink to the bottom.
+        const dueKey = (item) => {
+            const obl = oblMap[item.obligation_id];
+            if (!obl) return 99999;
+            const off = obl.billing_offset_months || 0;
+            const day = obl.match_day_from || obl.due_day || 99;
+            return off * 100 + day;
+        };
         const groups = {};
         allItems.forEach(item => {
             const cat = item.oblCategory || 'Other';
@@ -601,12 +614,16 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([cat, items]) => ({
                 category: cat,
-                items: [...items.planned, ...items.paid], // Budget first, then paid
+                // Ordered by due date (earliest first), planned + paid interleaved;
+                // name breaks ties.
+                items: [...items.planned, ...items.paid].sort(
+                    (a, b) => dueKey(a) - dueKey(b) || (a.oblName || '').localeCompare(b.oblName || '')
+                ),
                 paidCount: items.paid.length,
                 plannedCount: items.planned.length,
                 totalAmount: [...items.paid, ...items.planned].reduce((s, i) => s + (i.amount || 0), 0)
             }));
-    }, [allItems]);
+    }, [allItems, obligations]);
 
     const [collapsedCategories, setCollapsedCategories] = useState(new Set());
     const toggleCategory = (cat) => {
