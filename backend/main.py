@@ -1587,9 +1587,16 @@ def pay_obligation(obligation_id: str, payment: schemas.PaymentCreate, db: Sessi
     _require_owned(db, models.MonthlyObligation, obligation_id, current_user)
 
     try:
-        return crud.create_payment(db=db, obligation_id=obligation_id, payment=payment)
+        result = crud.create_payment(db=db, obligation_id=obligation_id, payment=payment)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    # Auto-cleanup: keep this month's distribution plan in step with the new forecast
+    # (e.g. forecasting to 0 removes the stale unlinked plan). Never fails the save.
+    try:
+        crud.reconcile_distribution_plan(db, current_user.id, obligation_id, payment.billing_month or "")
+    except Exception:
+        pass
+    return result
 
 @app.get("/obligations/{obligation_id}/payments")
 def read_obligation_payments(obligation_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -1662,9 +1669,16 @@ def read_obligation_history_legacy(obligation_id: str, db: Session = Depends(get
 @app.delete("/obligations/history/{payment_id}") # Backward compat URL for frontend
 def delete_payment(payment_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     _require_owned_payment(db, payment_id, current_user)
+    victim = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
+    obl_id = victim.obligation_id if victim else None
+    month = (victim.billing_month or "") if victim else ""
     killed = crud.delete_payment(db, payment_id)
     if not killed:
         raise HTTPException(status_code=404, detail="Payment entry not found")
+    try:
+        crud.reconcile_distribution_plan(db, current_user.id, obl_id, month)
+    except Exception:
+        pass
     return {"message": "Payment deleted"}
 
 @app.put("/obligations/history/{payment_id}", response_model=schemas.Payment) # Backward compat URL
@@ -1673,6 +1687,11 @@ def update_payment(payment_id: int, payment_update: schemas.PaymentUpdate, db: S
     updated = crud.update_payment(db, payment_id, payment_update)
     if not updated:
         raise HTTPException(status_code=404, detail="Payment entry not found")
+    # Auto-cleanup: keep the month's distribution plan in step with the changed forecast.
+    try:
+        crud.reconcile_distribution_plan(db, current_user.id, updated.obligation_id, updated.billing_month or "")
+    except Exception:
+        pass
     return updated
 
 # --- Auto-Match Obligations to Transactions ---

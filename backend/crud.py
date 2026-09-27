@@ -2137,6 +2137,55 @@ def calculate_allocation_preview(db: Session, source_account_id: str, month_offs
     )
 
 
+def reconcile_distribution_plan(db: Session, user_id: str, obligation_id: str, month_str: str) -> int:
+    """Keep a month's distribution PLAN in step with that month's OWN forecast.
+
+    When an obligation's expected amount for a month drops — the user forecasts it to
+    0, or lowers it — any UNLINKED (not-yet-executed) distribution plan the forecast
+    no longer justifies is deleted, or trimmed to fit. A distribution that has a
+    linked transaction is a real transfer already made and is NEVER touched. Each
+    month is reconciled against its own forecast only — months are never correlated,
+    so a change in one month never affects another. Returns rows deleted."""
+    if not obligation_id or not month_str:
+        return 0
+    month_str = month_str[:7]
+    expected = (obligation_expected_amounts(db, user_id, month_str).get(obligation_id) or {}).get("amount", 0) or 0
+
+    dists = db.query(models.Distribution).filter(
+        models.Distribution.obligation_id == obligation_id,
+        models.Distribution.billing_month == month_str,
+    ).all()
+    if not dists:
+        return 0
+
+    def _linked(d):
+        return bool(d.transaction_id) or db.query(models.DistributionTransaction).filter(
+            models.DistributionTransaction.distribution_id == d.id).count() > 0
+
+    linked_total = sum((d.amount or 0) for d in dists if _linked(d))
+    unlinked = [d for d in dists if not _linked(d)]
+    allowed = max(0.0, round(expected - linked_total, 2))
+
+    removed = 0
+    changed = False
+    budget = allowed
+    # Keep as many unlinked plans as the forecast still justifies (largest first),
+    # trim the one that overflows, delete the rest. allowed == 0 deletes them all.
+    for d in sorted(unlinked, key=lambda x: (x.amount or 0), reverse=True):
+        amt = d.amount or 0
+        if budget <= 0:
+            db.query(models.DistributionTransaction).filter(
+                models.DistributionTransaction.distribution_id == d.id).delete(synchronize_session=False)
+            db.delete(d); removed += 1; changed = True
+        elif amt > budget:
+            d.amount = round(budget, 2); budget = 0; changed = True
+        else:
+            budget -= amt
+    if changed:
+        db.commit()
+    return removed
+
+
 # --- Audit Functions ---
 
 def get_last_audit(db: Session, account_id: str):

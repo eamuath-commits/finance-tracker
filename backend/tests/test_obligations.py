@@ -233,6 +233,36 @@ class TestObligationsAPI:
         assert exp[oid]["amount"] == 0, exp[oid]
         assert exp[oid]["basis"] == "budget", exp[oid]
 
+    def test_zero_forecast_auto_cleans_distribution_plan(self, client, db_session, sample_account):
+        """B1 auto-cleanup: forecasting an obligation to 0 for a month removes the stale
+        UNLINKED distribution plan for that month — each month reconciled against its
+        own forecast, never correlated across months."""
+        import crud, models
+        from datetime import datetime
+
+        uid = db_session.query(models.User).filter(
+            models.User.username == client.test_username).first().id
+        acct = sample_account["id"]
+        oid = client.post("/obligations/", json={
+            "name": get_unique_name(), "due_day": 5, "category": "Bills",
+            "amount": 500.0, "target_account_id": acct,
+        }).json()["id"]
+
+        # Forecast this month to 0, and leave a stale UNLINKED distribution plan behind.
+        db_session.add(models.Payment(obligation_id=oid, user_id=uid, amount=0.0,
+                                      payment_date=datetime(2026, 8, 1).date(),
+                                      billing_month="2026-08-01", status=models.PaymentStatus.BUDGET))
+        db_session.add(models.Distribution(obligation_id=oid, user_id=uid,
+                                           source_account_id=acct, target_account_id=acct,
+                                           amount=500.0, billing_month="2026-08"))
+        db_session.flush()
+
+        removed = crud.reconcile_distribution_plan(db_session, uid, oid, "2026-08")
+        assert removed == 1
+        assert db_session.query(models.Distribution).filter(
+            models.Distribution.obligation_id == oid,
+            models.Distribution.billing_month == "2026-08").count() == 0
+
 
 class TestMatchHints:
     """_passes_match_hints: a text hint (bill number / name) is authoritative — it
