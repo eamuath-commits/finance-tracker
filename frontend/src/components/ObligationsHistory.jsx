@@ -854,57 +854,54 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                                             </div>
                                                                         )}
                                                                     </div>
-                                                                ) : item.linked_transactions && item.linked_transactions.length > 0 ? (
-                                                                    <div className="flex flex-wrap gap-1">
-                                                                        {item.linked_transactions.map(tx => (
-                                                                            <div key={tx.id} className="flex items-center gap-1.5 bg-purple-500/15 text-purple-400 text-[9px] px-2 py-1 rounded-lg border border-purple-500/25">
-                                                                                <button
-                                                                                    onClick={() => { setSelectedTransaction(tx); setShowTransactionDetail(true); }}
-                                                                                    className="hover:text-purple-200 flex items-center gap-1 text-left"
-                                                                                    title="View transaction details"
-                                                                                >
-                                                                                    <Eye size={10} />
-                                                                                    <span className="font-medium">{tx.merchant?.substring(0, 25) || 'Unknown'}</span>
-                                                                                    <span className="text-purple-300/60 font-mono text-[8px]">{formatCurrency(tx.amount)}</span>
-                                                                                    {tx.timestamp && <span className="text-cyan-300 text-[9px] whitespace-nowrap">· {new Date(tx.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}</span>}
-                                                                                </button>
-                                                                                <button
-                                                                                    onClick={() => handleUnlinkSingleTransaction(item.id, tx.id)}
-                                                                                    className="text-purple-500/50 hover:text-red-400 transition ml-0.5"
-                                                                                    title="Unlink"
-                                                                                >
-                                                                                    <Unlink size={9} />
-                                                                                </button>
-                                                                            </div>
-                                                                        ))}
-                                                                        <button onClick={() => openLinkModal(item)} className="text-slate-500 hover:text-purple-400 text-[9px] px-1 transition">+ Link</button>
-                                                                    </div>
-                                                                ) : item.transaction_id ? (
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <button
-                                                                            onClick={() => { setSelectedTransaction(item.linked_transaction); setShowTransactionDetail(true); }}
-                                                                            className="bg-purple-500/15 text-purple-400 text-[9px] px-2 py-1 rounded-lg border border-purple-500/25 flex items-center gap-1.5 hover:bg-purple-500/25 transition text-left"
-                                                                            title="View transaction details"
-                                                                        >
-                                                                            <Eye size={10} />
-                                                                            <span className="font-medium">{item.linked_transaction?.merchant?.substring(0, 25) || 'Linked'}</span>
-                                                                            {item.linked_transaction?.amount && (
-                                                                                <span className="text-purple-300/60 font-mono text-[8px]">{formatCurrency(item.linked_transaction.amount)}</span>
-                                                                            )}
-                                                                            {item.linked_transaction?.timestamp && <span className="text-cyan-300 text-[9px] whitespace-nowrap">· {new Date(item.linked_transaction.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}</span>}
-                                                                        </button>
-                                                                        <button onClick={() => handleUnlinkTransaction(item.id)} className="text-slate-500/50 hover:text-red-400 transition" title="Unlink">
-                                                                            <Unlink size={10} />
-                                                                        </button>
-                                                                    </div>
-                                                                ) : (
-                                                                    <button
-                                                                        onClick={() => openLinkModal(item)}
-                                                                        className="bg-slate-700/50 hover:bg-purple-600/50 text-slate-400 hover:text-purple-300 text-[9px] px-2 py-1 rounded border border-slate-600 hover:border-purple-500 font-bold uppercase tracking-wider transition flex items-center gap-1"
-                                                                    >
-                                                                        <DollarSign size={9} /> Link
-                                                                    </button>
-                                                                )}
+                                                                ) : (() => {
+                                                                    // Show ALL linked transactions — junction links AND the legacy
+                                                                    // single link, merged — so a paid row always shows every linked
+                                                                    // transaction (matching the paid amount), exactly like manual
+                                                                    // linking. A payment can carry both mechanisms at once, and the
+                                                                    // old if/else-if hid the legacy one whenever a junction link existed.
+                                                                    const junctionTxs = item.linked_transactions || [];
+                                                                    const junctionIds = new Set(junctionTxs.map(t => t.id));
+                                                                    const legacyTx = (item.transaction_id && item.linked_transaction && !junctionIds.has(item.linked_transaction.id))
+                                                                        ? [{ ...item.linked_transaction, _legacy: true }] : [];
+                                                                    const allTxs = [...junctionTxs, ...legacyTx];
+                                                                    if (allTxs.length === 0) {
+                                                                        return (
+                                                                            <button
+                                                                                onClick={() => openLinkModal(item)}
+                                                                                className="bg-slate-700/50 hover:bg-purple-600/50 text-slate-400 hover:text-purple-300 text-[9px] px-2 py-1 rounded border border-slate-600 hover:border-purple-500 font-bold uppercase tracking-wider transition flex items-center gap-1"
+                                                                            >
+                                                                                <DollarSign size={9} /> Link
+                                                                            </button>
+                                                                        );
+                                                                    }
+                                                                    return (
+                                                                        <div className="flex flex-wrap gap-1">
+                                                                            {allTxs.map(tx => (
+                                                                                <div key={tx.id} className="flex items-center gap-1.5 bg-purple-500/15 text-purple-400 text-[9px] px-2 py-1 rounded-lg border border-purple-500/25">
+                                                                                    <button
+                                                                                        onClick={() => { setSelectedTransaction(tx); setShowTransactionDetail(true); }}
+                                                                                        className="hover:text-purple-200 flex items-center gap-1 text-left"
+                                                                                        title="View transaction details"
+                                                                                    >
+                                                                                        <Eye size={10} />
+                                                                                        <span className="font-medium">{tx.merchant?.substring(0, 25) || 'Unknown'}</span>
+                                                                                        <span className="text-purple-300/60 font-mono text-[8px]">{formatCurrency(tx.amount)}</span>
+                                                                                        {tx.timestamp && <span className="text-cyan-300 text-[9px] whitespace-nowrap">· {new Date(tx.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}</span>}
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => tx._legacy ? handleUnlinkTransaction(item.id) : handleUnlinkSingleTransaction(item.id, tx.id)}
+                                                                                        className="text-purple-500/50 hover:text-red-400 transition ml-0.5"
+                                                                                        title="Unlink"
+                                                                                    >
+                                                                                        <Unlink size={9} />
+                                                                                    </button>
+                                                                                </div>
+                                                                            ))}
+                                                                            <button onClick={() => openLinkModal(item)} className="text-slate-500 hover:text-purple-400 text-[9px] px-1 transition">+ Link</button>
+                                                                        </div>
+                                                                    );
+                                                                })()}
                                                             </td>
 
                                                             {/* Actions */}
