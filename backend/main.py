@@ -1595,6 +1595,11 @@ def pay_obligation(obligation_id: str, payment: schemas.PaymentCreate, db: Sessi
 def read_obligation_payments(obligation_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     _require_owned(db, models.MonthlyObligation, obligation_id, current_user)
     payments = crud.get_payments(db, obligation_id)
+    # Effective amount = sum of a payment's LINKED transactions (the real money that
+    # moved) when it has any, else the recorded amount. The recorded amount can be
+    # stale/wrong (e.g. entered 170.02 but the single linked STC bill is 85.01), so
+    # every "paid" figure in the UI should use this, not p.amount.
+    eff = crud._payment_effective_amounts(db, payments)
     result = []
     for p in payments:
         # Get linked transactions from junction table
@@ -1620,6 +1625,7 @@ def read_obligation_payments(obligation_id: str, db: Session = Depends(get_db), 
             "id": p.id,
             "obligation_id": p.obligation_id,
             "amount": p.amount,
+            "effective_amount": eff.get(p.id, p.amount),
             "payment_date": p.payment_date,
             "billing_month": p.billing_month,
             "note": p.note,

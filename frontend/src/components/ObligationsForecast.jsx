@@ -228,7 +228,10 @@ const ObligationsForecast = ({ categoryFilter, obligations = [], payments = {}, 
                     (p.linked_transactions && p.linked_transactions.length > 0)
                 );
                 const isPaid = hasLinkedTx || monthPayments.length > 0;
-                const paidAmount = monthPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+                // Use the EFFECTIVE amount (sum of linked transactions when linked,
+                // else recorded) so "paid" reflects the real money that moved — not a
+                // stale recorded amount (e.g. recorded 170.02 vs one 85.01 STC bill).
+                const paidAmount = monthPayments.reduce((sum, p) => sum + (p.effective_amount ?? p.amount ?? 0), 0);
 
                 // Also check for BUDGET entries
                 const budgetPayments = oblPayments.filter(p => {
