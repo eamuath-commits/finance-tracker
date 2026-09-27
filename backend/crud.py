@@ -1953,11 +1953,16 @@ def obligation_expected_amounts(db: Session, user_id: str, month_str: str, now=N
     for o in obls:
         ps = by_obl.get(o.id, [])
         this_month = [p for p in ps if (p.billing_month or "")[:7] == month_str]
+        budget_this = [p for p in this_month if _is_status(p, "BUDGET")]
         actual = sum(eff[p.id] for p in this_month if _is_status(p, "PAID"))
-        budget = sum(eff[p.id] for p in this_month if _is_status(p, "BUDGET"))
+        budget = sum(eff[p.id] for p in budget_this)
         if actual > 0:
             result[o.id] = {"amount": round(actual, 2), "basis": "actual", "history": []}
-        elif budget > 0:
+        elif budget_this:
+            # An explicit budget was set for this month — honor it even when it is 0.
+            # Forecasting an obligation to 0 must zero it out in BOTH the forecast and
+            # the allocation planner, never fall through to predicting the last paid
+            # amount (which would keep planning a transfer the user deliberately cancelled).
             result[o.id] = {"amount": round(budget, 2), "basis": "budget", "history": []}
         else:
             paid = sorted([p for p in ps if _is_status(p, "PAID")],

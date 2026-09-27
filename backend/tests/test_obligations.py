@@ -205,6 +205,34 @@ class TestObligationsAPI:
         data = response.json()
         assert isinstance(data, dict)
 
+    def test_explicit_zero_budget_is_honored(self, client, db_session):
+        """Forecasting an obligation to 0 for a month must zero it out in the shared
+        expected-amount function (used by BOTH the forecast and the allocation
+        planner) — never fall through to predicting the last paid amount, which would
+        keep planning a transfer the user deliberately cancelled."""
+        import crud, models
+        from datetime import datetime
+
+        uid = db_session.query(models.User).filter(
+            models.User.username == client.test_username).first().id
+        oid = client.post("/obligations/", json={
+            "name": get_unique_name(), "due_day": 10, "category": "Bills", "amount": 1900.0,
+        }).json()["id"]
+
+        # A recent PAID month so 'predict' would return 1900 if the 0 were ignored.
+        db_session.add(models.Payment(obligation_id=oid, user_id=uid, amount=1900.0,
+                                      payment_date=datetime(2026, 7, 10).date(),
+                                      billing_month="2026-07-01", status=models.PaymentStatus.PAID))
+        # An explicit BUDGET of 0 for the target month.
+        db_session.add(models.Payment(obligation_id=oid, user_id=uid, amount=0.0,
+                                      payment_date=datetime(2026, 8, 1).date(),
+                                      billing_month="2026-08-01", status=models.PaymentStatus.BUDGET))
+        db_session.flush()
+
+        exp = crud.obligation_expected_amounts(db_session, uid, "2026-08", now=datetime(2026, 9, 27))
+        assert exp[oid]["amount"] == 0, exp[oid]
+        assert exp[oid]["basis"] == "budget", exp[oid]
+
 
 class TestMatchHints:
     """_passes_match_hints: a text hint (bill number / name) is authoritative — it
