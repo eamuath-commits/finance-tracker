@@ -4273,46 +4273,74 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
     target_date = datetime.now() + relativedelta(months=req.month_offset)
     billing_month = target_date.strftime('%Y-%m')
 
-    # Create ONE distribution PER OBLIGATION, idempotently (upsert on
-    # source+target+month+obligation), so re-running never duplicates and each
-    # distribution stays linked to the obligation it funds (precise reverse).
-    executed_transfers = []
+    # Create ONE distribution PER TARGET ACCOUNT (envelope): a single transfer funds
+    # every obligation routed to that account — one STC Wallet transfer covers Mae +
+    # Norma, one Jazira Checking transfer covers Personal + Mortgage + Visa + Ajwa —
+    # which is how the money actually moves (one bank transfer per destination).
+    # Idempotent: reuses/updates the envelope-level plan on source+target+month.
+    # Linked/real transfers are never touched (pending already excludes them); stale
+    # unlinked per-obligation plans for the envelope are folded into the one plan.
+    by_target = {}
     for item in preview.allocations:
         if item.pending_amount <= 0 or item.status == 'transferred':
             continue
         if req.obligation_ids and item.obligation_id not in req.obligation_ids:
             continue
-        transfer_amount = item.pending_amount
+        amt = item.pending_amount
         if req.override_amounts and item.obligation_id in req.override_amounts:
-            transfer_amount = req.override_amounts[item.obligation_id]
-        if not transfer_amount or transfer_amount <= 0:
+            amt = req.override_amounts[item.obligation_id]
+        if not amt or amt <= 0:
             continue
+        g = by_target.setdefault(item.target_account_id,
+                                 {"amount": 0.0, "names": [], "target_name": item.target_account_name})
+        g["amount"] += amt
+        g["names"].append(item.obligation_name)
 
-        note = f"Payday: {item.obligation_name}"
+    def _dist_linked(d):
+        return bool(d.transaction_id) or db.query(models.DistributionTransaction).filter(
+            models.DistributionTransaction.distribution_id == d.id).first() is not None
+
+    executed_transfers = []
+    for target_id, g in by_target.items():
+        total = round(g["amount"], 2)
+        if total <= 0:
+            continue
         existing = db.query(models.Distribution).filter(
             models.Distribution.source_account_id == source_acc.id,
-            models.Distribution.target_account_id == item.target_account_id,
+            models.Distribution.target_account_id == target_id,
             models.Distribution.billing_month == billing_month,
-            models.Distribution.obligation_id == item.obligation_id,
-        ).first()
-        if existing:
-            existing.amount = round(transfer_amount, 2)
-            existing.note = note
+        ).all()
+        consolidated = None
+        for d in existing:
+            if _dist_linked(d):
+                continue                       # real transfer already made — leave it alone
+            if consolidated is None and d.obligation_id is None:
+                consolidated = d               # reuse the envelope-level plan (idempotent)
+            else:
+                db.query(models.DistributionTransaction).filter(
+                    models.DistributionTransaction.distribution_id == d.id).delete(synchronize_session=False)
+                db.delete(d)                   # fold stale unlinked per-obligation plans into one
+        names = ", ".join(g["names"][:4]) + (f" +{len(g['names']) - 4} more" if len(g["names"]) > 4 else "")
+        note = f"Payday: {g['target_name']} ({names})"
+        if consolidated is not None:
+            consolidated.amount = total
+            consolidated.note = note
+            consolidated.obligation_id = None
         else:
             db.add(models.Distribution(
                 source_account_id=source_acc.id,
-                target_account_id=item.target_account_id,
-                obligation_id=item.obligation_id,
-                amount=round(transfer_amount, 2),
+                target_account_id=target_id,
+                obligation_id=None,
+                amount=total,
                 billing_month=billing_month,
                 note=note,
                 user_id=current_user.id,
             ))
         executed_transfers.append({
-            "obligation_id": item.obligation_id,
-            "obligation_name": item.obligation_name,
-            "target_account": item.target_account_name,
-            "amount": round(transfer_amount, 2),
+            "target_account_id": target_id,
+            "target_account": g["target_name"],
+            "obligations": g["names"],
+            "amount": total,
         })
     db.commit()
 
@@ -4320,7 +4348,7 @@ def execute_allocation(req: schemas.AllocationExecuteRequest, db: Session = Depe
         "status": "success",
         "transfers_count": len(executed_transfers),
         "details": executed_transfers,
-        "note": "One distribution per obligation (idempotent). Link each to its real bank transfer when it occurs."
+        "note": "One consolidated distribution per target account. Link each to its real bank transfer when it occurs."
     }
 
 @app.post("/allocation/reverse")

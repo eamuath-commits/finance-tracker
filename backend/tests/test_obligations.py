@@ -264,6 +264,47 @@ class TestObligationsAPI:
             models.Distribution.billing_month == "2026-08").count() == 0
 
 
+class TestAllocationExecute:
+    """A payday distribution funds an envelope with a single transfer: all obligations
+    routed to the same target account roll up into ONE distribution, not one each."""
+
+    def test_execute_consolidates_one_distribution_per_envelope(self, client, db_session, sample_account):
+        import models
+        from datetime import datetime
+        from dateutil.relativedelta import relativedelta
+
+        uid = db_session.query(models.User).filter(
+            models.User.username == client.test_username).first().id
+        tgt = sample_account["id"]
+        src = client.post("/accounts/", json={
+            "name": "Salary Src", "account_type": "CHECKING",
+            "last_4_digits": "9911", "current_balance": 100000.0, "bank_name": "Test",
+        }).json()["id"]
+
+        month = datetime.now() + relativedelta(months=-1)
+        bm = month.strftime("%Y-%m-01")
+        # Two obligations routed to the SAME envelope, each with a budget so expected>0.
+        for amt in (1000.0, 500.0):
+            oid = client.post("/obligations/", json={
+                "name": get_unique_name(), "due_day": 5, "category": "Bills",
+                "amount": amt, "target_account_id": tgt,
+            }).json()["id"]
+            db_session.add(models.Payment(obligation_id=oid, user_id=uid, amount=amt,
+                                          payment_date=month.date(), billing_month=bm,
+                                          status=models.PaymentStatus.BUDGET))
+        db_session.flush()
+
+        resp = client.post("/allocation/execute", json={"source_account_id": src, "month_offset": -1})
+        assert resp.status_code == 200, resp.text
+
+        dists = db_session.query(models.Distribution).filter(
+            models.Distribution.target_account_id == tgt,
+            models.Distribution.billing_month == month.strftime("%Y-%m")).all()
+        assert len(dists) == 1, [(d.obligation_id, d.amount) for d in dists]
+        assert dists[0].obligation_id is None                  # envelope-level, not per-obligation
+        assert abs((dists[0].amount or 0) - 1500.0) < 0.01     # summed the two obligations
+
+
 class TestMatchHints:
     """_passes_match_hints: a text hint (bill number / name) is authoritative — it
     finds the paying transaction even when it lands outside the usual day window;
