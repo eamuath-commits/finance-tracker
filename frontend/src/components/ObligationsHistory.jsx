@@ -537,9 +537,15 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
             });
         });
 
+        const term = (searchTerm || '').toLowerCase();
         obligations.forEach(obl => {
             if (oblsWithPayments.has(obl.id)) return;
+            // Planned rows are unpaid, so honor the same filters as paid rows:
+            // Paid-only hides them; a search term and category must match too.
+            if (selectedStatus === 'Paid') return;
             if (selectedCategory !== 'All' && obl.category !== selectedCategory) return;
+            if (term && !((obl.name || '').toLowerCase().includes(term)
+                || (obl.category || '').toLowerCase().includes(term))) return;
 
             // Priority: manual BUDGET entry > forecast API > obligation default
             const plannedAmount = budgetLookup[obl.id] !== undefined
@@ -574,7 +580,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
         });
 
         return items;
-    }, [sorted, obligations, forecast, selectedYear, selectedMonth, selectedCategory]);
+    }, [sorted, obligations, forecast, selectedYear, selectedMonth, selectedCategory, selectedStatus, searchTerm]);
 
     // --- Group allItems by category for the category-section view ---
     const groupedAllItems = useMemo(() => {
@@ -755,15 +761,24 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                         // its service month, so show the due date in that PAYMENT
                                                         // month. Prefer the configured match-day window as a range
                                                         // ("10–20 Jun"), else the single due day.
+                                                        // Salary cycle starts on the 25th: a due day >= 25 falls in the
+                                                        // selected month, a day < 25 falls in the NEXT calendar month
+                                                        // (e.g. in the October cycle, day 4 is Nov 4). billing_offset_months
+                                                        // shifts the base cycle for bills paid a further month late.
+                                                        const CYCLE_START = 25;
                                                         const off = oblForRow.billing_offset_months || 0;
-                                                        const payDate = new Date(Number(mmMatch[1]), Number(mmMatch[2]) - 1 + off, 1);
+                                                        const baseY = Number(mmMatch[1]), baseMo = Number(mmMatch[2]) - 1 + off;
+                                                        const cycleDate = (day) => new Date(baseY, baseMo + (day >= CYCLE_START ? 0 : 1), day);
+                                                        const mon = (d) => d.toLocaleDateString('en-GB', { month: 'short' });
                                                         const df = oblForRow.match_day_from, dt = oblForRow.match_day_to;
                                                         if (df && dt) {
-                                                            const mon = payDate.toLocaleDateString('en-GB', { month: 'short' });
-                                                            dueDateStr = `${df}–${dt} ${mon}`;
+                                                            const s = cycleDate(df), e = cycleDate(dt);
+                                                            dueDateStr = s.getMonth() === e.getMonth()
+                                                                ? `${df}–${dt} ${mon(s)}`
+                                                                : `${df} ${mon(s)} – ${dt} ${mon(e)}`;
                                                         } else if (oblForRow.due_day) {
-                                                            const d = new Date(payDate.getFullYear(), payDate.getMonth(), oblForRow.due_day);
-                                                            dueDateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+                                                            dueDateStr = cycleDate(oblForRow.due_day)
+                                                                .toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
                                                         }
                                                     }
                                                     // Warn when the linked transactions don't add up to the payment.
@@ -779,6 +794,24 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                                     <span className="font-medium text-white text-[12px] truncate">{item.oblName}</span>
                                                                 </div>
                                                                 {dueDateStr && <div className="text-[9px] text-slate-500 flex items-center gap-1"><Calendar size={8} /> Due {dueDateStr}</div>}
+                                                                {/* What made this Paid: the linked transaction(s). Always visible;
+                                                                    auto vs manual is shown in the Status column. */}
+                                                                {isPaid && (() => {
+                                                                    const txs = [...(item.linked_transactions || [])];
+                                                                    if (item.transaction_id && item.linked_transaction
+                                                                        && !txs.some(t => t.id === item.linked_transaction.id)) txs.push(item.linked_transaction);
+                                                                    if (!txs.length) return null;
+                                                                    const t0 = txs[0];
+                                                                    return (
+                                                                        <button onClick={() => { setSelectedTransaction(t0); setShowTransactionDetail(true); }}
+                                                                            className="text-[9px] text-purple-400 hover:text-purple-200 flex items-center gap-1 mt-0.5" title="View transaction">
+                                                                            <Link2 size={8} className="flex-shrink-0" />
+                                                                            <span>{formatCurrency(t0.amount)}
+                                                                                {t0.timestamp ? ' · ' + new Date(t0.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : ''}
+                                                                                {txs.length > 1 ? ` +${txs.length - 1}` : ''}</span>
+                                                                        </button>
+                                                                    );
+                                                                })()}
                                                                 {item.note && <div className="text-[9px] text-slate-500 italic truncate max-w-[200px]">{item.note}</div>}
                                                             </td>
 
@@ -806,16 +839,27 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                                 )}
                                                             </td>
 
-                                                            {/* Amount */}
+                                                            {/* Amount = the BUDGET (what you planned); the linked transaction (shown
+                                                                under the name) is what was actually paid, with over/under here. */}
                                                             <td className={`px-3 py-2 text-right font-mono text-[12px] font-medium ${isPaid ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                                                <span className="inline-flex items-center gap-1 justify-end">
-                                                                    {amountMismatch && (
-                                                                        <span title={`Linked transactions total ${formatCurrency(linkedSum)}, which doesn't match this payment — check the links`}>
-                                                                            <AlertTriangle size={11} className="text-amber-400" />
-                                                                        </span>
-                                                                    )}
-                                                                    {item.amount > 0 ? formatCurrency(item.amount) : '—'}
-                                                                </span>
+                                                                {(() => {
+                                                                    const budget = isPaid ? (item.planned_amount ?? oblForRow?.amount ?? item.amount) : item.amount;
+                                                                    const actual = isPaid ? (linkedSum > 0 ? linkedSum : item.amount) : null;
+                                                                    const over = (isPaid && budget) ? (actual - budget) : 0;
+                                                                    return (
+                                                                        <div className="flex flex-col items-end">
+                                                                            <span className="inline-flex items-center gap-1 justify-end">
+                                                                                {amountMismatch && <AlertTriangle size={11} className="text-amber-400" title="Linked transactions don't sum to this payment — check the links" />}
+                                                                                {budget > 0 ? formatCurrency(budget) : '—'}
+                                                                            </span>
+                                                                            {isPaid && Math.abs(over) > 0.01 && (
+                                                                                <span className={`text-[8px] font-bold ${over > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                                                                                    {over > 0 ? '▲' : '▼'} {formatCurrency(Math.abs(over))} {over > 0 ? 'over' : 'under'}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })()}
                                                             </td>
 
                                                             {/* Transaction */}

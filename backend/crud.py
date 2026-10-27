@@ -2386,13 +2386,13 @@ def get_distribution_matches(db: Session, distribution_id: str):
     min_amount = distribution.amount - tolerance
     max_amount = distribution.amount + tolerance
     
-    # Parse billing month to get date range (with buffer)
+    # Date range = the SALARY CYCLE for this month (25th → 24th), same as payments.
     try:
         year, month = distribution.billing_month.split('-')[:2]
-        from dateutil.relativedelta import relativedelta
-        start_date = datetime(int(year), int(month), 1) - relativedelta(days=5)
-        end_date = datetime(int(year), int(month), 1) + relativedelta(months=1, days=5)
-    except:
+        s, e = cycle_window(int(year), int(month))
+        start_date = datetime(s.year, s.month, s.day)
+        end_date = datetime(e.year, e.month, e.day, 23, 59, 59)
+    except Exception:
         return []
     
     from sqlalchemy import or_

@@ -365,6 +365,15 @@ def run_migrations(engine):
                     conn.execute(text(_stmt))
                 except Exception:
                     pass
+            # distribution_transactions.link_source ('auto' = auto-matched, NULL = manual),
+            # mirroring payment_transactions so the UI can show how each link was made.
+            try:
+                if 'distribution_transactions' in _b4_tables:
+                    _dt_cols = [c['name'] for c in inspector.get_columns('distribution_transactions')]
+                    if 'link_source' not in _dt_cols:
+                        conn.execute(text("ALTER TABLE distribution_transactions ADD COLUMN link_source VARCHAR"))
+            except Exception:
+                pass
             try:
                 conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_payment_obl_month "
                                   "ON payments (obligation_id, left(billing_month,7)) WHERE obligation_id IS NOT NULL"))
@@ -1632,6 +1641,7 @@ def read_obligation_payments(obligation_id: str, db: Session = Depends(get_db), 
             "id": p.id,
             "obligation_id": p.obligation_id,
             "amount": p.amount,
+            "planned_amount": getattr(p, "planned_amount", None),
             "effective_amount": eff.get(p.id, p.amount),
             "payment_date": p.payment_date,
             "billing_month": p.billing_month,
@@ -4557,6 +4567,7 @@ def get_distributions(
                         "category": tx.category,
                         "timestamp": tx.timestamp.isoformat() if tx.timestamp else None,
                         "account_id": tx.account_id,
+                        "link_source": getattr(link, "link_source", None),  # 'auto' | None (manual)
                     })
         
         result.append({
@@ -4616,6 +4627,240 @@ def link_distribution(distribution_id: str, transaction_id: str, db: Session = D
     if not result:
         raise HTTPException(status_code=404, detail="Distribution not found")
     return {"status": "linked", "distribution_id": distribution_id, "transaction_id": transaction_id}
+
+@app.post("/distributions/auto-match")
+def auto_match_distributions(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    """
+    Auto-link salary-distribution transfers to their real bank transactions —
+    the distribution counterpart of /obligations/auto-match.
+
+    For each UNLINKED distribution whose billing_month is the current or previous
+    salary cycle, search that cycle window (the 25th through the 24th of the next
+    month, via crud.cycle_window) for a transfer between the distribution's source
+    and target accounts whose amount is within +/-15% of the planned amount and
+    that isn't already linked to another distribution. The best candidate is
+    linked via the junction table with link_source='auto'. Idempotent: a
+    distribution that already has a link is skipped, so it's safe to re-run.
+
+    Unlike a bill payment (matched by biller DESCRIPTION, because a BUDGET is only
+    an estimate of the last paid amount), a transfer carries no biller name — the
+    source/target account pair and the amount ARE its identity, so amount stays a
+    real filter here instead of a ranking-only signal.
+    """
+    from datetime import datetime
+    import logging
+    logger = logging.getLogger("auto_match_dist")
+    now = datetime.now()
+
+    # Current + previous month LABELS; the salary-cycle window is derived per label.
+    target_labels = []
+    for offset in (0, -1):
+        y = now.year + ((now.month - 1 + offset) // 12)
+        m = ((now.month - 1 + offset) % 12) + 1
+        target_labels.append(f"{y}-{str(m).zfill(2)}")
+
+    owned_account_ids = {
+        aid for (aid,) in db.query(models.Account.id).filter(
+            models.Account.user_id == current_user.id
+        ).all()
+    }
+
+    # Every transaction already linked to ANY distribution (junction + legacy
+    # single link) so auto-match never double-links a transfer.
+    linked_tx_ids = set()
+    linked_tx_ids.update(t for (t,) in db.query(models.DistributionTransaction.transaction_id).all())
+    linked_tx_ids.update(
+        t for (t,) in db.query(models.Distribution.transaction_id).filter(
+            models.Distribution.transaction_id.isnot(None)
+        ).all()
+    )
+
+    matched, skipped = [], []
+
+    for d in crud.get_distributions(db):
+        # Scope to the caller's own accounts.
+        if d.source_account_id not in owned_account_ids and d.target_account_id not in owned_account_ids:
+            continue
+        # Only the current / previous salary-cycle labels.
+        if (d.billing_month or "")[:7] not in target_labels:
+            continue
+        # Already linked (junction OR legacy single link) -> skip (idempotent).
+        has_junction = db.query(models.DistributionTransaction).filter(
+            models.DistributionTransaction.distribution_id == d.id
+        ).first() is not None
+        if d.transaction_id or has_junction:
+            continue
+        if not d.amount or d.amount <= 0:
+            skipped.append({"distribution_id": d.id, "month": d.billing_month, "reason": "no_amount"})
+            continue
+
+        try:
+            yr, mo = d.billing_month.split('-')[:2]
+            sd, ed = crud.cycle_window(int(yr), int(mo))
+        except Exception:
+            skipped.append({"distribution_id": d.id, "month": d.billing_month, "reason": "invalid_month"})
+            continue
+        start_date = datetime(sd.year, sd.month, sd.day)
+        end_date = datetime(ed.year, ed.month, ed.day, 23, 59, 59)
+
+        tol = d.amount * 0.15
+        candidates = db.query(models.Transaction).filter(
+            models.Transaction.account_id.in_([d.source_account_id, d.target_account_id]),
+            models.Transaction.amount >= d.amount - tol,
+            models.Transaction.amount <= d.amount + tol,
+            models.Transaction.timestamp >= start_date,
+            models.Transaction.timestamp <= end_date,
+        ).order_by(models.Transaction.timestamp).all()
+
+        best, best_score = None, -1.0
+        anchor = datetime(sd.year, sd.month, sd.day)  # payday (25th) — rank transfers near it
+        for tx in candidates:
+            if tx.id in linked_tx_ids:
+                continue
+            if getattr(tx, "user_id", None) not in (None, current_user.id):
+                continue
+            # Amount closeness is the primary signal; date proximity to payday breaks ties.
+            score = 100.0 - min(100.0, abs((tx.amount or 0) - d.amount) / d.amount * 100.0)
+            if tx.timestamp:
+                score += max(0.0, 5.0 - abs((tx.timestamp - anchor).days))
+            if score > best_score:
+                best_score, best = score, tx
+
+        if not best:
+            skipped.append({"distribution_id": d.id, "month": d.billing_month, "reason": "no_matching_transfer"})
+            continue
+
+        db.add(models.DistributionTransaction(
+            distribution_id=d.id,
+            transaction_id=best.id,
+            link_source='auto',
+        ))
+        linked_tx_ids.add(best.id)
+        matched.append({
+            "distribution_id": d.id,
+            "target_account_id": d.target_account_id,
+            "month": d.billing_month,
+            "amount": d.amount,
+            "transaction_id": best.id,
+            "transaction_merchant": best.merchant,
+            "transaction_date": best.timestamp.isoformat() if best.timestamp else None,
+        })
+        logger.info(f"Auto-linked distribution {d.id} ({d.billing_month}) -> tx {best.id}")
+
+    db.commit()
+    return {"total_matched": len(matched), "total_skipped": len(skipped),
+            "matched": matched, "skipped": skipped}
+
+@app.get("/distributions/{distribution_id}/suggested-transactions")
+def get_distribution_suggested_transactions(distribution_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    """
+    Suggest transactions that might fund this distribution — the transfer
+    counterpart of /payments/{id}/suggested-transactions, so the Distribute
+    button opens the SAME scored, best-match-first picker as payments.
+
+    A transfer has no biller name, so (unlike a bill payment, which qualifies by
+    DESCRIPTION) a distribution qualifies by AMOUNT: a candidate within +/-15% of
+    the planned transfer, on the source or target account, inside the salary
+    cycle (the 25th through the 24th). Amount closeness and proximity to payday
+    (the 25th) then rank them. Candidates already linked to ANOTHER distribution
+    are hidden; this distribution's own links are shown flagged as already_linked.
+    """
+    from datetime import datetime
+    d = _require_owned_distribution(db, distribution_id, current_user)
+
+    try:
+        yr, mo = d.billing_month.split('-')[:2]
+        sd, ed = crud.cycle_window(int(yr), int(mo))
+    except Exception:
+        return []
+    start_date = datetime(sd.year, sd.month, sd.day)
+    end_date = datetime(ed.year, ed.month, ed.day, 23, 59, 59)
+    anchor = datetime(sd.year, sd.month, sd.day)  # payday (25th)
+
+    # Transactions already linked to a DIFFERENT distribution (junction + legacy).
+    linked_other = set()
+    linked_other.update(
+        t for (t,) in db.query(models.DistributionTransaction.transaction_id).filter(
+            models.DistributionTransaction.distribution_id != distribution_id).all()
+    )
+    linked_other.update(
+        t for (t,) in db.query(models.Distribution.transaction_id).filter(
+            models.Distribution.transaction_id.isnot(None),
+            models.Distribution.id != distribution_id).all()
+    )
+    # This distribution's OWN links still show, flagged, so re-linking is clear.
+    own_linked = {d.transaction_id} if d.transaction_id else set()
+    own_linked |= {
+        t for (t,) in db.query(models.DistributionTransaction.transaction_id).filter(
+            models.DistributionTransaction.distribution_id == distribution_id).all()
+    }
+
+    txns = db.query(models.Transaction).filter(
+        models.Transaction.user_id == current_user.id,
+        models.Transaction.account_id.in_([d.source_account_id, d.target_account_id]),
+        models.Transaction.timestamp >= start_date,
+        models.Transaction.timestamp <= end_date,
+    ).order_by(models.Transaction.timestamp.desc()).all()
+
+    planned = d.amount or 0
+    suggestions = []
+    for tx in txns:
+        if tx.id in linked_other:
+            continue
+        score = 0
+        reasons = []
+        qualified = False
+
+        # AMOUNT qualifies a transfer (its identity), the way DESCRIPTION qualifies a bill.
+        if planned > 0 and tx.amount:
+            diff_pct = abs(tx.amount - planned) / planned * 100
+            if diff_pct < 1:
+                score += 60
+                reasons.append("exact_amount")
+                qualified = True
+            elif diff_pct <= 15:
+                score += 40
+                reasons.append("similar_amount")
+                qualified = True
+
+        # Which leg of the transfer (ranking + an explanation chip for the UI).
+        if tx.account_id == d.source_account_id:
+            score += 10
+            reasons.append("from_source")
+        elif tx.account_id == d.target_account_id:
+            score += 10
+            reasons.append("to_target")
+
+        # Date proximity to payday.
+        if tx.timestamp:
+            days_diff = abs((tx.timestamp.date() - anchor.date()).days)
+            if days_diff == 0:
+                score += 20
+                reasons.append("exact_date")
+            elif days_diff <= 3:
+                score += 10
+                reasons.append("close_date")
+
+        # For a transfer, amount closeness IS the only real signal — a row that
+        # doesn't qualify on amount is noise, so it's not offered (Browse All covers it).
+        if not qualified:
+            continue
+
+        suggestions.append({
+            "transaction_id": tx.id,
+            "merchant": tx.merchant,
+            "amount": tx.amount,
+            "date": tx.timestamp.isoformat() if tx.timestamp else None,
+            "score": score,
+            "reasons": reasons,
+            "qualified": qualified,
+            "already_linked": tx.id in own_linked,
+            "raw_sms_content": tx.raw_sms_content,
+        })
+
+    # Every qualified match ranks by score (all shown rows are qualified here).
+    suggestions.sort(key=lambda x: (x["qualified"], x["score"]), reverse=True)
+    return suggestions[:25]
 
 @app.put("/distributions/{distribution_id}", response_model=schemas.Distribution)
 def update_distribution(distribution_id: str, update: schemas.DistributionUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):

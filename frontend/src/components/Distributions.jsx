@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api, { API_URL } from '../utils/api';
-import { formatCurrency, selectClass } from './UI';
+import { formatCurrency, selectClass, Modal } from './UI';
 import TransactionDetailModal from './TransactionDetailModal';
 import TransactionSelectorModal from './TransactionSelectorModal';
 import ConfirmDialog from './ConfirmDialog';
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Trash2, Eye, ArrowUpRight, Clock, LayoutGrid, List, PlusCircle } from 'lucide-react';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download, Link2, LinkIcon, Unlink, CheckCircle, Trash2, Eye, ArrowUpRight, Clock, LayoutGrid, List, PlusCircle, Zap, MessageSquare } from 'lucide-react';
 
 
 const Distributions = ({ accounts }) => {
@@ -25,11 +25,18 @@ const Distributions = ({ accounts }) => {
 
     // Link Modal State
 
+    const [showLinkModal, setShowLinkModal] = useState(false);          // suggestions-first modal (payment-parity)
     const [showMultiLinkModal, setShowMultiLinkModal] = useState(false);
     const [linkingTransfer, setLinkingTransfer] = useState(null);
 
     const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+    const [suggestedTransactions, setSuggestedTransactions] = useState([]);
+    const [expandedSms, setExpandedSms] = useState(null);
     const [linkedTransactionIds, setLinkedTransactionIds] = useState([]);
+
+    // Auto-match state
+    const [autoMatching, setAutoMatching] = useState(false);
+    const [autoMatchResult, setAutoMatchResult] = useState(null);
 
     // Transaction Detail Modal State
     const [showTransactionDetail, setShowTransactionDetail] = useState(false);
@@ -232,22 +239,50 @@ const Distributions = ({ accounts }) => {
     ];
 
     // Link functions
+    // Distribute → open the SAME scored, best-match-first picker as payments:
+    // fetch ranked suggestions, show them for one-click linking, with a
+    // "Browse All Transactions" fallback to the full selector.
     const openLinkModal = async (transfer) => {
         setLinkingTransfer(transfer);
+        setShowLinkModal(true);
         setLoadingSuggestions(true);
-        setLinkedTransactionIds([]);
+        setSuggestedTransactions([]);
+        setExpandedSms(null);
 
         try {
-            const linkedRes = await api.get(`${API_URL}/distributions/${transfer.id}/transactions`).catch(() => ({ data: [] }));
-            setLinkedTransactionIds(linkedRes.data.map(tx => tx.id));
+            const [suggestRes, linkedRes] = await Promise.all([
+                api.get(`${API_URL}/distributions/${transfer.id}/suggested-transactions`).catch(() => ({ data: [] })),
+                api.get(`${API_URL}/distributions/${transfer.id}/transactions`).catch(() => ({ data: [] })),
+            ]);
+            setSuggestedTransactions(suggestRes.data || []);
+            setLinkedTransactionIds((linkedRes.data || []).map(tx => tx.id));
         } catch (err) {
-            console.error("Error fetching linked transactions:", err);
+            console.error("Error fetching suggestions:", err);
         } finally {
             setLoadingSuggestions(false);
         }
+    };
 
-        // Go directly to the full TransactionSelectorModal
+    // From the suggestions modal → the full "Browse All Transactions" selector.
+    const openMultiLinkModal = () => {
+        setShowLinkModal(false);
         setShowMultiLinkModal(true);
+    };
+
+    // One-click link a single suggested transaction (manual link via junction).
+    const handleLinkSuggestion = async (transactionId) => {
+        if (!linkingTransfer) return;
+        try {
+            await api.post(`${API_URL}/distributions/${linkingTransfer.id}/transactions`, {
+                transaction_ids: [transactionId],
+            });
+            setShowLinkModal(false);
+            setLinkingTransfer(null);
+            fetchTransfers();
+        } catch (err) {
+            console.error("Error linking transaction:", err);
+            alert("Failed to link transaction");
+        }
     };
 
     // Create distribution for an entire envelope (all planned obligations for a target account), then open link modal
@@ -379,6 +414,24 @@ const Distributions = ({ accounts }) => {
         });
     };
 
+    // Auto-link distributions to their real bank transfers (current + previous
+    // salary cycle), mirroring the obligations Auto-match. Idempotent server-side.
+    const runAutoMatch = async () => {
+        setAutoMatching(true);
+        try {
+            const res = await api.post(`${API_URL}/distributions/auto-match`);
+            const n = res.data?.total_matched ?? 0;
+            setAutoMatchResult(n > 0 ? `Auto-linked ${n} transfer${n === 1 ? '' : 's'}` : 'No new transfers to link');
+            await fetchTransfers();
+        } catch (err) {
+            console.error('Auto-match failed:', err);
+            setAutoMatchResult('Auto-match failed');
+        } finally {
+            setAutoMatching(false);
+            setTimeout(() => setAutoMatchResult(null), 4000);
+        }
+    };
+
     if (loading) {
         return (
             <div className="bg-slate-800/50 rounded-xl p-8 text-center border border-slate-700">
@@ -413,7 +466,20 @@ const Distributions = ({ accounts }) => {
                         <div className="flex items-center gap-2 text-slate-400 text-xs uppercase font-bold">
                             <Filter size={14} /> Filter Transfers
                         </div>
-                        <div className="flex items-center gap-1 bg-slate-900/50 p-0.5 rounded-lg">
+                        <div className="flex items-center gap-2">
+                            {autoMatchResult && (
+                                <span className="text-[10px] text-emerald-300 font-medium">{autoMatchResult}</span>
+                            )}
+                            <button
+                                onClick={runAutoMatch}
+                                disabled={autoMatching}
+                                title="Auto-link transfers to matching bank transactions in the current and previous salary cycle"
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-purple-600/90 hover:bg-purple-500 text-white transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Zap size={13} className={autoMatching ? 'animate-pulse' : ''} />
+                                {autoMatching ? 'Matching…' : 'Auto-match'}
+                            </button>
+                            <div className="flex items-center gap-1 bg-slate-900/50 p-0.5 rounded-lg">
                             <button
                                 onClick={() => setViewMode('envelope')}
                                 className={`p-1.5 rounded transition ${viewMode === 'envelope' ? 'bg-purple-600 text-white' : 'text-slate-500 hover:text-white'}`}
@@ -428,6 +494,7 @@ const Distributions = ({ accounts }) => {
                             >
                                 <List size={14} />
                             </button>
+                            </div>
                         </div>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -569,6 +636,12 @@ const Distributions = ({ accounts }) => {
                                                                         <Eye size={9} />
                                                                         {tx.merchant?.substring(0, 10) || tx.id.substring(0, 6)}
                                                                     </button>
+                                                                    <span
+                                                                        className={`text-[8px] uppercase font-bold px-1 rounded ${tx.link_source === 'auto' ? 'bg-sky-500/20 text-sky-300' : 'bg-slate-500/20 text-slate-400'}`}
+                                                                        title={tx.link_source === 'auto' ? 'Auto-matched' : 'Linked manually'}
+                                                                    >
+                                                                        {tx.link_source === 'auto' ? 'auto' : 'manual'}
+                                                                    </span>
                                                                     <button
                                                                         onClick={() => handleUnlinkSingleTransaction(item.id, tx.id)}
                                                                         className="text-purple-500 hover:text-red-400 transition"
@@ -731,6 +804,12 @@ const Distributions = ({ accounts }) => {
                                                             <Eye size={10} />
                                                             {tx.merchant?.substring(0, 12) || tx.id.substring(0, 8)}...
                                                         </button>
+                                                        <span
+                                                            className={`text-[8px] uppercase font-bold px-1 rounded ${tx.link_source === 'auto' ? 'bg-sky-500/20 text-sky-300' : 'bg-slate-500/20 text-slate-400'}`}
+                                                            title={tx.link_source === 'auto' ? 'Auto-matched' : 'Linked manually'}
+                                                        >
+                                                            {tx.link_source === 'auto' ? 'auto' : 'manual'}
+                                                        </span>
                                                         <button
                                                             onClick={() => handleUnlinkSingleTransaction(item.id, tx.id)}
                                                             className="text-purple-500 hover:text-red-400 transition ml-1"
@@ -802,6 +881,119 @@ const Distributions = ({ accounts }) => {
             )}
 
             {/* Transaction Linking Modal (with SMS viewing & multi-select) */}
+            {/* Suggestions-first Link Modal (payment-parity) */}
+            <Modal isOpen={showLinkModal} title="Link to Transfer" onClose={() => setShowLinkModal(false)}>
+                <div className="space-y-4">
+                    {linkingTransfer && (
+                        <div className="bg-slate-700/50 p-3 rounded-lg text-sm">
+                            <div className="text-slate-400 text-xs uppercase font-bold mb-1">Distribution</div>
+                            <div className="text-white font-semibold">{linkingTransfer.target_account_name || 'Envelope'}</div>
+                            <div className="text-emerald-400 font-mono">{formatCurrency(linkingTransfer.amount)}</div>
+                            <div className="text-slate-500 text-xs">
+                                {linkingTransfer.source_account_name ? `from ${linkingTransfer.source_account_name} · ` : ''}{linkingTransfer.billing_month}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="text-slate-400 text-xs uppercase font-bold">Suggested Transfers</div>
+
+                    {loadingSuggestions ? (
+                        <div className="text-center py-8 text-slate-500">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto mb-2"></div>
+                            Finding matching transfers...
+                        </div>
+                    ) : suggestedTransactions.length > 0 ? (
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {suggestedTransactions.map(tx => (
+                                <div
+                                    key={tx.transaction_id}
+                                    className={`p-3 rounded-lg border cursor-pointer transition ${tx.already_linked
+                                        ? 'bg-emerald-500/10 border-emerald-500/30'
+                                        : 'bg-slate-700/50 border-slate-600 hover:border-purple-500 hover:bg-purple-500/10'
+                                        }`}
+                                    onClick={() => !tx.already_linked && handleLinkSuggestion(tx.transaction_id)}
+                                >
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex-1 min-w-0 mr-3">
+                                            <div className="text-white font-semibold text-sm flex items-center gap-1.5">
+                                                {tx.merchant || 'Transfer'}
+                                                {tx.raw_sms_content && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setExpandedSms(prev => prev === tx.transaction_id ? null : tx.transaction_id);
+                                                        }}
+                                                        className={`p-0.5 rounded transition ${expandedSms === tx.transaction_id ? 'text-blue-400 bg-blue-500/20' : 'text-slate-500 hover:text-blue-400 hover:bg-slate-600/50'}`}
+                                                        title="View SMS"
+                                                    >
+                                                        <MessageSquare size={13} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="text-slate-400 text-xs">
+                                                {tx.date ? new Date(tx.date).toLocaleDateString() : '-'}
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-emerald-400 font-mono text-sm">{formatCurrency(tx.amount)}</div>
+                                            {tx.already_linked ? (
+                                                <span className="text-emerald-400 text-[10px] flex items-center gap-1 justify-end">
+                                                    <CheckCircle size={10} /> Linked
+                                                </span>
+                                            ) : (
+                                                <div className="text-[10px] text-purple-400">Score: {tx.score}</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {tx.reasons && tx.reasons.length > 0 && (
+                                        <div className="flex gap-1 mt-2 flex-wrap">
+                                            {tx.reasons.map(r => (
+                                                <span key={r} className="bg-slate-600/50 text-slate-400 text-[9px] px-1.5 py-0.5 rounded">
+                                                    {r.replace(/_/g, ' ')}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {expandedSms === tx.transaction_id && tx.raw_sms_content && (
+                                        <div className="mt-2 border-t border-slate-600/30 pt-2">
+                                            <div className="bg-slate-900/80 rounded-lg p-2.5">
+                                                <div className="text-[9px] uppercase text-slate-500 font-bold mb-1 flex items-center gap-1">
+                                                    <MessageSquare size={9} /> SMS Content
+                                                </div>
+                                                <p className="text-slate-300 text-[11px] font-mono leading-relaxed whitespace-pre-wrap">
+                                                    {tx.raw_sms_content}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-8 text-slate-500">
+                            <LinkIcon className="mx-auto mb-2 opacity-30" size={32} />
+                            <div>No matching transfers found.</div>
+                            <div className="text-xs mt-1">Browse all transactions to link one manually.</div>
+                        </div>
+                    )}
+
+                    <div className="flex gap-2">
+                        <button
+                            onClick={openMultiLinkModal}
+                            className="flex-1 bg-purple-600 hover:bg-purple-500 text-white py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2"
+                        >
+                            <List size={14} /> Browse All Transactions
+                        </button>
+                        <button
+                            onClick={() => setShowLinkModal(false)}
+                            className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm font-medium transition"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
             <TransactionSelectorModal
                 isOpen={showMultiLinkModal}
                 onClose={() => {
@@ -811,7 +1003,20 @@ const Distributions = ({ accounts }) => {
                 onSelect={handleMultiLink}
                 currentLinked={linkedTransactionIds}
                 title={`Link Transactions to ${linkingTransfer?.target_account_name || 'Distribution'}`}
-                filters={{ accountId: linkingTransfer?.source_account_id || '' }}
+                filters={(() => {
+                    // Scope suggestions to the salary cycle (25th → 24th) of this
+                    // distribution's month, same as the payment link window.
+                    const CYCLE_START = 25;
+                    const bm = (linkingTransfer?.billing_month || '').match(/^(\d{4})-(\d{2})/);
+                    let startDate = '', endDate = '';
+                    if (bm) {
+                        const y = +bm[1], m = +bm[2] - 1;
+                        const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                        startDate = iso(new Date(y, m, CYCLE_START));
+                        endDate = iso(new Date(y, m + 1, CYCLE_START - 1));
+                    }
+                    return { accountId: linkingTransfer?.source_account_id || '', startDate, endDate };
+                })()}
                 expectedAmount={linkingTransfer?.amount || null}
             />
 

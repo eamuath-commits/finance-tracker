@@ -380,3 +380,72 @@ class TestBillingArrearsOffset:
         assert main._add_months(datetime(2026, 12, 10), 1) == datetime(2027, 1, 1)
         assert main._add_months(datetime(2026, 11, 3), 3) == datetime(2027, 2, 1)
 
+
+class TestDistributionAutoMatch:
+    """POST /distributions/auto-match links an envelope transfer to the real bank
+    transaction in its salary cycle — the distribution counterpart of
+    /obligations/auto-match. Amount IS a filter here (a transfer has no biller name)."""
+
+    def _setup(self, client, db_session, amount, tx_amount):
+        """Make a src+tgt account, an unlinked distribution for the current cycle,
+        and a transfer transaction on the source inside that cycle window."""
+        import crud, models
+        uid = db_session.query(models.User).filter(
+            models.User.username == client.test_username).first().id
+        d4 = lambda: str(uuid.uuid4().int)[:4]
+        src = client.post("/accounts/", json={
+            "name": "Salary Src", "account_type": "CHECKING",
+            "last_4_digits": d4(), "current_balance": 100000.0, "bank_name": "Test",
+        }).json()["id"]
+        tgt = client.post("/accounts/", json={
+            "name": "Envelope", "account_type": "CHECKING",
+            "last_4_digits": d4(), "current_balance": 0.0, "bank_name": "Test",
+        }).json()["id"]
+
+        now = datetime.now()
+        bm = now.strftime("%Y-%m")                       # current salary-cycle label
+        sd, _ed = crud.cycle_window(now.year, now.month)  # 25th -> 24th
+        dist = models.Distribution(user_id=uid, source_account_id=src, target_account_id=tgt,
+                                   amount=amount, billing_month=bm)
+        db_session.add(dist)
+        tx = models.Transaction(user_id=uid, account_id=src, amount=tx_amount, type="debit",
+                                merchant="Transfer to Envelope",
+                                timestamp=datetime(sd.year, sd.month, sd.day, 12, 0))
+        db_session.add(tx)
+        db_session.flush()
+        return dist, tx
+
+    def test_auto_links_matching_transfer(self, client, db_session):
+        import models
+        dist, tx = self._setup(client, db_session, amount=1500.0, tx_amount=1500.0)
+
+        resp = client.post("/distributions/auto-match")
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["total_matched"] >= 1
+
+        link = db_session.query(models.DistributionTransaction).filter(
+            models.DistributionTransaction.distribution_id == dist.id).first()
+        assert link is not None
+        assert link.transaction_id == tx.id
+        assert link.link_source == "auto"
+
+    def test_idempotent_second_run_adds_nothing(self, client, db_session):
+        import models
+        dist, _tx = self._setup(client, db_session, amount=1500.0, tx_amount=1500.0)
+
+        assert client.post("/distributions/auto-match").json()["total_matched"] >= 1
+        # A distribution that already has a link is skipped on re-run.
+        again = client.post("/distributions/auto-match").json()
+        assert all(m["distribution_id"] != dist.id for m in again["matched"])
+        assert db_session.query(models.DistributionTransaction).filter(
+            models.DistributionTransaction.distribution_id == dist.id).count() == 1
+
+    def test_amount_outside_tolerance_is_not_linked(self, client, db_session):
+        import models
+        # Distribution 1500 vs transfer 2000 (> +15% = 1725) -> no auto-link.
+        dist, _tx = self._setup(client, db_session, amount=1500.0, tx_amount=2000.0)
+
+        client.post("/distributions/auto-match")
+        assert db_session.query(models.DistributionTransaction).filter(
+            models.DistributionTransaction.distribution_id == dist.id).count() == 0
+

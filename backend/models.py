@@ -438,7 +438,8 @@ class DistributionTransaction(Base):
     distribution_id = Column(String, ForeignKey("distributions.id", ondelete="CASCADE"), primary_key=True)
     transaction_id = Column(String, ForeignKey("transactions.id", ondelete="CASCADE"), primary_key=True)
     created_at = Column(DateTime, default=datetime.now)
-    
+    link_source = Column(String, nullable=True)  # 'auto' = auto-matched/auto-linked, None = manual
+
     # Relationships
     distribution = relationship("Distribution", backref="linked_transactions")
     transaction = relationship("Transaction", backref="distribution_links")

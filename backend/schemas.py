@@ -260,6 +260,9 @@ class Transaction(TransactionBase):
     merchant_info: Optional[Merchant] = None
     beneficiary_info: Optional[Beneficiary] = None
     biller_info: Optional[Biller] = None
+    # How this transaction was linked to its parent (payment/distribution):
+    # 'auto' = auto-matched, None = manual. Response-only; set by link endpoints.
+    link_source: Optional[str] = None
 
     class Config:
         from_attributes = True
