@@ -27,6 +27,15 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
     const [loadingSuggestions, setLoadingSuggestions] = useState(false);
     const [linkedTransactionIds, setLinkedTransactionIds] = useState([]); // Already linked tx IDs
 
+    // Configurable payday (salary-cycle start day); 25 until settings load.
+    const [cycleStartDay, setCycleStartDay] = useState(25);
+    useEffect(() => {
+        api.get(`${API_URL}/settings`).then(res => {
+            const v = parseInt(res.data?.cycle_start_day?.value);
+            if (v >= 1 && v <= 28) setCycleStartDay(v);
+        }).catch(() => {});
+    }, []);
+
     // Transaction Detail Modal State
     const [showTransactionDetail, setShowTransactionDetail] = useState(false);
     const [selectedTransaction, setSelectedTransaction] = useState(null);
@@ -340,7 +349,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
             // to the 24th of the next calendar month, so a bill paid early next month
             // still belongs here. Search that whole cycle (+ any billing_offset_months
             // arrears). Matches crud.cycle_window on the backend.
-            const CYCLE_START = 25;
+            const CYCLE_START = cycleStartDay;
             const off = parseInt(obl.billing_offset_months) || 0;
             const base = new Date(y, (m - 1) + off, 1);
             startDate = iso(new Date(base.getFullYear(), base.getMonth(), CYCLE_START));
@@ -353,7 +362,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
             search: obl.match_text || '',
             startDate, endDate,
         };
-    }, [linkingPayment, obligations]);
+    }, [linkingPayment, obligations, cycleStartDay]);
 
     const handleUnlinkTransaction = async (paymentId) => {
         if (!(await confirm({ title: 'Unlink Transaction', message: 'Remove the link to this transaction?', variant: 'danger', confirmText: 'Remove' }))) return;
@@ -765,7 +774,7 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
                                                         // selected month, a day < 25 falls in the NEXT calendar month
                                                         // (e.g. in the October cycle, day 4 is Nov 4). billing_offset_months
                                                         // shifts the base cycle for bills paid a further month late.
-                                                        const CYCLE_START = 25;
+                                                        const CYCLE_START = cycleStartDay;
                                                         const off = oblForRow.billing_offset_months || 0;
                                                         const baseY = Number(mmMatch[1]), baseMo = Number(mmMatch[2]) - 1 + off;
                                                         const cycleDate = (day) => new Date(baseY, baseMo + (day >= CYCLE_START ? 0 : 1), day);

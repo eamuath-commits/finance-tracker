@@ -326,6 +326,20 @@ class TestSalaryCycle:
         s2, e2 = crud.cycle_window(2026, 10, offset=1)             # + arrears
         assert (s2.month, s2.day) == (11, 25)
 
+    def test_cycle_window_honors_configured_payday(self, client, db_session):
+        """get_cycle_start_day reads the 'cycle_start_day' setting (clamped 1..28),
+        and cycle_window uses it to move the whole window. Uses the upsert endpoint
+        so it's independent of whatever the default seed left."""
+        import crud
+        client.put("/settings/cycle_start_day", json={"value": "10"})
+        assert crud.get_cycle_start_day(db_session) == 10
+        s, e = crud.cycle_window(2026, 10, start=crud.get_cycle_start_day(db_session))
+        assert (s.month, s.day) == (10, 10)
+        assert (e.month, e.day) == (11, 9)
+        # Out-of-range values are clamped, never crash cycle_window.
+        client.put("/settings/cycle_start_day", json={"value": "99"})
+        assert crud.get_cycle_start_day(db_session) == 28
+
 
 class TestMatchHints:
     """_passes_match_hints: a text hint (bill number / name) is authoritative — it

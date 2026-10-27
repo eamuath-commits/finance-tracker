@@ -1942,6 +1942,21 @@ def cycle_window(year: int, month: int, offset: int = 0, start: int = CYCLE_STAR
     return s, e
 
 
+def get_cycle_start_day(db: Session) -> int:
+    """The configured payday / salary-cycle start day (the 'cycle_start_day'
+    setting), clamped to 1..28 so cycle_window never overflows a short month.
+    Falls back to CYCLE_START_DAY (25) when unset or invalid. Settings are global
+    in this app, so this is a single key lookup."""
+    try:
+        row = db.query(models.UserSettings).filter(
+            models.UserSettings.key == "cycle_start_day").first()
+        if row and row.value:
+            return max(1, min(28, int(float(row.value))))
+    except Exception:
+        pass
+    return CYCLE_START_DAY
+
+
 def obligation_expected_amounts(db: Session, user_id: str, month_str: str, now=None, months_back: int = 6):
     """Single source of truth for 'what does each obligation cost in month M', used
     by BOTH the forecast and the allocation planner so the two never disagree.
@@ -2389,7 +2404,7 @@ def get_distribution_matches(db: Session, distribution_id: str):
     # Date range = the SALARY CYCLE for this month (25th → 24th), same as payments.
     try:
         year, month = distribution.billing_month.split('-')[:2]
-        s, e = cycle_window(int(year), int(month))
+        s, e = cycle_window(int(year), int(month), start=get_cycle_start_day(db))
         start_date = datetime(s.year, s.month, s.day)
         end_date = datetime(e.year, e.month, e.day, 23, 59, 59)
     except Exception:

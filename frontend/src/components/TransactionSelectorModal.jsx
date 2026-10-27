@@ -30,6 +30,9 @@ export default function TransactionSelectorModal({
     const [expandedSms, setExpandedSms] = useState(null);
     const seedFilters = () => ({
         accountId: defaultFilters.accountId || '',
+        // ANY-of account scope (e.g. a distribution's source + destination). Used
+        // when no single accountId is chosen; a dropdown pick overrides it.
+        accountIds: defaultFilters.accountIds || null,
         minAmount: defaultFilters.minAmount || '',
         maxAmount: defaultFilters.maxAmount || '',
         startDate: defaultFilters.startDate || '',
@@ -63,7 +66,7 @@ export default function TransactionSelectorModal({
             // Pre-filter to the payment (account/debits/text, around its billing
             // month) so the right transaction is already narrowed down.
             setFilters(seedFilters());
-            if (defaultFilters.startDate || defaultFilters.type || defaultFilters.minAmount || defaultFilters.accountId) {
+            if (defaultFilters.startDate || defaultFilters.type || defaultFilters.minAmount || defaultFilters.accountId || defaultFilters.accountIds) {
                 setShowFilters(true);
             }
         }
@@ -74,6 +77,7 @@ export default function TransactionSelectorModal({
         const params = new URLSearchParams();
         if (searchQuery) params.set('query', searchQuery);
         if (filters.accountId) params.set('account_id', filters.accountId);
+        else if (filters.accountIds && filters.accountIds.length) params.set('account_ids', filters.accountIds.join(','));
         if (filters.minAmount) params.set('min_amount', filters.minAmount);
         if (filters.maxAmount) params.set('max_amount', filters.maxAmount);
         if (filters.startDate) params.set('start_date', filters.startDate);

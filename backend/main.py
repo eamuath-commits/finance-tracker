@@ -1724,6 +1724,7 @@ def auto_match_obligations(db: Session = Depends(get_db), current_user: models.U
 
     logger = logging.getLogger("auto_match")
     now = datetime.now()
+    csd = crud.get_cycle_start_day(db)  # configurable payday (cycle start)
 
     # Target current month and previous month
     target_months = []
@@ -1796,7 +1797,7 @@ def auto_match_obligations(db: Session = Depends(get_db), current_user: models.U
             # through the 24th of the next), + any billing_offset_months arrears —
             # so a bill paid early next month still matches its cycle month.
             try:
-                sd, ed = crud.cycle_window(year, month, obl.billing_offset_months or 0)
+                sd, ed = crud.cycle_window(year, month, obl.billing_offset_months or 0, start=csd)
             except ValueError:
                 skipped.append({"name": obl.name, "month": bm_prefix, "reason": "invalid_date"})
                 continue
@@ -1852,8 +1853,8 @@ def auto_match_obligations(db: Session = Depends(get_db), current_user: models.U
                         score += 10
                 if tx.timestamp:
                     # Rank by closeness to the due day placed inside the cycle.
-                    dd = min(obl.due_day or crud.CYCLE_START_DAY, 28)
-                    anchor = sd if dd >= crud.CYCLE_START_DAY else ed
+                    dd = min(obl.due_day or csd, 28)
+                    anchor = sd if dd >= csd else ed
                     due_rank = datetime(anchor.year, anchor.month, dd)
                     score += max(0, 5 - abs((tx.timestamp - due_rank).days))
 
@@ -4696,7 +4697,7 @@ def auto_match_distributions(db: Session = Depends(get_db), current_user: models
 
         try:
             yr, mo = d.billing_month.split('-')[:2]
-            sd, ed = crud.cycle_window(int(yr), int(mo))
+            sd, ed = crud.cycle_window(int(yr), int(mo), start=crud.get_cycle_start_day(db))
         except Exception:
             skipped.append({"distribution_id": d.id, "month": d.billing_month, "reason": "invalid_month"})
             continue
@@ -4770,12 +4771,12 @@ def get_distribution_suggested_transactions(distribution_id: str, db: Session = 
 
     try:
         yr, mo = d.billing_month.split('-')[:2]
-        sd, ed = crud.cycle_window(int(yr), int(mo))
+        sd, ed = crud.cycle_window(int(yr), int(mo), start=crud.get_cycle_start_day(db))
     except Exception:
         return []
     start_date = datetime(sd.year, sd.month, sd.day)
     end_date = datetime(ed.year, ed.month, ed.day, 23, 59, 59)
-    anchor = datetime(sd.year, sd.month, sd.day)  # payday (25th)
+    anchor = datetime(sd.year, sd.month, sd.day)  # payday (cycle start)
 
     # Transactions already linked to a DIFFERENT distribution (junction + legacy).
     linked_other = set()
@@ -5078,6 +5079,7 @@ def unlink_transaction_from_distribution(distribution_id: str, transaction_id: s
 def search_transactions(
     query: Optional[str] = None,
     account_id: Optional[str] = None,
+    account_ids: Optional[str] = None,  # comma-separated; matches ANY (e.g. a distribution's source + destination)
     category: Optional[str] = None,
     min_amount: Optional[float] = None,
     max_amount: Optional[float] = None,
@@ -5120,9 +5122,15 @@ def search_transactions(
         q = q.filter(or_(*conditions))
 
     
-    if account_id:
+    # account_ids (ANY-of) takes precedence over a single account_id, so a
+    # distribution can scope the picker to its source AND destination accounts.
+    if account_ids:
+        ids = [a for a in (account_ids.split(",")) if a]
+        if ids:
+            q = q.filter(models.Transaction.account_id.in_(ids))
+    elif account_id:
         q = q.filter(models.Transaction.account_id == account_id)
-    
+
     if category:
         q = q.filter(models.Transaction.category == category)
     
@@ -5221,6 +5229,12 @@ def seed_default_settings():
             db.add(models.UserSettings(key="period_start_day", value="1", label=""))
             db.commit()
             logger.info("Seeded default setting: period_start_day=1")
+        # Payday / salary-cycle start day (the 25th by default) — drives every
+        # cycle_window date range (auto-match, suggestions, distribution matching).
+        if not db.query(models.UserSettings).filter(models.UserSettings.key == "cycle_start_day").first():
+            db.add(models.UserSettings(key="cycle_start_day", value=str(crud.CYCLE_START_DAY), label="Payday (cycle start day)"))
+            db.commit()
+            logger.info(f"Seeded default setting: cycle_start_day={crud.CYCLE_START_DAY}")
     except Exception as e:
         logger.error(f"Error seeding settings: {e}")
         db.rollback()

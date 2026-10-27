@@ -38,6 +38,9 @@ const Distributions = ({ accounts }) => {
     const [autoMatching, setAutoMatching] = useState(false);
     const [autoMatchResult, setAutoMatchResult] = useState(null);
 
+    // Configurable payday (salary-cycle start day); 25 until settings load.
+    const [cycleStartDay, setCycleStartDay] = useState(25);
+
     // Transaction Detail Modal State
     const [showTransactionDetail, setShowTransactionDetail] = useState(false);
     const [selectedTransaction, setSelectedTransaction] = useState(null);
@@ -47,6 +50,10 @@ const Distributions = ({ accounts }) => {
 
     useEffect(() => {
         fetchTransfers();
+        api.get(`${API_URL}/settings`).then(res => {
+            const v = parseInt(res.data?.cycle_start_day?.value);
+            if (v >= 1 && v <= 28) setCycleStartDay(v);
+        }).catch(() => {});
     }, []);
 
     const fetchTransfers = async () => {
@@ -1004,9 +1011,10 @@ const Distributions = ({ accounts }) => {
                 currentLinked={linkedTransactionIds}
                 title={`Link Transactions to ${linkingTransfer?.target_account_name || 'Distribution'}`}
                 filters={(() => {
-                    // Scope suggestions to the salary cycle (25th → 24th) of this
-                    // distribution's month, same as the payment link window.
-                    const CYCLE_START = 25;
+                    // Scope the picker to this distribution's salary cycle (payday →
+                    // the day before next payday) AND to the envelope's configured
+                    // source + destination accounts, same window as the payment link.
+                    const CYCLE_START = cycleStartDay;
                     const bm = (linkingTransfer?.billing_month || '').match(/^(\d{4})-(\d{2})/);
                     let startDate = '', endDate = '';
                     if (bm) {
@@ -1015,7 +1023,8 @@ const Distributions = ({ accounts }) => {
                         startDate = iso(new Date(y, m, CYCLE_START));
                         endDate = iso(new Date(y, m + 1, CYCLE_START - 1));
                     }
-                    return { accountId: linkingTransfer?.source_account_id || '', startDate, endDate };
+                    const accountIds = [linkingTransfer?.source_account_id, linkingTransfer?.target_account_id].filter(Boolean);
+                    return { accountIds, startDate, endDate };
                 })()}
                 expectedAmount={linkingTransfer?.amount || null}
             />

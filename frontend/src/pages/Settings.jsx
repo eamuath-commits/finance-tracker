@@ -12,6 +12,11 @@ const Settings = () => {
     const [saved, setSaved] = useState(false);
     const [loading, setLoading] = useState(true);
 
+    // Salary-cycle payday (drives obligation + distribution matching windows)
+    const [cycleStartDay, setCycleStartDay] = useState('25');
+    const [cycleSaving, setCycleSaving] = useState(false);
+    const [cycleSaved, setCycleSaved] = useState(false);
+
     // Bank connection state
     const [bankStatus, setBankStatus] = useState(null);
     const [bankLoading, setBankLoading] = useState(true);
@@ -30,6 +35,8 @@ const Settings = () => {
                     setPeriodStartDay(psd.value || '1');
                     setPeriodLabel(psd.label || '');
                 }
+                const csd = res.data?.cycle_start_day;
+                if (csd) setCycleStartDay(csd.value || '25');
             } catch (e) {
                 console.error('Failed to load settings', e);
             } finally {
@@ -79,6 +86,23 @@ const Settings = () => {
             alert('Failed to save settings');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleSaveCycle = async () => {
+        setCycleSaving(true);
+        setCycleSaved(false);
+        try {
+            await api.put(`${API_URL}/settings/cycle_start_day`, {
+                value: String(Math.min(28, Math.max(1, parseInt(cycleStartDay) || 25))),
+                label: 'Payday (cycle start day)',
+            });
+            setCycleSaved(true);
+            setTimeout(() => setCycleSaved(false), 3000);
+        } catch (e) {
+            alert('Failed to save payday');
+        } finally {
+            setCycleSaving(false);
         }
     };
 
@@ -361,6 +385,74 @@ const Settings = () => {
                             </p>
                         </div>
                     )}
+                </div>
+            </div>
+
+            {/* ====== SALARY CYCLE (PAYDAY) SECTION ====== */}
+            <div className="bg-slate-900/70 backdrop-blur-sm border border-slate-700/50 rounded-2xl overflow-hidden shadow-lg mb-6">
+                <div className="px-6 py-4 border-b border-slate-700/40 bg-slate-800/40">
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-purple-600/20 flex items-center justify-center">
+                            <Calendar size={16} className="text-purple-400" />
+                        </div>
+                        <div>
+                            <h2 className="text-white font-semibold text-sm">Salary Cycle (Payday)</h2>
+                            <p className="text-slate-500 text-xs">The day your salary arrives — starts each obligation cycle</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="p-6 space-y-6">
+                    <div>
+                        <label className="flex items-center gap-2 text-xs text-slate-400 uppercase tracking-wider font-bold mb-2">
+                            <Calendar size={12} />
+                            Payday
+                        </label>
+                        <p className="text-slate-500 text-xs mb-3">
+                            Bills and distributions are matched within the salary cycle that starts on this day and
+                            runs to the day before the next payday. Drives the Payments and Distributions matching windows.
+                        </p>
+                        <div className="flex items-center gap-3">
+                            <input
+                                type="number"
+                                min="1"
+                                max="28"
+                                value={cycleStartDay}
+                                onChange={(e) => setCycleStartDay(e.target.value)}
+                                className="w-24 bg-slate-800 border border-slate-600 rounded-xl px-4 py-2.5 text-white text-center text-lg font-bold font-mono outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition"
+                            />
+                            <span className="text-slate-500 text-sm">of each month</span>
+                        </div>
+
+                        <div className="mt-4 bg-slate-800/60 border border-slate-700/40 rounded-xl px-4 py-3">
+                            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-1">Example: "October" cycle</p>
+                            <p className="text-purple-300 text-sm font-mono font-medium">
+                                {(() => {
+                                    const d = Math.min(28, Math.max(1, parseInt(cycleStartDay) || 25));
+                                    return `Oct ${d} → Nov ${d - 1 || 30}`;
+                                })()}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="px-6 py-4 border-t border-slate-700/40 bg-slate-800/30 flex items-center justify-between">
+                    <div>
+                        {cycleSaved && (
+                            <div className="flex items-center gap-1.5 text-emerald-400 text-sm animate-fade-in">
+                                <CheckCircle size={14} />
+                                <span className="font-medium">Payday saved</span>
+                            </div>
+                        )}
+                    </div>
+                    <button
+                        onClick={handleSaveCycle}
+                        disabled={cycleSaving}
+                        className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-600/50 text-white font-semibold text-sm px-5 py-2.5 rounded-xl shadow-lg shadow-purple-600/20 transition"
+                    >
+                        {cycleSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                        {cycleSaving ? 'Saving...' : 'Save Payday'}
+                    </button>
                 </div>
             </div>
 
