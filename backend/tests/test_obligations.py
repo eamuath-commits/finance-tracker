@@ -305,6 +305,28 @@ class TestAllocationExecute:
         assert abs((dists[0].amount or 0) - 1500.0) < 0.01     # summed the two obligations
 
 
+class TestSalaryCycle:
+    """The billing 'month' is a salary cycle starting on the 25th: a date on/after
+    the 25th keeps its month; before the 25th rolls back to the previous month."""
+
+    def test_cycle_month(self):
+        import crud
+        from datetime import date
+        assert crud.cycle_month(date(2026, 10, 26)) == "2026-10"   # after 25 -> same
+        assert crud.cycle_month(date(2026, 10, 25)) == "2026-10"   # on 25 -> same
+        assert crud.cycle_month(date(2026, 11, 3)) == "2026-10"    # before 25 -> prev
+        assert crud.cycle_month(date(2026, 10, 7)) == "2026-09"    # Oct 7 -> Sep cycle
+        assert crud.cycle_month(date(2026, 11, 25)) == "2026-11"
+
+    def test_cycle_window(self):
+        import crud
+        s, e = crud.cycle_window(2026, 10)                         # October cycle
+        assert (s.month, s.day) == (10, 25)
+        assert (e.month, e.day) == (11, 24)
+        s2, e2 = crud.cycle_window(2026, 10, offset=1)             # + arrears
+        assert (s2.month, s2.day) == (11, 25)
+
+
 class TestMatchHints:
     """_passes_match_hints: a text hint (bill number / name) is authoritative — it
     finds the paying transaction even when it lands outside the usual day window;

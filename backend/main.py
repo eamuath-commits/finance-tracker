@@ -1782,20 +1782,18 @@ def auto_match_obligations(db: Session = Depends(get_db), current_user: models.U
                 skipped.append({"name": obl.name, "month": bm_prefix, "reason": "no_expected_amount"})
                 continue
 
-            # Calculate due date and search window (±5 days)
-            due_day = obl.due_day or 1
-            last_day = calendar.monthrange(year, month)[1]
-            actual_due_day = min(due_day, last_day)
+            # Search window = the SALARY CYCLE for this month (25th of the month
+            # through the 24th of the next), + any billing_offset_months arrears —
+            # so a bill paid early next month still matches its cycle month.
             try:
-                due_date = datetime(year, month, actual_due_day)
+                sd, ed = crud.cycle_window(year, month, obl.billing_offset_months or 0)
             except ValueError:
                 skipped.append({"name": obl.name, "month": bm_prefix, "reason": "invalid_date"})
                 continue
+            start_date = datetime(sd.year, sd.month, sd.day)
+            end_date = datetime(ed.year, ed.month, ed.day, 23, 59, 59)
 
-            start_date = due_date - timedelta(days=5)
-            end_date = due_date + timedelta(days=5)
-
-            # Candidate debits in the ±5 day window. Amount is deliberately NOT a
+            # Candidate debits in the cycle window. Amount is deliberately NOT a
             # filter: a BUDGET is only an estimate of the last paid amount, so the
             # real transaction routinely differs (and exact float equality would
             # rarely match anyway).
@@ -1843,7 +1841,11 @@ def auto_match_obligations(db: Session = Depends(get_db), current_user: models.U
                     elif diff / expected_amount <= 0.1:
                         score += 10
                 if tx.timestamp:
-                    score += max(0, 5 - abs((tx.timestamp - due_date).days))
+                    # Rank by closeness to the due day placed inside the cycle.
+                    dd = min(obl.due_day or crud.CYCLE_START_DAY, 28)
+                    anchor = sd if dd >= crud.CYCLE_START_DAY else ed
+                    due_rank = datetime(anchor.year, anchor.month, dd)
+                    score += max(0, 5 - abs((tx.timestamp - due_rank).days))
 
                 if score > best_score:
                     best_score = score

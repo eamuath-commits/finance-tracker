@@ -336,24 +336,15 @@ const ObligationsPayments = ({ obligations, history, monthOffset, onEdit, onDele
         let startDate = '', endDate = '';
         if (mm) {
             const y = +mm[1], m = +mm[2];
-            // A bill paid in arrears posts billing_offset_months AFTER its service
-            // (billing) month, so anchor the window on the PAYMENT month — matching
-            // the backend suggestion window and the displayed due date. Without this
-            // the picker filtered the service month and missed the real transaction.
+            // The billing "month" is a SALARY CYCLE that starts on the 25th and runs
+            // to the 24th of the next calendar month, so a bill paid early next month
+            // still belongs here. Search that whole cycle (+ any billing_offset_months
+            // arrears). Matches crud.cycle_window on the backend.
+            const CYCLE_START = 25;
             const off = parseInt(obl.billing_offset_months) || 0;
-            const anchor = new Date(y, (m - 1) + off, 1);
-            const ay = anchor.getFullYear(), am = anchor.getMonth();
-            const lastDay = new Date(ay, am + 1, 0).getDate();
-            const df = parseInt(obl.match_day_from) || 0, dt = parseInt(obl.match_day_to) || 0;
-            if (df && dt && df <= dt) {
-                // Obligation's day window -> tight range inside the payment month.
-                startDate = iso(new Date(ay, am, Math.max(1, df - 2)));
-                endDate = iso(new Date(ay, am, Math.min(lastDay, dt + 2)));
-            } else {
-                const s = new Date(ay, am, 1); s.setDate(s.getDate() - 7);
-                const e = new Date(ay, am + 1, 0); e.setDate(e.getDate() + 20);
-                startDate = iso(s); endDate = iso(e);
-            }
+            const base = new Date(y, (m - 1) + off, 1);
+            startDate = iso(new Date(base.getFullYear(), base.getMonth(), CYCLE_START));
+            endDate = iso(new Date(base.getFullYear(), base.getMonth() + 1, CYCLE_START - 1));
         }
         // Obligation match-hints pre-applied: account + text (searched) + day window.
         return {

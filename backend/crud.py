@@ -1915,6 +1915,33 @@ def _is_status(p, name):
     return p.status == getattr(models.PaymentStatus, name, name) or p.status == name
 
 
+# A billing "month" is a SALARY CYCLE, not a calendar month: it starts on
+# CYCLE_START_DAY (payday, the 25th) and runs to the 24th of the next calendar
+# month. So a bill paid on Nov 3 belongs to the OCTOBER cycle (Oct 25 - Nov 24),
+# because it is paid from October's salary. Matching anchors on this, not 1st-end.
+CYCLE_START_DAY = 25
+
+
+def cycle_month(d, start: int = CYCLE_START_DAY) -> str:
+    """The salary-cycle month ('YYYY-MM') a date belongs to. Day >= start keeps the
+    date's own month; day < start rolls back to the previous month."""
+    from dateutil.relativedelta import relativedelta
+    return (d - relativedelta(days=start - 1)).strftime("%Y-%m")
+
+
+def cycle_window(year: int, month: int, offset: int = 0, start: int = CYCLE_START_DAY):
+    """(start_date, end_date) of the salary cycle for a given obligation month —
+    the range its paying transaction may fall in: the `start`-th of (month+offset)
+    through the (start-1)-th of the following calendar month. `offset` keeps the
+    existing billing_offset_months (further arrears) working on top of the cycle."""
+    from datetime import date
+    from dateutil.relativedelta import relativedelta
+    base = date(year, month, 1) + relativedelta(months=offset)
+    s = base.replace(day=start)
+    e = (base + relativedelta(months=1)).replace(day=start) - relativedelta(days=1)
+    return s, e
+
+
 def obligation_expected_amounts(db: Session, user_id: str, month_str: str, now=None, months_back: int = 6):
     """Single source of truth for 'what does each obligation cost in month M', used
     by BOTH the forecast and the allocation planner so the two never disagree.
